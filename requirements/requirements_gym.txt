@@ -1,0 +1,16 @@
+# Unified Gymnasium environment requirements (MuJoCo + Robotics)
+# Compatible with uv package manager
+# Install with: uv pip install -r requirements/requirements_gym.txt
+# Note: PyTorch packages will be installed from PyPI by default
+# For CUDA support, install PyTorch separately: uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+
+gymnasium
+gymnasium-robotics
+mujoco>=2.4.0
+numpy
+torch
+torchvision
+torchaudio
+stable-baselines3
+loguru
+tqdm 
