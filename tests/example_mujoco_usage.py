@@ -25,7 +25,7 @@ def main():
     
     # Example 1: Single environment
     print("Example 1: Single environment")
-    env = GymMuJoCoEnv("HalfCheetah-v4", num_envs=1)
+    env = GymMuJoCoEnv("HalfCheetah-v5", num_envs=1)
     
     # Reset the environment
     observations = env.reset()
@@ -44,7 +44,7 @@ def main():
     
     # Example 2: Multiple environments
     print("Example 2: Multiple environments")
-    env = GymMuJoCoEnv("Hopper-v4", num_envs=4)
+    env = GymMuJoCoEnv("Hopper-v5", num_envs=4)
     
     observations = env.reset()
     print(f"Initial observations shape: {observations.shape}")
@@ -54,15 +54,15 @@ def main():
         actions = torch.randn(4, env.num_actions)
         observations, rewards, dones, infos = env.step(actions)
         print(f"Step {step + 1}:")
-        print(f"  Rewards: {rewards.numpy()}")
-        print(f"  Dones: {dones.numpy()}")
+        print(f"  Rewards: {rewards.cpu().numpy()}")
+        print(f"  Dones: {dones.cpu().numpy()}")
     
     env.close()
     print()
     
     # Example 3: Different environment
     print("Example 3: Walker2d environment")
-    env = GymMuJoCoEnv("Walker2d-v4", num_envs=2)
+    env = GymMuJoCoEnv("Walker2d-v5", num_envs=2)
     
     observations = env.reset()
     print(f"Walker2d observations shape: {observations.shape}")
@@ -73,7 +73,7 @@ def main():
     for step in range(3):
         actions = torch.randn(2, env.num_actions)
         observations, rewards, dones, infos = env.step(actions)
-        print(f"Step {step + 1}: Rewards = {rewards.numpy()}")
+        print(f"Step {step + 1}: Rewards = {rewards.cpu().numpy()}")
     
     env.close()
     print("All examples completed successfully!")

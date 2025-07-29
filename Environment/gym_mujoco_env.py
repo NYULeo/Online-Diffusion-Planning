@@ -14,9 +14,9 @@ log.add(lambda msg: False, level="CRITICAL")
 
 def make_env(env_name, rank, render_mode=None, seed=0):
     """
-    Utility function for multiprocessed env.
-
-    :param env_name: (str) name of the MuJoCo environment
+    Create a function that returns an environment.
+    
+    :param env_name: (str) name of the environment
     :param rank: (int) index of the subprocess
     :param render_mode: (str) rendering mode
     :param seed: (int) the initial seed for RNG
@@ -24,7 +24,8 @@ def make_env(env_name, rank, render_mode=None, seed=0):
     def _init():
         env = gym.make(env_name, render_mode=render_mode)
         env = TimeLimit(env, max_episode_steps=1000)
-        env.unwrapped.seed(seed + rank)
+        # Use reset with seed instead of deprecated seed method
+        env.reset(seed=seed + rank)
         return env
 
     return _init
@@ -53,9 +54,9 @@ class GymMuJoCoEnv:
         )
 
         # Set episode length based on environment
-        if env_name in ["HalfCheetah-v4", "Hopper-v4", "Walker2d-v4"]:
+        if env_name in [ "HalfCheetah-v5", "Hopper-v5", "Walker2d-v5"]:
             self.max_episode_steps = 1000
-        elif env_name in ["Ant-v4", "Humanoid-v4"]:
+        elif env_name in ["Ant-v5", "Humanoid-v5"]:
             self.max_episode_steps = 1000
         else:
             self.max_episode_steps = 1000
@@ -126,17 +127,15 @@ class GymMuJoCoEnv:
 def get_available_mujoco_envs():
     """Get list of available MuJoCo environments."""
     return [
-        "HalfCheetah-v4",
-        "Hopper-v4", 
-        "Walker2d-v4",
-        "Ant-v4",
-        "Humanoid-v4",
-        "Swimmer-v4",
-        "InvertedPendulum-v4",
-        "InvertedDoublePendulum-v4",
-        "Reacher-v4",
-        "Pusher-v4",
-        "Thrower-v4",
-        "Striker-v4",
-        "HumanoidStandup-v4"
+        "HalfCheetah-v5",
+        "Hopper-v5",
+        "Walker2d-v5",
+        "Ant-v5",
+        "Humanoid-v5",
+        "Swimmer-v5",
+        "InvertedPendulum-v5",
+        "InvertedDoublePendulum-v5",
+        "Reacher-v5",
+        "Pusher-v5",
+        "HumanoidStandup-v5"
     ]

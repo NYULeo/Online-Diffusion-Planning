@@ -4,13 +4,14 @@
 # Note: PyTorch packages will be installed from PyPI by default
 # For CUDA support, install PyTorch separately: uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
-gymnasium
-gymnasium-robotics
+gymnasium[mujoco]<1.0.0
+gymnasium-robotics>=1.1.0
 mujoco>=2.4.0
-numpy
-torch
-torchvision
-torchaudio
+numpy<2.0
+torch==2.6.0
+torchvision==0.21.0
+torchaudio==2.6.0
 stable-baselines3
 loguru
-tqdm 
+tqdm
+pytest 

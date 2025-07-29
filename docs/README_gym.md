@@ -5,10 +5,10 @@ Unified wrapper for [Gymnasium](https://github.com/Farama-Foundation/Gymnasium) 
 ## Available Environments
 
 ### MuJoCo Environments
-- `HalfCheetah-v4`, `Hopper-v4`, `Walker2d-v4`
-- `Ant-v4`, `Humanoid-v4`, `Swimmer-v4`
-- `InvertedPendulum-v4`, `InvertedDoublePendulum-v4`
-- `Reacher-v4`, `Pusher-v4`, `Thrower-v4`, `Striker-v4`
+- `HalfCheetah-v5`, `Hopper-v5`, `Walker2d-v5`
+- `Ant-v5`, `Humanoid-v5`, `Swimmer-v5`
+- `InvertedPendulum-v5`, `InvertedDoublePendulum-v5`
+- `Reacher-v5`, `Pusher-v5`
 
 ### Robotics Environments
 
@@ -118,13 +118,11 @@ The wrapper automatically flattens these into a single tensor.
 ## Testing
 
 ```bash
-# Run unified tests
-pytest tests/test_gym_envs.py
-
 # Run individual tests
-pytest tests/test_gym_mujoco_env.py
-pytest tests/test_gym_robotics_env.py
+python -m pytest tests/test_gym_mujoco_env.py -v
+python -m pytest tests/test_gym_robotics_env.py -v
 
 # Run examples
-python tests/example_gym_usage.py
+python tests/example_mujoco_usage.py
+python tests/example_robotics_usage.py
 ``` 
