@@ -18,12 +18,14 @@ The **Training SDE** method implements a diffusion process with the following co
 ---
 
 #### Forward Process (Noise Addition)
+
+**Mathematical Formulation:**
 The forward process gradually adds noise to expert trajectories:
 
 ```
-dxₜ
-─── = f(xₜ, t) + g(t) · εₜ
-dt
+                dxₜ
+                ─── = f(xₜ, t) + g(t) · εₜ
+                dt
 ```
 
 **Parameters:**
@@ -35,10 +37,12 @@ dt
 > **Note:** This process gradually transforms clean trajectories into pure noise over time.
 
 #### Cosine Noise Schedule
+
+**Mathematical Formulation:**
 We use a cosine noise schedule for optimal performance:
 
 ```
-β(t) = 1 - (1 - β₀) cos(πt/2T)
+                β(t) = 1 - (1 - β₀) cos(πt/2T)
 ```
 
 **Parameters:**
@@ -47,21 +51,25 @@ We use a cosine noise schedule for optimal performance:
 - **t ∈ [0, T]** is the current timestep
 
 #### Reverse Process (Denoising)
+
+**Mathematical Formulation:**
 The model learns to reverse the noise addition:
 
 ```
-dxₜ
-─── = f(xₜ, t) - ½g²(t) ∇ₓₜ log pₜ(xₜ)
-dt
+                dxₜ
+                ─── = f(xₜ, t) - ½g²(t) ∇ₓₜ log pₜ(xₜ)
+                dt
 ```
 
 > **Note:** This process learns to denoise trajectories by predicting the score function.
 
 #### Loss Function
+
+**Mathematical Formulation:**
 We use Denoising Score Matching (DSM) with sigma2 weighting:
 
 ```
-L = E[t,x₀,ε] [σ²(t) ||ε - εθ(xₜ, t)||²]
+                L = E[t,x₀,ε] [σ²(t) ||ε - εθ(xₜ, t)||²]
 ```
 
 **Components:**
