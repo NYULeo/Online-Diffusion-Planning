@@ -15,23 +15,33 @@ This code trains diffusion models for HumanoidBench tasks using the **Training S
 
 The **Training SDE** method implements a diffusion process with the following components:
 
+---
+
 #### Forward Process (Noise Addition)
 The forward process gradually adds noise to expert trajectories:
 
-**dxₜ/dt = f(xₜ, t) + g(t) · εₜ**
+```
+dxₜ
+─── = f(xₜ, t) + g(t) · εₜ
+dt
+```
 
-where:
+**Parameters:**
 - **xₜ** is the trajectory at time **t**
-- **f(xₜ, t)** is the drift term
+- **f(xₜ, t)** is the drift term  
 - **g(t)** is the diffusion coefficient
 - **εₜ ~ N(0, I)** is Gaussian noise
+
+> **Note:** This process gradually transforms clean trajectories into pure noise over time.
 
 #### Cosine Noise Schedule
 We use a cosine noise schedule for optimal performance:
 
-**β(t) = 1 - (1 - β₀) cos(πt/2T)**
+```
+β(t) = 1 - (1 - β₀) cos(πt/2T)
+```
 
-where:
+**Parameters:**
 - **β₀ = 0.008** (optimal parameter from DDPM research)
 - **T** is the total number of diffusion steps
 - **t ∈ [0, T]** is the current timestep
@@ -39,17 +49,29 @@ where:
 #### Reverse Process (Denoising)
 The model learns to reverse the noise addition:
 
-**dxₜ/dt = f(xₜ, t) - ½g²(t) ∇ₓₜ log pₜ(xₜ)**
+```
+dxₜ
+─── = f(xₜ, t) - ½g²(t) ∇ₓₜ log pₜ(xₜ)
+dt
+```
+
+> **Note:** This process learns to denoise trajectories by predicting the score function.
 
 #### Loss Function
 We use Denoising Score Matching (DSM) with sigma2 weighting:
 
-**L = E[t,x₀,ε] [σ²(t) ||ε - εθ(xₜ, t)||²]**
+```
+L = E[t,x₀,ε] [σ²(t) ||ε - εθ(xₜ, t)||²]
+```
 
-where:
+**Components:**
 - **εθ** is the noise prediction network
 - **σ²(t)** is the sigma2 weighting scheme
 - **ε** is the ground truth noise
+
+> **Note:** The sigma2 weighting scheme provides better convergence than beta weighting for trajectory planning.
+
+---
 
 ## 🌍 Environment and Dataset
 
