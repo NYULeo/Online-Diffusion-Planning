@@ -18,38 +18,38 @@ The **Training SDE** method implements a diffusion process with the following co
 #### Forward Process (Noise Addition)
 The forward process gradually adds noise to expert trajectories:
 
-$$\frac{dx_t}{dt} = f(x_t, t) + g(t) \cdot \epsilon_t$$
+**dxₜ/dt = f(xₜ, t) + g(t) · εₜ**
 
 where:
-- $x_t$ is the trajectory at time $t$
-- $f(x_t, t)$ is the drift term
-- $g(t)$ is the diffusion coefficient
-- $\epsilon_t \sim \mathcal{N}(0, I)$ is Gaussian noise
+- **xₜ** is the trajectory at time **t**
+- **f(xₜ, t)** is the drift term
+- **g(t)** is the diffusion coefficient
+- **εₜ ~ N(0, I)** is Gaussian noise
 
 #### Cosine Noise Schedule
 We use a cosine noise schedule for optimal performance:
 
-$$\beta(t) = 1 - (1 - \beta_0) \cos\left(\frac{\pi t}{2T}\right)$$
+**β(t) = 1 - (1 - β₀) cos(πt/2T)**
 
 where:
-- $\beta_0 = 0.008$ (optimal parameter from DDPM research)
-- $T$ is the total number of diffusion steps
-- $t \in [0, T]$ is the current timestep
+- **β₀ = 0.008** (optimal parameter from DDPM research)
+- **T** is the total number of diffusion steps
+- **t ∈ [0, T]** is the current timestep
 
 #### Reverse Process (Denoising)
 The model learns to reverse the noise addition:
 
-$$\frac{dx_t}{dt} = f(x_t, t) - \frac{1}{2}g^2(t) \nabla_{x_t} \log p_t(x_t)$$
+**dxₜ/dt = f(xₜ, t) - ½g²(t) ∇ₓₜ log pₜ(xₜ)**
 
 #### Loss Function
 We use Denoising Score Matching (DSM) with sigma2 weighting:
 
-$$\mathcal{L} = \mathbb{E}_{t,x_0,\epsilon} \left[ \sigma^2(t) \left\| \epsilon - \epsilon_\theta(x_t, t) \right\|^2 \right]$$
+**L = E[t,x₀,ε] [σ²(t) ||ε - εθ(xₜ, t)||²]**
 
 where:
-- $\epsilon_\theta$ is the noise prediction network
-- $\sigma^2(t)$ is the sigma2 weighting scheme
-- $\epsilon$ is the ground truth noise
+- **εθ** is the noise prediction network
+- **σ²(t)** is the sigma2 weighting scheme
+- **ε** is the ground truth noise
 
 ## 🌍 Environment and Dataset
 
