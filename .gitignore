@@ -115,3 +115,8 @@ checkpoints/
 # Logs
 *.log
 logs/
+
+# Backup files
+*_backup.*
+*.backup
+*.bak
