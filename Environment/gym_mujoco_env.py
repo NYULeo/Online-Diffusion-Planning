@@ -54,9 +54,9 @@ class GymMuJoCoEnv:
         )
 
         # Set episode length based on environment
-        if env_name in [ "HalfCheetah-v5", "Hopper-v5", "Walker2d-v5"]:
+        if env_name in [ "HalfCheetah-v4", "Hopper-v4", "Walker2d-v4"]:
             self.max_episode_steps = 1000
-        elif env_name in ["Ant-v5", "Humanoid-v5"]:
+        elif env_name in ["Ant-v4", "Humanoid-v4"]:
             self.max_episode_steps = 1000
         else:
             self.max_episode_steps = 1000
@@ -127,15 +127,15 @@ class GymMuJoCoEnv:
 def get_available_mujoco_envs():
     """Get list of available MuJoCo environments."""
     return [
-        "HalfCheetah-v5",
-        "Hopper-v5",
-        "Walker2d-v5",
-        "Ant-v5",
-        "Humanoid-v5",
-        "Swimmer-v5",
-        "InvertedPendulum-v5",
-        "InvertedDoublePendulum-v5",
-        "Reacher-v5",
-        "Pusher-v5",
-        "HumanoidStandup-v5"
+        "HalfCheetah-v4",
+        "Hopper-v4",
+        "Walker2d-v4",
+        "Ant-v4",
+        "Humanoid-v4",
+        "Swimmer-v4",
+        "InvertedPendulum-v4",
+        "InvertedDoublePendulum-v4",
+        "Reacher-v4",
+        "Pusher-v4",
+        "HumanoidStandup-v4"
     ]

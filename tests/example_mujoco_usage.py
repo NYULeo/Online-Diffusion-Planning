@@ -25,7 +25,7 @@ def main():
     
     # Example 1: Single environment
     print("Example 1: Single environment")
-    env = GymMuJoCoEnv("HalfCheetah-v5", num_envs=1)
+    env = GymMuJoCoEnv("HalfCheetah-v4", num_envs=1)
     
     # Reset the environment
     observations = env.reset()
@@ -44,7 +44,7 @@ def main():
     
     # Example 2: Multiple environments
     print("Example 2: Multiple environments")
-    env = GymMuJoCoEnv("Hopper-v5", num_envs=4)
+    env = GymMuJoCoEnv("Hopper-v4", num_envs=4)
     
     observations = env.reset()
     print(f"Initial observations shape: {observations.shape}")
@@ -62,7 +62,7 @@ def main():
     
     # Example 3: Different environment
     print("Example 3: Walker2d environment")
-    env = GymMuJoCoEnv("Walker2d-v5", num_envs=2)
+    env = GymMuJoCoEnv("Walker2d-v4", num_envs=2)
     
     observations = env.reset()
     print(f"Walker2d observations shape: {observations.shape}")
