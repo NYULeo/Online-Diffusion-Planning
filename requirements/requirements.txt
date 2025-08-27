@@ -14,6 +14,8 @@ tensordict==0.7.2
 tyro
 loguru
 huggingface_hub  # Optional: for downloading datasets from Hugging Face Hub
+gymnasium-robotics>=1.4.0  # Official Franka Kitchen environment
+
 torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
