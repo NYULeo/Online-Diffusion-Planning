@@ -4,7 +4,8 @@ import torch.nn.functional as F
 import numpy as np
 import math
 from typing import Optional
-
+import random
+import os
 
 def compute_log_prob(model, s, a, s_next, device="cpu"):
    
@@ -32,3 +33,28 @@ def total_pro(traj, model):
             prob += compute_log_prob(model, s, a, s_next)
             count += 1
     return (prob / count)
+
+def set_seed(seed=42):
+    """
+    Set all random seeds for reproducible results.
+    
+    Args:
+        seed (int): Random seed value
+    """
+    # Python random
+    random.seed(seed)
+    
+    # NumPy random
+    np.random.seed(seed)
+    
+    # PyTorch random
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # if using multiple GPUs
+    
+    # PyTorch deterministic algorithms
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    
+    # Set environment variable for additional reproducibility
+    os.environ['PYTHONHASHSEED'] = str(seed)

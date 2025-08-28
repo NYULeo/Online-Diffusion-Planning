@@ -9,6 +9,7 @@ class TransitionKernel(nn.Module):
         hidden_dim = 256
         self.net = nn.Sequential(
             nn.Linear(obs_dim + act_dim, hidden_dim),
+            nn.BatchNorm1d(hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU()

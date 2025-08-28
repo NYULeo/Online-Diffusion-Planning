@@ -1,4 +1,4 @@
-from Dataset import KitchenDataset
+from Dataset import KitchenDataset, PointMazeDataset
 import random
 from torch.utils.data import Dataset, DataLoader
 from Critic import QNet
@@ -39,21 +39,29 @@ class CriticDataset(Dataset):
             torch.tensor(d, dtype=torch.float32)
         )
 
-def train_critic(
-    dataset_name: str,
-    specific_dataset: str,
-    batch_size=1024, 
-    epochs=20, 
-    gamma=0.99,
-    lr=3e-4,
-    tau = 0.005,
-    ):
+def train_critic(dataset_name: str, specific_dataset: str, batch_size, epochs, gamma, lr, tau):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device {device}")
     if(dataset_name == 'kitchen'):
-         data =  KitchenDataset(specific_dataset)
+         data = KitchenDataset(specific_dataset)
+         if(specific_dataset == 'complete'):
+              model_name = 'Kitchen_High_Critic.pkl'
+         elif(specific_dataset == 'partial'):
+              model_name = 'Kitchen_medium_Critic.pkl'
+         else:
+              model_name = 'Kitchen_Low_Critic.pkl'
+    elif(dataset_name == 'pointmaze'):
+         data = PointMazeDataset(specific_dataset)
+         if(specific_dataset == 'large'):
+              model_name = '2DMaze_Large_Critic.pkl'
+         elif(specific_dataset == 'medium'):
+              model_name = '2DMaze_medium_Critic.pkl'
+         else:
+              model_name = '2DMaze_nnmaze_Critic.pkl'
     else:
-         raise ValueError(f"Dataset {dataset_name} not found")
+         raise ValueError(f"Invalid Dataset Name: {dataset_name}")
+    
+    print(f"Training critic for {dataset_name}-{specific_dataset} Dataset")
     trajectories = data.get_trajectories()
     dataset = CriticDataset(trajectories)
     dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True)
@@ -97,15 +105,21 @@ def train_critic(
 
        if epoch % 10 == 0:
               print(f"Epoch {epoch+10}, loss {loss.item():.4f}")
+    
+    critic.eval()
+    torch.save(critic, model_name)
+    print(f"critic model save to {model_name}")
+
 
 if __name__ == '__main__':  # pragma: no cover
     random.seed(1)
     train_critic(
     dataset_name = 'kitchen', 
-    specific_dataset = 'mixed', 
+    specific_dataset = 'complete', 
     batch_size=1024, 
     epochs=50,  
     gamma=0.99, 
     lr=1e-3, 
     tau = 0.005)
+
 

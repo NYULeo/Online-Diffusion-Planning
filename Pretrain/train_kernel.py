@@ -1,12 +1,11 @@
 from transition_kernel import TransitionKernel
 import torch
-import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
-import random
-from Dataset import KitchenDataset
+from Dataset import KitchenDataset, PointMazeDataset
 from utils import *
+import random
 
 
 # Build (s, a, s') transitions from your offline trajectories
@@ -34,19 +33,28 @@ class KernelDataset(Dataset):
             torch.tensor(s_next, dtype=torch.float32)
         )
 
-def train(dataset_name, batch_size, lr, epochs):
+def train_kernel(dataset_name, batch_size, lr, epochs):
      # Prepare dataset and dataloader
+     print(f"Training kernel for {dataset_name} Dataset")
      device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
      if(dataset_name == 'kitchen'):
-         kitchen_data_1 = KitchenDataset('complete')
-         kitchen_data_2 = KitchenDataset('partial')
-         kitchen_data_3 = KitchenDataset('mixed')
-         trajectories = kitchen_data_1.get_trajectories() + kitchen_data_2.get_trajectories() + kitchen_data_3.get_trajectories()
+         data_1 = KitchenDataset('complete')
+         data_2 = KitchenDataset('partial')
+         data_3 = KitchenDataset('mixed')
+         trajectories = data_1.get_trajectories() + data_2.get_trajectories() + data_3.get_trajectories()
+         kernel_name = 'Kitchen_Kernel.pkl'
+
+     elif(dataset_name == 'pointmaze'):
+         data_1 = PointMazeDataset('large')
+         data_2 = PointMazeDataset('medium')
+         data_3 = PointMazeDataset('umaze')
+         trajectories = data_1.get_trajectories() + data_2.get_trajectories() + data_3.get_trajectories()
+         kernel_name = '2DMaze_Kernel.pkl'
      else:
          raise ValueError(f"Invalid dataset name: {dataset_name}")
 
-     obs_dim = kitchen_data_1.get_state_dim()
-     act_dim = kitchen_data_1.get_action_dim()
+     obs_dim = data_1.get_state_dim()
+     act_dim = data_1.get_action_dim()
      dataset = KernelDataset(trajectories)
      loader = DataLoader(dataset, batch_size, shuffle=True, drop_last=True)
 
@@ -58,11 +66,10 @@ def train(dataset_name, batch_size, lr, epochs):
      total_prob = total_pro(trajectories, model)
      print(f"Total Probability Before Training: {total_prob:.4f}")
      # Training loop
+     model.train()
      for epoch in range(epochs):
           total_nll = 0.0
           for s, a, s_next in loader:
-               print(len(s))
-               break
                s = s.to(device)
                a = a.to(device)
                s_next = s_next.to(device)
@@ -75,15 +82,21 @@ def train(dataset_name, batch_size, lr, epochs):
                optimiser.step()
 
                total_nll += loss.item() * len(s)
-          break
+          
+          
           avg_nll = total_nll / len(dataset)
           if epoch % 10 == 0 or epoch == epochs - 1:
                print(f"Epoch {epoch}, negative log-likelihood: {avg_nll:.4f}")
-
+          
+     
+     model.eval()
      #total probability after training
      total_prob = total_pro(trajectories, model)
      print(f"Total Probability After Training: {total_prob:.4f}")
+     torch.save(model, kernel_name)
+     
+
 
 if __name__ == '__main__':  # pragma: no cover
     random.seed(1)
-    train(dataset_name = 'kitchen', batch_size = 256, lr = 1e-3, epochs = 100)
+    train_kernel(dataset_name = 'kitchen', batch_size = 256, lr = 1e-3, epochs = 100)

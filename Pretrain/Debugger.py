@@ -17,5 +17,11 @@ import numpy as np
 import pickle
 import os
 from typing import Optional, List, Dict, Any
+import torch.nn as nn
 
-
+time_mlp = nn.Sequential(
+            nn.Linear(4, 5),
+            nn.SiLU(),
+            nn.Linear(5, 6),
+        )
+print(time_mlp[0].in_features)

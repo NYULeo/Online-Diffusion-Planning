@@ -1,13 +1,10 @@
 
-from diffusion_transformer import DiffusionSDETrainer, ScoreModel
 import torch
-import torch.optim as optim
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
-from Dataset import KitchenDataset
-from diffusion_unet import UNet1D, SDETrainer
-import random
-
+from Dataset import KitchenDataset, PointMazeDataset
+from Backbone import UNet1D, SDETrainer
+from utils import set_seed
 
 class PlannerDataset(Dataset):
     """Return trajectories as sequences of concatenated state–action pairs."""
@@ -37,19 +34,39 @@ class PlannerDataset(Dataset):
         return self.windows[idx]
 
 
-def train(batch_size, horizon, num_epochs, lr):  # pragma: no cover
+def train_planner(dataset_name, specific_dataset, batch_size, horizon, num_epochs, lr):  # pragma: no cover
     """Run a small example demonstrating model instantiation and training."""
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    kitchen_data = KitchenDataset(name='complete')
-    state_dim = kitchen_data.get_state_dim()
-    action_dim = kitchen_data.get_action_dim()
+    if(dataset_name == 'kitchen'):
+         data = KitchenDataset(specific_dataset)
+         if(specific_dataset == 'complete'):
+              model_name = 'Kitchen_High_Planner.pt'
+         elif(specific_dataset == 'partial'):
+              model_name = 'Kitchen_medium_Planner.pt'
+         else:
+              model_name = 'Kitchen_Low_Planner.pt'
+    elif(dataset_name == 'pointmaze'):
+           data = PointMazeDataset(specific_dataset)
+           if(specific_dataset == 'large'):
+              model_name = '2DMaze_Large_Planner.pt'
+           elif(specific_dataset == 'medium'):
+              model_name = '2DMaze_medium_Planner.pt'
+           else:
+              model_name = '2DMaze_nnmaze_Planner.pt'
+    else:
+         raise ValueError(f"Invalid Dataset Name: {dataset_name}")
+    
+    print(f"Training planner for {dataset_name}-{specific_dataset} Dataset]")
+    state_dim = data.get_state_dim()
+    action_dim = data.get_action_dim()
     sa_dim = state_dim + action_dim
-    trajectories = kitchen_data.get_trajectories()
+    trajectories = data.get_trajectories()
     dataset = PlannerDataset(trajectories, horizon)
     dataloader = DataLoader(dataset, batch_size, shuffle=True, drop_last=True)
 
 
-    model = UNet1D(input_dim=feature_dim, base_channels=32).to(device)
+    model = UNet1D(input_dim = sa_dim * horizon, base_channels=32).to(device)
+    model.train()
     trainer = SDETrainer(model, device = device)
     optim = torch.optim.Adam(model.parameters(), lr)
     for epoch in range(num_epochs):
@@ -59,34 +76,19 @@ def train(batch_size, horizon, num_epochs, lr):  # pragma: no cover
             loss.backward()
             optim.step()
        print(f"Epoch {epoch}, loss = {loss.item():.4f}")
+    model.eval()
+    return model
+    
+    #torch.save(model.state_dict(), model_name) 
+    #print(f"Planner model saved to {model_name}")
 
-
-
-def example_usage():  # pragma: no cover
-    """Demonstrate offline training with random data."""
-    # Generate random state–action data of dimension 40
-    B = 16
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    feature_dim = 40
-    x0 = torch.randn(B, feature_dim, device = device)
-    model = UNet1D(input_dim=feature_dim, base_channels=32).to(device)
-    trainer = SDETrainer(model, device = device)
-    opt = torch.optim.Adam(model.parameters(), lr=1e-3)
-    for step in range(10):
-        opt.zero_grad()
-        loss = trainer.train_step(x0)
-        loss.backward()
-        opt.step()
-        print(f"step {step}, loss={loss.item():.4f}")
-
-
-if __name__ == '__main__':  # pragma: no cover
-    random.seed(1)
-    example_usage()
 """
 if __name__ == '__main__':  # pragma: no cover
-    train(batch_size = 8, horizon = 32, num_epochs = 100, lr = 3e-4)
+     set_seed(1)
+     train_planner(dataset_name = 'kitchen', specific_dataset = 'complete', batch_size = 6, horizon = 32, num_epochs = 10, lr = 3e-4)
+    
 """
 
 
-            
+
+#train_planner(dataset_name = 'kitchen', specific_dataset = 'complete', batch_size = 6, horizon = 32, num_epochs = 10, lr = 3e-4)
