@@ -15,6 +15,11 @@ tyro
 loguru
 huggingface_hub  # Optional: for downloading datasets from Hugging Face Hub
 gymnasium-robotics>=1.4.0  # Official Franka Kitchen environment
+minari  # For loading D4RL datasets
+mediapy  # For media processing and animations
+sympy  # For symbolic mathematics
+h5py>=3.0.0  # Required for D4RL dataset loading
+humanoid-bench  # Humanoid benchmark environments
 
 torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
