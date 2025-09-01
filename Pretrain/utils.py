@@ -7,6 +7,34 @@ from typing import Optional
 import random
 import os
 
+
+
+
+class SAStats:
+    obs_mean: np.ndarray
+    obs_std:  np.ndarray
+    act_min:  np.ndarray
+    act_max:  np.ndarray
+    eps: float = 1e-6
+
+    # ---- observation ----
+    def norm_obs(self, s: np.ndarray) -> np.ndarray:
+        return (s - self.obs_mean) / (self.obs_std + self.eps)
+
+    def denorm_obs(self, s_tilde: np.ndarray) -> np.ndarray:
+        return s_tilde * (self.obs_std + self.eps) + self.obs_mean
+
+    # ---- action ----
+    def norm_act(self, a: np.ndarray) -> np.ndarray:
+        rng = np.maximum(self.act_max - self.act_min, self.eps)
+        return 2.0 * ((a - self.act_min) / rng) - 1.0
+
+    def denorm_act(self, a_tilde: np.ndarray) -> np.ndarray:
+        rng = np.maximum(self.act_max - self.act_min, self.eps)
+        return (a_tilde + 1.0) * 0.5 * rng + self.act_min
+
+
+
 def compute_log_prob(model, s, a, s_next, device="cpu"):
    
     s = torch.tensor(s, dtype=torch.float32, device=device).unsqueeze(0)
@@ -34,27 +62,57 @@ def total_pro(traj, model):
             count += 1
     return (prob / count)
 
-def set_seed(seed=42):
-    """
-    Set all random seeds for reproducible results.
-    
-    Args:
-        seed (int): Random seed value
-    """
+
+
+def set_seed(seed=0):
     # Python random
     random.seed(seed)
-    
     # NumPy random
     np.random.seed(seed)
-    
     # PyTorch random
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)  # if using multiple GPUs
-    
     # PyTorch deterministic algorithms
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    
     # Set environment variable for additional reproducibility
     os.environ['PYTHONHASHSEED'] = str(seed)
+
+
+def compare_models_state_dict(model1, model2, tolerance=1e-6):
+    """
+    Compare two models by their state dictionaries.
+    Returns True if models are identical within tolerance.
+    """
+    # Get state dictionaries
+    state_dict1 = model1.state_dict()
+    state_dict2 = model2.state_dict()
+    
+    # Check if they have the same keys
+    if set(state_dict1.keys()) != set(state_dict2.keys()):
+        print("Models have different parameter names")
+        return False
+    
+    # Compare each parameter
+    for key in state_dict1.keys():
+        param1 = state_dict1[key]
+        param2 = state_dict2[key]
+        
+        # Check shapes
+        if param1.shape != param2.shape:
+            print(f"Parameter {key} has different shapes: {param1.shape} vs {param2.shape}")
+            return False
+        
+        # Check values
+        if not torch.allclose(param1, param2, atol=tolerance):
+            print(f"Parameter {key} has different values (max diff: {torch.max(torch.abs(param1 - param2))})")
+            return False
+    
+    print("Models are identical!")
+    return True
+
+
+
+
+

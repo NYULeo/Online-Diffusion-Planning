@@ -1,15 +1,71 @@
-from Dataset import KitchenDataset, PointMazeDataset
+from Dataset import KitchenDataset, PointMazeDataset, get_dataset, get_env
 import random
 from torch.utils.data import Dataset, DataLoader
-from Critic import QNet
 import torch
 import torch.optim as optim
 import numpy as np
+from utils import set_seed, SAStats
+from train_critic import get_CriticName
+import torch.nn as nn
+import pickle
 
 
+
+class Reward(nn.Module):
+    def __init__(self, obs_dim, act_dim, hidden = 256):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(obs_dim + act_dim, hidden),
+            nn.BatchNorm1d(hidden),
+            nn.ReLU(),
+            nn.Linear(hidden, hidden),
+            nn.BatchNorm1d(hidden),
+            nn.ReLU(),
+            nn.Linear(hidden, 1)
+        )
+
+    def forward(self, obs, act):
+        x = torch.cat([obs, act], dim=-1)
+        return self.net(x).squeeze(-1)
+    
+
+class Reward_Processor():
+     def __init__(self, dataset_name, speific_dataset):
+          critic_name = get_CriticName(dataset_name, speific_dataset)
+          stats_name = critic_name.replace('.pt', '_stats.pkl')
+          with open(stats_name, 'rb') as f:
+                self.stats = pickle.load(f)
+     
+     def preprocess(self, obs, act):
+          obs = self.stats.norm_obs(obs)
+          act = self.stats.norm_act(act)
+          return obs, act
+     
+      
 
 class RewardDataset(Dataset):
     def __init__(self, trajs):
+               
+               
+        # ----- gather raw obs/actions to fit stats -----
+        obs_list, act_list = [], []
+        for traj in self.traj:
+            obs, acts = traj['observations'], traj['actions']
+            L = min(len(obs), len(acts))
+            obs_list.append(obs[:L])
+            act_list.append(acts[:L])
+        obs_all = np.concatenate(obs_list, axis=0)  # [N, d_s]
+        act_all = np.concatenate(act_list, axis=0)  # [N, d_a]
+        
+        
+        #get stats
+        self.stats = SAStats(
+            obs_mean=obs_all.mean(axis=0),
+            obs_std =obs_all.std(axis=0),
+            act_min =act_all.min(axis=0),
+            act_max =act_all.max(axis=0),
+        )
+        
         transitions = []
         for traj in trajs:
             obs = np.asarray(traj['observations'])      
@@ -61,10 +117,11 @@ def train_reward(dataset_name: str, batch_size, epochs, lr):
     obs_dim = data_1.get_state_dim()
     act_dim = data_1.get_action_dim()
 
-    reward_net = QNet(obs_dim, act_dim).to(device)
+    reward_net = Reward(obs_dim, act_dim).to(device)
     optimizer = optim.Adam(reward_net.parameters(), lr = lr)
-
-    for epoch in range(epochs):  # number of passes over dataset
+    R = []
+    for epoch in range(epochs):
+       R = []  # number of passes over dataset
        for batch in dataloader:
            s, a, r = batch
            s = s.to(device)
@@ -73,13 +130,15 @@ def train_reward(dataset_name: str, batch_size, epochs, lr):
         
            # Predicted Reward
            q_pred = reward_net(s, a)
+           R.append(q_pred.detach().cpu().numpy())
+
            loss = ((q_pred - r) ** 2).mean()
 
            optimizer.zero_grad()
            loss.backward()
            optimizer.step()
 
-
+       print(np.mean(R))
        if epoch % 10 == 0:
               print(f"Epoch {epoch+10}, loss {loss.item():.4f}")
     
@@ -90,7 +149,7 @@ def train_reward(dataset_name: str, batch_size, epochs, lr):
 
 
 if __name__ == '__main__':  # pragma: no cover
-    random.seed(1)
+    set_seed(1)
     train_reward(
     dataset_name = 'kitchen',  
     batch_size=1024, 

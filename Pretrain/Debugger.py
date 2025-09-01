@@ -18,10 +18,9 @@ import pickle
 import os
 from typing import Optional, List, Dict, Any
 import torch.nn as nn
+from Backbone import UNet1D
+from Dataset import get_dataset
+import torch
+import math
 
-time_mlp = nn.Sequential(
-            nn.Linear(4, 5),
-            nn.SiLU(),
-            nn.Linear(5, 6),
-        )
-print(time_mlp[0].in_features)
+print(torch.tensor([2,2,2])**2)

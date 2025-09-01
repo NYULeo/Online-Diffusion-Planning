@@ -1,7 +1,40 @@
 import numpy as np
 import minari
+from sympy.core import I
+import mediapy as media
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
+def get_env(env_name, specific_env):
+    data = get_dataset(env_name, specific_env)
+    d_s = data.get_state_dim()
+    d_a = data.get_action_dim()
+    return data.get_env(), d_s, d_a
+
+
+def get_dataset(name: str, specific_name: str):
+       if(name == 'kitchen'):
+             if specific_name == 'partial':
+                  return KitchenDataset('partial')
+             elif specific_name == 'complete':
+                  return KitchenDataset('complete')
+             elif specific_name == 'mixed':
+                  return KitchenDataset('mixed')
+             else:
+                  raise ValueError(f"Invalid Dataset name: {specific_name}")
+       elif(name == 'PointMaze'):
+            if specific_name == 'large':
+                  return PointMazeDataset('large')
+            elif specific_name== 'medium':
+                  return PointMazeDataset('medium')
+            elif specific_name == 'umaze':
+                  return PointMazeDataset('unmaze')
+            else:
+                  raise ValueError(f"Invalid Dataset name: {specific_name}")
+       else:
+            raise ValueError(f"Invalid Dataset name: {name}")
+     
 
 class KitchenDataset():
      def __init__(self, name: str):
@@ -48,7 +81,7 @@ class KitchenDataset():
           return self.dataset._action_space.shape[0]
     
      def get_env(self):
-          return self.dataset.recover_environment()
+          return self.dataset.recover_environment(render_mode = 'rgb_array')
 
      def get_total_steps(self):
           return self.dataset.total_steps
@@ -98,10 +131,9 @@ class PointMazeDataset():
           return self.dataset._action_space.shape[0]
     
      def get_env(self):
-          return self.dataset.recover_environment()
+          return self.dataset.recover_environment(render_mode = 'rgb_array')
 
      def get_total_steps(self):
           return self.dataset.total_steps
      
 
-     

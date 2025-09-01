@@ -45,6 +45,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+
+
 def positional_encoding(t: torch.Tensor, embed_dim: int) -> torch.Tensor:
     """Create sinusoidal embeddings of scalar time steps.
 
@@ -63,6 +65,17 @@ def positional_encoding(t: torch.Tensor, embed_dim: int) -> torch.Tensor:
     emb = torch.cat([torch.sin(args), torch.cos(args)], dim=1)
     return emb
 
+
+def cosine_beta(t: torch.Tensor, s: float = 0.008) -> torch.Tensor:
+    """
+    Continuous-time VP drift g(t)^2 = beta(t) for the cosine schedule.
+    Using beta(t) = -2 d/dt log alpha(t) = (pi/(1+s)) * tan(a).
+    """
+    t = t.clamp(0.0, 1.0)
+    a = (math.pi / 2.0) * (t + s) / (1.0 + s)
+    return (math.pi / (1.0 + s)) * torch.tan(a)
+
+
 def cosine_alpha_sigma(t: torch.Tensor, s: float = 0.008) -> Tuple[torch.Tensor, torch.Tensor]:
     """Continuous cosine schedule for α(t) and σ(t).
 
@@ -71,12 +84,13 @@ def cosine_alpha_sigma(t: torch.Tensor, s: float = 0.008) -> Tuple[torch.Tensor,
     """
     t = t.clamp(0.0, 1.0)
     factor = (t + s) / (1.0 + s)
-    f_t = torch.cos( torch.tensor(factor * math.pi / 2)) ** 2
-    f0 = torch.cos( torch.tensor((s / (1.0 + s)) * math.pi / 2)) ** 2
+    f_t = torch.cos(    factor * (math.pi / 2)     )** 2
+    f0 = torch.cos( torch.tensor((s / (1.0 + s)) * (math.pi / 2))  ) ** 2
     alpha_bar = (f_t / f0).clamp(0.0, 1.0)
     alpha = torch.sqrt(alpha_bar)
     sigma = torch.sqrt(1.0 - alpha_bar)
     return alpha, sigma
+
 
 class UNet1D(nn.Module):
     """A minimal 1‑D UNet suitable for flat vectors.
@@ -143,6 +157,7 @@ class UNet1D(nn.Module):
             Tensor of shape ``(batch, input_dim)`` containing the predicted
             score for each vector element.
         """
+        #B, N = x.shape
         B, N = x.shape
         assert N == self.input_dim, f"expected input dimension {self.input_dim}, got {N}"
         # Time embedding
@@ -192,6 +207,7 @@ class UNet1D(nn.Module):
         out = out.squeeze(1)
         return out
 
+
 class SDETrainer:
     """Offline trainer for score‑based diffusion models with a UNet backbone.
 
@@ -217,8 +233,10 @@ class SDETrainer:
         B, D = x0.shape
         # Sample time uniformly
         t = torch.rand(B, device=self.device)
+        
         # Compute α and σ
         alpha, sigma = cosine_alpha_sigma(t, self.s)
+        
         alpha_b = alpha.view(B, 1)
         sigma_b = sigma.view(B, 1)
         # Sample noise
@@ -232,9 +250,127 @@ class SDETrainer:
         # Weight
         if self.weight_type == "sigma2":
             weight = sigma.view(B, 1) ** 2
+        
+        elif self.weight_type == "beta":
+            beta = cosine_beta(t, self.s)                     # (B,)
+            weight = beta.view(B,1)
+
         else:
             raise ValueError(f"Unsupported weight_type {self.weight_type}")
         mse = F.mse_loss(pred, target, reduction='none')
         loss = (weight * mse).mean()
         return loss
 
+
+@torch.no_grad()
+def sample_pf_ode(
+    s0: np.ndarray,        
+    score_model: UNet1D,
+    d_s: int,
+    d_a: int,
+    horizon: int,
+    steps_T: int = 100,
+    device: Optional[torch.device] = None,
+) -> torch.Tensor:
+    """
+    Explicit-Euler integration of the PF-ODE:
+      dx/dt = f(x,t) - 0.5 g(t)^2 s_theta(x,t)
+    with the same VP schedule; hard-prefix via alpha(t)*v projection.
+    """
+    device = device or("cuda" if torch.cuda.is_available() else "cpu")
+    D_tot = (d_s + d_a) * horizon
+
+
+    t_asc = torch.linspace(0.0, 1.0, steps_T + 1, device=device)
+    alpha, sigma = cosine_alpha_sigma(t_asc, s = 0.008)
+    beta = cosine_beta(t_asc, s = 0.008)                                  # g^2
+    idx_desc = torch.arange(steps_T, -1, -1, device=device)
+
+    x = torch.randn(D_tot, device=device)
+
+    # mask for first D1 entries; fixed vector holding s0 in those slots
+    s0_t = torch.tensor(s0, device=device, dtype=x.dtype)
+    M = torch.zeros(D_tot, device=device); M[:d_s] = 1.0
+    Xfix = torch.zeros(D_tot, device=device, dtype=x.dtype)
+
+    
+
+    for i in range(len(idx_desc) - 1):
+        k_now  = idx_desc[i]
+        k_next = idx_desc[i + 1]
+        t_now, t_next = t_asc[k_now], t_asc[k_next]
+        
+        dt = (t_next - t_now).item()                               # negative
+        g2 = beta[k_now].item()
+        drift = -0.5 * g2 * x
+        
+        score = score_model(x.unsqueeze(0), t_now.unsqueeze(0)).squeeze(0)
+
+        # Explicit Euler for PF-ODE
+        x = x + (drift - 0.5 * g2 * score) * dt
+
+        # Hard-prefix: deterministic forward path y = alpha(t_next) * v
+        known_next = alpha[k_next].item() * s0_t
+        Xfix[:d_s] = known_next
+        x = M * Xfix + (1.0 - M) * x
+
+    return x.detach().cpu().numpy()
+
+
+@torch.no_grad()
+def sample_reverse_sde(
+    s0: np.ndarray,             # (d_s,)
+    score_model: UNet1D,
+    d_s: int,
+    d_a: int,
+    horizon: int,
+    steps_T: int = 100,
+    eta: float = 1.0,           # 1.0 = reverse SDE (stochastic), 0.0 = PF-ODE (deterministic)
+    device: Optional[str] = None
+):
+    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    D_tot = (d_s + d_a) * horizon
+
+    # Time grid & VP schedule (Nichol–Dhariwal cosine)
+    t_asc = torch.linspace(0.0, 1.0, steps_T + 1, device=device)
+    alpha, sigma = cosine_alpha_sigma(t_asc, s=0.008)  # (T+1,)
+    beta = cosine_beta(t_asc, s=0.008)                 # (T+1,) => g^2 = beta
+    idx_desc = torch.arange(steps_T, -1, -1, device=device)  # T..0
+    c_eta = 0.5 * (1.0 + eta**2)    # score coefficient in drift (SDE/ODE unification)
+
+    # Init x_T ~ N(0, I)
+    x = torch.randn(D_tot, device=device)
+
+    # Prefix & mask (first d_s dims fixed)
+    s0_t = torch.as_tensor(s0, device=device, dtype=x.dtype)
+    M = torch.zeros(D_tot, device=device, dtype=x.dtype); M[:d_s] = 1.0
+    Xfix = torch.zeros(D_tot, device=device, dtype=x.dtype)
+
+    for i in range(len(idx_desc) - 1):
+        k_now  = idx_desc[i]
+        k_next = idx_desc[i + 1]
+        t_now, t_next = t_asc[k_now], t_asc[k_next]
+        
+        
+        dt = (t_next - t_now).item()          # negative
+        g2 = beta[k_now].item()               # g^2(t) = beta(t)
+        drift = -0.5 * g2 * x                 # f(x,t) = -0.5 beta x
+
+        # Score s_theta(x,t)
+        score = score_model(x.unsqueeze(0), t_now.unsqueeze(0)).squeeze(0)
+
+        # Unified predictor step
+        noise = torch.randn_like(x) if eta > 0 else torch.zeros_like(x)
+        x = x + (drift - c_eta * g2 * score) * dt + eta * (g2**0.5) * ((-dt)**0.5) * noise
+
+        # Masked projection with forward-noised prefix at t_next
+        if eta > 0:
+            z = torch.randn(d_s, device=device, dtype=x.dtype)
+            known_next = alpha[k_next].item() * s0_t + sigma[k_next].item() * z
+        else:
+            known_next = alpha[k_next].item() * s0_t
+
+        Xfix[:d_s] = known_next
+        x = M * Xfix + (1.0 - M) * x
+
+    return x.detach().cpu().numpy()

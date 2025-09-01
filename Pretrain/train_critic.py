@@ -1,29 +1,111 @@
-from Dataset import KitchenDataset, PointMazeDataset
 import random
 from torch.utils.data import Dataset, DataLoader
-from Critic import QNet
 import torch
 import torch.optim as optim
 import numpy as np
+import torch.nn as nn
+from Dataset import get_dataset, get_env
+from utils import set_seed, SAStats
+import pickle
 
+def get_CriticName(env_name, specific_env):
+     if(env_name == 'kitchen'):
+          if(specific_env == 'complete'):
+               return 'Kitchen_High_Critic.pt'
+          elif(specific_env == 'partial'):
+               return 'Kitchen_Medium_Critic.pt'
+          elif(specific_env == 'mixed'):
+               return 'Kitchen_Mixed_Critic.pt'
+          else:
+               raise ValueError(f"Invalid specific environment: {specific_env}")
+     elif(env_name == 'pointmaze'):
+         if(specific_env == 'large'):
+              return 'PointMaze_Large_Critic.pt'
+         elif(specific_env == 'medium'):
+              return 'PointMaze_Medium_Critic.pt'
+         elif(specific_env == 'unmaze'):
+              return 'PointMaze_Unmaze_Critic.pt'
+         else:
+              raise ValueError(f"Invalid specific environment: {specific_env}")
+     else:
+         raise ValueError(f"Invalid environment name: '{env_name}")
+
+class Critic(nn.Module):
+    def __init__(self, obs_dim, act_dim, hidden = 256):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(obs_dim + act_dim, hidden),
+            nn.BatchNorm1d(hidden),
+            nn.ReLU(),
+            nn.Linear(hidden, hidden),
+            nn.BatchNorm1d(hidden),
+            nn.ReLU(),
+            nn.Linear(hidden, 1)
+        )
+    def forward(self, obs, act):
+        x = torch.cat([obs, act], dim=-1)
+        return self.net(x).squeeze(2-1)
+
+
+class Critic_Processor():
+     def __init__(self, dataset_name, speific_dataset):
+          critic_name = get_CriticName(dataset_name, speific_dataset)
+          stats_name = critic_name.replace('.pt', '_stats.pkl')
+          with open(stats_name, 'rb') as f:
+                self.stats = pickle.load(f)
+    
+     def preprocess(self, obs, act):
+          obs = self.stats.norm_obs(obs)
+          act = self.stats.norm_act(act)
+          return obs, act
 
 class CriticDataset(Dataset):
-    def __init__(self, trajs):
+    def __init__(self, dataset_name, specific_dataset):
+        data = get_dataset(dataset_name, specific_dataset)
+        self.critic_name = get_CriticName(dataset_name, specific_dataset)
+        self.trajs = data.get_trajectories()
         transitions = []
-        for traj in trajs:
+        
+        # ----- gather raw obs/actions to fit stats -----
+        obs_list, act_list = [], []
+        for traj in self.trajs:
+            obs, acts = traj['observations'], traj['actions']
+            L = min(len(obs), len(acts))
+            obs_list.append(obs[:L])
+            act_list.append(acts[:L])
+        obs_all = np.concatenate(obs_list, axis=0)  # [N, d_s]
+        act_all = np.concatenate(act_list, axis=0)  # [N, d_a]
+        
+        
+        #get stats
+        self.stats = SAStats()
+        self.stats.obs_mean=obs_all.mean(axis=0)
+        self.stats.obs_std =obs_all.std(axis=0)
+        self.stats.act_min =act_all.min(axis=0)
+        self.stats.act_max =act_all.max(axis=0)
+
+        
+        for traj in self.trajs:
             obs = np.asarray(traj['observations'])      
             acts = np.asarray(traj['actions'])
             rews = np.asarray(traj['rewards'])
             for t in range(len(acts)):
-                s_t   = obs[t]
-                a_t   = acts[t]
+                s_t   = self.stats.norm_obs(obs[t])
+                a_t   = self.stats.norm_act(acts[t])
                 r_t   = rews[t]
-                s_tp1 = obs[t+1]  if t < (len(acts)-1) else np.zeros_like(s_t)
-                a_tp1 = acts[t+1] if t < (len(acts)-1) else np.zeros_like(a_t)
+                s_tp1 = self.stats.norm_obs(obs[t+1])  if t < (len(acts)-1) else np.zeros_like(s_t)
+                a_tp1 = self.stats.norm_act(acts[t+1]) if t < (len(acts)-1) else np.zeros_like(a_t)
                 done_t = 1.0 if t == (len(acts)-1) else 0.0
                 transitions.append((s_t, a_t, r_t, s_tp1, a_tp1, done_t))
-
+        
         self.transitions = transitions
+        self.save_stats()
+    
+    def save_stats(self):
+        stats_name = self.critic_name.replace('.pt', '_stats.pkl')
+        with open(stats_name, 'wb') as f:
+              pickle.dump(self.stats, f)
+
 
     def __len__(self):
         return len(self.transitions)
@@ -38,44 +120,28 @@ class CriticDataset(Dataset):
             torch.tensor(a_next, dtype=torch.float32),
             torch.tensor(d, dtype=torch.float32)
         )
+    
+
 
 def train_critic(dataset_name: str, specific_dataset: str, batch_size, epochs, gamma, lr, tau):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device {device}")
-    if(dataset_name == 'kitchen'):
-         data = KitchenDataset(specific_dataset)
-         if(specific_dataset == 'complete'):
-              model_name = 'Kitchen_High_Critic.pkl'
-         elif(specific_dataset == 'partial'):
-              model_name = 'Kitchen_medium_Critic.pkl'
-         else:
-              model_name = 'Kitchen_Low_Critic.pkl'
-    elif(dataset_name == 'pointmaze'):
-         data = PointMazeDataset(specific_dataset)
-         if(specific_dataset == 'large'):
-              model_name = '2DMaze_Large_Critic.pkl'
-         elif(specific_dataset == 'medium'):
-              model_name = '2DMaze_medium_Critic.pkl'
-         else:
-              model_name = '2DMaze_nnmaze_Critic.pkl'
-    else:
-         raise ValueError(f"Invalid Dataset Name: {dataset_name}")
-    
-    print(f"Training critic for {dataset_name}-{specific_dataset} Dataset")
-    trajectories = data.get_trajectories()
-    dataset = CriticDataset(trajectories)
+
+    #get information
+    model_name = get_CriticName(dataset_name, specific_dataset)
+    dataset = CriticDataset(dataset_name, specific_dataset)
+    env, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+   
+    #prepare training
     dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True)
-    
-    obs_dim = data.get_state_dim()
-    act_dim = data.get_action_dim()
-
-    critic = QNet(obs_dim, act_dim).to(device)
-    target_critic = QNet(obs_dim, act_dim).to(device)
+    critic = Critic(obs_dim, act_dim).to(device)
+    target_critic = Critic(obs_dim, act_dim).to(device)
     target_critic.load_state_dict(critic.state_dict())
-
     optimizer = optim.Adam(critic.parameters(), lr = lr)
 
+    print(f"Training critic for {dataset_name}-{specific_dataset}")
     for epoch in range(epochs):  # number of passes over dataset
+       total_loss = 0
        for batch in dataloader:
            s, a, r, s_next, a_next, d = batch
            s = s.to(device)
@@ -96,23 +162,24 @@ def train_critic(dataset_name: str, specific_dataset: str, batch_size, epochs, g
 
            optimizer.zero_grad()
            loss.backward()
+           total_loss += loss.item()
            optimizer.step()
 
            # Soft update target network
            for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):
                tgt_param.data.mul_(1 - tau)
                tgt_param.data.add_(tau * param.data)
-
+       avg_loss = total_loss / len(dataloader)
        if epoch % 10 == 0:
-              print(f"Epoch {epoch+10}, loss {loss.item():.4f}")
+              print(f"Epoch {epoch+10}, loss {avg_loss:.4f}")
     
     critic.eval()
-    torch.save(critic, model_name)
+    torch.save(critic.state_dict(), model_name) 
     print(f"critic model save to {model_name}")
 
 
 if __name__ == '__main__':  # pragma: no cover
-    random.seed(1)
+    set_seed(1)
     train_critic(
     dataset_name = 'kitchen', 
     specific_dataset = 'complete', 
