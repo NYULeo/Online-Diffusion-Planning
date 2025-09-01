@@ -144,6 +144,6 @@ if __name__ == '__main__':  # pragma: no cover
      dataset_name = 'kitchen'
      specific_dataset = 'complete'
      horizon = 32
-     train_planner(dataset_name = dataset_name, specific_dataset = specific_dataset, horizon = horizon, batch_size = 128, num_epochs = 10, lr = 2e-4)
+     train_planner(dataset_name = dataset_name, specific_dataset = specific_dataset, horizon = horizon, batch_size = 128, num_epochs = 100, lr = 2e-4)
     
 
