@@ -115,9 +115,10 @@ def train_planner(dataset_name, specific_dataset, horizon, batch_size, num_epoch
     model = UNet1D(input_dim = ((state_dim + action_dim) * horizon)).to(device)
     model.train()
     trainer = SDETrainer(model, device = device)
-    optim = torch.optim.AdamW(model.parameters(), lr, weight_decay = 1e-4)
+    optim = torch.optim.AdamW(model.parameters(), lr)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, num_epochs)
     print(f"Training planner for {dataset_name}-{specific_dataset} Dataset]")
+    print(f"Horizon: {horizon}, Epochs: {num_epochs}, Batch Size: {batch_size}, Learning Rate; {lr}")
     for epoch in range(num_epochs):
        total_loss = 0
        num_batches = 0
@@ -143,7 +144,7 @@ if __name__ == '__main__':  # pragma: no cover
      set_seed(1)
      dataset_name = 'kitchen'
      specific_dataset = 'complete'
-     horizon = 32
-     train_planner(dataset_name = dataset_name, specific_dataset = specific_dataset, horizon = horizon, batch_size = 128, num_epochs = 100, lr = 2e-4)
+     horizon = 20
+     train_planner(dataset_name = dataset_name, specific_dataset = specific_dataset, horizon = horizon, batch_size = 64, num_epochs = 100, lr = 2e-4)
     
 

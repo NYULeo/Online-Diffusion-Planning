@@ -365,9 +365,8 @@ def sample_reverse_sde(
         # Unified predictor step
         noise = torch.randn_like(x) if eta > 0 else torch.zeros_like(x)
         #print(g2)
-        print(x)
+        
         x = x + (drift - c_eta * g2 * score) * dt + eta * (g2**0.5) * ((-1*dt)**0.5) * noise
-        print(x)
 
         # Masked projection with forward-noised prefix at t_next
         if eta > 0:
