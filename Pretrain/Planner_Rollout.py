@@ -71,9 +71,9 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length : int 
            step = {'observation': obs['observation'].copy(), 'action':action.copy(), 'reward': reward}
            play_seq.append(step)
            current_state = obs['observation'].copy()
-           print(f"Episode {i} reward: {reward}")
+           #print(f"Episode {i} reward: {reward}")
            if(terminated or truncated):
-                print(f"Episode {i} terminated or truncated")
+                #print(f"Episode {i} terminated or truncated")
                 break
      
      traj_info = {'sequence': play_seq, 'env_name': env_name, 'specific_env': specific_env }
