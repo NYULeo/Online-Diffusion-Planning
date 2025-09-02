@@ -19,6 +19,7 @@ class ActionSelector:
          critic_name = get_CriticName(self.dataset_name, self.specific_dataset)
          critic_state_dict = torch.load(critic_name, map_location = 'cpu')
          self.critic.load_state_dict(critic_state_dict)
+         self.critic = self.critic.to(device)  # Move critic to correct device
          self.critic.eval()
          self.critic_processor = Critic_Processor(self.dataset_name, self.specific_dataset)
          self.device = device
