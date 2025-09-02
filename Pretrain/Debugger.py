@@ -23,4 +23,5 @@ from Dataset import get_dataset
 import torch
 import math
 
-print(torch.tensor([2,2,2])**2)
+a = torch.linspace(1.0, 0.0, 10)
+print(a)

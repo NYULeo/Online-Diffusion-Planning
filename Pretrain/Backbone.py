@@ -47,6 +47,7 @@ import torch.nn.functional as F
 
 
 
+
 def positional_encoding(t: torch.Tensor, embed_dim: int) -> torch.Tensor:
     """Create sinusoidal embeddings of scalar time steps.
 
@@ -304,6 +305,7 @@ def sample_pf_ode(
         g2 = beta[k_now].item()
         drift = -0.5 * g2 * x
         
+
         score = score_model(x.unsqueeze(0), t_now.unsqueeze(0)).squeeze(0)
 
         # Explicit Euler for PF-ODE
@@ -332,10 +334,10 @@ def sample_reverse_sde(
     D_tot = (d_s + d_a) * horizon
 
     # Time grid & VP schedule (Nichol–Dhariwal cosine)
-    t_asc = torch.linspace(0.0, 1.0, steps_T + 1, device=device)
+    t_asc = torch.linspace(1.0, 0.0, steps_T + 1, device=device)
     alpha, sigma = cosine_alpha_sigma(t_asc, s=0.008)  # (T+1,)
     beta = cosine_beta(t_asc, s=0.008)                 # (T+1,) => g^2 = beta
-    idx_desc = torch.arange(steps_T, -1, -1, device=device)  # T..0
+    #idx_desc = torch.arange(steps_T, -1, -1, device=device)  # T..0
     c_eta = 0.5 * (1.0 + eta**2)    # score coefficient in drift (SDE/ODE unification)
 
     # Init x_T ~ N(0, I)
@@ -346,29 +348,33 @@ def sample_reverse_sde(
     M = torch.zeros(D_tot, device=device, dtype=x.dtype); M[:d_s] = 1.0
     Xfix = torch.zeros(D_tot, device=device, dtype=x.dtype)
 
-    for i in range(len(idx_desc) - 1):
-        k_now  = idx_desc[i]
-        k_next = idx_desc[i + 1]
-        t_now, t_next = t_asc[k_now], t_asc[k_next]
+    for i in range(len(t_asc) - 1):
+        t_now, t_next = t_asc[i], t_asc[i+1]
         
         
         dt = (t_next - t_now).item()          # negative
-        g2 = beta[k_now].item()               # g^2(t) = beta(t)
+        #print(dt)
+        g2 = beta[i].item()               # g^2(t) = beta(t)
         drift = -0.5 * g2 * x                 # f(x,t) = -0.5 beta x
-
+  
+        
         # Score s_theta(x,t)
         score = score_model(x.unsqueeze(0), t_now.unsqueeze(0)).squeeze(0)
-
+        
+        
         # Unified predictor step
         noise = torch.randn_like(x) if eta > 0 else torch.zeros_like(x)
-        x = x + (drift - c_eta * g2 * score) * dt + eta * (g2**0.5) * ((-dt)**0.5) * noise
+        #print(g2)
+        print(x)
+        x = x + (drift - c_eta * g2 * score) * dt + eta * (g2**0.5) * ((-1*dt)**0.5) * noise
+        print(x)
 
         # Masked projection with forward-noised prefix at t_next
         if eta > 0:
             z = torch.randn(d_s, device=device, dtype=x.dtype)
-            known_next = alpha[k_next].item() * s0_t + sigma[k_next].item() * z
+            known_next = alpha[i].item() * s0_t + sigma[i].item() * z
         else:
-            known_next = alpha[k_next].item() * s0_t
+            known_next = alpha[i].item() * s0_t
 
         Xfix[:d_s] = known_next
         x = M * Xfix + (1.0 - M) * x

@@ -62,7 +62,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length : int 
      for i in range(episode_length):
            actions = []
            current_state_norm = planner_processor.preprocess(current_state)
-           for i in range(10):
+           for j in range(10):
                 x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
                 action = planner_processor.postprocess(x[d_s:(d_s+d_a)].copy())
                 actions.append(action)
