@@ -8,7 +8,7 @@ set -e  # Exit on any error
 # Configuration
 BERKELEY_USER="ghr"
 BERKELEY_HOST="em11.ist.berkeley.edu"
-REMOTE_PATH="~/${BERKELEY_USER}/Online-Diffusion-Planning"
+REMOTE_PATH="~/Online-Diffusion-Planning"  # Fixed path
 COMMIT_MESSAGE="${1:-Auto-commit from workflow automation}"
 
 echo "🚀 Starting Workflow Automation for Online Diffusion Planning"

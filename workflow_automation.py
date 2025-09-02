@@ -27,7 +27,7 @@ class WorkflowAutomation:
     def __init__(self, berkeley_user="ghr", berkeley_host="em11.ist.berkeley.edu"):
         self.berkeley_user = berkeley_user
         self.berkeley_host = berkeley_host
-        self.remote_path = f"~/{berkeley_user}/Online-Diffusion-Planning"
+        self.remote_path = "~/Online-Diffusion-Planning"  # Fixed path
         self.local_path = Path.cwd()
         
     def run_command(self, command, description="", check=True):
