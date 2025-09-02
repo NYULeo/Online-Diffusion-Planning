@@ -72,7 +72,7 @@ def cosine_beta(t: torch.Tensor, s: float = 0.008) -> torch.Tensor:
     Continuous-time VP drift g(t)^2 = beta(t) for the cosine schedule.
     Using beta(t) = -2 d/dt log alpha(t) = (pi/(1+s)) * tan(a).
     """
-    t = t.clamp(0.0, 1.0)
+    t = t.clamp(0.0, 1.0 - 1e-6)
     a = (math.pi / 2.0) * (t + s) / (1.0 + s)
     return (math.pi / (1.0 + s)) * torch.tan(a)
 
@@ -83,11 +83,11 @@ def cosine_alpha_sigma(t: torch.Tensor, s: float = 0.008) -> Tuple[torch.Tensor,
     Reuse of the same function from ``diffusion_transformer.py``.  See
     that module for details.
     """
-    t = t.clamp(0.0, 1.0)
+    t = t.clamp(0.0, 1.0 - 1e-6)
     factor = (t + s) / (1.0 + s)
     f_t = torch.cos(    factor * (math.pi / 2)     )** 2
     f0 = torch.cos( torch.tensor((s / (1.0 + s)) * (math.pi / 2))  ) ** 2
-    alpha_bar = (f_t / f0).clamp(0.0, 1.0)
+    alpha_bar = (f_t / f0).clamp(0.0, 1.0 - 1e-6)
     alpha = torch.sqrt(alpha_bar)
     sigma = torch.sqrt(1.0 - alpha_bar)
     return alpha, sigma
@@ -106,7 +106,7 @@ class UNet1D(nn.Module):
     low‑dimensional data; more complex architectures can be adopted for
     higher‑resolution signals.
     """
-
+     
     def __init__(
         self,
         input_dim: int,
@@ -241,7 +241,7 @@ class SDETrainer:
         alpha_b = alpha.view(B, 1)
         sigma_b = sigma.view(B, 1)
         # Sample noise
-        eps = torch.randn_like(x0)
+        eps = torch.randn_like(x0, dtype = x0.dtype)
         # Construct x_t
         x_t = alpha_b * x0 + sigma_b * eps
         # Compute target score
@@ -341,7 +341,7 @@ def sample_reverse_sde(
     c_eta = 0.5 * (1.0 + eta**2)    # score coefficient in drift (SDE/ODE unification)
 
     # Init x_T ~ N(0, I)
-    x = torch.randn(D_tot, device=device)
+    x = torch.randn(D_tot, dtype = torch.float32, device=device)
 
     # Prefix & mask (first d_s dims fixed)
     s0_t = torch.as_tensor(s0, device=device, dtype=x.dtype)
@@ -363,11 +363,10 @@ def sample_reverse_sde(
         
         
         # Unified predictor step
-        noise = torch.randn_like(x) if eta > 0 else torch.zeros_like(x)
-        #print(g2)
+        noise = torch.randn_like(x, dtype=x.dtype) if eta > 0 else torch.zeros_like(x)
         
-        x = x + (drift - c_eta * g2 * score) * dt + eta * (g2**0.5) * ((-1*dt)**0.5) * noise
-
+        x = x + ( (drift - c_eta * g2 * score) * dt + eta * (g2**0.5) * ((-1*dt)**0.5) * noise )
+        
         # Masked projection with forward-noised prefix at t_next
         if eta > 0:
             z = torch.randn(d_s, device=device, dtype=x.dtype)

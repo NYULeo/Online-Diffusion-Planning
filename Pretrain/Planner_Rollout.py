@@ -26,10 +26,9 @@ class ActionSelector:
      def action_selection(self, current_state, actions):
         q_values = []
         for i in range(len(actions)):
-           act = actions[i]
-           current_state = torch.tensor(current_state, dtype = torch.float32).unsqueeze(0).to(self.device)
-           act = torch.tensor(act, dtype = torch.float32).unsqueeze(0).to(self.device)
-           current_state_norm, act_norm = self.critic_processor.preprocess(current_state, act)
+           current_state_norm, act_norm = self.critic_processor.preprocess(current_state, actions[i])
+           current_state_norm = torch.tensor(current_state_norm, dtype = torch.float32).unsqueeze(0).to(self.device)
+           act_norm = torch.tensor(act_norm, dtype = torch.float32).unsqueeze(0).to(self.device)
            q_value = self.critic(current_state_norm, act_norm)
            q_values.append(q_value.item())
         idx = np.argmax(q_values)
@@ -66,15 +65,14 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length : int 
                 x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
                 action = planner_processor.postprocess(x[d_s:(d_s+d_a)].copy())
                 actions.append(action)
-           
            action = action_selector.action_selection(current_state, actions)
            obs, reward, terminated, truncated, info = env.step(action)
            step = {'observation': obs['observation'].copy(), 'action':action.copy(), 'reward': reward}
            play_seq.append(step)
            current_state = obs['observation'].copy()
-           print(f"Episode {i} reward: {reward}")
+           #print(f"Episode {i} reward: {reward}")
            if(terminated or truncated):
-                print(f"Episode {i} terminated or truncated")
+                #print(f"Episode {i} terminated or truncated")
                 break
      
      traj_info = {'sequence': play_seq, 'env_name': env_name, 'specific_env': specific_env }
@@ -88,7 +86,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length : int 
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
     set_seed(1)
-    horizon = 32
+    horizon = 20
     env_name = 'kitchen'
     specific_env = 'complete'
 
