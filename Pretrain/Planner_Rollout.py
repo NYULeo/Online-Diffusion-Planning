@@ -40,7 +40,7 @@ class ActionSelector:
 
 def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length : int = 1000):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = 'rgb_array')
-
+     print(f"Horizon: {horizon}, step_T: {steps_T}")
      env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = 'rgb_array')
      device = "cuda" if torch.cuda.is_available() else "cpu"
      print(f"Using device {device}")
