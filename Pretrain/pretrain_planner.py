@@ -103,7 +103,7 @@ class Planner_Processor():
 def train_planner(dataset_name, specific_dataset, horizon, batch_size, num_epochs, lr):  # pragma: no cover
     """Run a small example demonstrating model instantiation and training."""
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    env, state_dim, action_dim = get_env(dataset_name, specific_dataset)
+    state_dim, action_dim = get_env(dataset_name, specific_dataset)
     dataset = PlannerDataset(dataset_name, specific_dataset, horizon)
     model_name = dataset.planner_name
     
