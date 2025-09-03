@@ -3,7 +3,7 @@ import mediapy as media
 import warnings
 import pickle
 warnings.filterwarnings("ignore", category=UserWarning)
-from Dataset import get_env
+from Dataset import get_env, get_dataset
 
 
 #load the trajectory
@@ -20,7 +20,6 @@ for i in range(len(sequence)):
 
 #get environment
 env, d_s, d_a= get_env(traj_info['env_name'], traj_info['specific_env'])
-
 
 #start animation
 set_seed(0)

@@ -44,7 +44,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length : int 
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      device = "cuda" if torch.cuda.is_available() else "cpu"
      print(f"Using device {device}")
-     action_selector = ActionSelector(env_name, specific_env, device)
+     #action_selector = ActionSelector(env_name, specific_env, device)
      planner_processor = Planner_Processor(env_name, specific_env)
 
      #get environment
@@ -98,7 +98,7 @@ if __name__ == "__main__":
     set_seed(1)
     horizon = 32
     env_name = 'kitchen'
-    specific_env = 'complete'
+    specific_env = 'partial'
 
     rollout(env_name, specific_env, horizon, steps_T = 100, eta = 0.3, episode_length  = 500)
 

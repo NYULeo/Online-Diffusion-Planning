@@ -140,7 +140,7 @@ def train_planner(dataset_name, specific_dataset, horizon, batch_size, num_epoch
 if __name__ == '__main__':  # pragma: no cover
      set_seed(1)
      dataset_name = 'kitchen'
-     specific_dataset = 'complete'
+     specific_dataset = 'partial'
      horizon = 32
      train_planner(dataset_name = dataset_name, specific_dataset = specific_dataset, horizon = horizon, batch_size = 64, num_epochs = 1000, lr = 1e-4)
     

@@ -271,7 +271,7 @@ def sample_pf_ode(
     d_s: int,
     d_a: int,
     horizon: int,
-    steps_T: int = 100,
+    steps_T: int,
     device: Optional[torch.device] = None
 ) -> torch.Tensor:
     """
@@ -286,7 +286,6 @@ def sample_pf_ode(
     t_asc = torch.linspace(1.0, 0.0, steps_T + 1, device=device)
     alpha, sigma = cosine_alpha_sigma(t_asc, s = 0.008)
     beta = cosine_beta(t_asc, s = 0.008)                                  # g^2
-    #idx_desc = torch.arange(steps_T, -1, -1, device=device)
 
     x = torch.randn(D_tot, device=device)
 
@@ -311,8 +310,8 @@ def sample_pf_ode(
         x = x + (drift - 0.5 * g2 * score) * dt
 
         # Hard-prefix: deterministic forward path y = alpha(t_next) * v
-        #known_next = alpha[i+1].item() * s0_t
-        Xfix[:d_s] = s0_t
+        known_next = alpha[i+1].item() * s0_t
+        Xfix[:d_s] = known_next
         x = M * Xfix + (1.0 - M) * x
 
     return x.detach().cpu().numpy()
@@ -325,8 +324,8 @@ def sample_reverse_sde(
     d_s: int,
     d_a: int,
     horizon: int,
-    steps_T: int = 100,
-    eta: float = 1.0,           # 1.0 = reverse SDE (stochastic), 0.0 = PF-ODE (deterministic)
+    steps_T: int,
+    eta: float,           # 1.0 = reverse SDE (stochastic), 0.0 = PF-ODE (deterministic)
     device: Optional[str] = None
 ):
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -336,8 +335,7 @@ def sample_reverse_sde(
     t_asc = torch.linspace(1.0, 0.0, steps_T + 1, device=device)
     alpha, sigma = cosine_alpha_sigma(t_asc, s=0.008)  # (T+1,)
     beta = cosine_beta(t_asc, s=0.008)                 # (T+1,) => g^2 = beta
-    #idx_desc = torch.arange(steps_T, -1, -1, device=device)  # T..0
-    #eta = 0.5 * (1.0 + eta**2)    # score coefficient in drift (SDE/ODE unification)
+   
 
     # Init x_T ~ N(0, I)
     x = torch.randn(D_tot, dtype = torch.float32, device=device)
@@ -366,15 +364,15 @@ def sample_reverse_sde(
         x = x + ( (drift - g2 * score) * dt +   eta * (g2**0.5) * ((-1*dt)**0.5) * noise  )
         
         # Masked projection with forward-noised prefix at t_next
-        """
+        
         if eta > 0:
             z  = torch.randn(d_s, device=device, dtype=x.dtype)
             known_next = alpha[i+1].item() * s0_t + sigma[i].item() * z
         else:
             known_next = alpha[i+1].item() * s0_t
 
-        """
-        Xfix[:d_s] = s0_t
+    
+        Xfix[:d_s] =  known_next
         x = M * Xfix + (1.0 - M) * x
 
     return x.detach().cpu().numpy()

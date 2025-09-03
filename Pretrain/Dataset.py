@@ -74,7 +74,6 @@ class KitchenDataset():
               }
            
               trajectories.append(trajectory)
-              break
           
           return trajectories
      
