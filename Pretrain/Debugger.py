@@ -27,11 +27,8 @@ from pretrain_planner import get_PlannerName
 
 
 
-
-a = np.array([[1,1,1,1], [2,2,2,2]])
-print(np.mean(a, axis = 0))
-
-
+env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle'], render_mode = 'rgb_array')
+print(env)
 
 
 

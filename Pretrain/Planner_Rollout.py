@@ -9,12 +9,14 @@ from Dataset import get_env
 from utils import set_seed
 from train_critic import Critic, Critic_Processor, get_CriticName
 from pretrain_planner import Planner_Processor, get_PlannerName
+import gymnasium as gym
+
 
 class ActionSelector:
      def __init__(self, dataset_name, specific_dataset, device):
          self.dataset_name = dataset_name
          self.specific_dataset = specific_dataset
-         self.env, self.d_s, self.d_a = get_env(self.dataset_name, self.specific_dataset)
+         self.d_s, self.d_a = get_env(self.dataset_name, self.specific_dataset)
          self.critic = Critic(self.d_s, self.d_a)
          critic_name = get_CriticName(self.dataset_name, self.specific_dataset)
          critic_state_dict = torch.load(critic_name, map_location = 'cpu')
@@ -27,7 +29,7 @@ class ActionSelector:
      def action_selection(self, current_state, actions):
         q_values = []
         for i in range(len(actions)):
-           current_state_norm, act_norm = self.critic_processor.preprocess(current_state, actions[i])
+           current_state_norm, act_norm= self.critic_processor.preprocess(current_state, actions[i])
            current_state_norm = torch.tensor(current_state_norm, dtype = torch.float32).unsqueeze(0).to(self.device)
            act_norm = torch.tensor(act_norm, dtype = torch.float32).unsqueeze(0).to(self.device)
            q_value = self.critic(current_state_norm, act_norm)
@@ -37,13 +39,16 @@ class ActionSelector:
 
 
 def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length : int = 1000):
+     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = 'rgb_array')
+
+     env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = 'rgb_array')
      device = "cuda" if torch.cuda.is_available() else "cpu"
      print(f"Using device {device}")
      action_selector = ActionSelector(env_name, specific_env, device)
      planner_processor = Planner_Processor(env_name, specific_env)
 
      #get environment
-     env, d_s, d_a = get_env(env_name, specific_env)
+     d_s, d_a = get_env(env_name, specific_env)
 
      #get Planner 
      planner_name = get_PlannerName(env_name, specific_env)
@@ -62,16 +67,13 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length : int 
      for i in range(episode_length):
            actions = []
            current_state_norm = planner_processor.preprocess(current_state)
-           x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
-           """
+           #x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
            for j in range(10):
                 x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
                 action = planner_processor.postprocess(x[d_s:(d_s+d_a)].copy())
                 actions.append(action)
            action = action_selector.action_selection(current_state, actions)
-           """
-           action = planner_processor.postprocess(x[d_s:(d_s+d_a)].copy())
-           action = np.clip(action, -1.0, 1.0)
+           #action = planner_processor.postprocess(x[d_s:(d_s+d_a)].copy())
            obs, reward, terminated, truncated, info = env.step(action)
            step = {'observation': obs['observation'].copy(), 'action':action.copy(), 'reward': reward}
            play_seq.append(step)
@@ -92,11 +94,9 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length : int 
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
     set_seed(1)
-    horizon = 20
+    horizon = 32
     env_name = 'kitchen'
     specific_env = 'complete'
 
-    rollout(env_name, specific_env, horizon, steps_T = 500, eta = 1.0, episode_length  = 500)
-   
-    
+    rollout(env_name, specific_env, horizon, steps_T = 1000, eta = 0.3, episode_length  = 500)
 

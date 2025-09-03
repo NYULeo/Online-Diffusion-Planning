@@ -56,7 +56,7 @@ class Critic_Processor():
     
      def preprocess(self, obs, act):
           obs = self.stats.norm_obs(obs)
-          act = self.stats.norm_act(act)
+          act = np.clip(act, -1.0, 1.0)
           return obs, act
 
 class CriticDataset(Dataset):
@@ -74,15 +74,12 @@ class CriticDataset(Dataset):
             obs_list.append(obs[:L])
             act_list.append(acts[:L])
         obs_all = np.concatenate(obs_list, axis=0)  # [N, d_s]
-        act_all = np.concatenate(act_list, axis=0)  # [N, d_a]
         
         
         #get stats
         self.stats = SAStats()
         self.stats.obs_mean=obs_all.mean(axis=0)
         self.stats.obs_std =obs_all.std(axis=0)
-        self.stats.act_min =act_all.min(axis=0)
-        self.stats.act_max =act_all.max(axis=0)
 
         
         for traj in self.trajs:
@@ -130,7 +127,7 @@ def train_critic(dataset_name: str, specific_dataset: str, batch_size, epochs, g
     #get information
     model_name = get_CriticName(dataset_name, specific_dataset)
     dataset = CriticDataset(dataset_name, specific_dataset)
-    obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+    env, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
    
     #prepare training
     dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True)
