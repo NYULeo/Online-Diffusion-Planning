@@ -130,7 +130,7 @@ def train_critic(dataset_name: str, specific_dataset: str, batch_size, epochs, g
     #get information
     model_name = get_CriticName(dataset_name, specific_dataset)
     dataset = CriticDataset(dataset_name, specific_dataset)
-    env, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+    obs_dim, act_dim = get_env(dataset_name, specific_dataset)
    
     #prepare training
     dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True)

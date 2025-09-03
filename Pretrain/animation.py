@@ -3,7 +3,7 @@ import mediapy as media
 import warnings
 import pickle
 warnings.filterwarnings("ignore", category=UserWarning)
-from utils import get_env
+from Dataset import get_env
 
 
 #load the trajectory
