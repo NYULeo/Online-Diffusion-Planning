@@ -338,7 +338,7 @@ def sample_reverse_sde(
     alpha, sigma = cosine_alpha_sigma(t_asc, s=0.008)  # (T+1,)
     beta = cosine_beta(t_asc, s=0.008)                 # (T+1,) => g^2 = beta
     #idx_desc = torch.arange(steps_T, -1, -1, device=device)  # T..0
-    c_eta = 0.5 * (1.0 + eta**2)    # score coefficient in drift (SDE/ODE unification)
+    #eta = 0.5 * (1.0 + eta**2)    # score coefficient in drift (SDE/ODE unification)
 
     # Init x_T ~ N(0, I)
     x = torch.randn(D_tot, dtype = torch.float32, device=device)
@@ -364,15 +364,14 @@ def sample_reverse_sde(
         
         # Unified predictor step
         noise = torch.randn_like(x, dtype=x.dtype) if eta > 0 else torch.zeros_like(x)
-        
-        x = x + ( (drift - c_eta * g2 * score) * dt + eta * (g2**0.5) * ((-1*dt)**0.5) * noise )
+        x = x + ( (drift - g2 * score) * dt +   eta * (g2**0.5) * ((-1*dt)**0.5) * noise  )
         
         # Masked projection with forward-noised prefix at t_next
         if eta > 0:
-            z = torch.randn(d_s, device=device, dtype=x.dtype)
-            known_next = alpha[i].item() * s0_t + sigma[i].item() * z
+            z  = torch.randn(d_s, device=device, dtype=x.dtype)
+            known_next = alpha[i+1].item() * s0_t + sigma[i].item() * z
         else:
-            known_next = alpha[i].item() * s0_t
+            known_next = alpha[i+1].item() * s0_t
 
         Xfix[:d_s] = known_next
         x = M * Xfix + (1.0 - M) * x

@@ -13,26 +13,26 @@ import os
 class SAStats:
     obs_mean: np.ndarray
     obs_std:  np.ndarray
-    act_min:  np.ndarray
-    act_max:  np.ndarray
-    eps: float = 1e-6
+    eps: float = 1e-3
+    std_floor: float = 1e-3   
 
     # ---- observation ----
     def norm_obs(self, s: np.ndarray) -> np.ndarray:
-        return (s - self.obs_mean) / (self.obs_std + self.eps)
+        std = np.maximum(self.obs_std, self.std_floor)
+        return (s - self.obs_mean) / (std + self.eps)
 
     def denorm_obs(self, s_tilde: np.ndarray) -> np.ndarray:
-        return s_tilde * (self.obs_std + self.eps) + self.obs_mean
+        std = np.maximum(self.obs_std, self.std_floor)
+        return s_tilde * (std + self.eps) + self.obs_mean
 
     # ---- action ----
     def norm_act(self, a: np.ndarray) -> np.ndarray:
-        rng = np.maximum(self.act_max - self.act_min, self.eps)
-        return 2.0 * ((a - self.act_min) / rng) - 1.0
+        a = np.clip(1, -1.0, 1.0)
+        return a
 
-    def denorm_act(self, a_tilde: np.ndarray) -> np.ndarray:
-        rng = np.maximum(self.act_max - self.act_min, self.eps)
-        return (a_tilde + 1.0) * 0.5 * rng + self.act_min
-
+    def denorm_act(self, a: np.ndarray) -> np.ndarray:
+        a = np.clip(a, -1.0, 1.0)
+        return a
 
 
 def compute_log_prob(model, s, a, s_next, device="cpu"):

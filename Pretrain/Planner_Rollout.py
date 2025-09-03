@@ -71,6 +71,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length : int 
            action = action_selector.action_selection(current_state, actions)
            """
            action = planner_processor.postprocess(x[d_s:(d_s+d_a)].copy())
+           action = np.clip(action, -1.0, 1.0)
            obs, reward, terminated, truncated, info = env.step(action)
            step = {'observation': obs['observation'].copy(), 'action':action.copy(), 'reward': reward}
            play_seq.append(step)
@@ -95,7 +96,7 @@ if __name__ == "__main__":
     env_name = 'kitchen'
     specific_env = 'complete'
 
-    rollout(env_name, specific_env, horizon, steps_T = 1000, eta = 1.0, episode_length  = 500)
+    rollout(env_name, specific_env, horizon, steps_T = 500, eta = 1.0, episode_length  = 500)
    
     
 

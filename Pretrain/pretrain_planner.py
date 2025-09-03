@@ -46,19 +46,18 @@ class PlannerDataset(Dataset):
             obs_list.append(obs[:L])
             act_list.append(acts[:L])
         obs_all = np.concatenate(obs_list, axis=0)  # [N, d_s]
-        act_all = np.concatenate(act_list, axis=0)  # [N, d_a]
 
         #get stats
         self.stats = SAStats()
         self.stats.obs_mean=obs_all.mean(axis=0)
         self.stats.obs_std =obs_all.std(axis=0)
-        self.stats.act_min =act_all.min(axis=0)
-        self.stats.act_max =act_all.max(axis=0)
 
         # ----- build normalized sliding windows -----
         for traj in self.traj:
             obs, acts = traj['observations'], traj['actions']
             L = min(len(obs), len(acts))
+
+            
 
             # per-step normalize then concat [s_t, a_t]
             sa_pairs = []
@@ -144,7 +143,7 @@ if __name__ == '__main__':  # pragma: no cover
      set_seed(1)
      dataset_name = 'kitchen'
      specific_dataset = 'complete'
-     horizon = 20
-     train_planner(dataset_name = dataset_name, specific_dataset = specific_dataset, horizon = horizon, batch_size = 128, num_epochs = 5000, lr = 2e-4)
+     horizon = 32
+     train_planner(dataset_name = dataset_name, specific_dataset = specific_dataset, horizon = horizon, batch_size = 64, num_epochs = 1000, lr = 1e-4)
     
 
