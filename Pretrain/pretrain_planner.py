@@ -55,9 +55,7 @@ class PlannerDataset(Dataset):
         # ----- build normalized sliding windows -----
         for traj in self.traj:
             obs, acts = traj['observations'], traj['actions']
-            L = min(len(obs), len(acts))
-
-            
+            L = min(len(obs), len(acts))     
 
             # per-step normalize then concat [s_t, a_t]
             sa_pairs = []

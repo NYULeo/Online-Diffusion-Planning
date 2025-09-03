@@ -21,13 +21,13 @@ class SAStats:
         std = np.maximum(self.obs_std, self.std_floor)
         return (s - self.obs_mean) / (std + self.eps)
 
-    def denorm_obs(self, s_tilde: np.ndarray) -> np.ndarray:
+    def denorm_obs(self, s: np.ndarray) -> np.ndarray:
         std = np.maximum(self.obs_std, self.std_floor)
-        return s_tilde * (std + self.eps) + self.obs_mean
+        return s * (std + self.eps) + self.obs_mean
 
     # ---- action ----
     def norm_act(self, a: np.ndarray) -> np.ndarray:
-        a = np.clip(1, -1.0, 1.0)
+        a = np.clip(a, -1.0, 1.0)
         return a
 
     def denorm_act(self, a: np.ndarray) -> np.ndarray:
