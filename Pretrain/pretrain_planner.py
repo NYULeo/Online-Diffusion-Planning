@@ -103,13 +103,14 @@ class Planner_Processor():
 def train_planner(dataset_name, specific_dataset, horizon, batch_size, num_epochs, lr):  # pragma: no cover
     """Run a small example demonstrating model instantiation and training."""
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    state_dim, action_dim = get_env(dataset_name, specific_dataset)
+    env, state_dim, action_dim = get_env(dataset_name, specific_dataset)
     dataset = PlannerDataset(dataset_name, specific_dataset, horizon)
     model_name = dataset.planner_name
     
 
     dataloader = DataLoader(dataset, batch_size, shuffle=True, drop_last=True)
-    model = UNet1D(input_dim = ((state_dim + action_dim) * horizon)).to(device)
+    print(len(dataloader))
+    model = UNet1D(input_dim = ((state_dim + action_dim) * horizon), base_channels = 128, time_embed_dim = 128).to(device)
     model.train()
     trainer = SDETrainer(model, device = device)
     optim = torch.optim.AdamW(model.parameters(), lr)
@@ -127,6 +128,8 @@ def train_planner(dataset_name, specific_dataset, horizon, batch_size, num_epoch
             optim.step()
             total_loss += loss.item()
             num_batches += 1
+            if(num_batches == 5):
+               break
        scheduler.step()
        avg_loss = total_loss / num_batches
        print(f"Epoch {epoch}, avg_loss = {avg_loss:.4f}")
@@ -140,8 +143,8 @@ def train_planner(dataset_name, specific_dataset, horizon, batch_size, num_epoch
 if __name__ == '__main__':  # pragma: no cover
      set_seed(1)
      dataset_name = 'kitchen'
-     specific_dataset = 'partial'
+     specific_dataset = 'complete'
      horizon = 32
-     train_planner(dataset_name = dataset_name, specific_dataset = specific_dataset, horizon = horizon, batch_size = 64, num_epochs = 1000, lr = 1e-4)
+     train_planner(dataset_name = dataset_name, specific_dataset = specific_dataset, horizon = horizon, batch_size = 64, num_epochs = 500, lr = 1e-4)
     
 

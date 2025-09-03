@@ -110,7 +110,7 @@ class UNet1D(nn.Module):
     def __init__(
         self,
         input_dim: int,
-        base_channels: int = 64,
+        base_channels: int = 128,
         time_embed_dim: int = 128,
     ):
         super().__init__()

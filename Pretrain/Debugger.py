@@ -31,7 +31,7 @@ import torch
 import math
 from pretrain_planner import get_PlannerName
 
-t_asc = torch.linspace(1.0, 0.0, 10 + 1)
-b = torch.arange(10, -1, -1)
-print(len(t_asc))
-print(len(b))
+
+
+
+

@@ -19,11 +19,11 @@ class SAStats:
     # ---- observation ----
     def norm_obs(self, s: np.ndarray) -> np.ndarray:
         std = np.maximum(self.obs_std, self.std_floor)
-        return (s - self.obs_mean) / (std + self.eps)
+        return (s - self.obs_mean) / (std)
 
     def denorm_obs(self, s: np.ndarray) -> np.ndarray:
         std = np.maximum(self.obs_std, self.std_floor)
-        return s * (std + self.eps) + self.obs_mean
+        return s * (std) + self.obs_mean
 
     # ---- action ----
     def norm_act(self, a: np.ndarray) -> np.ndarray:
