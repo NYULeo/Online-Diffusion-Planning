@@ -9,11 +9,11 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 def get_env(env_name, specific_env):
     data = get_dataset(env_name, specific_env)
-    env = data.get_env()
+    #env = data.get_env()
     d_s = data.get_state_dim()
     d_a = data.get_action_dim()
     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = 'rgb_array')
-    return  env, d_s, d_a
+    return  d_s, d_a
 
 
 def get_dataset(name: str, specific_name: str):
@@ -74,6 +74,7 @@ class KitchenDataset():
               }
            
               trajectories.append(trajectory)
+              break
           
           return trajectories
      
@@ -84,7 +85,12 @@ class KitchenDataset():
           return self.dataset._action_space.shape[0]
     
      def get_env(self):
-          return self.dataset.recover_environment(render_mode = 'rgb_array')
+          # Use headless mode for servers without display capabilities
+          try:
+               return self.dataset.recover_environment(render_mode = 'rgb_array')
+          except ImportError:
+               # Fallback to headless mode if GLFW3 is not available
+               return self.dataset.recover_environment(render_mode = None)
 
      def get_total_steps(self):
           return self.dataset.total_steps

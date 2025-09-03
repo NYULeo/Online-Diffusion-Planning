@@ -3,8 +3,14 @@ import os
 import logging
 import numpy as np
 import torch
-import gymnasium as gym
-import gymnasium_robotics
+import gymnasium as gym# Conditional import to avoid GLFW3 errors on headless servers
+try:
+    import gymnasium_robotics
+    GYMNASIUM_ROBOTICS_AVAILABLE = True
+except ImportError:
+    GYMNASIUM_ROBOTICS_AVAILABLE = False
+    print("Warning: gymnasium_robotics not available, some functionality may be limited")
+
 from gymnasium.wrappers import TimeLimit
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from loguru import logger as log
@@ -25,10 +31,7 @@ import torch
 import math
 from pretrain_planner import get_PlannerName
 
-
-
-env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle'], render_mode = 'rgb_array')
-print(env)
-
-
-
+t_asc = torch.linspace(1.0, 0.0, 10 + 1)
+b = torch.arange(10, -1, -1)
+print(len(t_asc))
+print(len(b))

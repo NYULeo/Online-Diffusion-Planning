@@ -263,6 +263,7 @@ class SDETrainer:
         return loss
 
 
+
 @torch.no_grad()
 def sample_pf_ode(
     s0: np.ndarray,        
@@ -271,7 +272,7 @@ def sample_pf_ode(
     d_a: int,
     horizon: int,
     steps_T: int = 100,
-    device: Optional[torch.device] = None,
+    device: Optional[torch.device] = None
 ) -> torch.Tensor:
     """
     Explicit-Euler integration of the PF-ODE:
@@ -282,10 +283,10 @@ def sample_pf_ode(
     D_tot = (d_s + d_a) * horizon
 
 
-    t_asc = torch.linspace(0.0, 1.0, steps_T + 1, device=device)
+    t_asc = torch.linspace(1.0, 0.0, steps_T + 1, device=device)
     alpha, sigma = cosine_alpha_sigma(t_asc, s = 0.008)
     beta = cosine_beta(t_asc, s = 0.008)                                  # g^2
-    idx_desc = torch.arange(steps_T, -1, -1, device=device)
+    #idx_desc = torch.arange(steps_T, -1, -1, device=device)
 
     x = torch.randn(D_tot, device=device)
 
@@ -296,13 +297,11 @@ def sample_pf_ode(
 
     
 
-    for i in range(len(idx_desc) - 1):
-        k_now  = idx_desc[i]
-        k_next = idx_desc[i + 1]
-        t_now, t_next = t_asc[k_now], t_asc[k_next]
+    for i in range(len(t_asc)-1):
+        t_now, t_next = t_asc[i], t_asc[i+1]
         
         dt = (t_next - t_now).item()                               # negative
-        g2 = beta[k_now].item()
+        g2 = beta[i].item()
         drift = -0.5 * g2 * x
         
 
@@ -312,8 +311,8 @@ def sample_pf_ode(
         x = x + (drift - 0.5 * g2 * score) * dt
 
         # Hard-prefix: deterministic forward path y = alpha(t_next) * v
-        known_next = alpha[k_next].item() * s0_t
-        Xfix[:d_s] = known_next
+        #known_next = alpha[i+1].item() * s0_t
+        Xfix[:d_s] = s0_t
         x = M * Xfix + (1.0 - M) * x
 
     return x.detach().cpu().numpy()
@@ -367,13 +366,15 @@ def sample_reverse_sde(
         x = x + ( (drift - g2 * score) * dt +   eta * (g2**0.5) * ((-1*dt)**0.5) * noise  )
         
         # Masked projection with forward-noised prefix at t_next
+        """
         if eta > 0:
             z  = torch.randn(d_s, device=device, dtype=x.dtype)
             known_next = alpha[i+1].item() * s0_t + sigma[i].item() * z
         else:
             known_next = alpha[i+1].item() * s0_t
 
-        Xfix[:d_s] = known_next
+        """
+        Xfix[:d_s] = s0_t
         x = M * Xfix + (1.0 - M) * x
 
     return x.detach().cpu().numpy()

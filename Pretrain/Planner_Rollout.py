@@ -39,9 +39,9 @@ class ActionSelector:
 
 
 def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length : int = 1000):
-     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = 'rgb_array')
+     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      print(f"Horizon: {horizon}, step_T: {steps_T}")
-     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = 'rgb_array')
+     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      device = "cuda" if torch.cuda.is_available() else "cpu"
      print(f"Using device {device}")
      action_selector = ActionSelector(env_name, specific_env, device)
@@ -67,13 +67,15 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length : int 
      for i in range(episode_length):
            actions = []
            current_state_norm = planner_processor.preprocess(current_state)
-           #x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
+           x = sample_pf_ode(current_state_norm, model, d_s, d_a, horizon, steps_T, device)
+           """
            for j in range(10):
                 x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
                 action = planner_processor.postprocess(x[d_s:(d_s+d_a)].copy())
                 actions.append(action)
-           action = action_selector.action_selection(current_state, actions)
-           #action = planner_processor.postprocess(x[d_s:(d_s+d_a)].copy())
+           """
+           #action = action_selector.action_selection(current_state, actions)
+           action = planner_processor.postprocess(x[d_s:(d_s+d_a)].copy())
            obs, reward, terminated, truncated, info = env.step(action)
            step = {'observation': obs['observation'].copy(), 'action':action.copy(), 'reward': reward}
            play_seq.append(step)
@@ -98,5 +100,5 @@ if __name__ == "__main__":
     env_name = 'kitchen'
     specific_env = 'complete'
 
-    rollout(env_name, specific_env, horizon, steps_T = 1000, eta = 0.3, episode_length  = 500)
+    rollout(env_name, specific_env, horizon, steps_T = 100, eta = 0.3, episode_length  = 500)
 
