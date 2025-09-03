@@ -16,7 +16,7 @@ class ActionSelector:
      def __init__(self, dataset_name, specific_dataset, device):
          self.dataset_name = dataset_name
          self.specific_dataset = specific_dataset
-         self.d_s, self.d_a = get_env(self.dataset_name, self.specific_dataset)
+         env, self.d_s, self.d_a = get_env(self.dataset_name, self.specific_dataset)
          self.critic = Critic(self.d_s, self.d_a)
          critic_name = get_CriticName(self.dataset_name, self.specific_dataset)
          critic_state_dict = torch.load(critic_name, map_location = 'cpu')
@@ -41,14 +41,14 @@ class ActionSelector:
 def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length : int = 1000):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = 'rgb_array')
      print(f"Horizon: {horizon}, step_T: {steps_T}")
-     env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = 'rgb_array')
+     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = 'rgb_array')
      device = "cuda" if torch.cuda.is_available() else "cpu"
      print(f"Using device {device}")
      action_selector = ActionSelector(env_name, specific_env, device)
      planner_processor = Planner_Processor(env_name, specific_env)
 
      #get environment
-     d_s, d_a = get_env(env_name, specific_env)
+     env, d_s, d_a = get_env(env_name, specific_env)
 
      #get Planner 
      planner_name = get_PlannerName(env_name, specific_env)
