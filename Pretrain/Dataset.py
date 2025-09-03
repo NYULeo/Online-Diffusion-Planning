@@ -8,10 +8,10 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 def get_env(env_name, specific_env):
     data = get_dataset(env_name, specific_env)
-    env= data.get_env()
+    #env= data.get_env()
     d_s = data.get_state_dim()
     d_a = data.get_action_dim()
-    return  env, d_s, d_a
+    return  d_s, d_a
 
 
 def get_dataset(name: str, specific_name: str):
