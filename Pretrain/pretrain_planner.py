@@ -2,7 +2,8 @@
 import torch
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
-from Backbone import UNet1D, SDETrainer
+from Backbone.UNet import TemporalUnet
+from Backbone.Trainer import SDETrainer
 from Dataset import get_dataset, get_env
 import pickle
 from utils import SAStats, set_seed
@@ -67,8 +68,8 @@ class PlannerDataset(Dataset):
             # sliding horizon, then flatten to 1D
             for start in range(0, L - horizon + 1):
                 segment = np.array(sa_pairs[start:start + horizon])  # [H, d_s+d_a]
-                self.windows.append(torch.from_numpy(segment.flatten()).float())
-        
+                self.windows.append(torch.from_numpy(segment).float())
+               
         self.save_stats()
 
     def save_stats(self):
@@ -100,7 +101,7 @@ class Planner_Processor():
           return  act
          
 
-def train_planner(dataset_name, specific_dataset, horizon, batch_size, num_epochs, lr):  # pragma: no cover
+def train_planner(dataset_name, specific_dataset, horizon, batch_size, num_epochs, lr, weight_type):  # pragma: no cover
     """Run a small example demonstrating model instantiation and training."""
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     state_dim, action_dim = get_env(dataset_name, specific_dataset)
@@ -109,14 +110,13 @@ def train_planner(dataset_name, specific_dataset, horizon, batch_size, num_epoch
     
 
     dataloader = DataLoader(dataset, batch_size, shuffle=True, drop_last=True)
-    print(len(dataloader))
-    model = UNet1D(input_dim = ((state_dim + action_dim) * horizon), base_channels = 128, time_embed_dim = 128).to(device)
+    model = TemporalUnet(horizon=horizon, transition_dim=(state_dim + action_dim)).to(device)
     model.train()
-    trainer = SDETrainer(model, device = device)
+    trainer = SDETrainer(model, s = 0.008,  weight_type = weight_type, device = device)
     optim = torch.optim.AdamW(model.parameters(), lr)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, num_epochs)
     print(f"Training planner for {dataset_name}-{specific_dataset} Dataset]")
-    print(f"Horizon: {horizon}, Epochs: {num_epochs}, Batch Size: {batch_size}, Learning Rate; {lr}")
+    print(f"Horizon: {horizon}, Epochs: {num_epochs}, Batch Size: {batch_size}, Learning Rate; {lr}, weight_type: {weight_type}")
     for epoch in range(num_epochs):
        total_loss = 0
        num_batches = 0
@@ -125,11 +125,10 @@ def train_planner(dataset_name, specific_dataset, horizon, batch_size, num_epoch
             loss = trainer.train_step(sa0)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            #torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optim.step()
             total_loss += loss.item()
             num_batches += 1
-            if(num_batches == 5):
-               break
        scheduler.step()
        avg_loss = total_loss / num_batches
        print(f"Epoch {epoch}, avg_loss = {avg_loss:.4f}")
@@ -145,6 +144,6 @@ if __name__ == '__main__':  # pragma: no cover
      dataset_name = 'kitchen'
      specific_dataset = 'complete'
      horizon = 32
-     train_planner(dataset_name = dataset_name, specific_dataset = specific_dataset, horizon = horizon, batch_size = 64, num_epochs = 500, lr = 1e-4)
+     train_planner(dataset_name = dataset_name, specific_dataset = specific_dataset, horizon = horizon, batch_size = 64, num_epochs = 1000, lr = 1e-4, weight_type = 'sigma2')
     
 

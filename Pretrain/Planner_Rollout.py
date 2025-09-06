@@ -2,7 +2,8 @@ import math
 import numpy as np
 import torch
 from dataclasses import dataclass
-from Backbone import UNet1D, sample_reverse_sde, sample_pf_ode
+from Backbone.UNet import TemporalUnet
+from Backbone.Sampler import sample_reverse_sde
 import pickle
 from typing import Optional
 from Dataset import get_env
@@ -11,7 +12,7 @@ from train_critic import Critic, Critic_Processor, get_CriticName
 from pretrain_planner import Planner_Processor, get_PlannerName
 import gymnasium as gym
 
-
+"""
 class ActionSelector:
      def __init__(self, dataset_name, specific_dataset, device):
          self.dataset_name = dataset_name
@@ -37,7 +38,7 @@ class ActionSelector:
         idx = np.argmax(q_values)
         return actions[idx]
 
-
+"""
 def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length : int = 1000):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      print(f"Horizon: {horizon}, step_T: {steps_T}")
@@ -52,7 +53,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length : int 
 
      #get Planner 
      planner_name = get_PlannerName(env_name, specific_env)
-     model = UNet1D(input_dim=(d_s+d_a)*horizon).to(device)
+     model = TemporalUnet(horizon=horizon, transition_dim=(d_s+d_a)).to(device)
      state_dict = torch.load(planner_name, map_location='cpu')
      model.load_state_dict(state_dict)
      model.eval()
@@ -67,7 +68,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length : int 
      for i in range(episode_length):
            actions = []
            current_state_norm = planner_processor.preprocess(current_state)
-           x = sample_pf_ode(current_state_norm, model, d_s, d_a, horizon, steps_T, device)
+           x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,device)
            """
            for j in range(10):
                 x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
@@ -75,7 +76,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length : int 
                 actions.append(action)
            """
            #action = action_selector.action_selection(current_state, actions)
-           action = planner_processor.postprocess(x[d_s:(d_s+d_a)].copy())
+           action = planner_processor.postprocess(x[0, d_s:(d_s+d_a)].copy())
            obs, reward, terminated, truncated, info = env.step(action)
            step = {'observation': obs['observation'].copy(), 'action':action.copy(), 'reward': reward}
            play_seq.append(step)
@@ -98,7 +99,8 @@ if __name__ == "__main__":
     set_seed(1)
     horizon = 32
     env_name = 'kitchen'
-    specific_env = 'partial'
+    specific_env = 'complete'
 
-    rollout(env_name, specific_env, horizon, steps_T = 100, eta = 0.3, episode_length  = 500)
+    rollout(env_name, specific_env, horizon, steps_T = 100, eta = 0.5, episode_length  = 3)
+
 

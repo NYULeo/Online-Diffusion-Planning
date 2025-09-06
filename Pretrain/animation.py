@@ -31,7 +31,7 @@ env.reset()
 frames = []
 for i in range(len(actions)):
     #action = np.random.uniform(-1.0, 1.0, d_a)
-    action = np.clip(action[i], -1.0, 1.0)
+    action = np.clip(actions[i], -1.0, 1.0)
     obs, rew, terminated, truncated, info = env.step(action)
     frames.append(env.render())
     if terminated or truncated:
