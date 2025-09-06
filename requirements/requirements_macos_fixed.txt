@@ -1,0 +1,30 @@
+gymnasium<1.0.0
+jax-jumpy==1.0.0 ; python_version >= "3.8" and python_version < "3.11"
+matplotlib
+moviepy
+numpy<2.0
+pandas
+protobuf
+pygame
+stable-baselines3
+tqdm
+wandb
+torchrl==0.7.2
+tensordict==0.7.2
+tyro
+loguru
+huggingface_hub  # Optional: for downloading datasets from Hugging Face Hub
+gymnasium-robotics>=1.4.0  # Official Franka Kitchen environment
+minari  # For loading D4RL datasets
+mediapy  # For media processing and animations
+sympy  # For symbolic mathematics
+h5py>=3.0.0  # Required for D4RL dataset loading
+mujoco  # MuJoCo physics engine
+
+# PyTorch for macOS (CPU version)
+torch==2.6.0
+torchvision==0.21.0
+torchaudio==2.6.0
+
+# JAX for macOS
+jax==0.4.35

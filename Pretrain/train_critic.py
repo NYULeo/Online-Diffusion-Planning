@@ -181,9 +181,9 @@ if __name__ == '__main__':  # pragma: no cover
     dataset_name = 'kitchen', 
     specific_dataset = 'complete', 
     batch_size=1024, 
-    epochs=50,  
+    epochs=300,  
     gamma=0.99, 
-    lr=1e-3, 
+    lr=1e-4, 
     tau = 0.005)
 
 

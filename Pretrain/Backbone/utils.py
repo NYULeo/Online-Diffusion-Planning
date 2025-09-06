@@ -17,7 +17,7 @@ def cosine_beta(t: torch.Tensor, s: float = 0.008) -> torch.Tensor:
     Using beta(t) = -2 d/dt log alpha(t) = (pi/(1+s)) * tan(a).
     """
     t = t.clamp(0.0, 1.0 - 1e-3)
-    a = (math.pi / 2.0) * (t + s) / (1.0 + s)
+    a = (math.pi / 2.0) * ((t + s) / (1.0 + s))
     return (math.pi / (1.0 + s)) * torch.tan(a)
 
 

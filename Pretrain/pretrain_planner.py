@@ -30,6 +30,66 @@ def get_PlannerName(env_name, specific_env):
      else:
          raise ValueError(f"Invalid environment name: '{env_name}")
 
+class PlannerDataset_debug(Dataset):
+    def __init__(self, dataset_name, specific_dataset, horizon, index):
+        data = get_dataset(dataset_name, specific_dataset)
+        self.planner_name = get_PlannerName(dataset_name, specific_dataset)
+        self.traj = data.get_trajectories()
+        self.horizon = horizon
+        self.windows = []
+
+
+        # ----- gather raw obs/actions to fit stats -----
+        obs_list, act_list = [], []
+        obs, acts = self.traj[index]['observations'], self.traj[index]['actions']
+        L = min(len(obs), len(acts))
+        obs_list.append(obs[:L])
+        act_list.append(acts[:L])
+        
+        obs_all = np.concatenate(obs_list, axis = 0)  # [N, d_s]
+        act_all = np.concatenate(act_list, axis = 0)
+        total = [obs_all, act_all]
+        with open('total.pkl', 'wb') as f:
+            pickle.dump(total, f)
+
+
+        #get stats
+        self.stats = SAStats()
+        self.stats.obs_mean=obs_all.mean(axis=0)
+        self.stats.obs_std =obs_all.std(axis=0)
+        self.save_stats()
+
+        # ----- build normalized sliding windows -----
+        #for traj in self.traj:
+        obs, acts = self.traj[index]['observations'], self.traj[index]['actions']
+        L = min(len(obs), len(acts))     
+        sa_pairs = []
+        for t in range(L):
+             s_norm = self.stats.norm_obs(obs[t])
+             a_norm = self.stats.norm_act(acts[t])
+             sa_pairs.append(np.concatenate([s_norm, a_norm], axis=0))
+        
+        # sliding horizon, then flatten to 1D
+        for start in range(0, L - horizon + 1):
+                segment = np.array(sa_pairs[start:start + horizon])  # [H, d_s+d_a]
+                self.windows.append(torch.from_numpy(segment).float())
+            
+         
+
+    def save_stats(self):
+        stats_name = self.planner_name.replace('.pt', '_stats.pkl')
+        with open(stats_name, 'wb') as f:
+              pickle.dump(self.stats, f)
+ 
+
+    def __len__(self):
+        return len(self.windows)
+
+    def __getitem__(self, idx):
+        return self.windows[idx]
+
+
+
 
 class PlannerDataset(Dataset):
     def __init__(self, dataset_name, specific_dataset, horizon):
@@ -57,7 +117,6 @@ class PlannerDataset(Dataset):
         for traj in self.traj:
             obs, acts = traj['observations'], traj['actions']
             L = min(len(obs), len(acts))     
-
             # per-step normalize then concat [s_t, a_t]
             sa_pairs = []
             for t in range(L):
@@ -69,7 +128,7 @@ class PlannerDataset(Dataset):
             for start in range(0, L - horizon + 1):
                 segment = np.array(sa_pairs[start:start + horizon])  # [H, d_s+d_a]
                 self.windows.append(torch.from_numpy(segment).float())
-               
+
         self.save_stats()
 
     def save_stats(self):
@@ -101,22 +160,23 @@ class Planner_Processor():
           return  act
          
 
-def train_planner(dataset_name, specific_dataset, horizon, batch_size, num_epochs, lr, weight_type):  # pragma: no cover
+def train_planner(dataset_name, specific_dataset, horizon, batch_size, num_epochs, lr):  # pragma: no cover
     """Run a small example demonstrating model instantiation and training."""
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     state_dim, action_dim = get_env(dataset_name, specific_dataset)
-    dataset = PlannerDataset(dataset_name, specific_dataset, horizon)
+    #dataset = PlannerDataset(dataset_name, specific_dataset, horizon)
+    dataset = PlannerDataset_debug(dataset_name, specific_dataset, horizon, index = 0)
     model_name = dataset.planner_name
     
 
     dataloader = DataLoader(dataset, batch_size, shuffle=True, drop_last=True)
     model = TemporalUnet(horizon=horizon, transition_dim=(state_dim + action_dim)).to(device)
     model.train()
-    trainer = SDETrainer(model, s = 0.008,  weight_type = weight_type, device = device)
+    trainer = SDETrainer(model, device = device)
     optim = torch.optim.AdamW(model.parameters(), lr)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, num_epochs)
     print(f"Training planner for {dataset_name}-{specific_dataset} Dataset]")
-    print(f"Horizon: {horizon}, Epochs: {num_epochs}, Batch Size: {batch_size}, Learning Rate; {lr}, weight_type: {weight_type}")
+    print(f"Horizon: {horizon}, Epochs: {num_epochs}, Batch Size: {batch_size}, Learning Rate; {lr}")
     for epoch in range(num_epochs):
        total_loss = 0
        num_batches = 0
@@ -144,6 +204,6 @@ if __name__ == '__main__':  # pragma: no cover
      dataset_name = 'kitchen'
      specific_dataset = 'complete'
      horizon = 32
-     train_planner(dataset_name = dataset_name, specific_dataset = specific_dataset, horizon = horizon, batch_size = 64, num_epochs = 1000, lr = 1e-4, weight_type = 'sigma2')
+     train_planner(dataset_name = dataset_name, specific_dataset = specific_dataset, horizon = horizon, batch_size = 32, num_epochs = 100, lr = 2e-5)
     
 
