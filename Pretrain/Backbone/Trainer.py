@@ -27,7 +27,8 @@ class SDETrainer:
     
 
     def train_step(self, x0: torch.Tensor, conditions: torch.Tensor) -> torch.Tensor:
-        x0 = x0.to(self.device)                          # (B,H,D)
+        x0 = x0.to(self.device)
+        conditions = conditions.to(self.device)                          # (B,H,D)
         B, H, D = x0.shape
         mask = torch.zeros((B, H, D), dtype = torch.float32, device = self.device)
         y = torch.zeros((B, H, D), dtype = torch.float32, device = self.device)
