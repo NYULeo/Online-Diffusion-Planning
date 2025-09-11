@@ -24,6 +24,7 @@ from utils import set_seed
 from Dataset import get_env, get_dataset
 import gymnasium_robotics
 import mediapy as media
+from collections import namedtuple
 
 
 
@@ -56,20 +57,13 @@ for i in range(len(traj['actions'])):
 media.write_video("demo.mp4", frames, fps=30)
 """
 
-Xfix = torch.zeros(2, 3)
-M = torch.zeros(2,3)
+a = np.concatenate([np.array([1,2,3]), np.array([4,5,6])], axis=0)
+print(a)
 
-M[0, :] = 1.0 
-print(M)
-Xfix[0, :] = torch.tensor([1,2,3])
-print(Xfix)
 
-x = torch.tensor( [ [4,5,6, 7, 8], [7,8,9, 10, 11]          ]       )
-print(x)
-"""
-x = M * Xfix + (1.0 - M) * x
-print(x)
-"""
 
-print(int(1e6 // 10000))
+
+
+
+
 

@@ -150,6 +150,9 @@ class LinearAttention(nn.Module):
 
 
 
+def apply_conditioning(x, conditions, state_dim):
+    x[:, 0, :state_dim] = conditions.clone()
+    return x
 
 """
 

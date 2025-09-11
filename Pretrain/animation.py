@@ -6,7 +6,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 from Dataset import get_env, get_dataset
 from utils import SAStats
 import numpy as np
-
+import matplotlib.pyplot as plt
 #load the trajectory
 with open('Generated_trajectory.pkl', 'rb') as f:
     traj_info= pickle.load(f)
@@ -14,10 +14,39 @@ with open('Generated_trajectory.pkl', 'rb') as f:
 
 #get action sequence
 sequence = traj_info['sequence']
-actions = []
+Gen_actions = []
 for i in range(len(sequence)):
-      actions.append(sequence[i]['action'])
+      Gen_actions.append(sequence[i]['action'])
 
+
+"""
+
+with open('total.pkl', 'rb') as f:
+     total = pickle.load(f)
+
+
+
+#get action sequence
+sequence = traj_info['sequence']
+Gen_actions = []
+for i in range(len(sequence)):
+      Gen_actions.append(sequence[i]['action'])
+
+
+
+actions = total[1]
+dis = []
+for i in range(len(actions)):
+      dis.append(np.linalg.norm(actions[i] - Gen_actions[i]))
+
+print(np.mean(dis))
+
+
+
+
+
+
+"""
 
 #get environment
 env, d_s, d_a= get_env(traj_info['env_name'], traj_info['specific_env'])
@@ -29,10 +58,10 @@ env, d_s, d_a= get_env(traj_info['env_name'], traj_info['specific_env'])
 set_seed(0)
 env.reset()
 frames = []
-for i in range(len(actions)):
+for i in range(len(Gen_actions)):
     #action = np.random.uniform(-1.0, 1.0, d_a)
     #action = np.clip(actions[i], -1.0, 1.0)
-    obs, rew, terminated, truncated, info = env.step(actions[i])
+    obs, rew, terminated, truncated, info = env.step(Gen_actions[i])
     frames.append(env.render())
     if terminated or truncated:
         break

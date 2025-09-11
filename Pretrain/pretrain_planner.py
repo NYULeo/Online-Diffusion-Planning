@@ -30,6 +30,7 @@ def get_PlannerName(env_name, specific_env):
      else:
          raise ValueError(f"Invalid environment name: '{env_name}")
 
+"""
 class PlannerDataset_debug(Dataset):
     def __init__(self, dataset_name, specific_dataset, horizon, index):
         data = get_dataset(dataset_name, specific_dataset)
@@ -74,30 +75,32 @@ class PlannerDataset_debug(Dataset):
                 segment = np.array(sa_pairs[start:start + horizon])  # [H, d_s+d_a]
                 self.windows.append(torch.from_numpy(segment).float())
             
-         
 
     def save_stats(self):
         stats_name = self.planner_name.replace('.pt', '_stats.pkl')
         with open(stats_name, 'wb') as f:
               pickle.dump(self.stats, f)
- 
 
+ 
     def __len__(self):
         return len(self.windows)
 
     def __getitem__(self, idx):
         return self.windows[idx]
-
-
+"""
 
 
 class PlannerDataset(Dataset):
-    def __init__(self, dataset_name, specific_dataset, horizon):
+    def __init__(self, dataset_name, specific_dataset, horizon, state_dim, action_dim):
         data = get_dataset(dataset_name, specific_dataset)
         self.planner_name = get_PlannerName(dataset_name, specific_dataset)
         self.traj = data.get_trajectories()
         self.horizon = horizon
         self.windows = []
+        self.conditions = []
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        
 
         # ----- gather raw obs/actions to fit stats -----
         obs_list, act_list = [], []
@@ -123,12 +126,13 @@ class PlannerDataset(Dataset):
                 s_norm = self.stats.norm_obs(obs[t])
                 a_norm = self.stats.norm_act(acts[t])
                 sa_pairs.append(np.concatenate([s_norm, a_norm], axis=0))
-
+            
             # sliding horizon, then flatten to 1D
             for start in range(0, L - horizon + 1):
-                segment = np.array(sa_pairs[start:start + horizon])  # [H, d_s+d_a]
+                segment = np.array(sa_pairs[start : start + horizon])  # [H, d_s+d_a]
                 self.windows.append(torch.from_numpy(segment).float())
-
+                self.conditions.append(torch.from_numpy(sa_pairs[start][:self.state_dim]).float())
+      
         self.save_stats()
 
     def save_stats(self):
@@ -141,7 +145,7 @@ class PlannerDataset(Dataset):
         return len(self.windows)
 
     def __getitem__(self, idx):
-        return self.windows[idx]
+        return self.windows[idx], self.conditions[idx]
  
 
 class Planner_Processor():
@@ -164,15 +168,14 @@ def train_planner(dataset_name, specific_dataset, horizon, batch_size, num_epoch
     """Run a small example demonstrating model instantiation and training."""
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     state_dim, action_dim = get_env(dataset_name, specific_dataset)
-    #dataset = PlannerDataset(dataset_name, specific_dataset, horizon)
-    dataset = PlannerDataset_debug(dataset_name, specific_dataset, horizon, index = 0)
+    dataset = PlannerDataset(dataset_name, specific_dataset, horizon, state_dim, action_dim)
     model_name = dataset.planner_name
     
 
     dataloader = DataLoader(dataset, batch_size, shuffle=True, drop_last=True)
     model = TemporalUnet(horizon=horizon, transition_dim=(state_dim + action_dim)).to(device)
     model.train()
-    trainer = SDETrainer(model, device = device)
+    trainer = SDETrainer(model, state_dim, action_dim, device = device)
     optim = torch.optim.AdamW(model.parameters(), lr)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, num_epochs)
     print(f"Training planner for {dataset_name}-{specific_dataset} Dataset]")
@@ -180,9 +183,9 @@ def train_planner(dataset_name, specific_dataset, horizon, batch_size, num_epoch
     for epoch in range(num_epochs):
        total_loss = 0
        num_batches = 0
-       for sa0 in dataloader:
+       for traj, cond in dataloader:
             optim.zero_grad()
-            loss = trainer.train_step(sa0)
+            loss = trainer.train_step(traj, cond)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             #torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
@@ -199,11 +202,21 @@ def train_planner(dataset_name, specific_dataset, horizon, batch_size, num_epoch
 
 
 
+
 if __name__ == '__main__':  # pragma: no cover
      set_seed(1)
      dataset_name = 'kitchen'
      specific_dataset = 'complete'
      horizon = 32
-     train_planner(dataset_name = dataset_name, specific_dataset = specific_dataset, horizon = horizon, batch_size = 32, num_epochs = 100, lr = 2e-5)
-    
+     train_planner(dataset_name = dataset_name, specific_dataset = specific_dataset, horizon = horizon, batch_size = 32, num_epochs = 1000, lr = 2e-5) 
+
+
+
+
+
+
+
+
+
+
 

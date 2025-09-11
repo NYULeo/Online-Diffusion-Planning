@@ -105,6 +105,6 @@ if __name__ == "__main__":
     env_name = 'kitchen'
     specific_env = 'complete'
 
-    rollout(env_name, specific_env, horizon, steps_T = 30, eta = 0.3, episode_length  = 500, critic = False)
+    rollout(env_name, specific_env, horizon, steps_T = 30, eta = 0.3, episode_length  = 300, critic = False)
 
 
