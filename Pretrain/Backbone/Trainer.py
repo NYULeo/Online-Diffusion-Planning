@@ -23,14 +23,14 @@ class SDETrainer:
         specific_dataset,
         horizon,
         num_steps = 100000,
-        batch_size = 32,
+        batch_size = 128,
         lr=2e-4,
         device: Optional[torch.device] = None,
-        update_ema_every=10,
+        update_ema_every=2,
         step_start_ema = 2000,
         gradient_accumulate_every=2,
         ema_decay=0.995,
-        save_freq= 100,
+        save_freq= 10000,
         log_freq = 10,
         s: float = 0.008,                  # cosine offset
         weight_type: str = 'sigma2',         # {"one", "sigma2", "beta"}
@@ -55,13 +55,13 @@ class SDETrainer:
         self.gradient_accumulate_every = gradient_accumulate_every
         self.lr = lr
         self.step_start_ema = step_start_ema
-        self.optim = torch.optim.AdamW(self.model.parameters(), self.lr,  weight_decay = 1e-5)
+        self.optim = torch.optim.AdamW(self.model.parameters(), self.lr)
         self.num_steps = num_steps
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optim, self.num_steps)
         self.batch_size = batch_size
         self.log_freq = log_freq
         self.save_freq = save_freq
-        self.logdir = "Pretrain/Checkpoints/"
+        self.logdir = "Checkpoints/"
 
 
     def reset_parameters(self):

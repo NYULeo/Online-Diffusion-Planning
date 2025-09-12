@@ -222,7 +222,7 @@ class PlannerDataset(Dataset):
 
     def save_stats(self):
         stats_name =  str(self.planner_name) + '_stats.pkl'
-        stats_dir = 'Pretrain/Stats/'
+        stats_dir = 'Stats/'
         os.makedirs(stats_dir, exist_ok=True)
         savepath = os.path.join(stats_dir, stats_name)
         with open(savepath, 'wb') as f:
