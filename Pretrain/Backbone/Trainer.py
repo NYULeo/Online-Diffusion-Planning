@@ -97,8 +97,7 @@ class SDETrainer:
     def train(self):
         print(self.device)
         dataset = PlannerDataset(self.dataset_name, self.specific_dataset, self.horizon, self.state_dim, self.action_dim)
-        dataloader = cycle(DataLoader(dataset, self.batch_size, shuffle = True, pin_memory = True, num_workers = 4))
-        
+        dataloader = cycle(DataLoader(dataset, self.batch_size, shuffle = True, pin_memory = True, num_workers = 8))
         print(f"Training planner for {self.dataset_name}-{self.specific_dataset} Dataset")
         print(f"Horizon: {self.horizon}, Epochs: {self.num_steps}, Batch Size: {self.batch_size}, Learning Rate; {self.lr}")
         

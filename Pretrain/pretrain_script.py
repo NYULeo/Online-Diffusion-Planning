@@ -15,7 +15,7 @@ if __name__ == '__main__':  # pragma: no cover
      horizon = 32
      device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
      trainer = SDETrainer(dataset_name, specific_dataset, horizon, 
-         num_steps = 100000, 
+         num_steps = 1000000, 
          batch_size = 32,
          lr=2e-4,
          device = device)
