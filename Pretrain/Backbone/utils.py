@@ -5,6 +5,37 @@ import torch.nn as nn
 import einops
 from einops.layers.torch import Rearrange
 from typing import List, Tuple, Optional
+import torch.nn.functional as F
+
+
+
+#-----------------------------------------------------------------------------#
+#---------------------------------- Trainer ----------------------------------#
+#-----------------------------------------------------------------------------#
+
+def cycle(dl):
+    while True:
+        for data in dl:
+            yield data
+
+class EMA():
+    '''
+        empirical moving average
+    '''
+    def __init__(self, beta):
+        super().__init__()
+        self.beta = beta
+
+    def update_model_average(self, ma_model, current_model):
+        for current_params, ma_params in zip(current_model.parameters(), ma_model.parameters()):
+            old_weight, up_weight = ma_params.data, current_params.data
+            ma_params.data = self.update_average(old_weight, up_weight)
+
+    def update_average(self, old, new):
+        if old is None:
+            return new
+        return old * self.beta + (1 - self.beta) * new
+
 
 
 #-----------------------------------------------------------------------------#
@@ -35,6 +66,7 @@ def cosine_alpha_sigma(t: torch.Tensor, s: float = 0.008) -> Tuple[torch.Tensor,
     alpha = torch.sqrt(alpha_bar)
     sigma = torch.sqrt(1.0 - alpha_bar)
     return alpha, sigma
+
 
 
 
