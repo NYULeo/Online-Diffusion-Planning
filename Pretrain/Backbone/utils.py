@@ -6,6 +6,9 @@ import einops
 from einops.layers.torch import Rearrange
 from typing import List, Tuple, Optional
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
+import pickle
+import os
 
 
 
@@ -343,4 +346,104 @@ Losses = {
 
 
 """
+
+
+
+# Add this class before SDETrainer
+class LossTracker:
+    """Class to track and plot training losses"""
+    
+    def __init__(self, save_dir: str = "./logs/"):
+        self.save_dir = save_dir
+        self.losses = []
+        self.steps = []
+        self.learning_rates = []
+        os.makedirs(save_dir, exist_ok=True)
+    
+    def log_loss(self, step: int, loss: float, lr: Optional[float] = None):
+        """Log a loss value at a specific step"""
+        self.steps.append(step)
+        self.losses.append(loss)
+        if lr is not None:
+            self.learning_rates.append(lr)
+    
+    def save_logs(self, filename: str = "training_logs.pkl"):
+        """Save logs to pickle file"""
+        log_data = {
+            'steps': self.steps,
+            'losses': self.losses,
+            'learning_rates': self.learning_rates
+        }
+        save_path = os.path.join(self.save_dir, filename)
+        with open(save_path, 'wb') as f:
+            pickle.dump(log_data, f)
+        print(f"Logs saved to {save_path}")
+    
+    def plot_loss_curve(self, 
+                       save_path: Optional[str] = None,
+                       title: str = "Training Loss Curve",
+                       show_lr: bool = False,
+                       smooth_window: int = 50):
+        """Plot the loss curve with optional smoothing and learning rate"""
+        
+        if not self.losses:
+            print("No loss data to plot!")
+            return
+        
+        fig, ax1 = plt.subplots(figsize=(12, 8))
+        
+        # Convert to numpy arrays
+        steps = np.array(self.steps)
+        losses = np.array(self.losses)
+        
+        # Plot raw loss
+        ax1.plot(steps, losses, alpha=0.3, color='blue', label='Raw Loss')
+        
+        # Plot smoothed loss
+        if len(losses) > smooth_window:
+            smoothed_losses = self._smooth_curve(losses, smooth_window)
+            ax1.plot(steps, smoothed_losses, color='red', linewidth=2, label=f'Smoothed Loss (window={smooth_window})')
+        
+        ax1.set_xlabel('Training Steps', fontsize=12)
+        ax1.set_ylabel('Loss', fontsize=12, color='blue')
+        ax1.tick_params(axis='y', labelcolor='blue')
+        ax1.grid(True, alpha=0.3)
+        ax1.legend()
+        
+        # Plot learning rate on secondary axis if available
+        if show_lr and self.learning_rates:
+            ax2 = ax1.twinx()
+            ax2.plot(steps, self.learning_rates, color='green', alpha=0.7, label='Learning Rate')
+            ax2.set_ylabel('Learning Rate', fontsize=12, color='green')
+            ax2.tick_params(axis='y', labelcolor='green')
+            ax2.legend(loc='upper right')
+        
+        plt.title(title, fontsize=14, fontweight='bold')
+        plt.tight_layout()
+        
+        # Save plot
+        if save_path is None:
+            save_path = os.path.join(self.save_dir, "loss_curve.png")
+        
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Loss curve saved to {save_path}")
+        
+        # Show plot
+        plt.show()
+        
+        return fig
+    
+    def _smooth_curve(self, data: np.ndarray, window: int) -> np.ndarray:
+        """Apply moving average smoothing to the data"""
+        if window <= 1:
+            return data
+        
+        smoothed = np.convolve(data, np.ones(window)/window, mode='valid')
+        # Pad the beginning to maintain the same length
+        padded = np.full_like(data, np.nan)
+        padded[window-1:] = smoothed
+        return padded
 

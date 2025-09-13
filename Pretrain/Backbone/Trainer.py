@@ -9,9 +9,11 @@ from Dataset import get_env
 from torch.utils.data import DataLoader
 import numpy as np
 from Backbone.Dit import DiT1d
+from Backbone.UNet import TemporalUnet
 import os
 from Dataset import get_PlannerName, PlannerDataset
-from utils import set_seed
+from .utils import LossTracker
+
 
 
 
@@ -22,6 +24,7 @@ class SDETrainer:
         dataset_name,
         specific_dataset,
         horizon,
+        backbone_name,
         num_steps = 10000,
         batch_size = 64,
         lr=2e-4,
@@ -42,6 +45,8 @@ class SDETrainer:
         self.dataset_name = dataset_name
         self.specific_dataset = specific_dataset
         self.state_dim, self.action_dim = get_env(self.dataset_name, self.specific_dataset)
+        self.backbone_name = backbone_name
+        self.backbone_selection()
         self.model_name = get_PlannerName(self.dataset_name, self.specific_dataset)
         self.model = DiT1d(
             in_dim = (self.state_dim + self.action_dim), emb_dim = 128,
@@ -65,8 +70,16 @@ class SDETrainer:
         self.log_freq = log_freq
         self.save_freq = save_freq
         self.logdir = "./Checkpoints/"
+        self.loss_tracker = LossTracker(save_dir="./logs/")
 
-
+    def backbone_selection(self):
+         if(self.backbone_name == 'transformer'):
+              self.model = DiT1d(
+                   in_dim = (self.state_dim + self.action_dim), emb_dim = 128,
+                   d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(self.device)
+         elif(self.backbone_name == 'unet'):
+              self.model = TemporalUnet(self.horizon, self.state_dim + self.action_dim).to(self.device)
+              
     def reset_parameters(self):
         self.ema_model.load_state_dict(self.model.state_dict())
 
@@ -85,6 +98,8 @@ class SDETrainer:
         self.model.eval()
         self.ema_model.eval()
         data = {
+            'dataset_name': self.dataset_name,
+            'specific_dataset': self.specific_dataset,
             'step': self.step,
             'ema': self.ema_model.state_dict()
         }
@@ -101,7 +116,7 @@ class SDETrainer:
         dataset = PlannerDataset(self.dataset_name, self.specific_dataset, self.horizon, self.state_dim, self.action_dim)
         dataloader = cycle(DataLoader(dataset, self.batch_size, shuffle = True, pin_memory = True, num_workers = 8))
         print(f"Training planner for {self.dataset_name}-{self.specific_dataset} Dataset")
-        print(f"Horizon: {self.horizon}, Epochs: {self.num_steps}, Batch Size: {self.batch_size}, Learning Rate; {self.lr}")
+        print(f"Backbone:{self.backbone_name}, Horizon: {self.horizon}, Epochs: {self.num_steps}, Batch Size: {self.batch_size}, Learning Rate; {self.lr}")
         
         self.model.train()
         self.ema_model.eval()
@@ -120,6 +135,7 @@ class SDETrainer:
             self.optim.zero_grad()
             #self.scheduler.step()
             total_loss += loss.item()
+            self.loss_tracker.log_loss(self.step, loss.item(), self.optim.param_groups[0]['lr'])
 
             if ((self.step % self.update_ema_every) == 0):
                 self.step_ema()
@@ -128,11 +144,22 @@ class SDETrainer:
                 print(f"step {self.step} loss {total_loss/self.log_freq}")
                 total_loss = 0
             
-            if (self.step % self.save_freq == 0):
+            if ((self.step % self.save_freq == 0) and (self.step!=0)):
                 self.save(self.step)
+                self.loss_tracker.save_logs(f"{self.model_name}_logs.pkl")
+                self.loss_tracker.plot_loss_curve(
+                      save_path=f"./plots/{self.model_name}_loss_curve.png",
+                      title=f"{self.model_name} Training Loss",
+                      show_lr=True,
+                      smooth_window=50)
 
             self.step += 1
-            
+        # Final save and plot
+        self.loss_tracker.save_logs(f"{self.model_name}_final_logs.pkl")
+        self.loss_tracker.plot_loss_curve(
+             title=f"{self.model_name} Final Training Loss",
+             show_lr=True,
+             smooth_window=50)
         
 
 
