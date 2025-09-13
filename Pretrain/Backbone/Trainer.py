@@ -133,7 +133,7 @@ class SDETrainer:
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
             self.optim.step()
             self.optim.zero_grad()
-            #self.scheduler.step()
+            self.scheduler.step()
             total_loss += loss.item()
             self.loss_tracker.log_loss(self.step, loss.item(), self.optim.param_groups[0]['lr'])
 
