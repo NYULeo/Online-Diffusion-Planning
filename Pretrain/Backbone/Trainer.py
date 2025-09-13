@@ -62,8 +62,8 @@ class SDETrainer:
         self.gradient_accumulate_every = gradient_accumulate_every
         self.lr = lr
         self.step_start_ema = step_start_ema
-        #self.optim = torch.optim.AdamW(self.model.parameters(), self.lr)
-        self.optim = torch.optim.Adam(self.model.parameters(), self.lr)
+        self.optim = torch.optim.AdamW(self.model.parameters(), self.lr)
+        #self.optim = torch.optim.Adam(self.model.parameters(), self.lr)
         self.num_steps = num_steps
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optim, self.num_steps)
         self.batch_size = batch_size
@@ -124,7 +124,7 @@ class SDETrainer:
               p.requires_grad_(False)
         self.step = 0
         total_loss = 0
-        for step in range(self.num_steps):
+        while(self.step < self.num_steps):
             for i in range(self.gradient_accumulate_every):
                 traj, cond = next(dataloader)
                 loss = self.Loss(traj.to(self.device), cond.to(self.device))
@@ -155,6 +155,7 @@ class SDETrainer:
 
             self.step += 1
         # Final save and plot
+        self.save(self.step)
         self.loss_tracker.save_logs(f"{self.model_name}_final_logs.pkl")
         self.loss_tracker.plot_loss_curve(
              title=f"{self.model_name} Final Training Loss",
