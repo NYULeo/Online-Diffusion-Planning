@@ -16,6 +16,8 @@ from Backbone.Dit import DiT1d
 import mediapy as media
 
 
+
+
 def get_pretrained_planner(planner_name, checkpoint_steps):
       checkpoint_path = f"./Checkpoints/{planner_name}_{checkpoint_steps}.pt"
       if not os.path.exists(checkpoint_path):
@@ -101,9 +103,13 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
                 action = action_selector.action_selection(current_state, actions)
            else:
                x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
+               #print(x[0])
                action = x[0, d_s:(d_s+d_a)].copy()
-               action = torch.tanh(action)
-               action = planner_processor.postprocess(action)
+               #print(action)
+               #exit()
+
+               #action = torch.tanh(torch.tensor(action))
+               #action = planner_processor.postprocess(action)
                #action = x[0, d_s:(d_s+d_a)].copy()
                
            
@@ -132,6 +138,6 @@ if __name__ == "__main__":
     env_name = 'kitchen'
     specific_env = 'partial'
 
-    rollout(env_name, specific_env, horizon, steps_T = 40, eta = 0, episode_length  = 300, critic = False, checkpoint_steps = 10000)
+    rollout(env_name, specific_env, horizon, steps_T = 150, eta = 0.3, episode_length  = 300, critic = False, checkpoint_steps = 10000)
 
 

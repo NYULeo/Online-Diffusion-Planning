@@ -1,3 +1,4 @@
+from pstats import StatsProfile
 import sys
 import os
 import logging
@@ -28,7 +29,9 @@ from collections import namedtuple
 
 
 
-
+with open('./Stats/Kitchen_Medium_Planner_stats.pkl', 'rb') as f:
+      stats = pickle.load(f)
+print(stats.obs_mean)
 
 
 

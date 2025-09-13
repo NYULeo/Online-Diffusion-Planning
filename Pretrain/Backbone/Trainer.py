@@ -25,15 +25,15 @@ class SDETrainer:
         specific_dataset,
         horizon,
         backbone_name,
-        num_steps = 10000,
-        batch_size = 64,
+        num_steps = 1000000,
+        batch_size = 128,
         lr=2e-4,
         device: Optional[torch.device] = None,
         update_ema_every = 2,
         step_start_ema = 1000,
         gradient_accumulate_every=2,
         ema_decay=0.995,
-        save_freq= 2000,
+        save_freq= 10000,
         log_freq = 10,
         s: float = 0.008,                  # cosine offset
         weight_type: str = 'sigma2',         # {"one", "sigma2", "beta"}
@@ -112,6 +112,8 @@ class SDETrainer:
         print(self.device)
         dataset = PlannerDataset(self.dataset_name, self.specific_dataset, self.horizon, self.state_dim, self.action_dim)
         dataloader = cycle(DataLoader(dataset, self.batch_size, shuffle = True, pin_memory = True, num_workers = 8))
+        print(len(DataLoader(dataset, 1, shuffle = True, pin_memory = True, num_workers = 8)))
+        exit()
         print(f"Training planner for {self.dataset_name}-{self.specific_dataset} Dataset")
         print(f"Backbone:{self.backbone_name}, Horizon: {self.horizon}, Epochs: {self.num_steps}, Batch Size: {self.batch_size}, Learning Rate; {self.lr}")
         
