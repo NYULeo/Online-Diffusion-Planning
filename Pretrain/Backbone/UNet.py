@@ -4,7 +4,7 @@ import einops
 from einops.layers.torch import Rearrange
 
 from .utils import (
-    SinusoidalPosEmb,
+    SinusoidalEmbedding,
     Downsample1d,
     Upsample1d,
     Conv1dBlock,
@@ -67,7 +67,7 @@ class TemporalUnet(nn.Module):
          
         time_dim = dim
         self.time_mlp = nn.Sequential(
-            SinusoidalPosEmb(dim),
+            SinusoidalEmbedding(dim),
             nn.Linear(dim, dim * 4),
             nn.Mish(),
             nn.Linear(dim * 4, dim),

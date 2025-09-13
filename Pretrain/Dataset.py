@@ -18,7 +18,7 @@ def get_env(env_name, specific_env):
     d_s = data.get_state_dim()
     d_a = data.get_action_dim()
     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = 'rgb_array')
-    return d_s, d_a
+    return  d_s, d_a
 
 def get_dataset(name: str, specific_name: str):
        if(name == 'kitchen'):
@@ -78,7 +78,7 @@ class KitchenDataset():
               }
            
               trajectories.append(trajectory)
-          
+              break
           return trajectories
      
      def get_state_dim(self):
@@ -217,12 +217,12 @@ class PlannerDataset(Dataset):
                 segment = np.array(sa_pairs[start : start + horizon])  # [H, d_s+d_a]
                 self.windows.append(torch.from_numpy(segment).float())
                 self.conditions.append(torch.from_numpy(sa_pairs[start][:self.state_dim]).float())
-      
+            
         self.save_stats()
 
     def save_stats(self):
         stats_name =  str(self.planner_name) + '_stats.pkl'
-        stats_dir = 'Stats/'
+        stats_dir = './Stats/'
         os.makedirs(stats_dir, exist_ok=True)
         savepath = os.path.join(stats_dir, stats_name)
         with open(savepath, 'wb') as f:

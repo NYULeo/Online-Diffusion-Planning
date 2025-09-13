@@ -8,9 +8,8 @@ from utils import SAStats
 import numpy as np
 import matplotlib.pyplot as plt
 #load the trajectory
-with open('Generated_trajectory.pkl', 'rb') as f:
-    traj_info= pickle.load(f)
 
+"""
 
 #get action sequence
 sequence = traj_info['sequence']
@@ -19,7 +18,7 @@ for i in range(len(sequence)):
       Gen_actions.append(sequence[i]['action'])
 
 
-"""
+
 
 with open('total.pkl', 'rb') as f:
      total = pickle.load(f)
@@ -49,7 +48,10 @@ print(np.mean(dis))
 """
 
 #get environment
-env, d_s, d_a= get_env(traj_info['env_name'], traj_info['specific_env'])
+env, d_s, d_a= get_env('kitchen', 'partial')
+data = get_dataset('kitchen', 'partial')
+traj = data.get_trajectories()
+Gen_actions = traj[0]['actions']
 
 
 
@@ -67,5 +69,4 @@ for i in range(len(Gen_actions)):
         break
 
 media.write_video("demo.mp4", frames, fps=30)
-
 

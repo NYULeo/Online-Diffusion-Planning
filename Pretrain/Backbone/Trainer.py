@@ -8,7 +8,7 @@ import copy
 from Dataset import get_env
 from torch.utils.data import DataLoader
 import numpy as np
-from Backbone.UNet import TemporalUnet
+from Backbone.Dit import DiT1d
 import os
 from Dataset import get_PlannerName, PlannerDataset
 from utils import set_seed
@@ -22,15 +22,15 @@ class SDETrainer:
         dataset_name,
         specific_dataset,
         horizon,
-        num_steps = 100000,
-        batch_size = 128,
+        num_steps = 10000,
+        batch_size = 64,
         lr=2e-4,
         device: Optional[torch.device] = None,
-        update_ema_every=2,
-        step_start_ema = 2000,
+        update_ema_every = 2,
+        step_start_ema = 1000,
         gradient_accumulate_every=2,
         ema_decay=0.995,
-        save_freq= 10000,
+        save_freq= 2000,
         log_freq = 10,
         s: float = 0.008,                  # cosine offset
         weight_type: str = 'sigma2',         # {"one", "sigma2", "beta"}
@@ -43,7 +43,9 @@ class SDETrainer:
         self.specific_dataset = specific_dataset
         self.state_dim, self.action_dim = get_env(self.dataset_name, self.specific_dataset)
         self.model_name = get_PlannerName(self.dataset_name, self.specific_dataset)
-        self.model = TemporalUnet(horizon = horizon, transition_dim=(self.state_dim + self.action_dim)).to(self.device)
+        self.model = DiT1d(
+            in_dim = (self.state_dim + self.action_dim), emb_dim = 128,
+            d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(self.device)
         self.ema_model = copy.deepcopy(self.model).to(self.device)
         self.reset_parameters()
         self.ema = EMA(ema_decay)
@@ -55,13 +57,14 @@ class SDETrainer:
         self.gradient_accumulate_every = gradient_accumulate_every
         self.lr = lr
         self.step_start_ema = step_start_ema
-        self.optim = torch.optim.AdamW(self.model.parameters(), self.lr)
+        #self.optim = torch.optim.AdamW(self.model.parameters(), self.lr)
+        self.optim = torch.optim.Adam(self.model.parameters(), self.lr)
         self.num_steps = num_steps
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optim, self.num_steps)
         self.batch_size = batch_size
         self.log_freq = log_freq
         self.save_freq = save_freq
-        self.logdir = "Checkpoints/"
+        self.logdir = "./Checkpoints/"
 
 
     def reset_parameters(self):
@@ -83,7 +86,6 @@ class SDETrainer:
         self.ema_model.eval()
         data = {
             'step': self.step,
-            'model': self.model.state_dict(),
             'ema': self.ema_model.state_dict()
         }
         file_mame = self.model_name + '_' + str(epoch) + '.pt'
@@ -116,7 +118,7 @@ class SDETrainer:
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
             self.optim.step()
             self.optim.zero_grad()
-            self.scheduler.step()
+            #self.scheduler.step()
             total_loss += loss.item()
 
             if ((self.step % self.update_ema_every) == 0):
@@ -161,7 +163,7 @@ class SDETrainer:
         target = -(xt_clamped - alpha_b * x0) / ( sigma_b**2 + 1e-8)   # (B,H,D)  (Song et al.) :contentReference[oaicite:2]{index=2}
 
         # 5) model prediction (must match (B,H,D)); pass per-sample t
-        pred = self.model(xt_clamped, conditions, t)                        # (B,H,D)
+        pred = self.model(xt_clamped, t)                        # (B,H,D)
 
 
         # 6) loss weighting λ(t)
