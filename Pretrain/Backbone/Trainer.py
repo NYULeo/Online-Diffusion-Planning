@@ -48,9 +48,6 @@ class SDETrainer:
         self.backbone_name = backbone_name
         self.backbone_selection()
         self.model_name = get_PlannerName(self.dataset_name, self.specific_dataset)
-        self.model = DiT1d(
-            in_dim = (self.state_dim + self.action_dim), emb_dim = 128,
-            d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(self.device)
         self.ema_model = copy.deepcopy(self.model).to(self.device)
         self.reset_parameters()
         self.ema = EMA(ema_decay)
@@ -158,7 +155,8 @@ class SDETrainer:
         self.save(self.step)
         self.loss_tracker.save_logs(f"{self.model_name}_final_logs.pkl")
         self.loss_tracker.plot_loss_curve(
-             title=f"{self.model_name} Final Training Loss",
+             save_path=f"./plots/{self.model_name}_final_loss_curve.png",
+             title=f"{self.model_name} Training Loss",
              show_lr=True,
              smooth_window=50)
         

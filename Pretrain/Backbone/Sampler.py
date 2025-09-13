@@ -37,6 +37,8 @@ def sample_reverse_sde(
     y[:, 0, :d_s] = conditions.clone()
     #x = apply_conditioning(x, conditions, d_s)
     x = mask * y + (1 - mask) * x
+    
+    
 
     for i in range(len(t_asc) - 1):
         t_now, t_next = t_asc[i], t_asc[i + 1]
@@ -45,6 +47,8 @@ def sample_reverse_sde(
         drift = -0.5 * g2_val * x
         #t_tensor = t_now.repeat(batch)
         score = score_model(x, t_now.unsqueeze(0))
+        
+       
 
         if eta > 0:
             noise = torch.randn_like(x)
@@ -54,8 +58,10 @@ def sample_reverse_sde(
             x = x + (drift - g2_val * score) * dt
         
         x = mask * y + (1 - mask) * x
+        
+        
         #x = apply_conditioning(x, conditions, d_s)
 
-    return x.detach().cpu().numpy()
+    return x.squeeze(0).detach().cpu().numpy()
 
 

@@ -13,6 +13,8 @@ import pickle
 class SAStats:
     obs_mean: np.ndarray
     obs_std:  np.ndarray
+    act_min = -1.0
+    act_max =  1.0
     eps: float = 1e-3
     std_floor: float = 1e-3   
 
@@ -25,15 +27,13 @@ class SAStats:
         std = np.maximum(self.obs_std, self.std_floor)
         return s * (std) + self.obs_mean
 
-    # ---- action ----
-    def norm_act(self, a: np.ndarray) -> np.ndarray:
-        a = np.clip(a, -1.0, 1.0)
-        return a
+    def norm_act(self,a):
+    # map [low, high] -> [-1, 1]
+         return -1.0 + 2.0 * (a - self.act_min) / np.maximum(self.act_max - self.act_min, self.eps)
 
-    def denorm_act(self, a: np.ndarray) -> np.ndarray:
-        a = np.clip(a, -1.0, 1.0)
-        return a
-
+    def denorm_act(self, a_norm):
+    # map [-1, 1] -> [low, high]
+         return ((a_norm + 1.0) / 2.0) * (self.act_max - self.act_min) + self.act_min
 
 def compute_log_prob(model, s, a, s_next, device="cpu"):
    

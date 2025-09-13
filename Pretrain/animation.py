@@ -9,20 +9,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 #load the trajectory
 
-"""
 
-#get action sequence
-sequence = traj_info['sequence']
-Gen_actions = []
-for i in range(len(sequence)):
-      Gen_actions.append(sequence[i]['action'])
-
-
-
-
-with open('total.pkl', 'rb') as f:
-     total = pickle.load(f)
-
+with open('Generated_trajectory.pkl', 'rb') as f:
+       traj_info = pickle.load(f)
 
 
 #get action sequence
@@ -30,18 +19,6 @@ sequence = traj_info['sequence']
 Gen_actions = []
 for i in range(len(sequence)):
       Gen_actions.append(sequence[i]['action'])
-
-
-
-actions = total[1]
-dis = []
-for i in range(len(actions)):
-      dis.append(np.linalg.norm(actions[i] - Gen_actions[i]))
-
-print(np.mean(dis))
-
-
-
 
 
 
@@ -49,10 +26,6 @@ print(np.mean(dis))
 
 #get environment
 env, d_s, d_a= get_env('kitchen', 'partial')
-data = get_dataset('kitchen', 'partial')
-traj = data.get_trajectories()
-Gen_actions = traj[0]['actions']
-
 
 
 
@@ -69,4 +42,22 @@ for i in range(len(Gen_actions)):
         break
 
 media.write_video("demo.mp4", frames, fps=30)
+"""
+
+
+data = get_dataset('kitchen', 'partial')
+traj = data.get_trajectories()
+actions = traj[0]['actions']
+actions = np.array(actions)
+Gen_actions = np.array(Gen_actions)
+
+
+"""
+
+plt.hist(actions.flatten(), bins=80, alpha=0.5, label="dataset actions")
+plt.hist(Gen_actions.flatten(), bins=80, alpha=0.5, label="rollout actions")
+plt.legend()
+plt.show()
+"""
+print(Gen_actions[0])
 

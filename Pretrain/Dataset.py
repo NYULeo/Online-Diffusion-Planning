@@ -14,11 +14,11 @@ import os
 
 def get_env(env_name, specific_env):
     data = get_dataset(env_name, specific_env)
-    #env = data.get_env() 
+    env = data.get_env() 
     d_s = data.get_state_dim()
     d_a = data.get_action_dim()
     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = 'rgb_array')
-    return  d_s, d_a
+    return  env, d_s, d_a
 
 def get_dataset(name: str, specific_name: str):
        if(name == 'kitchen'):
@@ -194,12 +194,13 @@ class PlannerDataset(Dataset):
             L = min(len(obs), len(acts))
             obs_list.append(obs[:L])
             act_list.append(acts[:L])
-        obs_all = np.concatenate(obs_list, axis=0)  # [N, d_s]
+        obs_all = np.concatenate(obs_list, axis = 0, dtype = np.float32)  # [N, d_s]
 
         #get stats
         self.stats = SAStats()
         self.stats.obs_mean=obs_all.mean(axis=0)
         self.stats.obs_std =obs_all.std(axis=0)
+       
 
         # ----- build normalized sliding windows -----
         for traj in self.traj:
@@ -211,6 +212,7 @@ class PlannerDataset(Dataset):
                 s_norm = self.stats.norm_obs(obs[t])
                 a_norm = self.stats.norm_act(acts[t])
                 sa_pairs.append(np.concatenate([s_norm, a_norm], axis=0))
+               
             
             # sliding horizon, then flatten to 1D
             for start in range(0, L - horizon + 1):
@@ -297,9 +299,20 @@ class PlannerDataset_debug(Dataset):
 class Planner_Processor():
      def __init__(self, dataset_name, specific_dataset):
           Planner_name = get_PlannerName(dataset_name, specific_dataset)
+          stats_name = Planner_name + '_stats.pkl'  # Remove .pt replacement since Planner_name doesn't have .pt
+          stats_dir = './Stats/'
+          stats_path = os.path.join(stats_dir, stats_name)
+          
+
+          # Check if stats file exists
+          if not os.path.exists(stats_path):
+            raise FileNotFoundError(f"Stats file not found: {stats_path}")
+
+
           stats_name = Planner_name.replace('.pt', '_stats.pkl')
-          with open(stats_name, 'rb') as f:
-                self.stats = pickle.load(f)
+
+          with open(stats_path, 'rb') as f:
+              self.stats = pickle.load(f)
     
      def preprocess(self, obs):
           obs = self.stats.norm_obs(obs)
