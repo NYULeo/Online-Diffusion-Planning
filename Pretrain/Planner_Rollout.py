@@ -138,6 +138,6 @@ if __name__ == "__main__":
     env_name = 'kitchen'
     specific_train_dataset = 'partial'
 
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 500, critic = False, checkpoint_steps = 920000)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 500, critic = False, checkpoint_steps = 860000)
 
 
