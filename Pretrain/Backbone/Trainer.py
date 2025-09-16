@@ -11,8 +11,8 @@ import numpy as np
 from Backbone.Dit import DiT1d
 from Backbone.UNet import TemporalUnet
 import os
-from Dataset import get_PlannerName, PlannerDataset
-from .utils import LossTracker
+from Dataset import get_PlannerName, PlannerDataset, PlannerDataset_Rollout
+from .utils import LossTracker, get_pretrained_planner
 
 
 
@@ -159,8 +159,39 @@ class SDETrainer:
              title=f"{self.model_name} Training Loss",
              show_lr=True,
              smooth_window=50)
-        
+    
 
+    def selector(self, specific_dataset):
+         dataset = PlannerDataset_Rollout(self.dataset_name, specific_dataset, self.specific_dataset, self.horizon, self.state_dim, self.action_dim)
+         dataloader = DataLoader(dataset, 10, shuffle = True, pin_memory = True)
+         N = np.floor(len(dataset)/10)
+         min_Loss = float('inf')
+         checkpoint = self.save_freq
+         best_checkpoint = 0
+         while(checkpoint <= self.num_steps):
+            self.backbone_selection()
+            state_dict = get_pretrained_planner(self.model_name, checkpoint)
+            self.model.load_state_dict(state_dict)
+            self.model.eval()
+            total_loss = 0
+            for traj, cond in dataloader:
+                 loss = self.Loss(traj.to(self.device), cond.to(self.device))
+                 total_loss += loss.item()
+            Loss = total_loss/N
+            if(Loss < min_Loss):
+                 min_Loss = Loss
+                 best_checkpoint = checkpoint
+            print(f"Checkpoint: {checkpoint} Loss: {Loss}")
+            self.loss_tracker.log_loss(checkpoint, Loss)
+            checkpoint += self.save_freq  
+         print(f"Best Checkpoint: {best_checkpoint}, Loss: {min_Loss}")  
+         #self.loss_tracker.save_logs(f"{self.model_name}_{specific_dataset}_validation_loss_curve.pkl")
+         self.loss_tracker.plot_loss_curve(
+             save_path=f"./plots/{self.model_name}_{specific_dataset}_final_validation_loss_curve.png",
+             title=f"{self.model_name} {specific_dataset} Validation Loss",
+             show_lr=False,
+             smooth_window=50)
+         return best_checkpoint, min_Loss
 
 
     def Loss(self, x0: torch.Tensor, conditions: torch.Tensor) -> torch.Tensor:                       # (B,H,D)

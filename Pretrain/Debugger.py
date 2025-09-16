@@ -27,11 +27,11 @@ import gymnasium_robotics
 import mediapy as media
 from collections import namedtuple
 
+from Backbone.utils import get_pretrained_planner
+from torch.utils.data import DataLoader
+from Dataset import PlannerDataset
 
 
-with open('./Stats/Kitchen_Medium_Planner_stats.pkl', 'rb') as f:
-      stats = pickle.load(f)
-print(stats.obs_mean)
 
 
 
@@ -60,8 +60,6 @@ for i in range(len(traj['actions'])):
 media.write_video("demo.mp4", frames, fps=30)
 """
 
-a = np.concatenate([np.array([1,2,3]), np.array([4,5,6])], axis=0)
-print(a)
 
 
 

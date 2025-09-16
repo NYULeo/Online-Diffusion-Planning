@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 #load the trajectory
 
+"""
 
 with open('Generated_trajectory.pkl', 'rb') as f:
        traj_info = pickle.load(f)
@@ -19,14 +20,14 @@ sequence = traj_info['sequence']
 Gen_actions = []
 for i in range(len(sequence)):
       Gen_actions.append(sequence[i]['action'])
-
+"""
 
 
 
 
 data = get_dataset('kitchen', 'partial')
 traj = data.get_trajectories()
-actions = traj[0]['actions']
+actions = traj[4]['actions']
 
 #get environment
 env, d_s, d_a= get_env('kitchen', 'partial')

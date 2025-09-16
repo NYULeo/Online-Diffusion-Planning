@@ -230,6 +230,7 @@ class PlannerDataset(Dataset):
         savepath = os.path.join(stats_dir, stats_name)
         with open(savepath, 'wb') as f:
               pickle.dump(self.stats, f)
+        print(f"saved stats to {savepath}")
  
 
     def __len__(self):
@@ -319,9 +320,48 @@ class Planner_Processor():
           obs = self.stats.norm_obs(obs)
           return obs
      
+     def norm_act(self, act):
+          act = self.stats.norm_act(act)
+          return act
+     
      def postprocess(self, act):
           act = self.stats.denorm_act(act)
           return  act
 
 
 
+class PlannerDataset_Rollout(Dataset):
+    def __init__(self, dataset_name, specific_dataset, specific_train_dataset, horizon, state_dim, action_dim):
+        data = get_dataset(dataset_name, specific_dataset)
+        self.traj = data.get_trajectories()
+        self.horizon = horizon
+        self.windows = []
+        self.conditions = []
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.planner_processor = Planner_Processor(dataset_name, specific_train_dataset)
+        
+        # ----- build normalized sliding windows -----
+        for traj in self.traj:
+            obs, acts = traj['observations'], traj['actions']
+            L = min(len(obs), len(acts))     
+            # per-step normalize then concat [s_t, a_t]
+            sa_pairs = []
+            for t in range(L):
+                s_norm = self.planner_processor.preprocess(obs[t])
+                a_norm = self.planner_processor.norm_act(acts[t])
+                #a_norm = acts[t]
+                sa_pairs.append(np.concatenate([s_norm, a_norm], axis=0))
+               
+            # sliding horizon, then flatten to 1D
+            for start in range(0, L - horizon + 1):
+                segment = np.array(sa_pairs[start : start + horizon])  # [H, d_s+d_a]
+                self.windows.append(torch.from_numpy(segment).float())
+                self.conditions.append(torch.from_numpy(sa_pairs[start][:self.state_dim]).float())
+
+
+    def __len__(self):
+        return len(self.windows)
+
+    def __getitem__(self, idx):
+        return self.windows[idx], self.conditions[idx]

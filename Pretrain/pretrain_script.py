@@ -19,6 +19,7 @@ if __name__ == '__main__':  # pragma: no cover
          batch_size = 128,
          lr=2e-4,
          device = device)
-     trainer.train()
+     #trainer.train()
+     trainer.selector('complete')
 
 

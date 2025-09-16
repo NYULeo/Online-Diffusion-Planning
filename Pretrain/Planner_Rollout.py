@@ -8,6 +8,7 @@ import pickle
 from typing import Optional
 from Dataset import get_env
 from utils import set_seed
+from Backbone.utils import get_pretrained_planner
 from train_critic import Critic, Critic_Processor, get_CriticName
 from Dataset import Planner_Processor, get_PlannerName
 import gymnasium as gym
@@ -16,15 +17,14 @@ from Backbone.Dit import DiT1d
 import mediapy as media
 
 
-
-
+"""
 def get_pretrained_planner(planner_name, checkpoint_steps):
       checkpoint_path = f"./Checkpoints/{planner_name}_{checkpoint_steps}.pt"
       if not os.path.exists(checkpoint_path):
           raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
       checkpoint = torch.load(checkpoint_path, map_location='cpu')
       return checkpoint['ema']
-
+"""
 
 
 class ActionSelector:
@@ -44,7 +44,7 @@ class ActionSelector:
      def action_selection(self, current_state, actions):
         q_values = []
         for i in range(len(actions)):
-           current_state_norm, act_norm= self.critic_processor.preprocess(current_state, actions[i])
+           current_state_norm, act_norm = self.critic_processor.preprocess(current_state, actions[i])
            current_state_norm = torch.tensor(current_state_norm, dtype = torch.float32).unsqueeze(0).to(self.device)
            act_norm = torch.tensor(act_norm, dtype = torch.float32).unsqueeze(0).to(self.device)
            q_value = self.critic(current_state_norm, act_norm)
@@ -53,9 +53,9 @@ class ActionSelector:
         return actions[idx]
 
 
-def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, critic, checkpoint_steps = 10000):
+def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, critic, checkpoint_steps):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}")
+     print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checpoint_steps; {checkpoint_steps}")
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      device = "cuda" if torch.cuda.is_available() else "cpu"
      print(f"Using device {device}")
@@ -97,8 +97,8 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
                 for j in range(10):
                    x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
                    action = x[0, d_s:(d_s+d_a)].copy()
-                   action = torch.tanh(action)
-                   action = planner_processor.postprocess(action)
+                   #action = torch.tanh(action)
+                   #action = planner_processor.postprocess(action)
                    actions.append(action)
                 action = action_selector.action_selection(current_state, actions)
            else:
@@ -124,7 +124,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
                 break
      
      traj_info = {'sequence': play_seq, 'env_name': env_name, 'specific_env': specific_env }
-     media.write_video("demo.mp4", frames, fps=30)
+     media.write_video("demo.mp4", frames, fps=50)
      with open('Generated_trajectory.pkl', 'wb') as f:
                 pickle.dump(traj_info, f)
      
@@ -136,8 +136,8 @@ if __name__ == "__main__":
     set_seed(1)
     horizon = 32
     env_name = 'kitchen'
-    specific_env = 'partial'
+    specific_train_dataset = 'partial'
 
-    rollout(env_name, specific_env, horizon, steps_T = 150, eta = 0.3, episode_length  = 300, critic = False, checkpoint_steps = 10000)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 500, critic = False, checkpoint_steps = 920000)
 
 

@@ -267,6 +267,20 @@ def apply_conditioning(x, conditions, state_dim):
     x[:, 0, :state_dim] = conditions.clone()
     return x
 
+
+
+#-----------------------------------------------------------------------------#
+#---------------------------------- Selection --------------------------------#
+#-----------------------------------------------------------------------------#
+
+
+def get_pretrained_planner(planner_name, checkpoint_steps):
+      checkpoint_path = f"./Checkpoints/{planner_name}_{checkpoint_steps}.pt"
+      if not os.path.exists(checkpoint_path):
+          raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+      checkpoint = torch.load(checkpoint_path, map_location='cpu')
+      return checkpoint['ema']
+
 """
 
 
