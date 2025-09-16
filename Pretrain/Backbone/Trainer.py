@@ -168,6 +168,7 @@ class SDETrainer:
          min_Loss = float('inf')
          checkpoint = self.save_freq
          best_checkpoint = 0
+         print(f"Loss of {self.model_name} on {specific_dataset} dataset")
          while(checkpoint <= self.num_steps):
             self.backbone_selection()
             state_dict = get_pretrained_planner(self.model_name, checkpoint)
