@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 #print(states_1[len(states_1)-1] == states_2[0])
 #print(np.array_equal(states_1[len(states_1)-1], states_2[0]))
 
-
+"""
 
 data = get_dataset('PointMaze', 'medium')
 traj = data.get_trajectories()
@@ -27,20 +27,20 @@ for i in range(len(traj)-1):
          print(i)
          #break
 
-    
+  """  
 
 
 
 
 
 
-"""
 
-data = get_dataset('kitchen', 'partial')
+
+data = get_dataset('kitchen', 'complete')
 traj = data.get_trajectories()
-actions = traj[329]['actions']
+actions = traj[0]['actions']
 #get environment
-env, d_s, d_a= get_env('kitchen', 'partial')
+env, d_s, d_a= get_env('kitchen', 'complete')
 
 rewards = []
 
@@ -56,11 +56,10 @@ for i in range(len(actions)):
     frames.append(env.render())
     if terminated or truncated:
         break
-#print(rewards)
+print(rewards)
 media.write_video("demo.mp4", frames, fps=30)
 
 
-"""
 
 
 

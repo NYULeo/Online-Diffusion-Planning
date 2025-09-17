@@ -162,43 +162,43 @@ class SDETrainer:
              smooth_window=50)
     
 
-    def selector(self, specific_dataset):
+    def selector(self, specific_dataset, times = 1000):
          dataset = PlannerDataset_Rollout(self.dataset_name, specific_dataset, self.specific_dataset, self.horizon, self.state_dim, self.action_dim)
          dataloader = DataLoader(dataset, 10, shuffle = True, pin_memory = True)
-         N = np.floor(len(dataset)/10)
+         N = len(dataloader)
          min_Loss = float('inf')
          checkpoint = self.save_freq
          best_checkpoint = 0
-         print(f"Loss of {self.model_name} on {specific_dataset} dataset")
+         validation_tracker = LossTracker(save_dir="./logs/")
+         print(f"Loss of {self.model_name} on {specific_dataset} dataset. Running {times} times for each checkpoints")
          while(checkpoint <= self.num_steps):
             self.backbone_selection()
             state_dict = get_pretrained_planner(self.model_name, checkpoint)
             self.model.load_state_dict(state_dict)
             self.model.eval()
             avg_loss = 0
-            for i in range(10):
+            for i in range(times):
                 total_loss = 0
                 for traj, cond in dataloader:
                     loss = self.Loss(traj.to(self.device), cond.to(self.device))
                     total_loss += loss.item()
                 Loss = total_loss/N
                 avg_loss += Loss
-            Loss = avg_loss/10
-            if(Loss < min_Loss):
-                 min_Loss = Loss
+            final_loss = avg_loss/times
+            if(final_loss < min_Loss):
+                 min_Loss = final_loss
                  best_checkpoint = checkpoint
-            print(f"Checkpoint: {checkpoint} Loss: {Loss}")
-            #self.loss_tracker.log_loss(checkpoint, Loss)
+            print(f"Checkpoint: {checkpoint} Loss: {final_loss}")
+            validation_tracker.log_loss(checkpoint, final_loss)
             checkpoint += self.save_freq  
          print(f"Best Checkpoint: {best_checkpoint}, Loss: {min_Loss}")  
          #self.loss_tracker.save_logs(f"{self.model_name}_{specific_dataset}_validation_loss_curve.pkl")
-         """
-         self.loss_tracker.plot_loss_curve(
-             save_path=f"./plots/{self.model_name}_{specific_dataset}_final_validation_loss_curve.png",
+         validation_tracker.plot_loss_curve(
+             save_path=f"./plots/{self.model_name}_{specific_dataset}_validation_loss_curve.png",
              title=f"{self.model_name} {specific_dataset} Validation Loss",
              show_lr=False,
-             smooth_window=50)
-         """
+             smooth_window=5)
+         
          return best_checkpoint, min_Loss
 
 

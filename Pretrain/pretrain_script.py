@@ -20,6 +20,6 @@ if __name__ == '__main__':  # pragma: no cover
          lr=2e-4,
          device = device)
      #trainer.train()
-     trainer.selector('complete')
+     trainer.selector('complete', times = 1000)
 
 

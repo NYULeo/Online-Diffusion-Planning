@@ -12,13 +12,17 @@ import pickle
 from utils import SAStats
 import os
 
+
+
+
+
 def get_env(env_name, specific_env):
     data = get_dataset(env_name, specific_env)
-   #env = data.get_env() 
+    #env = data.get_env() 
     d_s = data.get_state_dim()
     d_a = data.get_action_dim()
     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = 'rgb_array')
-    return  d_s, d_a
+    return   d_s, d_a
 
 def get_dataset(name: str, specific_name: str):
        if(name == 'kitchen'):
@@ -31,12 +35,20 @@ def get_dataset(name: str, specific_name: str):
              else:
                   raise ValueError(f"Invalid Dataset name: {specific_name}")
        elif(name == 'PointMaze'):
-            if specific_name == 'large':
-                  return PointMazeDataset('large')
+            if specific_name == 'open_dense':
+                  return PointMazeDataset('open_dense')
+            elif specific_name == 'unmaze':
+                  return PointMazeDataset('unmaze')
+            elif specific_name == 'large_dense':
+                  return PointMazeDataset('large_dense')
             elif specific_name== 'medium':
                   return PointMazeDataset('medium')
-            elif specific_name == 'umaze':
-                  return PointMazeDataset('unmaze')
+            elif specific_name == 'unmaze_dense':
+                  return PointMazeDataset('unmaze_dense')
+            elif specific_name == 'large':
+                  return PointMazeDataset('large')
+            elif specific_name == 'open':
+                  return PointMazeDataset('open')
             else:
                   raise ValueError(f"Invalid Dataset name: {specific_name}")
        else:
@@ -100,12 +112,20 @@ class KitchenDataset():
      
 class PointMazeDataset():
      def __init__(self, name: str):
-          if name == 'large':
-              self.dataset = minari.load_dataset('D4RL/pointmaze/large-v2', download = True)
-          elif name == 'medium':
-              self.dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download = True)
+          if name == 'open_dense':
+               self.dataset = minari.load_dataset('D4RL/pointmaze/open-dense-v2', download = True)
           elif name == 'umaze':
-              self.dataset = minari.load_dataset('D4RL/pointmaze/umaze-v2', download = True)
+               self.dataset = minari.load_dataset('D4RL/pointmaze/umaze-v2', download = True)
+          elif name == 'large_dense':
+               self.dataset = minari.load_dataset('D4RL/pointmaze/large-dense-v2', download = True)
+          elif name == 'medium':
+               self.dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download = True)
+          elif name == 'umaze_dense':
+               self.dataset = minari.load_dataset('D4RL/pointmaze/umaze-dense-v2', download = True)
+          elif name == 'large':
+               self.dataset = minari.load_dataset('D4RL/pointmaze/large-v2', download = True)
+          elif name == 'open':
+               self.dataset = minari.load_dataset('D4RL/pointmaze/open-v2', download = True)
           else:
               raise ValueError(f"Invalid Dataset name: {name}")
           
