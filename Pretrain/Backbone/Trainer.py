@@ -1,4 +1,5 @@
 from itertools import accumulate
+from re import L
 import torch
 from typing import Optional
 from .utils import cosine_alpha_sigma, cosine_beta, EMA, cycle
@@ -174,24 +175,30 @@ class SDETrainer:
             state_dict = get_pretrained_planner(self.model_name, checkpoint)
             self.model.load_state_dict(state_dict)
             self.model.eval()
-            total_loss = 0
-            for traj, cond in dataloader:
-                 loss = self.Loss(traj.to(self.device), cond.to(self.device))
-                 total_loss += loss.item()
-            Loss = total_loss/N
+            avg_loss = 0
+            for i in range(10):
+                total_loss = 0
+                for traj, cond in dataloader:
+                    loss = self.Loss(traj.to(self.device), cond.to(self.device))
+                    total_loss += loss.item()
+                Loss = total_loss/N
+                avg_loss += Loss
+            Loss = avg_loss/10
             if(Loss < min_Loss):
                  min_Loss = Loss
                  best_checkpoint = checkpoint
             print(f"Checkpoint: {checkpoint} Loss: {Loss}")
-            self.loss_tracker.log_loss(checkpoint, Loss)
+            #self.loss_tracker.log_loss(checkpoint, Loss)
             checkpoint += self.save_freq  
          print(f"Best Checkpoint: {best_checkpoint}, Loss: {min_Loss}")  
          #self.loss_tracker.save_logs(f"{self.model_name}_{specific_dataset}_validation_loss_curve.pkl")
+         """
          self.loss_tracker.plot_loss_curve(
              save_path=f"./plots/{self.model_name}_{specific_dataset}_final_validation_loss_curve.png",
              title=f"{self.model_name} {specific_dataset} Validation Loss",
              show_lr=False,
              smooth_window=50)
+         """
          return best_checkpoint, min_Loss
 
 
