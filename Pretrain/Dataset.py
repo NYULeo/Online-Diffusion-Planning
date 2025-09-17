@@ -18,7 +18,7 @@ def get_env(env_name, specific_env):
     d_s = data.get_state_dim()
     d_a = data.get_action_dim()
     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = 'rgb_array')
-    return d_s, d_a
+    return  d_s, d_a
 
 def get_dataset(name: str, specific_name: str):
        if(name == 'kitchen'):
