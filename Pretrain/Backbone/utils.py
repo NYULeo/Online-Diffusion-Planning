@@ -9,6 +9,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import pickle
 import os
+from Dataset import get_PlannerName
 
 
 
@@ -274,8 +275,9 @@ def apply_conditioning(x, conditions, state_dim):
 #-----------------------------------------------------------------------------#
 
 
-def get_pretrained_planner(planner_name, checkpoint_steps):
-      checkpoint_path = f"./Checkpoints/{planner_name}_{checkpoint_steps}.pt"
+def get_pretrained_planner(dataset_name, specific_dataset, checkpoint_steps):
+      planner_name = get_PlannerName(dataset_name, specific_dataset)
+      checkpoint_path = f"./{dataset_name}_{specific_dataset}_checkpoints/{planner_name}_{checkpoint_steps}.pt"
       if not os.path.exists(checkpoint_path):
           raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
       checkpoint = torch.load(checkpoint_path, map_location='cpu')

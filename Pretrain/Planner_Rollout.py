@@ -9,8 +9,8 @@ from typing import Optional
 from Dataset import get_env
 from utils import set_seed
 from Backbone.utils import get_pretrained_planner
-from train_critic import Critic, Critic_Processor, get_CriticName
-from Dataset import Planner_Processor, get_PlannerName
+from Critic.train_critic import Critic, Critic_Processor, get_CriticName
+from Dataset import Planner_Processor
 import gymnasium as gym
 import os
 from Backbone.Dit import DiT1d
@@ -69,8 +69,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
      env, d_s, d_a = get_env(env_name, specific_env)
 
      #get Planner
-     planner_name = get_PlannerName(env_name, specific_env)
-     state_dict = get_pretrained_planner(planner_name, checkpoint_steps)
+     state_dict = get_pretrained_planner(env_name, specific_env, checkpoint_steps)
      if( env_name == 'kitchen'):
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)    
      else:
@@ -135,7 +134,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
 if __name__ == "__main__":
     set_seed(1)
     horizon = 32
-    env_name = 'kitchen'
+    env_name = 'PointMaze'
     specific_train_dataset = 'partial'
 
     rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 500, critic = False, checkpoint_steps = 990000)

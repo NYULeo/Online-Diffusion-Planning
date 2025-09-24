@@ -9,60 +9,71 @@ import numpy as np
 import matplotlib.pyplot as plt
 #load the trajectory
 
+def check_rewards(trajs):
+    print('Checking Rewards')
+    for i in range(len(trajs)):
+       D = {}
+       rewards = trajs[i]['rewards']
+       #print(len(rewards))
+       for j in range(len(rewards)):
+          if(rewards[j] in D.keys()):
+               D[rewards[j]] = D[rewards[j]]+1
+          else:
+               D[rewards[j]] = 1
+       count = True
+       for key in D.keys():
+           if(key > 0):
+               count = False
+               break
+       print(D)
+       if(count):
+            print(i)
+
+def check_speration(trajs):
+    print('Checking Separation')
+    for i in range(len(trajs)-1):
+     states_1 = trajs[i]['observations']
+     states_2 = trajs[i+1]['observations']
+     if (np.array_equal(states_1[len(states_1)-1], states_2[0])):
+         print(i)
+
+def Rollout(env, actions):
+     set_seed(0)
+     env.reset()
+     rewards = []
+     frames = []
+     for i in range(len(actions)):
+         obs, rew, terminated, truncated, info = env.step(actions[i])
+         rewards.append(rew)
+         frames.append(env.render())
+         if terminated or truncated:
+             break
+     media.write_video("demo.mp4", frames, fps=30)
 
 
 
-#print(states_1[len(states_1)-1] == states_2[0])
-#print(np.array_equal(states_1[len(states_1)-1], states_2[0]))
+
+
+
+data = get_dataset('AntMaze', 'umaze')
+traj = data.get_trajectories()
+
+check_rewards(traj)
+check_speration(traj)
+
+
+
+
+
 
 """
-
-data = get_dataset('PointMaze', 'medium')
-traj = data.get_trajectories()
-#actions = traj[311]['actions']
-for i in range(len(traj)-1):
-     states_1 = traj[i]['observations']
-     states_2 = traj[i+1]['observations']
-     if (not np.array_equal(states_1[len(states_1)-1], states_2[0])):
-         print(i)
-         #break
-
-  """  
-
-
-
-
-
-
-
-
-data = get_dataset('kitchen', 'complete')
+data = get_dataset('kitchen', 'partial')
 traj = data.get_trajectories()
 actions = traj[0]['actions']
-#get environment
-env, d_s, d_a= get_env('kitchen', 'complete')
+env, _, _ = get_env('kitchen', 'complete')
+Rollout(env, actions)
 
-rewards = []
-
-#start animation
-set_seed(0)
-env.reset()
-frames = []
-for i in range(len(actions)):
-    #action = np.random.uniform(-1.0, 1.0, d_a)
-    #action = np.clip(actions[i], -1.0, 1.0)
-    obs, rew, terminated, truncated, info = env.step(actions[i])
-    rewards.append(rew)
-    frames.append(env.render())
-    if terminated or truncated:
-        break
-print(rewards)
-media.write_video("demo.mp4", frames, fps=30)
-
-
-
-
-
+"""
 
 
 

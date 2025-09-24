@@ -5,7 +5,7 @@ import torch
 import torch.optim as optim
 import numpy as np
 from utils import set_seed, SAStats
-from train_critic import get_CriticName
+from Critic.train_critic import get_CriticName
 import torch.nn as nn
 import pickle
 

@@ -28,12 +28,12 @@ class SDETrainer:
         backbone_name,
         num_steps = 1000000,
         batch_size = 128,
-        lr=2e-4,
+        lr=3e-4,
         device: Optional[torch.device] = None,
         update_ema_every = 2,
         step_start_ema = 1000,
         gradient_accumulate_every=2,
-        ema_decay=0.995,
+        ema_decay=0.999,
         save_freq= 10000,
         log_freq = 10,
         s: float = 0.008,                  # cosine offset
@@ -67,7 +67,7 @@ class SDETrainer:
         self.batch_size = batch_size
         self.log_freq = log_freq
         self.save_freq = save_freq
-        self.logdir = "./Checkpoints/"
+        self.logdir = f"./{self.dataset_name}_{self.specific_dataset}_checkpoints/"
         self.loss_tracker = LossTracker(save_dir="./logs/")
 
     def backbone_selection(self):

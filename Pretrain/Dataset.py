@@ -15,7 +15,9 @@ import os
 
 
 
-
+#-------------------------------------------------------------------------------------#
+#------------------------------------- Dataset ---------------------------------------#
+#-------------------------------------------------------------------------------------#
 def get_env(env_name, specific_env):
     data = get_dataset(env_name, specific_env)
     #env = data.get_env() 
@@ -24,33 +26,26 @@ def get_env(env_name, specific_env):
     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = 'rgb_array')
     return   d_s, d_a
 
+def merger(traj_1, traj_2):
+     states_1 = traj_1['observations']
+     states_2 = traj_2['observations']
+     if (np.array_equal(states_1[len(states_1)-1], states_2[0])):
+          trajectory = {
+                      'observations': np.concatenate((traj_1['observations'], traj_2['observations'][1:])),
+                      'actions': np.concatenate((traj_1['actions'], traj_2['actions'])),
+                      'rewards': np.concatenate((traj_1['rewards'], traj_2['rewards']))
+                    }
+          return trajectory
+     else:
+          return None   
+
 def get_dataset(name: str, specific_name: str):
        if(name == 'kitchen'):
-             if specific_name == 'partial':
-                  return KitchenDataset('partial')
-             elif specific_name == 'complete':
-                  return KitchenDataset('complete')
-             elif specific_name == 'mixed':
-                  return KitchenDataset('mixed')
-             else:
-                  raise ValueError(f"Invalid Dataset name: {specific_name}")
-       elif(name == 'PointMaze'):
-            if specific_name == 'open_dense':
-                  return PointMazeDataset('open_dense')
-            elif specific_name == 'unmaze':
-                  return PointMazeDataset('unmaze')
-            elif specific_name == 'large_dense':
-                  return PointMazeDataset('large_dense')
-            elif specific_name== 'medium':
-                  return PointMazeDataset('medium')
-            elif specific_name == 'unmaze_dense':
-                  return PointMazeDataset('unmaze_dense')
-            elif specific_name == 'large':
-                  return PointMazeDataset('large')
-            elif specific_name == 'open':
-                  return PointMazeDataset('open')
-            else:
-                  raise ValueError(f"Invalid Dataset name: {specific_name}")
+            return KitchenDataset(specific_name)
+       elif(name == 'pointmaze'):
+            return PointMazeDataset(specific_name)
+       elif(name == 'antmaze'): 
+            return AntMazeDataset(specific_name)
        else:
             raise ValueError(f"Invalid Dataset name: {name}")     
 
@@ -75,7 +70,6 @@ class KitchenDataset():
               truncated = episode.truncations
               done_seq = np.logical_or(terminated, truncated)
               
-              
               for i in range(len(actions)):
                    if(done_seq[i]):
                         observations = observations[:i+2]
@@ -83,16 +77,55 @@ class KitchenDataset():
                         rewards = rewards[:i+1]
                         break
               
-              trajectory = {
-                'observations': observations,
-                'actions': actions,
-                'rewards': rewards
-              }
-           
-              trajectories.append(trajectory)
               
-          return trajectories
+              if(len(actions) < 10):
+                  continue
+              else: 
+                 new_rewards = self.spare_reward_kitchen(rewards)
+                 if(not self.reward_checker(rewards, new_rewards)):
+                       print('No')
+                 trajectory = {
+                      'observations': observations,
+                      'actions': actions,
+                      'rewards': new_rewards
+                    }
+                 if(len(trajectories) != 0):
+                      Temp = merger(trajectories[len(trajectories)-1], trajectory)
+                      if(Temp is not None):
+                            trajectories.pop()
+                            trajectories.append(Temp)
+                      else:
+                            trajectories.append(trajectory)
+                 else:
+                      trajectories.append(trajectory)
+
+          return trajectories  
      
+     def reward_checker(self, rewards, new_rewards):
+         if(len(rewards) != len(new_rewards)):
+               return False
+         for i in range(1, len(rewards)):
+              if(rewards[i] == rewards[i-1]+1):
+                  if(new_rewards[i] !=1):
+                      return False
+              else:
+                  if(new_rewards[i] != 0):
+                      return False
+         return True
+
+     def spare_reward_kitchen(self, rewards):
+         Temp = []
+         for i in range(1, len(rewards)):
+            if(rewards[i] == rewards[i-1]+1):
+                  Temp.append(i)
+         new_rewards = [0]*len(rewards)
+         for i in range(len(rewards)):
+             if(i in Temp):
+                  new_rewards[i] = 1
+             else:
+                  new_rewards[i] = 0
+         return np.array(new_rewards) 
+
      def get_state_dim(self):
           return self.dataset._observation_space['observation'].shape[0]
     
@@ -145,16 +178,28 @@ class PointMazeDataset():
                         observations = observations[:i+2]
                         actions = actions[:i+1]
                         rewards = rewards[:i+1]
+                        break
               
-              trajectory = {
-                'observations': observations,
-                'actions': actions,
-                'rewards': rewards
-              }
-           
-              trajectories.append(trajectory)
-          
+
+              if(len(actions) < 10):
+                  continue
+              else: 
+                    trajectory = {
+                        'observations': observations,
+                        'actions': actions,
+                        'rewards': rewards
+                      }
+                    if(len(trajectories) != 0):
+                        Temp = merger(trajectories[len(trajectories)-1], trajectory)
+                        if(Temp is not None):
+                            trajectories.pop()
+                            trajectories.append(Temp)
+                        else:
+                            trajectories.append(trajectory)
+                    else:
+                      trajectories.append(trajectory)
           return trajectories
+          
      
      def get_state_dim(self):
           return self.dataset._observation_space['observation'].shape[0]
@@ -168,11 +213,82 @@ class PointMazeDataset():
      def get_total_steps(self):
           return self.dataset.total_steps
 
+class AntMazeDataset():
+     def __init__(self, name: str):
+          if name == 'medium_play':
+              self.dataset = minari.load_dataset('D4RL/antmaze/medium-play-v1', download=True)
+          elif name == 'umaze_diverse':
+              self.dataset = minari.load_dataset('D4RL/antmaze/umaze-diverse-v1', download=True)
+          elif name == 'large_diverse':
+              self.dataset = minari.load_dataset('D4RL/antmaze/large-diverse-v1', download=True)
+          elif name == 'large_play':
+              self.dataset = minari.load_dataset('D4RL/antmaze/large-play-v1', download=True)
+          elif name == 'medium_diverse':
+              self.dataset = minari.load_dataset('D4RL/antmaze/medium-diverse-v1', download=True)
+          elif name == 'umaze':
+              self.dataset = minari.load_dataset('D4RL/antmaze/umaze-v1', download=True)
+          else:
+              raise ValueError(f"Invalid Dataset name: {name}")
+          
+     def get_trajectories(self):
+          trajectories = []
+          for episode in self.dataset.iterate_episodes():
+              observations = episode.observations['observation']
+              actions = episode.actions
+              rewards = episode.rewards
+              terminated = episode.terminations
+              truncated = episode.truncations
+              done_seq = np.logical_or(terminated, truncated)
+              
+              for i in range(len(actions)):
+                   if(done_seq[i]):
+                        observations = observations[:i+2]
+                        actions = actions[:i+1]
+                        rewards = rewards[:i+1]
+                        break
+              
+              if(len(actions) < 10):
+                  continue
+              else: 
+                 trajectory = {
+                      'observations': observations,
+                      'actions': actions,
+                      'rewards': rewards
+                    }
+                 if(len(trajectories) != 0):
+                      Temp = merger(trajectories[len(trajectories)-1], trajectory)
+                      if(Temp is not None):
+                            trajectories.pop()
+                            trajectories.append(Temp)
+                      else:
+                            trajectories.append(trajectory)
+                 else:
+                      trajectories.append(trajectory)
 
-#-----------------------------------------------------------------------------#
+          return trajectories
+     
+     def get_state_dim(self):
+          return self.dataset._observation_space['observation'].shape[0]
+    
+     def get_action_dim(self):
+          return self.dataset._action_space.shape[0]
+    
+     def get_env(self):
+          # Use headless mode for servers without display capabilities
+          try:
+               return self.dataset.recover_environment(render_mode = 'rgb_array')
+          except ImportError:
+               # Fallback to headless mode if GLFW3 is not available
+               return self.dataset.recover_environment(render_mode = None)
+
+     def get_total_steps(self):
+          return self.dataset.total_steps
+
+
+
+#-------------------------------------------------------------------------------------#
 #---------------------------------- Planner Dataset ----------------------------------#
-#-----------------------------------------------------------------------------#
-
+#-------------------------------------------------------------------------------------#
 def get_PlannerName(env_name, specific_env):
      if(env_name == 'kitchen'):
           if(specific_env == 'complete'):
@@ -184,14 +300,37 @@ def get_PlannerName(env_name, specific_env):
           else:
                raise ValueError(f"Invalid specific environment: {specific_env}")
      elif(env_name == 'pointmaze'):
-         if(specific_env == 'large'):
-              return 'PointMaze_Large_Planner'
-         elif(specific_env == 'medium'):
-              return 'PointMaze_Medium_Planner'
-         elif(specific_env == 'unmaze'):
-              return 'PointMaze_Unmaze_Planner'
-         else:
+          if specific_env == 'open_dense':
+               return 'PointMaze_OpenDense_Planner'
+          elif specific_env == 'umaze':
+               return 'PointMaze_Umaze_Planner'
+          elif specific_env == 'large_dense':
+               return 'PointMaze_LargeDense_Planner'
+          elif specific_env== 'medium':
+               return 'PointMaze_Medium_Planner'
+          elif specific_env == 'umaze_dense':
+               return 'PointMaze_UmazeDense_Planner'
+          elif specific_env == 'large':
+               return 'PointMaze_Large_Planner'
+          elif specific_env == 'open':
+               return 'PointMaze_Open_Planner'
+          else:
               raise ValueError(f"Invalid specific environment: {specific_env}")
+     elif(env_name == 'antmaze'):
+          if specific_env == 'medium_play':
+               return 'AntMaze_MediumPlay_Planner'
+          elif specific_env == 'umaze_diverse':
+               return 'AntMaze_UmazeDiverse_Planner'
+          elif specific_env == 'large_diverse':
+               return 'AntMaze_LargeDiverse_Planner'
+          elif specific_env == 'large_play':
+               return 'AntMaze_LargePlay_Planner'
+          elif specific_env == 'medium_diverse':
+               return 'AntMaze_MediumDiverse_Planner'
+          elif specific_env == 'umaze':
+               return 'AntMaze_Umaze_Planner'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
      else:
          raise ValueError(f"Invalid environment name: '{env_name}")
 
@@ -230,8 +369,8 @@ class PlannerDataset(Dataset):
             sa_pairs = []
             for t in range(L):
                 s_norm = self.stats.norm_obs(obs[t])
-                a_norm = self.stats.norm_act(acts[t])
-                #a_norm = acts[t]
+                #a_norm = self.stats.norm_act(acts[t])
+                a_norm = acts[t]
                 sa_pairs.append(np.concatenate([s_norm, a_norm], axis=0))
                
             
@@ -348,8 +487,6 @@ class Planner_Processor():
           act = self.stats.denorm_act(act)
           return  act
 
-
-
 class PlannerDataset_Rollout(Dataset):
     def __init__(self, dataset_name, specific_dataset, specific_train_dataset, horizon, state_dim, action_dim):
         data = get_dataset(dataset_name, specific_dataset)
@@ -385,3 +522,7 @@ class PlannerDataset_Rollout(Dataset):
 
     def __getitem__(self, idx):
         return self.windows[idx], self.conditions[idx]
+
+
+
+

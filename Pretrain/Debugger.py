@@ -59,10 +59,8 @@ for i in range(len(traj['actions'])):
 
 media.write_video("demo.mp4", frames, fps=30)
 """
-
-
-
-
+for i in range(1, 10):
+    print(i)
 
 
 
