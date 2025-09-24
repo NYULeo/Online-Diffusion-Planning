@@ -17,7 +17,7 @@ if __name__ == '__main__':  # pragma: no cover
      trainer = SDETrainer(dataset_name, specific_dataset, horizon, backbone_name = 'transformer',
          num_steps = 1000000, 
          batch_size = 128,
-         lr=3e-4,
+         lr=2e-4,
          device = device)
      trainer.train()
      #trainer.selector('complete', times = 1000)

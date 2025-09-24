@@ -28,7 +28,7 @@ class SDETrainer:
         backbone_name,
         num_steps = 1000000,
         batch_size = 128,
-        lr=3e-4,
+        lr=2e-4,
         device: Optional[torch.device] = None,
         update_ema_every = 2,
         step_start_ema = 1000,
@@ -60,7 +60,7 @@ class SDETrainer:
         self.gradient_accumulate_every = gradient_accumulate_every
         self.lr = lr
         self.step_start_ema = step_start_ema
-        self.optim = torch.optim.AdamW(self.model.parameters(), self.lr)
+        self.optim = torch.optim.AdamW(self.model.parameters(), self.lr, weight_decay=1e-5)
         #self.optim = torch.optim.Adam(self.model.parameters(), self.lr)
         self.num_steps = num_steps
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optim, self.num_steps)
