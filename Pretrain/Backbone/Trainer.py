@@ -164,7 +164,7 @@ class SDETrainer:
 
     def selector(self, specific_dataset, times = 1000):
          dataset = PlannerDataset_Rollout(self.dataset_name, specific_dataset, self.specific_dataset, self.horizon, self.state_dim, self.action_dim)
-         dataloader = DataLoader(dataset, 10, shuffle = True, pin_memory = True)
+         dataloader = DataLoader(dataset, 25, shuffle = True, pin_memory = True)
          N = len(dataloader)
          min_Loss = float('inf')
          checkpoint = self.save_freq
@@ -173,7 +173,7 @@ class SDETrainer:
          print(f"Loss of {self.model_name} on {specific_dataset} dataset. Running {times} times for each checkpoints")
          while(checkpoint <= self.num_steps):
             self.backbone_selection()
-            state_dict = get_pretrained_planner(self.model_name, checkpoint)
+            state_dict = get_pretrained_planner(self.dataset_name, specific_dataset, checkpoint)
             self.model.load_state_dict(state_dict)
             self.model.eval()
             avg_loss = 0

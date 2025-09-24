@@ -28,3 +28,4 @@ torchaudio==2.6.0
 
 # JAX for macOS
 jax==0.4.35
+tensorflow-probability[jax]  # TensorFlow Probability with JAX substrate support

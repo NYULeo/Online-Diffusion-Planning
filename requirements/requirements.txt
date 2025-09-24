@@ -24,3 +24,6 @@ humanoid-bench  # Humanoid benchmark environments
 torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+
+# TensorFlow Probability for JAX compatibility
+tensorflow-probability[jax]

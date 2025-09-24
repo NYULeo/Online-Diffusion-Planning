@@ -506,8 +506,8 @@ class PlannerDataset_Rollout(Dataset):
             sa_pairs = []
             for t in range(L):
                 s_norm = self.planner_processor.preprocess(obs[t])
-                a_norm = self.planner_processor.norm_act(acts[t])
-                #a_norm = acts[t]
+                #a_norm = self.planner_processor.norm_act(acts[t])
+                a_norm = acts[t]
                 sa_pairs.append(np.concatenate([s_norm, a_norm], axis=0))
                
             # sliding horizon, then flatten to 1D

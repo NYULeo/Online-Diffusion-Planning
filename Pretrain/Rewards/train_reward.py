@@ -8,25 +8,8 @@ from utils import set_seed, SAStats
 from Critic.train_critic import get_CriticName
 import torch.nn as nn
 import pickle
+from nets import CategoricalReward, ScalarReward
 
-
-
-class Reward(nn.Module):
-    def __init__(self, obs_dim, act_dim, hidden = 256):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(obs_dim + act_dim, hidden),
-            nn.BatchNorm1d(hidden),
-            nn.ReLU(),
-            nn.Linear(hidden, hidden),
-            nn.BatchNorm1d(hidden),
-            nn.ReLU(),
-            nn.Linear(hidden, 1)
-        )
-
-    def forward(self, obs, act):
-        x = torch.cat([obs, act], dim=-1)
-        return self.net(x).squeeze(-1)
     
 
 class Reward_Processor():
@@ -41,7 +24,6 @@ class Reward_Processor():
           act = self.stats.norm_act(act)
           return obs, act
      
-      
 
 class RewardDataset(Dataset):
     def __init__(self, trajs):
@@ -117,8 +99,17 @@ def train_reward(dataset_name: str, batch_size, epochs, lr):
     obs_dim = data_1.get_state_dim()
     act_dim = data_1.get_action_dim()
 
-    reward_net = Reward(obs_dim, act_dim).to(device)
+    #reward_net = Reward(obs_dim, act_dim).to(device)
+    reward_net = ScalarReward(
+        obs_dim,
+        act_dim,
+        hidden_units=1024,
+        num_layers=5,
+        output_activation='tanh'  # Output range: [-1, 1]
+    ).to(device)
+
     optimizer = optim.Adam(reward_net.parameters(), lr = lr)
+    
     R = []
     for epoch in range(epochs):
        R = []  # number of passes over dataset
