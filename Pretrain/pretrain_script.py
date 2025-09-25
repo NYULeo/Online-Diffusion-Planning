@@ -11,7 +11,7 @@ import torch
 if __name__ == '__main__':  # pragma: no cover
      set_seed(1)
      dataset_name = 'pointmaze'
-     specific_dataset = 'umaze'
+     specific_dataset = 'medium'
      horizon = 32
      device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
      trainer = SDETrainer(dataset_name, specific_dataset, horizon, backbone_name = 'transformer',
@@ -19,7 +19,7 @@ if __name__ == '__main__':  # pragma: no cover
          batch_size = 128,
          lr=2e-4,
          device = device)
-     #trainer.train()
-     trainer.selector('umaze', times = 1000)
+     trainer.train()
+     #trainer.selector('complete', times = 1000)
 
 

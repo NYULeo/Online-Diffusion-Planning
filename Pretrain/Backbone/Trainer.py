@@ -164,7 +164,7 @@ class SDETrainer:
 
     def selector(self, specific_dataset, times = 1000):
          dataset = PlannerDataset_Rollout(self.dataset_name, specific_dataset, self.specific_dataset, self.horizon, self.state_dim, self.action_dim)
-         dataloader = DataLoader(dataset, 25, shuffle = True, pin_memory = True)
+         dataloader = DataLoader(dataset, 10, shuffle = True, pin_memory = True)
          N = len(dataloader)
          min_Loss = float('inf')
          checkpoint = self.save_freq
@@ -173,7 +173,7 @@ class SDETrainer:
          print(f"Loss of {self.model_name} on {specific_dataset} dataset. Running {times} times for each checkpoints")
          while(checkpoint <= self.num_steps):
             self.backbone_selection()
-            state_dict = get_pretrained_planner(self.dataset_name, specific_dataset, checkpoint)
+            state_dict = get_pretrained_planner(self.dataset_name, self.specific_dataset, checkpoint)
             self.model.load_state_dict(state_dict)
             self.model.eval()
             avg_loss = 0
@@ -189,11 +189,11 @@ class SDETrainer:
                  min_Loss = final_loss
                  best_checkpoint = checkpoint
             print(f"Checkpoint: {checkpoint} Loss: {final_loss}")
-            break
             validation_tracker.log_loss(checkpoint, final_loss)
             checkpoint += self.save_freq  
          print(f"Best Checkpoint: {best_checkpoint}, Loss: {min_Loss}")  
          #self.loss_tracker.save_logs(f"{self.model_name}_{specific_dataset}_validation_loss_curve.pkl")
+         
          validation_tracker.plot_loss_curve(
              save_path=f"./plots/{self.model_name}_{specific_dataset}_validation_loss_curve.png",
              title=f"{self.model_name} {specific_dataset} Validation Loss",
