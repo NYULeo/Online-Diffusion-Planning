@@ -189,6 +189,7 @@ class SDETrainer:
                  min_Loss = final_loss
                  best_checkpoint = checkpoint
             print(f"Checkpoint: {checkpoint} Loss: {final_loss}")
+            break
             validation_tracker.log_loss(checkpoint, final_loss)
             checkpoint += self.save_freq  
          print(f"Best Checkpoint: {best_checkpoint}, Loss: {min_Loss}")  
