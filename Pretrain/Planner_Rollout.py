@@ -71,7 +71,9 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
      #get Planner
      state_dict = get_pretrained_planner(env_name, specific_env, checkpoint_steps)
      if( env_name == 'kitchen'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)    
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     elif (env_name == 'pointmaze'):
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
      else:
           raise ValueError(f"Invalid Environment: {env_name}")
      model.load_state_dict(state_dict)
@@ -134,9 +136,9 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
 if __name__ == "__main__":
     set_seed(1)
     horizon = 32
-    env_name = 'PointMaze'
-    specific_train_dataset = 'partial'
+    env_name = 'pointmaze'
+    specific_train_dataset = 'medium'
 
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 500, critic = False, checkpoint_steps = 990000)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 2000, critic = False, checkpoint_steps = 1000000)
 
 

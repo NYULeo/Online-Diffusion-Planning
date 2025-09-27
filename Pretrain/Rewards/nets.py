@@ -2,7 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-
+from scipy.ndimage import gaussian_filter1d, convolve
+from torch.distributions import Beta
+from typing import Optional
 class CategoricalReward(nn.Module):
     """
     PyTorch implementation of the DreamSmooth reward prediction model.
@@ -161,29 +163,22 @@ class CategoricalReward(nn.Module):
 
 
 class ScalarReward(nn.Module):
-    """
-    PyTorch implementation of reward prediction model with scalar output.
+  
     
-    Architecture:
-    - Input: [deter, stoch] latent states
-    - 5-layer MLP with 1024 units per layer
-    - SiLU activation and layer normalization
-    - Output: Single scalar reward value
-    """
-    
-    def __init__(self, deter_dim, stoch_dim, hidden_units=1024, 
-                 num_layers=5, output_activation='tanh'):
+    def __init__(self, obs_dim, act_dim, hidden_units=1024, 
+                 num_layers=5, eps=1e-4):
         super().__init__()
         
         # Input dimensions
-        self.deter_dim = deter_dim
-        self.stoch_dim = stoch_dim
-        self.input_dim = deter_dim + stoch_dim
+        self.obs_dim = obs_dim
+        self.act_dim = act_dim
+        self.input_dim = obs_dim + act_dim
+        self.eps = eps
         
         # Architecture parameters
         self.hidden_units = hidden_units
         self.num_layers = num_layers
-        self.output_activation = output_activation
+        #self.output_activation = output_activation
         
         # Create the MLP layers
         self.layers = nn.ModuleList()
@@ -196,26 +191,17 @@ class ScalarReward(nn.Module):
             self.layers.append(nn.Linear(hidden_units, hidden_units))
         
         # Output layer - single scalar output
-        self.layers.append(nn.Linear(hidden_units, 1))
+        self.layers.append(nn.Linear(hidden_units, 2))
         
         # Layer normalization for each layer
         self.layer_norms = nn.ModuleList()
         for _ in range(num_layers):
             self.layer_norms.append(nn.LayerNorm(hidden_units))
         
-    def forward(self, deter, stoch):
-        """
-        Forward pass of the reward model.
+    def forward(self, obs, act):
         
-        Args:
-            deter: Deterministic latent state [batch_size, deter_dim]
-            stoch: Stochastic latent state [batch_size, stoch_dim]
-            
-        Returns:
-            reward: Scalar reward prediction [batch_size, 1]
-        """
         # Concatenate inputs
-        x = torch.cat([deter, stoch], dim=-1)
+        x = torch.cat([obs, act], dim=-1)
         
         # Forward through MLP layers
         for i, (layer, norm) in enumerate(zip(self.layers, self.layer_norms)):
@@ -226,56 +212,62 @@ class ScalarReward(nn.Module):
             else:  # Output layer
                 x = layer(x)
         
-        # Apply output activation
-        if self.output_activation == 'tanh':
-            reward = torch.tanh(x)
-        elif self.output_activation == 'sigmoid':
-            reward = torch.sigmoid(x)
-        elif self.output_activation == 'none':
-            reward = x
-        else:
-            raise ValueError(f"Unknown output activation: {self.output_activation}")
+        raw_alpha = x[:, 0]  # shape (B,)
+        raw_beta  = x[:, 1]  # shape (B,)
+        # Transform to positive
+        alpha = F.softplus(raw_alpha) + 1e-4
+        beta  = F.softplus(raw_beta)  + 1e-4
         
-        return reward.squeeze(-1)  # Remove last dimension to get [batch_size]
+        return alpha, beta
     
-    def compute_loss(self, predicted_rewards, target_rewards, loss_type='mse'):
+    @torch.no_grad()
+    def predict(self, obs, act, agg: str = "mean", ci:  Optional[float] = None):
         """
-        Compute the reward prediction loss.
-        
-        Args:
-            predicted_rewards: Predicted reward values [batch_size]
-            target_rewards: Target reward values [batch_size]
-            loss_type: Type of loss function ('mse', 'mae', 'huber')
-            
+        Prediction head.
+        - agg: "mean" (default), "mode", or "median_approx".
+        - ci: if set (e.g., 0.95), also returns (lo, hi) credible interval.
         Returns:
-            loss: Scalar loss value
+            pred  : [B] point estimate in [0,1]
+            (lo,hi): [B],[B] CI if ci is not None
         """
-        if loss_type == 'mse':
-            loss = F.mse_loss(predicted_rewards, target_rewards)
-        elif loss_type == 'mae':
-            loss = F.l1_loss(predicted_rewards, target_rewards)
-        elif loss_type == 'huber':
-            loss = F.huber_loss(predicted_rewards, target_rewards)
-        else:
-            raise ValueError(f"Unknown loss type: {loss_type}")
-        
-        return loss
-    
-    def predict_reward(self, deter, stoch):
-        """
-        Predict reward from latent states.
-        
-        Args:
-            deter: Deterministic latent state [batch_size, deter_dim]
-            stoch: Stochastic latent state [batch_size, stoch_dim]
-            
-        Returns:
-            predicted_rewards: Predicted reward values [batch_size]
-        """
-        with torch.no_grad():
-            predicted_rewards = self.forward(deter, stoch)
-            return predicted_rewards
+        alpha, beta = self.forward(obs, act)
+        dist = Beta(alpha, beta)  # PyTorch Beta distribution
 
+        if agg == "mean":
+            pred = alpha / (alpha + beta)               # E[R]
+        elif agg == "mode":
+            # Only valid if alpha>1 and beta>1; fall back to mean otherwise
+            mask = (alpha > 1) & (beta > 1)
+            mode = (alpha - 1) / (alpha + beta - 2)
+            mean = alpha / (alpha + beta)
+            pred = torch.where(mask, mode, mean)
+        elif agg == "median_approx":
+            # Kerman (2011) approx: (α-1/3)/(α+β-2/3) for α,β≥1
+            pred = (alpha - 1/3) / (alpha + beta - 2/3)
+            pred = pred.clamp(0.0, 1.0)                 # guard numerics
+        else:
+            raise ValueError("agg must be 'mean', 'mode', or 'median_approx'")
+
+        if ci is None:
+            return pred
+        qlo = (1 - ci) / 2
+        qhi = 1 - qlo
+        lo = dist.icdf(torch.full_like(alpha, qlo))
+        hi = dist.icdf(torch.full_like(alpha, qhi))
+        return pred, (lo, hi)
+
+    def loss(self, obs, act, r):
+        """
+        Beta negative log-likelihood for targets r in [0,1].
+        Clamps r into (eps, 1-eps) to avoid log_prob at the boundaries 0 or 1.
+        Returns scalar loss.
+        """
+        alpha, beta = self.forward(obs, act)
+        dist = Beta(alpha, beta)
+        r = r.clamp(self.eps, 1 - self.eps)             # keep inside (0,1)
+        nll = -dist.log_prob(r)                         # [B]
+        return nll.mean()
+    
 
 
 class Reward(nn.Module):
@@ -295,3 +287,9 @@ class Reward(nn.Module):
         x = torch.cat([obs, act], dim=-1)
         return self.net(x).squeeze(-1)
 
+def gaussian_rewards(episode, sigma):
+    if sigma > 0:
+        reward_raw = episode["rewards"]
+        reward_smooth = gaussian_filter1d(reward_raw, sigma, mode="nearest")
+        episode.update({"rewards_raw": reward_raw, "rewards": reward_smooth})
+        return episode
