@@ -9,6 +9,11 @@ import os
 import pickle
 
 
+def cycle(dl):
+    while True:
+        for data in dl:
+            yield data
+
 
 class SAStats:
     obs_mean: np.ndarray
