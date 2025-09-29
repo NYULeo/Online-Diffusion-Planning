@@ -1,12 +1,12 @@
-# Large dataset files
+# Large dataset files (but keep important model files)
 hbench.pickle
-*.pickle
-*.pkl
+# *.pickle  # Commented out to include model files
+# *.pkl    # Commented out to include model files
 
-# Preprocessed data files
-*_trajectories.npy
-*_task_conditions.npy
-*.npy
+# Preprocessed data files (but keep important data)
+# *_trajectories.npy  # Commented out to include trajectory data
+# *_task_conditions.npy  # Commented out to include task conditions
+# *.npy   # Commented out to include numpy data files
 
 # Python cache
 __pycache__/
@@ -104,13 +104,13 @@ Thumbs.db
 *.swo
 *~
 
-# Training outputs
+# Training outputs (but keep important checkpoints and models)
 hbench_runs/
 task_specific_models/
 runs/
-checkpoints/
-*.pt
-*.pth
+# checkpoints/  # Commented out to include checkpoint directories
+# *.pt        # Commented out to include PyTorch model files
+# *.pth       # Commented out to include PyTorch model files
 
 # Logs
 *.log
