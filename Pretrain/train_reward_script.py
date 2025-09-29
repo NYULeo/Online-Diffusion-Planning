@@ -8,6 +8,6 @@ if __name__ == '__main__':
     train_reward(
     dataset_name = 'kitchen',  
     batch_size=1024, 
-    num_steps=500,   
+    num_steps=1000,   
     lr=1e-4,
     sigma=3)
