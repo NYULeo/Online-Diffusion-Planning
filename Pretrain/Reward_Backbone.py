@@ -14,14 +14,20 @@ import os
 from scipy.ndimage import gaussian_filter1d, convolve
 from utils import cycle
 import copy
+from sympy import factorint
 
 def save_model(reward_net, reward_name, num_steps):
     reward_net.eval()
     net_dict = reward_net.state_dict()
-    os.makedirs('./Rewards/Models/', exist_ok=True)
-    save_path = f'Rewards/Models/{reward_name}_{num_steps}.pkl'
+    os.makedirs(f'./Rewards/{reward_name}/Models/', exist_ok=True)
+    save_path = f'Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
     torch.save(net_dict, save_path)
     print(f"reward model save to {reward_name}_{num_steps}.pkl")
+
+def load_model(reward_name, num_steps):
+    load_path = f'./Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
+    state_dict = torch.load(load_path, map_location='cpu')
+    return state_dict
 
 class Reward_Processor():
      def __init__(self, dataset_name, specific_dataset):
@@ -105,7 +111,7 @@ class RewardDataset(Dataset):
     
     def save_stats(self, reward_name):
         stats_name =  str(reward_name) + '_stats.pkl'
-        stats_dir = './Rewards/Stats/'
+        stats_dir = f'./Rewards/{reward_name}/Stats/'
         os.makedirs(stats_dir, exist_ok=True)
         savepath = os.path.join(stats_dir, stats_name)
         with open(savepath, 'wb') as f:
@@ -123,7 +129,32 @@ class RewardDataset(Dataset):
             torch.tensor(r, dtype=torch.float32),
         )
 
-
+def test_reward(dataset_name, specific_dataset: Optional[str] = None, sigma: float = 3, save_freq: int = 50, num_steps: int = 500):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
+    dataset = RewardDataset(trajs, sigma, reward_name)
+    a = factorint(len(dataset))
+    batch_size = int(np.min(list(a.keys())))
+    dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8)
+    num = save_freq
+    while num < num_steps:
+         state_dict = load_model(reward_name, num)
+         reward_net = ScalarReward(obs_dim, act_dim).to(device)
+         reward_net.load_state_dict(state_dict)
+         reward_net.eval()
+         total_loss = 0
+         for s, a, r in dataloader:
+             s = s.to(device)
+             a = a.to(device)
+             r = r.to(device)
+             r_pred = reward_net.predict(s, a)
+             loss = ((r_pred - r).abs()).mean()
+             total_loss += loss.item()
+         avg_loss = total_loss / len(dataloader)
+         print(f"model {num}, Loss {avg_loss:.4f}")
+         num += save_freq
+    
+    
 def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, specific_dataset: Optional[str] = None):
     save_freq = 50
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -170,14 +201,6 @@ def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, specific_d
 
 
 
-if __name__ == '__main__':  # pragma: no cover
-    set_seed(1)
-    train_reward(
-    dataset_name = 'kitchen',  
-    batch_size=1024, 
-    num_steps=500,   
-    lr=1e-4,
-    sigma=3)
 
 
 

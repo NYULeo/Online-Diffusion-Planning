@@ -33,6 +33,8 @@ from Dataset import PlannerDataset
 from Rewards.nets import gaussian_rewards
 import scipy
 import scipy.ndimage
+from sympy import factorint
+
 
 
 
@@ -223,14 +225,7 @@ a = np.array([0,0,1,0,0], dtype=np.float64)
 smoothed = gaussian_filter1d(a, 1.0, mode='nearest')
 print(f"Float64 result: {smoothed}")
 """
+a = factorint(250)
+T = list(a.keys())
+print(T)
 
-
-data = get_dataset('kitchen', 'complete')
-traj = data.get_trajectories()
-
-# Check if smoothing worked
-print(f"Original rewards: {traj[0]['rewards']}")
-print(f"Original sum: {np.sum(traj[0]['rewards'])}")
-gaussian_rewards(traj[0],1)
-print(f"Smoothed rewards {traj[0]['rewards']}")
-print(f"Smoothed sum: {np.sum(traj[0]['rewards'])}")
