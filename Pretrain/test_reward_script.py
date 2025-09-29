@@ -9,4 +9,4 @@ if __name__ == '__main__':
     specific_dataset = None, 
     sigma = 3, 
     save_freq = 50, 
-    num_steps = 500)
+    num_steps = 1000)
