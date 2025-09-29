@@ -137,7 +137,7 @@ def test_reward(dataset_name, specific_dataset: Optional[str] = None, sigma: flo
     batch_size = int(np.min(list(a.keys())))
     dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8)
     num = save_freq
-    while num < num_steps:
+    while num <= num_steps:
          state_dict = load_model(reward_name, num)
          reward_net = ScalarReward(obs_dim, act_dim).to(device)
          reward_net.load_state_dict(state_dict)
