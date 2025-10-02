@@ -156,7 +156,7 @@ def test_reward(dataset_name, specific_dataset: Optional[str] = None, sigma: flo
     
     
 def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, specific_dataset: Optional[str] = None):
-    save_freq = 50
+    save_freq = 100
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
     print(f"Training reward approximator for {dataset_name} Dataset") 
