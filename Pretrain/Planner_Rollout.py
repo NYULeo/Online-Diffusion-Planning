@@ -14,7 +14,7 @@ from Dataset import Planner_Processor
 import gymnasium as gym
 import os
 from Backbone.Dit import DiT1d
-#import mediapy as media
+import mediapy as media
 
 
 """
@@ -115,7 +115,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
                
            
            obs, reward, terminated, truncated, info = env.step(action)
-           #frames.append(env.render())
+           frames.append(env.render())
            step = {'observation': obs['observation'].copy(), 'action':action.copy(), 'reward': reward}
            play_seq.append(step)
            current_state = obs['observation'].copy()
@@ -125,7 +125,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
                 break
      
      traj_info = {'sequence': play_seq, 'env_name': env_name, 'specific_env': specific_env }
-     #media.write_video("demo.mp4", frames, fps=50)
+     media.write_video("demo.mp4", frames, fps=50)
      with open('Generated_trajectory.pkl', 'wb') as f:
                 pickle.dump(traj_info, f)
      
@@ -139,6 +139,6 @@ if __name__ == "__main__":
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
 
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 1000000)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 1000, critic = False, checkpoint_steps = 1000000)
 
 
