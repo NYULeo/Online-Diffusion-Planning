@@ -5,7 +5,7 @@ import numpy as np
 from Dataset import KitchenDataset, PointMazeDataset
 from utils import *
 import random
-
+import copy
 # Define the Gaussian forward dynamics model: inputs (s, a), outputs mean and log_std of s'
 class TransitionKernel(nn.Module):
     def __init__(self, obs_dim, act_dim):
@@ -36,7 +36,13 @@ class TransitionKernel(nn.Module):
         return nll.sum(dim=-1).mean()
 
 
-
+def save_model(kernel_net, kernel_name, num_steps):
+    kernel_net.eval()
+    net_dict =  kernel_net.state_dict()
+    os.makedirs(f'./Transition_Kernel/{kernel_name}/Models/', exist_ok=True)
+    save_path = f'./Transition_Kernel/{kernel_name}/Models/{kernel_name}_{num_steps}.pkl'
+    torch.save(net_dict, save_path)
+    print(f"Kernel model save to {kernel_name}_{num_steps}.pkl")
 
 # Build (s, a, s') transitions from your offline trajectories
 class KernelDataset(Dataset):
@@ -63,8 +69,9 @@ class KernelDataset(Dataset):
             torch.tensor(s_next, dtype=torch.float32)
         )
 
-def train_kernel(dataset_name, batch_size, lr, epochs):
+def train_kernel(dataset_name, specific_dataset: Optional[str] = None, batch_size = 256, lr = 1e-3, num_steps = 10000):
      # Prepare dataset and dataloader
+     save_freq = 100
      print(f"Training kernel for {dataset_name} Dataset")
      device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
      if(dataset_name == 'kitchen'):
@@ -75,10 +82,10 @@ def train_kernel(dataset_name, batch_size, lr, epochs):
          kernel_name = 'Kitchen_Kernel.pkl'
 
      elif(dataset_name == 'pointmaze'):
-         data_1 = PointMazeDataset('large')
-         data_2 = PointMazeDataset('medium')
-         data_3 = PointMazeDataset('umaze')
-         trajectories = data_1.get_trajectories() + data_2.get_trajectories() + data_3.get_trajectories()
+         if(specific_dataset is None):
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+         data = PointMazeDataset(specific_dataset)
+         trajectories = data.get_trajectories()
          kernel_name = '2DMaze_Kernel.pkl'
      else:
          raise ValueError(f"Invalid dataset name: {dataset_name}")
@@ -86,7 +93,7 @@ def train_kernel(dataset_name, batch_size, lr, epochs):
      obs_dim = data_1.get_state_dim()
      act_dim = data_1.get_action_dim()
      dataset = KernelDataset(trajectories)
-     loader = DataLoader(dataset, batch_size, shuffle=True, drop_last=True)
+     loader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
 
      # Create model and optimiser
      model = TransitionKernel(obs_dim, act_dim).to(device)
@@ -96,37 +103,45 @@ def train_kernel(dataset_name, batch_size, lr, epochs):
      total_prob = total_pro(trajectories, model)
      print(f"Total Probability Before Training: {total_prob:.4f}")
      # Training loop
+
      model.train()
-     for epoch in range(epochs):
-          total_nll = 0.0
-          for s, a, s_next in loader:
-               s = s.to(device)
-               a = a.to(device)
-               s_next = s_next.to(device)
+     step = 0
+     total_nll = 0.0
+     for i in range(num_steps):
+          s, a, s_next = next(loader)
+          s = s.to(device)
+          a = a.to(device)
+          s_next = s_next.to(device)
 
-               mu, log_std = model(s, a)
-               loss = model.gaussian_nll(s_next, mu, log_std)
+          mu, log_std = model(s, a)
+          loss = model.gaussian_nll(s_next, mu, log_std)
 
-               optimiser.zero_grad()
-               loss.backward()
-               optimiser.step()
+          optimiser.zero_grad()
+          loss.backward()
+          optimiser.step()
+          total_nll += loss.item() 
+          
+          if step % 10 == 0:
+              avg_loss = total_nll / 10
+              print(f"Step {step}, loss {avg_loss:.4f}")
+              total_loss = 0
 
-               total_nll += loss.item() * len(s)
-          
-          
-          avg_nll = total_nll / len(dataset)
-          if epoch % 10 == 0 or epoch == epochs - 1:
-               print(f"Epoch {epoch}, negative log-likelihood: {avg_nll:.4f}")
-          
+          if step % save_freq == 0:
+              checkpoint = copy.deepcopy(model)
+              save_model(checkpoint, model, step)
+         
      
      model.eval()
      #total probability after training
      total_prob = total_pro(trajectories, model)
      print(f"Total Probability After Training: {total_prob:.4f}")
-     torch.save(model, kernel_name)
+     #torch.save(model, kernel_name)
      
 
 
 if __name__ == '__main__':  # pragma: no cover
     random.seed(1)
     train_kernel(dataset_name = 'kitchen', batch_size = 256, lr = 1e-3, epochs = 100)
+
+
+ 

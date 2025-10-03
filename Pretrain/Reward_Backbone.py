@@ -16,6 +16,9 @@ from utils import cycle
 import copy
 from sympy import factorint
 
+
+
+
 def save_model(reward_net, reward_name, num_steps):
     reward_net.eval()
     net_dict = reward_net.state_dict()
@@ -128,33 +131,8 @@ class RewardDataset(Dataset):
             torch.tensor(a, dtype=torch.float32),
             torch.tensor(r, dtype=torch.float32),
         )
+    
 
-def test_reward(dataset_name, specific_dataset: Optional[str] = None, sigma: float = 3, save_freq: int = 50, num_steps: int = 500):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
-    dataset = RewardDataset(trajs, sigma, reward_name)
-    a = factorint(len(dataset))
-    batch_size = int(np.min(list(a.keys())))
-    dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8)
-    num = save_freq
-    while num <= num_steps:
-         state_dict = load_model(reward_name, num)
-         reward_net = ScalarReward(obs_dim, act_dim).to(device)
-         reward_net.load_state_dict(state_dict)
-         reward_net.eval()
-         total_loss = 0
-         for s, a, r in dataloader:
-             s = s.to(device)
-             a = a.to(device)
-             r = r.to(device)
-             r_pred = reward_net.predict(s, a)
-             loss = ((r_pred - r).abs()).mean()
-             total_loss += loss.item()
-         avg_loss = total_loss / len(dataloader)
-         print(f"model {num}, Loss {avg_loss:.4f}")
-         num += save_freq
-    
-    
 def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, specific_dataset: Optional[str] = None):
     save_freq = 100
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -200,6 +178,65 @@ def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, specific_d
     save_model(reward_net, reward_name, num_steps)
 
 
+class test_dataset(Dataset):
+    def __init__(self, trajs, sigma, Reward_name):
+        stats_path = f'./Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
+        with open(stats_path, 'rb') as f:
+              self.stats = pickle.load(f)
+        transitions = []
+        for traj in trajs:
+            obs = np.asarray(traj['observations'])      
+            acts = np.asarray(traj['actions'])
+            rews = np.asarray(traj['rewards'])
+            rews = gaussian_filter1d(rews, sigma)
+            for t in range(len(acts)):
+                obs_t = self.stats.norm_obs(obs[t])
+                a_t   = acts[t]
+                r_t   = rews[t]
+                transitions.append((obs_t, a_t, r_t))
+
+        self.transitions = transitions
+    
+    def __len__(self):
+        return len(self.transitions)
+
+    def __getitem__(self, idx):
+        s, a, r = self.transitions[idx]
+        return (
+            torch.tensor(s, dtype=torch.float32),
+            torch.tensor(a, dtype=torch.float32),
+            torch.tensor(r, dtype=torch.float32),
+        )
+        
+def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: float = 3, save_freq: int = 50, num_steps: int = 500):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if(trajs is None): 
+        train_Trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
+        dataset = RewardDataset(train_Trajs, sigma, reward_name)
+    else:
+        _, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
+        dataset = test_dataset(trajs, sigma, reward_name)
+    a = factorint(len(dataset))
+    batch_size = int(np.min(list(a.keys())))
+    dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8)
+    num = save_freq
+    while num <= num_steps:
+         state_dict = load_model(reward_name, num)
+         reward_net = ScalarReward(obs_dim, act_dim).to(device)
+         reward_net.load_state_dict(state_dict)
+         reward_net.eval()
+         total_loss = 0
+         for s, a, r in dataloader:
+             s = s.to(device)
+             a = a.to(device)
+             r = r.to(device)
+             r_pred = reward_net.predict(s, a)
+             loss = ((r_pred - r).abs()).mean()
+             total_loss += loss.item()
+         avg_loss = total_loss / len(dataloader)
+         print(f"model {num}, Loss {avg_loss:.4f}")
+         num += save_freq
+    
 
 
 
