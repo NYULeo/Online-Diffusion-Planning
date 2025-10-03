@@ -134,9 +134,9 @@ class KitchenDataset():
     
      def get_env(self):
           # Use headless mode for servers without display capabilities
-          #return self.dataset.recover_environment(render_mode = None)
-          env_spec = self.dataset.spec.env_spec
-          return gym.make(env_spec, render_mode='rgb_array')
+          return self.dataset.recover_environment(render_mode = None)
+          #env_spec = self.dataset.spec.env_spec
+          #return gym.make(env_spec, render_mode='rgb_array')
           #return gym.make(env_spec, render_mode = None)
 
      def get_total_steps(self):
@@ -208,9 +208,10 @@ class PointMazeDataset():
     
      def get_env(self):
           # Use headless mode for servers without display capabilities
-          #return self.dataset.recover_environment(render_mode = None)
-          env_spec = self.dataset.spec.env_spec
-          return gym.make(env_spec, render_mode='rgb_array')
+          return self.dataset.recover_environment(render_mode = None)
+          #return self.dataset.recover_environment(render_mode = 'rgb_array')
+          #env_spec = self.dataset.spec.env_spec
+          #return gym.make(env_spec, render_mode='rgb_array')
           #return gym.make(env_spec, render_mode = None)
 
      def get_total_steps(self):
@@ -278,9 +279,10 @@ class AntMazeDataset():
     
      def get_env(self):
           # Use headless mode for servers without display capabilities
-          #return self.dataset.recover_environment(render_mode = None)
-          env_spec = self.dataset.spec.env_spec
-          return gym.make(env_spec, render_mode='rgb_array')
+          return self.dataset.recover_environment(render_mode = None)
+          #return self.dataset.recover_environment(render_mode = 'rgb_array')
+          #env_spec = self.dataset.spec.env_spec
+          #return gym.make(env_spec, render_mode='rgb_array')
           #return gym.make(env_spec, render_mode = None)
 
      def get_total_steps(self):

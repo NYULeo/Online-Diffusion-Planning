@@ -139,6 +139,6 @@ if __name__ == "__main__":
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
 
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 1000, critic = False, checkpoint_steps = 1000000)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 1000000)
 
 
