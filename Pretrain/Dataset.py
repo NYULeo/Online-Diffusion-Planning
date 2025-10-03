@@ -136,8 +136,8 @@ class KitchenDataset():
           # Use headless mode for servers without display capabilities
           try:
                return self.dataset.recover_environment(render_mode = 'rgb_array')
-          except ImportError:
-               # Fallback to headless mode if GLFW3 is not available
+          except (ImportError, Exception):
+               # Fallback to headless mode if GLFW3 is not available or display issues
                return self.dataset.recover_environment(render_mode = None)
 
      def get_total_steps(self):
@@ -208,7 +208,12 @@ class PointMazeDataset():
           return self.dataset._action_space.shape[0]
     
      def get_env(self):
-          return self.dataset.recover_environment(render_mode = 'rgb_array')
+          # Use headless mode for servers without display capabilities
+          try:
+               return self.dataset.recover_environment(render_mode = 'rgb_array')
+          except (ImportError, Exception):
+               # Fallback to headless mode if GLFW3 is not available or display issues
+               return self.dataset.recover_environment(render_mode = None)
 
      def get_total_steps(self):
           return self.dataset.total_steps
@@ -277,8 +282,8 @@ class AntMazeDataset():
           # Use headless mode for servers without display capabilities
           try:
                return self.dataset.recover_environment(render_mode = 'rgb_array')
-          except ImportError:
-               # Fallback to headless mode if GLFW3 is not available
+          except (ImportError, Exception):
+               # Fallback to headless mode if GLFW3 is not available or display issues
                return self.dataset.recover_environment(render_mode = None)
 
      def get_total_steps(self):
