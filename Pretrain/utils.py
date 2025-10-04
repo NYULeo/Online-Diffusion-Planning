@@ -43,16 +43,18 @@ class SAStats:
 """
 
 def compute_log_prob(model, s, a, s_next, device):
-    s = torch.tensor(s, dtype=torch.float32, device=device).unsqueeze(0)
-    a = torch.tensor(a, dtype=torch.float32, device=device).unsqueeze(0)
-    s_next = torch.tensor(s_next, dtype=torch.float32, device=device).unsqueeze(0)
+    if not isinstance(s, torch.Tensor):
+        s = torch.tensor(s, dtype=torch.float32, device=device).unsqueeze(0)
+        a = torch.tensor(a, dtype=torch.float32, device=device).unsqueeze(0)
+        s_next = torch.tensor(s_next, dtype=torch.float32, device=device).unsqueeze(0)
+
     with torch.no_grad():
         mu, log_std = model(s, a)
         sigma = torch.exp(log_std)
         D = mu.size(-1)
         # Compute log prob per dimension and sum
         log_prob = -0.5 * (((s_next - mu) / sigma) ** 2).sum(dim=-1)
-        log_prob += -0.5 * (D * torch.log(torch.tensor(2 * torch.pi)) + 2 * log_std.sum(dim=-1))
+        log_prob += -0.5 * (D * math.log(2 * math.pi) + 2 * log_std.sum(dim=-1))
     return log_prob.item()
 
 

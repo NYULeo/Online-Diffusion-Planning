@@ -189,9 +189,11 @@ def rollout_parallel(env_name, specific_env, horizon, steps_T, eta, episode_leng
      current_states = s0_vec[0]['observation']  # Shape: (num_envs, d_s)
      
      # Store trajectories for each environment
-     all_play_seqs = [[] for _ in range(num_envs)]
      all_rewards = [0.0 for _ in range(num_envs)]
      done_envs = [False for _ in range(num_envs)]
+     observations = [[] for _ in range(num_envs)]
+     acts = [[] for _ in range(num_envs)]
+     rewards = [[] for _ in range(num_envs)]
      
      for i in range(episode_length):
          actions = np.zeros((num_envs, d_a))
@@ -224,13 +226,10 @@ def rollout_parallel(env_name, specific_env, horizon, steps_T, eta, episode_leng
          for env_idx in range(num_envs):
              if done_envs[env_idx]:
                  continue
-                 
-             step = {
-                 'observation': obs_vec['observation'][env_idx].copy(),
-                 'action': actions[env_idx].copy(),
-                 'reward': rewards_vec[env_idx]
-             }
-             all_play_seqs[env_idx].append(step)
+             
+             observations[env_idx].append(obs_vec['observation'][env_idx].copy())
+             acts[env_idx].append(actions[env_idx].copy())
+             rewards[env_idx].append(rewards_vec[env_idx])
              all_rewards[env_idx] += rewards_vec[env_idx]
              
              current_states[env_idx] = obs_vec['observation'][env_idx].copy()
@@ -252,15 +251,22 @@ def rollout_parallel(env_name, specific_env, horizon, steps_T, eta, episode_leng
      vec_env.close()
      
      # Find the trajectory with the maximum reward
+     trajs = [[] for _ in range(num_envs)]
+     for env_idx in range(num_envs):
+         trajs[env_idx] = {
+             'observations': observations[env_idx].copy(),
+             'actions': acts[env_idx].copy(),
+             'rewards': rewards[env_idx].copy()
+         }
      best_idx = np.argmax(all_rewards)
      best_reward = all_rewards[best_idx]
-     best_trajectory = all_play_seqs[best_idx]
+     best_trajectory = trajs[best_idx]
      
      print(f"\n{'='*60}")
      print(f"Results from {num_envs} parallel rollouts:")
      print(f"{'='*60}")
      for env_idx in range(num_envs):
-         print(f"  Env {env_idx}: Total reward = {all_rewards[env_idx]:.4f}, Steps = {len(all_play_seqs[env_idx])}")
+         print(f"  Env {env_idx}: Total reward = {all_rewards[env_idx]:.4f}, Steps = {len(trajs[env_idx])}")
      print(f"{'='*60}")
      print(f"Best trajectory: Env {best_idx} with reward = {best_reward:.4f}")
      print(f"Average reward: {np.mean(all_rewards):.4f} ± {np.std(all_rewards):.4f}")
@@ -269,7 +275,7 @@ def rollout_parallel(env_name, specific_env, horizon, steps_T, eta, episode_leng
      # Save the best trajectory in the same format as single rollout
      trajs_info = {
          'best_traj': best_trajectory,
-         'trajs': all_play_seqs,
+         'trajs': trajs,
          'env_name': env_name,
          'specific_env': specific_env,
          'total_reward': best_reward,

@@ -153,8 +153,6 @@ def train_kernel(dataset_name, specific_dataset: Optional[str] = None, batch_siz
      optimiser = optim.Adam(model.parameters(), lr, weight_decay = 1e-5)
 
      #total probability before training
-     total_prob = total_pro(trajs, model, device)
-     print(f"Total Probability Before Training: {total_prob:.4f}")
      # Training loop
 
      model.train()
@@ -175,8 +173,8 @@ def train_kernel(dataset_name, specific_dataset: Optional[str] = None, batch_siz
           total_nll += loss.item() 
           step += 1
           
-          if step % 10 == 0:
-              avg_loss = total_nll / 10
+          if step % 500 == 0:
+              avg_loss = total_nll / 500
               print(f"Step {step}, loss {avg_loss:.4f}")
               total_nll = 0.0
 
@@ -187,8 +185,6 @@ def train_kernel(dataset_name, specific_dataset: Optional[str] = None, batch_siz
          
      #total probability after training
      model.eval()
-     total_prob = total_pro(trajs, model, device)
-     print(f"Total Probability After Training: {total_prob:.4f}")
      save_model(model, kernel_name, num_steps)
      
 
@@ -202,9 +198,7 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
         _, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
         dataset = test_dataset(trajs, kernel_name)
     print(f"Testing the reward model on {len(dataset)} samples")
-    a = factorint(len(dataset))
-    batch_size = int(np.min(list(a.keys())))
-    dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8)
+    dataloader = DataLoader(dataset, batch_size = 1, shuffle = True, pin_memory = True, num_workers = 8)
     num = save_freq
     while num <= num_steps:
          state_dict = load_model(kernel_name, num)
@@ -213,15 +207,11 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
          kernel_net.eval()
          total_loss = 0
          for s, a, s_next in dataloader:
-             s_batch = s.to(device)
-             a_batch = a.to(device)
-             s_next_batch = s_next.to(device)
-             for i in range(s.shape[0]):
-                  s_i = s_batch[i].cpu().numpy()
-                  a_i = a_batch[i].cpu().numpy()
-                  s_next_i = s_next_batch[i].cpu().numpy()
-                  prob = compute_log_prob(kernel_net, s_i, a_i, s_next_i, device)
-                  total_loss += prob
+             s = s.to(device)
+             a = a.to(device)
+             s_next = s_next.to(device)
+             prob = compute_log_prob(kernel_net, s, a, s_next, device)
+             total_loss += prob
          avg_loss = total_loss / len(dataset)
          print(f"model {num}, Loss {avg_loss:.4f}")
          num += save_freq

@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-
+import math
 
 # Define the Gaussian forward dynamics model: inputs (s, a), outputs mean and log_std of s'
 class TransitionKernel(nn.Module):
@@ -28,7 +28,7 @@ class TransitionKernel(nn.Module):
 
     def gaussian_nll(self, x, mu, log_std):
         var = torch.exp(2 * log_std)
-        nll = 0.5 * torch.log(2 * torch.pi * var) + 0.5 * ((x - mu) ** 2) / var
+        nll = 0.5 * math.log(2 * math.pi * var) + 0.5 * ((x - mu) ** 2) / var
         return nll.sum(dim=-1).mean()
     
     
