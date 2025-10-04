@@ -90,19 +90,22 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
      current_state = s0
      play_seq = []
      frames = []
+     observations = []
+     actions = []
+     rewards = []
      for i in range(episode_length):
            current_state_norm = planner_processor.preprocess(current_state)
            #current_state_norm = current_state
            #x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta, device)
            if critic:
-                actions = []
+                candidates = []
                 for j in range(10):
                    x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
                    action = x[0, d_s:(d_s+d_a)].copy()
                    #action = torch.tanh(action)
                    #action = planner_processor.postprocess(action)
-                   actions.append(action)
-                action = action_selector.action_selection(current_state, actions)
+                   candidates.append(action)
+                action = action_selector.action_selection(current_state, candidates)
            else:
                x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
                #print(x[0])
@@ -117,8 +120,10 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
            
            obs, reward, terminated, truncated, info = env.step(action)
            #frames.append(env.render())
-           step = {'observation': obs['observation'].copy(), 'action':action.copy(), 'reward': reward}
-           play_seq.append(step)
+           
+           observations.append(obs['observation'].copy())
+           actions.append(action.copy())
+           rewards.append(reward)
            current_state = obs['observation'].copy()
            #print(f"Episode {i} reward: {reward}")
            if(terminated or truncated):
@@ -126,7 +131,8 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
                 break
      
      env.close()
-     traj_info = {'sequence': play_seq, 'env_name': env_name, 'specific_env': specific_env }
+     traj = {'observations': observations, 'actions': actions, 'rewards': rewards}
+     traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      #media.write_video("demo.mp4", frames, fps=50)
      with open('Generated_trajectory.pkl', 'wb') as f:
                 pickle.dump(traj_info, f)
