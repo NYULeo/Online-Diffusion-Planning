@@ -210,12 +210,14 @@ class test_dataset(Dataset):
         
 def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: float = 3, save_freq: int = 50, num_steps: int = 500):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device {device}")
     if(trajs is None): 
         train_Trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
         dataset = RewardDataset(train_Trajs, sigma, reward_name)
     else:
         _, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
         dataset = test_dataset(trajs, sigma, reward_name)
+    print(f"Testing the reward model on {len(dataset)} samples")
     a = factorint(len(dataset))
     batch_size = int(np.min(list(a.keys())))
     dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8)
