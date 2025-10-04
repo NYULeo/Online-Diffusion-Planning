@@ -1,4 +1,4 @@
-from Reward_Backbone import train_reward
+from Rewards.Reward_Backbone import train_reward
 from utils import set_seed
 
 

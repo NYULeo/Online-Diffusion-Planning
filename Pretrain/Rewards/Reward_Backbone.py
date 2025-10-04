@@ -9,7 +9,7 @@ from utils import set_seed, SAStats
 from Critic.train_critic import get_CriticName
 import torch.nn as nn
 import pickle
-from Rewards.nets import CategoricalReward, ScalarReward, gaussian_rewards
+from .nets import CategoricalReward, ScalarReward, gaussian_rewards
 import os
 from scipy.ndimage import gaussian_filter1d, convolve
 from utils import cycle

@@ -18,9 +18,9 @@ import os
 #-------------------------------------------------------------------------------------#
 #------------------------------------- Dataset ---------------------------------------#
 #-------------------------------------------------------------------------------------#
-def get_env(env_name, specific_env):
+def get_env(env_name, specific_env, render_mode = None):
     data = get_dataset(env_name, specific_env)
-    env = data.get_env()
+    env = data.get_env(render_mode)
     d_s = data.get_state_dim()
     d_a = data.get_action_dim()
     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = 'rgb_array')
@@ -132,9 +132,9 @@ class KitchenDataset():
      def get_action_dim(self):
           return self.dataset._action_space.shape[0]
     
-     def get_env(self):
+     def get_env(self, render_mode):
           # Use headless mode for servers without display capabilities
-          return self.dataset.recover_environment(render_mode = None)
+          return self.dataset.recover_environment(render_mode = render_mode)
           #env_spec = self.dataset.spec.env_spec
           #return gym.make(env_spec, render_mode='rgb_array')
           #return gym.make(env_spec, render_mode = None)
@@ -206,9 +206,9 @@ class PointMazeDataset():
      def get_action_dim(self):
           return self.dataset._action_space.shape[0]
     
-     def get_env(self):
+     def get_env(self, render_mode):
           # Use headless mode for servers without display capabilities
-          return self.dataset.recover_environment(render_mode = None)
+          return self.dataset.recover_environment(render_mode = render_mode)
           #return self.dataset.recover_environment(render_mode = 'rgb_array')
           #env_spec = self.dataset.spec.env_spec
           #return gym.make(env_spec, render_mode='rgb_array')
@@ -277,9 +277,9 @@ class AntMazeDataset():
      def get_action_dim(self):
           return self.dataset._action_space.shape[0]
     
-     def get_env(self):
+     def get_env(self, render_mode):
           # Use headless mode for servers without display capabilities
-          return self.dataset.recover_environment(render_mode = None)
+          return self.dataset.recover_environment(render_mode = render_mode)
           #return self.dataset.recover_environment(render_mode = 'rgb_array')
           #env_spec = self.dataset.spec.env_spec
           #return gym.make(env_spec, render_mode='rgb_array')

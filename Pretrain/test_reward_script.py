@@ -1,4 +1,4 @@
-from Reward_Backbone import test_Model
+from Rewards.Reward_Backbone import test_Model
 from utils import set_seed
 import pickle
 import numpy as np
@@ -23,7 +23,7 @@ if __name__ == '__main__':
        rewards = np.array(rewards)
        traj = {'observations': obs, 'actions': acts, 'rewards': rewards}
        data.append(traj)
-    set_seed(1)
+    #set_seed(1)
     test_Model(
     dataset_name = 'pointmaze', 
     specific_dataset = 'medium', 

@@ -15,7 +15,7 @@ import gymnasium as gym
 import os
 from Backbone.Dit import DiT1d
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
-#import mediapy as media
+import mediapy as media
 
 
 """
@@ -54,7 +54,7 @@ class ActionSelector:
         return actions[idx]
 
 
-def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, critic, checkpoint_steps):
+def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, critic, checkpoint_steps, render = False):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checpoint_steps; {checkpoint_steps}")
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
@@ -65,9 +65,11 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
      else:
             action_selector = None
      
-      
      #get environment
-     env, d_s, d_a = get_env(env_name, specific_env)
+     if(render):
+         env, d_s, d_a = get_env(env_name, specific_env, 'rgb_array')
+     else:
+         env, d_s, d_a = get_env(env_name, specific_env, None)
 
      #get Planner
      state_dict = get_pretrained_planner(env_name, specific_env, checkpoint_steps)
@@ -88,7 +90,6 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
      s0 = env.reset()
      s0 = s0[0]['observation']
      current_state = s0
-     play_seq = []
      frames = []
      observations = []
      actions = []
@@ -119,7 +120,8 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
                
            
            obs, reward, terminated, truncated, info = env.step(action)
-           #frames.append(env.render())
+           if(render):
+                frames.append(env.render())
            
            observations.append(obs['observation'].copy())
            actions.append(action.copy())
@@ -133,7 +135,8 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
      env.close()
      traj = {'observations': observations, 'actions': actions, 'rewards': rewards}
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
-     #media.write_video("demo.mp4", frames, fps=50)
+     if(render):
+          media.write_video("demo.mp4", frames, fps=50)
      with open('Generated_trajectory.pkl', 'wb') as f:
                 pickle.dump(traj_info, f)
      
@@ -290,6 +293,6 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 1000000)
-    rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 1000000, num_envs = 8)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 2000, critic = False, checkpoint_steps = 1000000, render = False)
+    #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 1000000, num_envs = 8)
 
