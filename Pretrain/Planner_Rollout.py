@@ -87,7 +87,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
 
      
      #reset
-     s0 = env.reset()
+     s0 = env.reset(seed=1)
      s0 = s0[0]['observation']
      current_state = s0
      frames = []
@@ -101,6 +101,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
            if critic:
                 candidates = []
                 for j in range(10):
+                   
                    x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
                    action = x[0, d_s:(d_s+d_a)].copy()
                    #action = torch.tanh(action)
@@ -118,7 +119,6 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
                #action = planner_processor.postprocess(action)
                #action = x[0, d_s:(d_s+d_a)].copy()
                
-           
            obs, reward, terminated, truncated, info = env.step(action)
            if(render):
                 frames.append(env.render())
@@ -185,7 +185,7 @@ def rollout_parallel(env_name, specific_env, horizon, steps_T, eta, episode_leng
      planner_processor = Planner_Processor(env_name, specific_env)
      
      # Reset all environments
-     s0_vec = vec_env.reset()
+     s0_vec = vec_env.reset(seed=1)
      current_states = s0_vec[0]['observation']  # Shape: (num_envs, d_s)
      
      # Store trajectories for each environment
@@ -293,6 +293,6 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 2000, critic = False, checkpoint_steps = 1000000, render = False)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 2000, critic = False, checkpoint_steps = 1000000, render = True)
     #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 1000000, num_envs = 8)
 
