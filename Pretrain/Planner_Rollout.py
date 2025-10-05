@@ -27,6 +27,12 @@ def get_pretrained_planner(planner_name, checkpoint_steps):
       return checkpoint['ema']
 """
 
+def save_trajs(trajs, env_name, specific_env):
+    os.makedirs(f'./Rollouts/{env_name}/{specific_env}/', exist_ok=True)
+    save_path = f'./Rollouts/{env_name}/{specific_env}/Generated_trajs_Info.pkl'
+    with open(save_path, 'wb') as f:
+         pickle.dump(trajs, f)
+    print(f"trajectories saved")
 
 class ActionSelector:
      def __init__(self, dataset_name, specific_dataset, device):
@@ -141,7 +147,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
                 pickle.dump(traj_info, f)
      
 
-def rollout_parallel(env_name, specific_env, horizon, steps_T, eta, episode_length, critic, checkpoint_steps, num_envs=4):
+def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 500, eta = 0.8, episode_length = 4000, critic = False, checkpoint_steps = 1000000, num_envs=8):
      """
      Run rollout on multiple environments in parallel and save the best trajectory
      
@@ -282,11 +288,8 @@ def rollout_parallel(env_name, specific_env, horizon, steps_T, eta, episode_leng
          'num_envs_tested': num_envs,
          'all_rewards': all_rewards
      }
-     
-     with open('Generated_trajectories.pkl', 'wb') as f:
-         pickle.dump(trajs_info, f)
-     
-     print(f"Saved Results to 'Generated_trajectories.pkl'")
+     save_trajs(trajs_info, env_name, specific_env)
+    
      
 
 
@@ -297,8 +300,8 @@ def rollout_parallel(env_name, specific_env, horizon, steps_T, eta, episode_leng
 if __name__ == "__main__":
     set_seed(1)
     horizon = 32
-    env_name = 'pointmaze'
-    specific_train_dataset = 'medium'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 2000, critic = False, checkpoint_steps = 1000000, render = True)
-    #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 1000000, num_envs = 8)
+    env_name = 'kitchen'
+    specific_train_dataset = 'partial'
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 2000, critic = False, checkpoint_steps = 1000000, render = True)
+    rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 990000, num_envs = 8)
 
