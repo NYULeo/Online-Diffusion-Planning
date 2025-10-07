@@ -27,7 +27,7 @@ import gymnasium_robotics
 import mediapy as media
 from collections import namedtuple
 
-from Backbone.utils import get_pretrained_planner
+from Planners.Backbone.utils import get_pretrained_planner
 from torch.utils.data import DataLoader
 from Dataset import PlannerDataset
 from Rewards.nets import gaussian_rewards
@@ -225,7 +225,11 @@ a = np.array([0,0,1,0,0], dtype=np.float64)
 smoothed = gaussian_filter1d(a, 1.0, mode='nearest')
 print(f"Float64 result: {smoothed}")
 """
-a = factorint(250)
-T = list(a.keys())
-print(T)
 
+
+
+with open('Rollouts/kitchen/partial/Generated_trajs_Info.pkl', 'rb') as f:
+    trajs_info = pickle.load(f)
+
+trajs = trajs_info['trajs']
+print(len(trajs))
