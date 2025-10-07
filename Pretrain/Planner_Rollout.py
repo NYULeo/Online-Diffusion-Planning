@@ -244,6 +244,7 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 500, eta = 
                  done_envs[env_idx] = True
                  print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
          
+        
          # Check if all environments are done
          if all(done_envs):
              print("All environments completed!")
