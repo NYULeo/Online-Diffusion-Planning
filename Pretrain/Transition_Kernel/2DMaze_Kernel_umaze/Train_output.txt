@@ -1,0 +1,69 @@
+
+
+
+Training kernel for pointmaze_umaze Dataset
+Using device: cuda
+saved stats to ./Transition_Kernel/2DMaze_Kernel_umaze/Stats/2DMaze_Kernel_umaze_stats.pkl
+Step 500, loss -3.1084
+Step 1000, loss -4.0551
+Step 1500, loss -4.1799
+Step 2000, loss -4.4738
+Kernel model save to 2DMaze_Kernel_umaze_2000.pkl
+Step 2500, loss -4.6802
+Step 3000, loss -4.6124
+Step 3500, loss -4.6974
+Step 4000, loss -4.7704
+Kernel model save to 2DMaze_Kernel_umaze_4000.pkl
+Step 4500, loss -4.9530
+Step 5000, loss -5.0577
+Step 5500, loss -5.0225
+Step 6000, loss -5.0397
+Kernel model save to 2DMaze_Kernel_umaze_6000.pkl
+Step 6500, loss -5.0899
+Step 7000, loss -5.2693
+Step 7500, loss -5.1555
+Step 8000, loss -5.2709
+Kernel model save to 2DMaze_Kernel_umaze_8000.pkl
+Step 8500, loss -5.3910
+Step 9000, loss -5.3218
+Step 9500, loss -5.3644
+Step 10000, loss -5.3704
+Kernel model save to 2DMaze_Kernel_umaze_10000.pkl
+Step 10500, loss -5.3938
+Step 11000, loss -5.4799
+Step 11500, loss -5.4538
+Step 12000, loss -5.5616
+Kernel model save to 2DMaze_Kernel_umaze_12000.pkl
+Step 12500, loss -5.4805
+Step 13000, loss -5.6439
+Step 13500, loss -5.5524
+Step 14000, loss -5.5163
+Kernel model save to 2DMaze_Kernel_umaze_14000.pkl
+Step 14500, loss -5.5723
+Step 15000, loss -5.6185
+Step 15500, loss -5.6965
+Step 16000, loss -5.6851
+Kernel model save to 2DMaze_Kernel_umaze_16000.pkl
+Step 16500, loss -5.5961
+Step 17000, loss -5.6643
+Step 17500, loss -5.6590
+Step 18000, loss -5.6979
+Kernel model save to 2DMaze_Kernel_umaze_18000.pkl
+Step 18500, loss -5.6730
+Step 19000, loss -5.7045
+Step 19500, loss -5.6538
+Step 20000, loss -5.6379
+Kernel model save to 2DMaze_Kernel_umaze_20000.pkl
+Step 20500, loss -5.7906
+Step 21000, loss -5.8124
+Step 21500, loss -5.8406
+Step 22000, loss -5.9451
+Kernel model save to 2DMaze_Kernel_umaze_22000.pkl
+Step 22500, loss -5.8671
+Step 23000, loss -5.8634
+Step 23500, loss -5.8946
+Step 24000, loss -5.9896
+Kernel model save to 2DMaze_Kernel_umaze_24000.pkl
+Step 24500, loss -5.8724
+Step 25000, loss -6.0158
+Kernel model save to 2DMaze_Kernel_umaze_25000.pkl

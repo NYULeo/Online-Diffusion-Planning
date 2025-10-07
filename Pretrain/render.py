@@ -46,6 +46,15 @@ def reward_checker(rewards, new_rewards):
                       return False
          return True
 
+def check_speration(trajs):
+    print('Checking Separation')
+    for i in range(len(trajs)-1):
+     states_1 = trajs[i]['observations']
+     states_2 = trajs[i+1]['observations']
+     if (np.array_equal(states_1[len(states_1)-1], states_2[0])):
+         print(i)
+
+         
 if __name__ == "__main__":
      with open('Rollouts/kitchen/partial/Generated_trajs_Info.pkl', 'rb') as f:
         info = pickle.load(f)
