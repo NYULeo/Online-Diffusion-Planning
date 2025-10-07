@@ -5,7 +5,7 @@ from utils import set_seed
 
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
-    train_kernel(dataset_name = 'kitchen', batch_size = 256, lr = 3e-4, num_steps =  300000)
+    train_kernel(dataset_name = 'kitchen', batch_size = 256, lr = 1e-4, num_steps =  50000)
     #train_kernel(dataset_name = 'pointmaze', specific_dataset ='umaze', batch_size = 256, lr = 1e-3, num_steps = 150000)
     #train_kernel(dataset_name = 'pointmaze', specific_dataset ='medium', batch_size = 256, lr = 3e-4, num_steps = 250000)
     #train_kernel(dataset_name = 'pointmaze', specific_dataset ='large', batch_size = 256, lr = 3e-4, num_steps = 300000)

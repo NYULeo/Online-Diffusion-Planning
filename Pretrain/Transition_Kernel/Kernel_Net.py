@@ -23,11 +23,12 @@ class TransitionKernel(nn.Module):
         mu = self.mean_head(h)
         log_std = self.log_std_head(h)
         # Clamp log_std to reasonable range for numerical stability
-        log_std = torch.clamp(log_std, min=-10.0, max=2.0)
+        log_std = torch.clamp(log_std, min=-3.0, max=2.0)
         return mu, log_std
 
     def gaussian_nll(self, x, mu, log_std):
         var = torch.exp(2 * log_std)
+        var = torch.clamp(var, min=1e-3)
         nll = 0.5 * torch.log(2 * math.pi * var) + 0.5 * ((x - mu) ** 2) / var
         return nll.sum(dim=-1).mean()
     
