@@ -130,7 +130,11 @@ class test_dataset(Dataset):
         for traj in trajs:
             obs = np.asarray(traj['observations'])      
             acts = np.asarray(traj['actions'])
-            for t in range(len(acts)):
+            if(len(obs) != len(acts)):
+                 L = len(acts)
+            else:
+                 L = len(acts) - 1
+            for t in range(L):
                 s_t = self.stats.norm_obs(obs[t])
                 a_t   = acts[t]
                 s_tp1 = self.stats.norm_obs(obs[t+1])
