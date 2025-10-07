@@ -156,7 +156,7 @@ class test_dataset(Dataset):
 
 def train_kernel(dataset_name, specific_dataset: Optional[str] = None, batch_size = 256, lr = 1e-3, num_steps = 10000):
      # Prepare dataset and dataloader
-     save_freq = 5000
+     save_freq = 2000
      if(specific_dataset is None):
          print(f"Training kernel for {dataset_name} Dataset")
      else: 
