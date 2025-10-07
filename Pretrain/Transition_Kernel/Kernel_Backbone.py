@@ -3,21 +3,20 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from Dataset import KitchenDataset, PointMazeDataset
-from utils import *
-import random
-import copy
+
 from .Kernel_Net import TransitionKernel
 from sympy import factorint
 import pickle
+import os
+from typing import Optional
+import math
+import copy
+from utils import SAStats, cycle
+
 
 # Define the Gaussian forward dynamics model: inputs (s, a), outputs mean and log_std of s'
 
-def compute_log_prob(model, s, a, s_next, device):
-    if not isinstance(s, torch.Tensor):
-        s = torch.tensor(s, dtype=torch.float32, device=device).unsqueeze(0)
-        a = torch.tensor(a, dtype=torch.float32, device=device).unsqueeze(0)
-        s_next = torch.tensor(s_next, dtype=torch.float32, device=device).unsqueeze(0)
-
+def compute_log_prob(model, s, a, s_next):
     with torch.no_grad():
         mu, log_std = model(s, a)
         sigma = torch.exp(log_std)
@@ -27,23 +26,6 @@ def compute_log_prob(model, s, a, s_next, device):
         log_prob += -0.5 * (D * math.log(2 * math.pi) + 2 * log_std.sum(dim=-1))
     return log_prob.item()
 
-
-def total_pro(traj, kernel_name, model, device):
-    model.eval()
-    #prob = 0
-    #count = 0
-    probs = []
-    stats_path = f'./Transition_Kernel/{kernel_name}/Stats/{kernel_name}_stats.pkl'
-    with open(stats_path, 'rb') as f:
-         stats = pickle.load(f)
-    for i in range(len(traj)):
-        for j in range(len(traj[i]['actions'])):
-            s, a, s_next = traj[i]['observations'][j], traj[i]['actions'][j], traj[i]['observations'][j+1]
-            s = stats.norm_obs(s)
-            s_next = stats.norm_obs(s_next)
-            probs.append(compute_log_prob(model, s, a, s_next, device))
-            #count += 1
-    return np.min(probs)
 
 def save_model(kernel_net, kernel_name, num_steps):
     kernel_net.eval()
@@ -226,16 +208,27 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
     print(f"Using device {device}")
     Train_trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)  
     if(trajs is None):
-         trajs = Train_trajs
+         dataset = test_dataset(Train_trajs, kernel_name)
+    else:
+         dataset = test_dataset(trajs, kernel_name)
+    dataloader = DataLoader(dataset, batch_size = 1, shuffle = True, pin_memory = True, num_workers = 8)
     num = save_freq 
     while num <= num_steps:
         state_dict = load_model(kernel_name, num)
         kernel_net = TransitionKernel(obs_dim, act_dim).to(device)
         kernel_net.load_state_dict(state_dict)
         kernel_net.eval()
-        min_prob = total_pro(trajs, kernel_name, kernel_net, device)
-        print(f"Model {num}, Min_Prob {min_prob:.4f}")
+        probs = []
+        for s, a, s_next in dataloader:
+             s = s.to(device)
+             a = a.to(device)
+             s_next = s_next.to(device)
+             probs.append(compute_log_prob(kernel_net, s, a, s_next))
+        mean_probs = np.mean(probs)
+        min_probs = np.min(probs)
+        print(f"Model {num}, mean_prob: {mean_probs:.4f}, min_prob {min_probs:.4f}")
         num += save_freq
+        
     
    
     
