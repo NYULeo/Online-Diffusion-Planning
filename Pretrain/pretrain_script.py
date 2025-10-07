@@ -1,7 +1,7 @@
 
 
 from utils import set_seed
-from Backbone.Trainer import SDETrainer
+from Planners.Backbone.Trainer import SDETrainer
 import torch
 
 

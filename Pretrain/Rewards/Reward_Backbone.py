@@ -227,16 +227,20 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
          reward_net = ScalarReward(obs_dim, act_dim).to(device)
          reward_net.load_state_dict(state_dict)
          reward_net.eval()
-         total_loss = 0
+         total_mean_loss = 0
+         total_var = 0
          for s, a, r in dataloader:
              s = s.to(device)
              a = a.to(device)
              r = r.to(device)
-             r_pred = reward_net.predict(s, a)
-             loss = ((r_pred - r).abs()).mean()
-             total_loss += loss.item()
-         avg_loss = total_loss / len(dataloader)
-         print(f"model {num}, Loss {avg_loss:.4f}")
+             mean = reward_net.predict(s, a)
+             var = reward_net.variance(s, a)
+             mean_loss = ((mean - r).abs()).mean()
+             total_var += var.mean().item()
+             total_loss += mean_loss.item()
+         avg_mean_loss = total_mean_loss / len(dataloader)
+         avg_var = total_var / len(dataloader)
+         print(f"model {num}, Loss {avg_mean_loss:.4f}, Variance {avg_var:.4f}")
          num += save_freq
     
 

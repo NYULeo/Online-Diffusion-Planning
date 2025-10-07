@@ -71,6 +71,7 @@ def total_pro(traj, model, device):
 
 
 
+
 def set_seed(seed=0):
     # Python random
     random.seed(seed)

@@ -268,6 +268,10 @@ class ScalarReward(nn.Module):
         nll = -dist.log_prob(r)                         # [B]
         return nll.mean()
     
+    def variance(self, obs, act):
+        alpha, beta = self.forward(obs, act)
+        var = (alpha * beta) / ( ((alpha + beta)**2) + (alpha + beta + 1) )
+        return var
 
 
 class Reward(nn.Module):

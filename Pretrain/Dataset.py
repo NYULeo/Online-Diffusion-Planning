@@ -388,7 +388,7 @@ class PlannerDataset(Dataset):
 
     def save_stats(self):
         stats_name =  str(self.planner_name) + '_stats.pkl'
-        stats_dir = './Stats/'
+        stats_dir = f'.Planners/{self.dataset_name}/{self.specific_dataset}/Stats/'
         os.makedirs(stats_dir, exist_ok=True)
         savepath = os.path.join(stats_dir, stats_name)
         with open(savepath, 'wb') as f:
@@ -465,16 +465,13 @@ class Planner_Processor():
      def __init__(self, dataset_name, specific_dataset):
           Planner_name = get_PlannerName(dataset_name, specific_dataset)
           stats_name = Planner_name + '_stats.pkl'  # Remove .pt replacement since Planner_name doesn't have .pt
-          stats_dir = './Stats/'
+          stats_dir = f'./Planners/{dataset_name}/{specific_dataset}/Stats/'
           stats_path = os.path.join(stats_dir, stats_name)
           
 
           # Check if stats file exists
           if not os.path.exists(stats_path):
             raise FileNotFoundError(f"Stats file not found: {stats_path}")
-
-
-          stats_name = Planner_name.replace('.pt', '_stats.pkl')
 
           with open(stats_path, 'rb') as f:
               self.stats = pickle.load(f)

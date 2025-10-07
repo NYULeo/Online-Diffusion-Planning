@@ -2,18 +2,18 @@ import math
 import numpy as np
 import torch
 from dataclasses import dataclass
-from Backbone.UNet import TemporalUnet
-from Backbone.Sampler import sample_reverse_sde
+from Planners.Backbone.UNet import TemporalUnet
+from Planners.Backbone.Sampler import sample_reverse_sde
 import pickle
 from typing import Optional
 from Dataset import get_env
 from utils import set_seed
-from Backbone.utils import get_pretrained_planner
+from Planners.Backbone.utils import get_pretrained_planner
 from Critic.train_critic import Critic, Critic_Processor, get_CriticName
 from Dataset import Planner_Processor
 import gymnasium as gym
 import os
-from Backbone.Dit import DiT1d
+from Planners.Backbone.Dit import DiT1d
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
 import mediapy as media
 
