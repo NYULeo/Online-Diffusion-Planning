@@ -4,7 +4,7 @@ from utils import set_seed
 import mediapy as media
 from Dataset import get_env
 import pickle
-
+import os
 
 def render(dataset_name, specific_dataset, traj):
      env, _, _ = get_env(dataset_name, specific_dataset, render_mode = 'rgb_array')
@@ -21,15 +21,67 @@ def render(dataset_name, specific_dataset, traj):
      env.close()
 
 
+def spare_reward_kitchen(rewards):
+         Temp = []
+         for i in range(1, len(rewards)):
+            if(rewards[i] == rewards[i-1]+1):
+                  Temp.append(i)
+         new_rewards = [0]*len(rewards)
+         for i in range(len(rewards)):
+             if(i in Temp):
+                  new_rewards[i] = 1
+             else:
+                  new_rewards[i] = 0
+         return np.array(new_rewards, dtype = np.float64) 
 
-
+def reward_checker(rewards, new_rewards):
+         if(len(rewards) != len(new_rewards)):
+               return False
+         for i in range(1, len(rewards)):
+              if(rewards[i] == rewards[i-1]+1):
+                  if(new_rewards[i] !=1):
+                      return False
+              else:
+                  if(new_rewards[i] != 0):
+                      return False
+         return True
 
 if __name__ == "__main__":
-     with open('Generated_trajectory_local.pkl', 'rb') as f:
+     with open('Rollouts/kitchen/partial/Generated_trajs_Info.pkl', 'rb') as f:
         info = pickle.load(f)
-     #trajs = info['trajs']
-     #traj = trajs[5]
-     traj = info['sequence']
-     set_seed(0)
-     render(dataset_name = 'pointmaze', specific_dataset = 'medium', traj = traj)
+     trajs = info['trajs']
+     """
+     env_name = info['env_name']
+     specific_env = info['specific_env']
+     all_rewards = []
+     num_envs = info['num_envs_tested']
+     for traj in trajs:
+           rewards = traj['rewards']
+           new_rewards = spare_reward_kitchen(rewards)
+           print(reward_checker(rewards, new_rewards))
+           traj['rewards'] = new_rewards
+           all_rewards.append(np.sum(new_rewards))
+     
+     best_idx = np.argmax(all_rewards)
+     best_reward = all_rewards[best_idx]
+     best_trajectory = trajs[best_idx]
+     trajs_info = {
+         'best_traj': best_trajectory,
+         'trajs': trajs,
+         'env_name': env_name,
+         'specific_env': specific_env,
+         'total_reward': best_reward,
+         'num_envs_tested': num_envs,
+         'all_rewards': all_rewards
+     }
+     render(env_name, specific_env, best_trajectory)
+     print(best_reward)
+     
+     save_path = f'./Rollouts/kitchen/partial/Generated_trajs_Info.pkl'
+     with open(save_path, 'wb') as f:
+         pickle.dump(trajs_info, f)
+     """
+
+
+    
      

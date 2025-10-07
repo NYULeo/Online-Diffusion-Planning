@@ -1,0 +1,128 @@
+Training kernel for kitchen Dataset
+Using device: cuda
+saved stats to ./Transition_Kernel/Kitchen_Kernel/Stats/Kitchen_Kernel_stats.pkl
+Step 500, loss 10.2558
+Step 1000, loss -33.6584
+Step 1500, loss -44.6043
+Step 2000, loss -51.0039
+Kernel model save to Kitchen_Kernel_2000.pkl
+Step 2500, loss -54.8467
+Step 3000, loss -57.6266
+Step 3500, loss -60.3161
+Step 4000, loss -61.9465
+Kernel model save to Kitchen_Kernel_4000.pkl
+Step 4500, loss -63.6278
+Step 5000, loss -65.0461
+Step 5500, loss -66.1878
+Step 6000, loss -67.5727
+Kernel model save to Kitchen_Kernel_6000.pkl
+Step 6500, loss -68.6643
+Step 7000, loss -68.9989
+Step 7500, loss -70.1262
+Step 8000, loss -70.7613
+Kernel model save to Kitchen_Kernel_8000.pkl
+Step 8500, loss -71.3289
+Step 9000, loss -72.0298
+Step 9500, loss -72.5501
+Step 10000, loss -72.6963
+Kernel model save to Kitchen_Kernel_10000.pkl
+Step 10500, loss -73.0338
+Step 11000, loss -74.0876
+Step 11500, loss -74.7434
+Step 12000, loss -74.6381
+Kernel model save to Kitchen_Kernel_12000.pkl
+Step 12500, loss -75.1858
+Step 13000, loss -75.4430
+Step 13500, loss -76.2083
+Step 14000, loss -75.8582
+Kernel model save to Kitchen_Kernel_14000.pkl
+Step 14500, loss -76.6266
+Step 15000, loss -77.2829
+Step 15500, loss -77.1894
+Step 16000, loss -77.3749
+Kernel model save to Kitchen_Kernel_16000.pkl
+Step 16500, loss -77.4740
+Step 17000, loss -77.5591
+Step 17500, loss -78.3509
+Step 18000, loss -77.9915
+Kernel model save to Kitchen_Kernel_18000.pkl
+Step 18500, loss -78.0655
+Step 19000, loss -78.5232
+Step 19500, loss -78.2019
+Step 20000, loss -78.8463
+Kernel model save to Kitchen_Kernel_20000.pkl
+Step 20500, loss -78.8831
+Step 21000, loss -79.1681
+Step 21500, loss -79.3716
+Step 22000, loss -79.5166
+Kernel model save to Kitchen_Kernel_22000.pkl
+Step 22500, loss -79.5853
+Step 23000, loss -79.8992
+Step 23500, loss -79.7408
+Step 24000, loss -80.2311
+Kernel model save to Kitchen_Kernel_24000.pkl
+Step 24500, loss -79.7305
+Step 25000, loss -80.2757
+Step 25500, loss -80.2362
+Step 26000, loss -80.4353
+Kernel model save to Kitchen_Kernel_26000.pkl
+Step 26500, loss -80.4270
+Step 27000, loss -80.6848
+Step 27500, loss -80.6889
+Step 28000, loss -80.8835
+Kernel model save to Kitchen_Kernel_28000.pkl
+Step 28500, loss -81.1175
+Step 29000, loss -81.2400
+Step 29500, loss -81.0142
+Step 30000, loss -81.5509
+Kernel model save to Kitchen_Kernel_30000.pkl
+Step 30500, loss -81.3844
+Step 31000, loss -81.4266
+Step 31500, loss -81.3990
+Step 32000, loss -81.7233
+Kernel model save to Kitchen_Kernel_32000.pkl
+Step 32500, loss -81.7941
+Step 33000, loss -81.8729
+Step 33500, loss -82.0468
+Step 34000, loss -81.9951
+Kernel model save to Kitchen_Kernel_34000.pkl
+Step 34500, loss -82.0403
+Step 35000, loss -82.1069
+Step 35500, loss -82.2158
+Step 36000, loss -82.2985
+Kernel model save to Kitchen_Kernel_36000.pkl
+Step 36500, loss -82.1854
+Step 37000, loss -82.5055
+Step 37500, loss -82.9417
+Step 38000, loss -82.4458
+Kernel model save to Kitchen_Kernel_38000.pkl
+Step 38500, loss -82.9326
+Step 39000, loss -82.7187
+Step 39500, loss -82.7816
+Step 40000, loss -83.2395
+Kernel model save to Kitchen_Kernel_40000.pkl
+Step 40500, loss -82.8806
+Step 41000, loss -83.2760
+Step 41500, loss -83.1499
+Step 42000, loss -83.1675
+Kernel model save to Kitchen_Kernel_42000.pkl
+Step 42500, loss -83.6534
+Step 43000, loss -83.1122
+Step 43500, loss -83.2672
+Step 44000, loss -83.5827
+Kernel model save to Kitchen_Kernel_44000.pkl
+Step 44500, loss -83.8032
+Step 45000, loss -83.3441
+Step 45500, loss -83.6577
+Step 46000, loss -84.1386
+Kernel model save to Kitchen_Kernel_46000.pkl
+Step 46500, loss -83.6018
+Step 47000, loss -83.9484
+Step 47500, loss -84.0202
+Step 48000, loss -84.0671
+Kernel model save to Kitchen_Kernel_48000.pkl
+Step 48500, loss -84.1072
+Step 49000, loss -84.1560
+Step 49500, loss -84.3559
+Step 50000, loss -84.7073
+Kernel model save to Kitchen_Kernel_50000.pkl

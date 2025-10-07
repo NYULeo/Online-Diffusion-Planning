@@ -11,15 +11,5 @@ if __name__ == '__main__':  # pragma: no cover
          trajs_info = pickle.load(f)
     trajs = trajs_info['trajs']
    
-    for traj in trajs:
-         obs = []
-         acts = []
-         rewards = []
-         for step in traj:
-             obs.append(step['observations'])
-             acts.append(step['actions'])
-             rewards.append(step['rewards'])
-        
-   
     #test_Model(dataset_name = 'kitchen', trajs = trajs, save_freq = 5000, num_steps = 300000)
     #test_Model(dataset_name = 'kitchen', save_freq = 5000, num_steps = 300000)
