@@ -1,0 +1,26 @@
+Using device cuda
+Model 2000, mean_prob: 4.9248, min_prob -386.8345
+Model 4000, mean_prob: 5.6824, min_prob -350.8800
+Model 6000, mean_prob: 5.6889, min_prob -173.7309
+Model 8000, mean_prob: 5.8598, min_prob -290.1104
+Model 10000, mean_prob: 5.2439, min_prob -290.3499
+Model 12000, mean_prob: 6.3862, min_prob -241.3386
+Model 14000, mean_prob: 5.8084, min_prob -110.1559
+Model 16000, mean_prob: 6.6134, min_prob -92.8699
+Model 18000, mean_prob: 5.8913, min_prob -93.2551
+Model 20000, mean_prob: 6.3401, min_prob -91.3887
+Model 22000, mean_prob: 6.5873, min_prob -128.4447
+Model 24000, mean_prob: 5.9486, min_prob -88.5525
+Model 26000, mean_prob: 6.2843, min_prob -48.6911
+Model 28000, mean_prob: 6.1139, min_prob -40.4370
+Model 30000, mean_prob: 6.5079, min_prob -54.5996
+Model 32000, mean_prob: 6.4089, min_prob -30.8484
+Model 34000, mean_prob: 6.7180, min_prob -58.1884
+Model 36000, mean_prob: 6.6237, min_prob -47.7053
+Model 38000, mean_prob: 6.5234, min_prob -75.2052
+Model 40000, mean_prob: 6.5366, min_prob -27.9831
+Model 42000, mean_prob: 6.5232, min_prob -38.7927
+Model 44000, mean_prob: 6.1773, min_prob -35.9247
+Model 46000, mean_prob: 6.6353, min_prob -25.5695
+Model 48000, mean_prob: 6.7143, min_prob -37.1000
+Model 50000, mean_prob: 6.4844, min_prob -35.7483
