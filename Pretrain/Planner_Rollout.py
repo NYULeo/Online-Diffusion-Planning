@@ -143,8 +143,10 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      if(render):
           media.write_video("demo.mp4", frames, fps=50)
+     """
      with open('Generated_trajectory.pkl', 'wb') as f:
                 pickle.dump(traj_info, f)
+     """
      
 
 def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 500, eta = 0.8, episode_length = 4000, critic = False, checkpoint_steps = 1000000, num_envs=8):
@@ -273,7 +275,7 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 500, eta = 
      print(f"Results from {num_envs} parallel rollouts:")
      print(f"{'='*60}")
      for env_idx in range(num_envs):
-         print(f"  Env {env_idx}: Total reward = {all_rewards[env_idx]:.4f}, Steps = {len(trajs[env_idx])}")
+         print(f"  Env {env_idx}: Total reward = {all_rewards[env_idx]:.4f}, Steps = {len(trajs[env_idx]['observations'])}")
      print(f"{'='*60}")
      print(f"Best trajectory: Env {best_idx} with reward = {best_reward:.4f}")
      print(f"Average reward: {np.mean(all_rewards):.4f} ± {np.std(all_rewards):.4f}")
@@ -303,6 +305,6 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 2000, critic = False, checkpoint_steps = 1000000, render = True)
-    rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 1000000, num_envs = 8)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 2000, critic = False, checkpoint_steps = 1000000, render = True)
+    #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 1000000, num_envs = 8)
   

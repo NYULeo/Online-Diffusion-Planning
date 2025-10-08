@@ -5,20 +5,24 @@ import mediapy as media
 from Dataset import get_env
 import pickle
 import os
+from gymnasium.vector import AsyncVectorEnv
 
 def render(dataset_name, specific_dataset, traj):
      env, _, _ = get_env(dataset_name, specific_dataset, render_mode = 'rgb_array')
      env.reset(seed=1)
      frames = []
      for i in range(len(traj['actions'])):
-         action = traj['actions'][i]
-         #action = np.clip(action, -1.0, 1.0)
-         _, _, terminated, truncated, _ = env.step(action)
-         frames.append(env.render())
-         if terminated or truncated:
+          action = traj['actions'][i]
+            #action = np.clip(action, -1.0, 1.0)
+          _, _, terminated, truncated, _ = env.step(action)
+          frames.append(env.render())
+          if terminated or truncated:
                break
-     media.write_video("demo.mp4", frames, fps=50)
+     media.write_video("demo2.mp4", frames, fps=50)
      env.close()
+
+
+
 
 
 def spare_reward_kitchen(rewards):
@@ -54,11 +58,14 @@ def check_speration(trajs):
      if (np.array_equal(states_1[len(states_1)-1], states_2[0])):
          print(i)
 
-         
+
 if __name__ == "__main__":
-     with open('Rollouts/kitchen/partial/Generated_trajs_Info.pkl', 'rb') as f:
+     set_seed(1)
+     with open('Rollouts/pointmaze/medium/Generated_trajs_Info.pkl', 'rb') as f:
         info = pickle.load(f)
      trajs = info['trajs']
+     best_traj = info['best_traj']
+     render(info['env_name'], info['specific_env'], best_traj)
      """
      env_name = info['env_name']
      specific_env = info['specific_env']

@@ -228,8 +228,8 @@ print(f"Float64 result: {smoothed}")
 
 
 
-with open('Rollouts/kitchen/partial/Generated_trajs_Info.pkl', 'rb') as f:
+with open('Rollouts/pointmaze/medium/Generated_trajs_Info.pkl', 'rb') as f:
     trajs_info = pickle.load(f)
 
 trajs = trajs_info['trajs']
-print(len(trajs))
+print(len(trajs[0]['observations']))
