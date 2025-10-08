@@ -11,5 +11,5 @@ if __name__ == '__main__':  # pragma: no cover
          trajs_info = pickle.load(f)
     trajs = trajs_info['trajs']
    
-    test_Model(dataset_name = 'pointmaze', specific_dataset = 'medium', trajs = trajs, save_freq = 5000, num_steps = 50000)
-    #test_Model(dataset_name = 'kitchen', save_freq = 5000, num_steps = 300000)
+    test_Model(dataset_name = 'pointmaze', specific_dataset = 'medium', trajs = trajs, save_freq = 2000, num_steps = 50000)
+    #test_Model(dataset_name = 'kitchen', save_freq = 2000, num_steps = 300000)
