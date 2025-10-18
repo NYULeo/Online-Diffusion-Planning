@@ -139,7 +139,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
                 break
      
      env.close()
-     traj = {'observations': observations, 'actions': actions, 'rewards': rewards}
+     traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(rewards)}
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      if(render):
           media.write_video("demo.mp4", frames, fps=50)
@@ -261,9 +261,9 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 500, eta = 
      trajs = [[] for _ in range(num_envs)]
      for env_idx in range(num_envs):
          trajs[env_idx] = {
-             'observations': observations[env_idx].copy(),
-             'actions': acts[env_idx].copy(),
-             'rewards': rewards[env_idx].copy()
+             'observations': np.asarray(observations[env_idx].copy()),
+             'actions': np.asarray(acts[env_idx].copy()),
+             'rewards': np.asarray(rewards[env_idx].copy())
          }
      best_idx = np.argmax(all_rewards)
      best_reward = all_rewards[best_idx]

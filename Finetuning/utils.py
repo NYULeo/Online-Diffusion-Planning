@@ -5,8 +5,12 @@ from Pretrain.Rewards.nets import ScalarReward
 from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel
 from torch import nn
 import torch
-
-
+import os
+import pickle
+from torch.utils.data import Dataset
+from Pretrain.utils import SAStats
+from scipy.ndimage import gaussian_filter1d
+from typing import TypedDict, List
 
 
 class RewardConfig:
@@ -50,8 +54,6 @@ class TotalReward(nn.Module):
         C = C * (1/(H-1))
         return total_reward, C
 
-
-
 class Lambda:
     def __init__(self, lam: float):
         self.lam = lam
@@ -60,6 +62,115 @@ class Lambda:
     def get_lam(self):
         return self.lam
 
-
 def function(x, beta: float):
     return (1/beta)* np.log(1 + np.exp(x*beta))
+
+class TrajectoryDict(TypedDict):
+    observations: np.ndarray
+    actions: np.ndarray  
+    rewards: np.ndarray
+
+# Build (s, a, s') transitions from your offline trajectories
+class KernelDataset(Dataset):
+    def __init__(self, trajectories: List[TrajectoryDict], kernel_name: str):
+         obs_list, act_list = [], []
+        
+         for traj in trajectories:
+            obs, acts = traj['observations'], traj['actions']
+            L = min(len(obs), len(acts))
+            obs_list.append(obs[:L])
+            act_list.append(acts[:L])
+         obs_all = np.concatenate(obs_list, axis=0)  # [N, d_s]
+         #act_all = np.concatenate(act_list, axis=0)  # [N, d_a]
+        
+        #get stats
+         self.stats = SAStats()
+         self.stats.obs_mean = obs_all.mean(axis=0)
+         self.stats.obs_std = obs_all.std(axis=0)+ 1e-8
+         data = []
+         for traj in trajectories:
+            obs = traj['observations']
+            acts = traj['actions']
+            for t in range(len(acts)):
+                s_t = self.stats.norm_obs(obs[t])
+                a_t   = acts[t]
+                s_tp1 = self.stats.norm_obs(obs[t+1])
+                data.append((s_t, a_t, s_tp1))
+         self.data = data
+         self.save_stats(kernel_name)
+    
+    def save_stats(self, kernel_name):
+        stats_name =  str(kernel_name) + '_stats.pkl'
+        stats_dir = f'./Transition_Kernel/{kernel_name}/Stats/'
+        os.makedirs(stats_dir, exist_ok=True)
+        savepath = os.path.join(stats_dir, stats_name)
+        with open(savepath, 'wb') as f:
+              pickle.dump(self.stats, f)
+        print(f"saved stats to {savepath}")
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        s, a, s_next = self.data[idx]
+        return (
+            torch.tensor(s, dtype=torch.float32),
+            torch.tensor(a, dtype=torch.float32),
+            torch.tensor(s_next, dtype=torch.float32)
+        )
+
+class RewardDataset(Dataset):
+    def __init__(self, trajs: List[TrajectoryDict], sigma: float, reward_name: str):
+            
+        # ----- gather raw obs/actions to fit stats -----
+        obs_list, act_list = [], []
+        
+        for traj in trajs:
+            obs, acts = traj['observations'], traj['actions']
+            L = min(len(obs), len(acts))
+            obs_list.append(obs[:L])
+            act_list.append(acts[:L])
+        obs_all = np.concatenate(obs_list, axis=0)  # [N, d_s]
+        #act_all = np.concatenate(act_list, axis=0)  # [N, d_a]
+        
+        
+        #get stats
+        self.stats = SAStats()
+        self.stats.obs_mean = obs_all.mean(axis=0)
+        self.stats.obs_std = obs_all.std(axis=0)+ 1e-8
+        
+        transitions = []
+        for traj in trajs:
+            obs = traj['observations']      
+            acts = traj['actions']
+            rews = traj['rewards']
+            rews = gaussian_filter1d(rews, sigma)
+            for t in range(len(acts)):
+                obs_t = self.stats.norm_obs(obs[t])
+                a_t   = acts[t]
+                r_t   = rews[t]
+                transitions.append((obs_t, a_t, r_t))
+
+        self.transitions = transitions
+        self.save_stats(reward_name)
+    
+    def save_stats(self, reward_name):
+        stats_name =  str(reward_name) + '_stats.pkl'
+        stats_dir = f'./Rewards/{reward_name}/Stats/'
+        os.makedirs(stats_dir, exist_ok=True)
+        savepath = os.path.join(stats_dir, stats_name)
+        with open(savepath, 'wb') as f:
+              pickle.dump(self.stats, f)
+        print(f"saved stats to {savepath}")
+
+    def __len__(self):
+        return len(self.transitions)
+
+    def __getitem__(self, idx):
+        s, a, r = self.transitions[idx]
+        return (
+            torch.tensor(s, dtype=torch.float32),
+            torch.tensor(a, dtype=torch.float32),
+            torch.tensor(r, dtype=torch.float32),
+        )
+    
