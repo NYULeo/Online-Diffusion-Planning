@@ -1,6 +1,7 @@
 from adjoint_matching import train_adjoint_matching
 from Pretrain.Rewards.nets import ScalarReward
-from Pretrain.Planners.Backbone.UNet import TemporalUnet
+from Pretrain.Planners.Backbone.Dit import DiT1d
+from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel
 import torch
 
 
@@ -14,7 +15,7 @@ if __name__ == "__main__":
 
     # Instantiate a dummy reward network (Beta distribution model) and backbone.
     reward_net = ScalarReward(obs_dim=state_dim, act_dim=action_dim)
-    backbone = TemporalUnet(horizon=horizon, transition_dim=state_dim + action_dim)
+    backbone = DiT1d(horizon=horizon, transition_dim=state_dim + action_dim)
 
     # Train the control network via Adjoint Matching without a dataset.
     trained_control = train_adjoint_matching(

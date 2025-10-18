@@ -237,7 +237,7 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
 
 def train_kernel(dataset_name, specific_dataset: str = None,
                  batch_size=256, lr=1e-3, num_steps=10000,
-                 ensemble_size=3, λ_reg=1e-3):
+                 ensemble_size=10, λ_reg=1e-3):
     # Prepare dataset / dataloader
     if specific_dataset is None:
         print(f"Training kernel for {dataset_name}")
@@ -366,4 +366,17 @@ def test_kernel(dataset_name, specific_dataset: str = None,
         #print("Worst transition index", worst[0], "lp", worst[1])
         #print("Corresponding s, a, s_next:", worst[2])
         step += save_freq
+
+
+
+
+
+
+
+
+
+
+
+
+
 

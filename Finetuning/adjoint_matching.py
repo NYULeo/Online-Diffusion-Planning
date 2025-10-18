@@ -10,7 +10,8 @@ from Pretrain.Planners.Backbone.utils import cosine_alpha_sigma, cosine_beta, co
 import numpy as np
 from typing import Optional
 from torch import Tensor
-from total_reward import TotalReward
+from .utils import TotalReward, Lambda, function
+from torch.utils.data import DataLoader
 
 
 
@@ -24,9 +25,12 @@ class FineTuningConfig:
     d_a: int
     eta: float = 0.8
     num_steps: int = 500
+    epoch: int = 100
     lr: float = 1e-4
     s: float = 0.008  # cosine schedule offset used in base drift
     device: str = "cuda"
+    lam: float = 1e-3
+
 
 
 class AdjointMatchingFineTuner:
@@ -58,6 +62,7 @@ class AdjointMatchingFineTuner:
         self.optimizer = torch.optim.Adam(self.new_score_net.parameters(), lr=config.lr)
         self.t_asc = torch.linspace(1.0, 0.0, self.config.num_steps + 1, device = self.config.device)
         self.k = self.kt(self.t_asc) 
+        self.Lam = Lambda(lam = config.lam)
 
     def vector_field(self, x: torch.Tensor, t: torch.Tensor, score_model: DiT1d) -> torch.Tensor:
         # Compute beta(t) from cosine schedule
@@ -168,7 +173,7 @@ class AdjointMatchingFineTuner:
         T = X_reversed[0].to(self.config.device)
         T.requires_grad_(True)
         T_squeezed = T.squeeze(0) 
-        output = self.reward_model(T_squeezed)
+        output, C = self.reward_model(T_squeezed)
         gradient = torch.autograd.grad(
              outputs = output,
              inputs = T_squeezed,
@@ -196,7 +201,7 @@ class AdjointMatchingFineTuner:
             a.append(new_a)
             
         a.reverse()
-        return a
+        return a, C
 
     def adjoint_matching_loss(
         self,
@@ -216,14 +221,17 @@ class AdjointMatchingFineTuner:
     def step(self, s0: np.ndarray) -> float:
         self.optimizer.zero_grad()
         Loss = torch.tensor(0.0, device=self.config.device, requires_grad=True)
+        Total_C = 0.0
         for i in range(len(s0)):
            traj_x = self.sample_Traj(s0[i])
-           adjoints = self.make_a(traj_x)
+           adjoints, C = self.make_a(traj_x)
            loss = self.adjoint_matching_loss(traj_x, adjoints)
            Loss += loss
         Loss = Loss / len(s0)
         Loss.backward()
         self.optimizer.step()
         return Loss.detach().cpu().item()
+    
+   # def finetune(self, )
 
         

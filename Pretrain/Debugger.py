@@ -72,9 +72,11 @@ def plot_function(func, x_range=(-10, 10), num_points=1000, title="Function Plot
     plt.tight_layout()
     plt.show()
 
+def function(x, beta: float):
+    return (1/beta)* np.log(1 + np.exp(x*beta))
 
 
-
+"""
 
 def kt(t: torch.Tensor, s: float = 0.008) -> torch.Tensor:
     
@@ -212,7 +214,8 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
 
 x = torch.tensor([[1,2,3], [4,5,6]]).unsqueeze(0)
 print(x.view(-1))
-    
+"""
 
-
+#plot_function(function, x_range=(-10, 10), num_points=1000, title="Function Plot", xlabel="x", ylabel="f(x)")
+print(function(0))
 

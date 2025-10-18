@@ -64,24 +64,24 @@ class RobustTransitionKernel(nn.Module):
         log_std = torch.clamp(log_std, max=self.max_log_std)
         return mu, log_std
 
-    def gaussian_nll(self, x, mu, log_std):
+    def gaussian_nll(self, s_next, mu, log_std):
         # x, mu: (..., obs_dim); log_std: (..., obs_dim)
         var_pred = torch.exp(2 * log_std)
         var = var_pred + self.noise_floor  # additive floor
         # optional: clamp or clip residuals
-        res = x - mu
+        res = s_next - mu
         max_res = 10.0
         res = torch.clamp(res, -max_res, +max_res)
         nll = 0.5 * (torch.log(2 * math.pi * var) + (res ** 2) / var)
         # sum over state dims, but keep batch dims
         return nll.sum(dim=-1).mean()
 
-    def log_prob(self, x, mu, log_std):
+    def log_prob(self, s_next, mu, log_std):
         # Compute log prob (not negative) — useful for testing / diagnostics
         var = torch.exp(2 * log_std) + self.noise_floor
         var = torch.clamp(var, min=1e-8)  # Prevent log(0)
-        D = x.size(-1)
+        D = s_next.size(-1)
         # log prob per dimension
-        lp = -0.5 * (((x - mu) ** 2) / var).sum(dim=-1)
+        lp = -0.5 * (((s_next - mu) ** 2) / var).sum(dim=-1)
         lp = lp - 0.5 * (D * math.log(2 * math.pi) + 2 * log_std.sum(dim=-1))
         return lp  # tensor of shape batch
