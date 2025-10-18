@@ -1,6 +1,8 @@
 import math
 import numpy as np
+from sympy.logic.boolalg import true
 import torch
+from torch import Tensor
 import torch.nn as nn
 import einops
 from einops.layers.torch import Rearrange
@@ -71,6 +73,77 @@ def cosine_alpha_sigma(t: torch.Tensor, s: float = 0.008) -> Tuple[torch.Tensor,
     sigma = torch.sqrt(1.0 - alpha_bar)
     return alpha, sigma
 
+def compute_dot_alpha_beta(t: Tensor, s: float = 0.008
+                        ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+   
+    eps = 1e-3
+    t2 = t.clamp(0.0, 1.0 - eps)
+    
+    # --- compute beta and dot_beta ---
+    a = (math.pi / 2.0) * ((t2 + s) / (1.0 + s))
+    da_dt = (math.pi / 2.0) * (1.0 / (1.0 + s))
+    beta = (math.pi / (1.0 + s)) * torch.tan(a)
+    # derivative: β' = (π/(1+s)) * sec^2(a) * da/dt
+    dot_beta = (math.pi / (1.0 + s)) * (1.0 / torch.cos(a))**2 * da_dt
+    
+    # --- compute alpha and dot_alpha ---
+    # Match cosine_alpha_sigma exactly
+    factor = (t2 + s) / (1.0 + s)
+    f_t = torch.cos(factor * (math.pi / 2))** 2
+    # Match cosine_alpha_sigma: use same tensor creation
+    f0 = torch.cos(torch.tensor((s / (1.0 + s)) * (math.pi / 2)))** 2
+    alpha_bar = (f_t / f0).clamp(0.0, 1.0 - 1e-3)
+    alpha = torch.sqrt(alpha_bar)
+    
+    # derivative of f_t: d[cos^2(u)]/dt = - sin(2u) * du/dt
+    # where u = factor * (math.pi / 2)
+    u = factor * (math.pi / 2.0)
+    du_dt = da_dt  # same as a's derivative
+    dot_f_t = - torch.sin(2.0 * u) * du_dt
+    dot_alpha_bar = dot_f_t / f0
+    # α = sqrt(α_bar) => dot α = dot α_bar / (2 * sqrt(α_bar))
+    # => dot_alpha = dot_alpha_bar / (2 α)
+    dot_alpha = dot_alpha_bar / (2.0 * alpha)
+    
+    return alpha, dot_alpha, beta, dot_beta
+
+
+    
+
+
+# 2. Autograd (derivative) version
+def compute_dot_autograd(t: Tensor, s: float = 0.008
+                         ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+ 
+    # Make t require gradient
+    eps = 1e-3
+    t2 = t.clamp(0.0, 1.0 - eps)
+    
+    
+    t_req = t2.clone().detach().requires_grad_(True)
+    
+    alpha_req, _ = cosine_alpha_sigma(t_req, s=s)
+    beta_req = cosine_beta(t_req, s=s)
+    
+    dot_alpha = torch.autograd.grad(
+        outputs=alpha_req,
+        inputs=t_req,
+        grad_outputs=torch.ones_like(alpha_req),
+        create_graph=True,
+        retain_graph=False
+    )[0]
+    
+    dot_beta = torch.autograd.grad(
+        outputs=beta_req,
+        inputs=t_req,
+        grad_outputs=torch.ones_like(beta_req),
+        create_graph=True,
+        retain_graph=False
+    )[0]
+    
+    # detach and return
+    return alpha_req, dot_alpha, beta_req, dot_beta
+    
 
 
 

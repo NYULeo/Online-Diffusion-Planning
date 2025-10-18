@@ -273,6 +273,116 @@ class ScalarReward(nn.Module):
         var = (alpha * beta) / ( ((alpha + beta)**2) + (alpha + beta + 1) )
         return var
 
+    def compute_reward_gradients(self, obs, act, agg: str = "mean", return_pred: bool = True):
+       """
+         Compute the gradient of the reward prediction with respect to concatenated [obs, act].
+    
+         Args:
+            reward_net: ScalarReward model
+            obs: Observations tensor [batch_size, obs_dim]
+            act: Actions tensor [batch_size, act_dim]
+            agg: Aggregation method - "mean", "mode", or "median_approx" (default: "mean")
+            return_pred: Whether to return the predicted values (default: True)
+    
+         Returns:
+            grad_input: Gradient with respect to [obs, act] [batch_size, obs_dim + act_dim]
+            pred: The predicted reward values [batch_size] (only if return_pred=True)
+       """
+       # Concatenate and ensure requires_grad
+       x = torch.cat([obs, act], dim=-1).detach().requires_grad_(True)
+    
+       # Forward pass through the network
+       # We need to manually pass through the network since it expects separate obs, act
+       # So we'll split and call forward
+       obs_split = x[..., :self.reward_net.obs_dim]
+       act_split = x[..., self.reward_net.obs_dim:]
+    
+       alpha, beta = self.reward_net.forward(obs_split, act_split)
+    
+       # Compute prediction based on aggregation method
+       if agg == "mean":
+            pred = alpha / (alpha + beta)
+       elif agg == "mode":
+            mask = (alpha > 1) & (beta > 1)
+            mode = (alpha - 1) / (alpha + beta - 2)
+            mean = alpha / (alpha + beta)
+            pred = torch.where(mask, mode, mean)
+       elif agg == "median_approx":
+            pred = (alpha - 1/3) / (alpha + beta - 2/3)
+            pred = pred.clamp(0.0, 1.0)
+       else:
+            raise ValueError("agg must be 'mean', 'mode', or 'median_approx'")
+    
+       # Compute gradient of sum (vectorized and efficient)
+       pred_sum = pred.sum()
+    
+       grad_input = torch.autograd.grad(
+            outputs=pred_sum,
+            inputs=x,
+            create_graph=False,
+            retain_graph=False)[0]
+    
+       if return_pred:
+           return grad_input, pred
+       else:
+           return grad_input
+
+
+def compute_reward_gradients_per_sample(reward_net, obs, act, agg: str = "mean"):
+      """
+        Compute per-sample gradients with respect to concatenated [obs, act].
+        Useful when you need independent gradients for each sample in the batch.
+    
+        Args:
+        reward_net: ScalarReward model
+        obs: Observations tensor [batch_size, obs_dim]
+        act: Actions tensor [batch_size, act_dim]
+        agg: Aggregation method - "mean", "mode", or "median_approx" (default: "mean")
+    
+        Returns:
+        grad_input: Gradient with respect to [obs, act] [batch_size, obs_dim + act_dim]
+        pred: The predicted reward values [batch_size]
+      """
+      # Concatenate and ensure requires_grad
+      x = torch.cat([obs, act], dim=-1).detach().requires_grad_(True)
+    
+    # Split for forward pass
+      obs_split = x[..., :reward_net.obs_dim]
+      act_split = x[..., reward_net.obs_dim:]
+    
+      alpha, beta = reward_net.forward(obs_split, act_split)
+    
+    # Compute prediction based on aggregation method
+      if agg == "mean":
+           pred = alpha / (alpha + beta)
+      elif agg == "mode":
+           mask = (alpha > 1) & (beta > 1)
+           mode = (alpha - 1) / (alpha + beta - 2)
+           mean = alpha / (alpha + beta)
+           pred = torch.where(mask, mode, mean)
+      elif agg == "median_approx":
+           pred = (alpha - 1/3) / (alpha + beta - 2/3)
+           pred = pred.clamp(0.0, 1.0)
+      else:
+          raise ValueError("agg must be 'mean', 'mode', or 'median_approx'")
+    
+    # Compute per-sample gradients
+      batch_size = pred.shape[0]
+      grad_input = torch.zeros_like(x)
+    
+      for i in range(batch_size):
+          grad = torch.autograd.grad(
+              outputs=pred[i],
+              inputs=x,
+              retain_graph=(i < batch_size - 1),
+              create_graph=False,
+              allow_unused=False
+          )[0]
+          grad_input[i] = grad[i]
+    
+      return grad_input, pred
+
+
 
 class Reward(nn.Module):
     def __init__(self, obs_dim, act_dim, hidden = 256):

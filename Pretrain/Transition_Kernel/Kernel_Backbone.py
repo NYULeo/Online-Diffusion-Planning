@@ -4,7 +4,7 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from Dataset import KitchenDataset, PointMazeDataset
 
-from .Kernel_Net import TransitionKernel
+from .Kernel_Net import TransitionKernel, RobustTransitionKernel
 from sympy import factorint
 import pickle
 import os
@@ -15,7 +15,7 @@ from utils import SAStats, cycle
 
 
 # Define the Gaussian forward dynamics model: inputs (s, a), outputs mean and log_std of s'
-
+"""
 def compute_log_prob(model, s, a, s_next):
     with torch.no_grad():
         mu, log_std = model(s, a)
@@ -26,18 +26,18 @@ def compute_log_prob(model, s, a, s_next):
         log_prob += -0.5 * (D * math.log(2 * math.pi) + 2 * log_std.sum(dim=-1))
     return log_prob.item()
 
-
-def save_model(kernel_net, kernel_name, num_steps):
+"""
+def save_model(kernel_net, kernel_name, num_steps, ensemble_idx):
     kernel_net.eval()
     net_dict =  kernel_net.state_dict()
-    os.makedirs(f'./Transition_Kernel/{kernel_name}/Models/', exist_ok=True)
-    save_path = f'./Transition_Kernel/{kernel_name}/Models/{kernel_name}_{num_steps}.pkl'
+    os.makedirs(f'./Transition_Kernel/{kernel_name}/Models/{num_steps}', exist_ok=True)
+    save_path = f'./Transition_Kernel/{kernel_name}/Models/{num_steps}/{kernel_name}_{num_steps}_{ensemble_idx}.pkl'
     torch.save(net_dict, save_path)
-    print(f"Kernel model save to {kernel_name}_{num_steps}.pkl")
+    print(f"Kernel model save to {kernel_name}_{num_steps}_{ensemble_idx}.pkl")
 
 
-def load_model(kernel_name, num_steps):
-    load_path = f'./Transition_Kernel/{kernel_name}/Models/{kernel_name}_{num_steps}.pkl'
+def load_model(kernel_name, num_steps, ensemble_idx):
+    load_path = f'./Transition_Kernel/{kernel_name}/Models/{num_steps}/{kernel_name}_{num_steps}_{ensemble_idx}.pkl'
     state_dict = torch.load(load_path, map_location='cpu')
     return state_dict
 
@@ -153,7 +153,7 @@ class test_dataset(Dataset):
             torch.tensor(s_next, dtype=torch.float32),
         )
         
-
+"""
 def train_kernel(dataset_name, specific_dataset: Optional[str] = None, batch_size = 256, lr = 1e-3, num_steps = 10000):
      # Prepare dataset and dataloader
      save_freq = 2000
@@ -233,6 +233,136 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
         print(f"Model {num}, mean_prob: {mean_probs:.4f}, min_prob {min_probs:.4f}")
         num += save_freq
         
-    
-   
-    
+"""
+
+def train_kernel(dataset_name, specific_dataset: str = None,
+                 batch_size=256, lr=1e-3, num_steps=10000,
+                 ensemble_size=3, λ_reg=1e-3):
+    # Prepare dataset / dataloader
+    if specific_dataset is None:
+        print(f"Training kernel for {dataset_name}")
+    else:
+        print(f"Training kernel for {dataset_name}_{specific_dataset}")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("Using device:", device)
+
+    trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
+    dataset = KernelDataset(trajs, kernel_name)
+    loader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
+                              pin_memory=True, num_workers=8))
+
+    # Create ensemble of models
+    ensemble = [RobustTransitionKernel(obs_dim, act_dim).to(device) for _ in range(ensemble_size)]
+    optimizers = [optim.Adam(m.parameters(), lr, weight_decay=1e-5) for m in ensemble]
+
+    step = 0
+    total_loss = 0.0
+    save_freq = 2000
+
+    for step in range(1, num_steps + 1):
+        s, a, s_next = next(loader)
+        s = s.to(device)
+        a = a.to(device)
+        s_next = s_next.to(device)
+
+        # For each model in ensemble, compute loss
+        losses = []
+        mus = []
+        log_stds = []
+        for m in ensemble:
+            mu, log_std = m(s, a)
+            mus.append(mu)
+            log_stds.append(log_std)
+            loss = m.gaussian_nll(s_next, mu, log_std)
+            losses.append(loss)
+        # optional: variance‐disagreement inflation
+        # compute mean of mus
+        mus_stack = torch.stack(mus, dim=0)  # (K, B, obs_dim)
+        mu_mean = mus_stack.mean(dim=0)      # (B, obs_dim)
+        # disagreement = average squared deviation
+        disagreement = ((mus_stack - mu_mean.unsqueeze(0)) ** 2).mean(dim=0)  # (B, obs_dim)
+        # inflate each model’s loss by penalizing small variance in high disagreement dims
+        for i, m in enumerate(ensemble):
+            # log_std_i is log_stds[i]
+            # penalize if log_std is too small relative to disagreement
+            penalty = (disagreement / (torch.exp(2 * log_stds[i]) + m.noise_floor)).sum(dim=-1).mean()
+            losses[i] = losses[i] + λ_reg * penalty
+
+        # Backprop & optimize each model
+        for i, (m, opt) in enumerate(zip(ensemble, optimizers)):
+            opt.zero_grad()
+            losses[i].backward()
+            opt.step()
+
+        avg_loss = sum(losses).item() / ensemble_size
+        total_loss += avg_loss
+
+        if step % 500 == 0:
+            print(f"Step {step}, avg_loss: {total_loss / 500:.6f}")
+            total_loss = 0.0
+
+        if step % save_freq == 0 or step == num_steps:
+            # Save all ensemble members
+            for idx, m in enumerate(ensemble):
+                ckpt = copy.deepcopy(m).cpu()
+                save_model(ckpt, kernel_name, step, idx)
+
+    # Return final ensemble
+    return ensemble
+
+
+
+
+def test_kernel(dataset_name, specific_dataset: str = None,
+                trajs: list = None,
+                save_freq: int = 50, num_steps: int = 500, ensemble_size = 3):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("Using device:", device)
+
+    train_trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
+    if trajs is None:
+        dataset = test_dataset(train_trajs, kernel_name)
+    else:
+        dataset = test_dataset(trajs, kernel_name)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, pin_memory=True, num_workers=8)
+
+    # For each saved checkpoint / ensemble member
+    step = save_freq
+    while step <= num_steps:
+        # Load ensemble members
+        ensemble = []
+        for idx in range(ensemble_size):
+            state_dict = load_model(kernel_name, step, idx)
+            m = RobustTransitionKernel(obs_dim, act_dim).to(device)
+            m.load_state_dict(state_dict)
+            m.eval()
+            ensemble.append(m)
+
+        # Compute log-probs over dataset
+        all_lp = []
+        #worst = (None, float("inf"), None)  # (idx, log_prob, (s, a, s_next))
+        for i, (s, a, s_next) in enumerate(dataloader):
+            s = s.to(device)
+            a = a.to(device)
+            s_next = s_next.to(device)
+
+            # For each ensemble member, compute log_prob
+            lps = []
+            for m in ensemble:
+                mu, log_std = m(s, a)
+                lp = m.log_prob(s_next, mu, log_std).item()
+                lps.append(lp)
+            # You can take mean, or min over ensemble.
+            lp_mean = sum(lps) / len(lps)
+            all_lp.append(lp_mean)
+
+            #if lp_mean < worst[1]:
+             #   worst = (i, lp_mean, (s.cpu().numpy(), a.cpu().numpy(), s_next.cpu().numpy()))
+
+        mean_lp = float(np.mean(all_lp))
+        min_lp = float(np.min(all_lp))
+        print(f"Checkpoint {step}: mean_log_prob = {mean_lp:.4f}, min_log_prob = {min_lp:.4f}")
+        #print("Worst transition index", worst[0], "lp", worst[1])
+        #print("Corresponding s, a, s_next:", worst[2])
+        step += save_freq
+

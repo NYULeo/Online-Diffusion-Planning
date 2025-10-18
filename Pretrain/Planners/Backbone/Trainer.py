@@ -250,5 +250,3 @@ class SDETrainer:
         loss = loss/((H*D) - self.state_dim)
         return loss
 
-
-

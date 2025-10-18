@@ -6,12 +6,19 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from .UNet import  TemporalUnet
+from .Dit import DiT1d
 from .utils import cosine_alpha_sigma, cosine_beta
+from torch import Tensor
+
+
+
+
+
 
 @torch.no_grad()
 def sample_reverse_sde(
     s0: np.ndarray,
-    score_model: TemporalUnet,
+    score_model: DiT1d,
     d_s: int,
     d_a: int,
     horizon: int,
