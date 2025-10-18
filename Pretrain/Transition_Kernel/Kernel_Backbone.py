@@ -4,7 +4,7 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from Dataset import KitchenDataset, PointMazeDataset
 
-from .Kernel_Net import TransitionKernel, RobustTransitionKernel
+from .Kernel_Net import  RobustTransitionKernel
 from sympy import factorint
 import pickle
 import os
