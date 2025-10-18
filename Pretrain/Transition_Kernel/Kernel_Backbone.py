@@ -280,12 +280,13 @@ def train_kernel(dataset_name, specific_dataset: str = None,
         mus_stack = torch.stack(mus, dim=0)  # (K, B, obs_dim)
         mu_mean = mus_stack.mean(dim=0)      # (B, obs_dim)
         # disagreement = average squared deviation
-        disagreement = ((mus_stack - mu_mean.unsqueeze(0)) ** 2).mean(dim=0)  # (B, obs_dim)
+        disagreement = ((mus_stack - mu_mean.unsqueeze(0)) ** 2).mean(dim=0) 
+        disagreement_detached = disagreement.detach()
         # inflate each model’s loss by penalizing small variance in high disagreement dims
         for i, m in enumerate(ensemble):
             # log_std_i is log_stds[i]
             # penalize if log_std is too small relative to disagreement
-            penalty = (disagreement / (torch.exp(2 * log_stds[i]) + m.noise_floor)).sum(dim=-1).mean()
+            penalty = (disagreement_detached / (torch.exp(2 * log_stds[i]) + m.noise_floor)).sum(dim=-1).mean()
             losses[i] = losses[i] + λ_reg * penalty
 
         # Backprop & optimize each model
