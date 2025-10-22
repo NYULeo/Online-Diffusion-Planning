@@ -95,6 +95,8 @@ class OnlineFinetuner():
 
     def finetune_planner(self):
         print(self.config.AMConfig.device)
+        print(f"finetune_batch_size: {self.config.finetune_batch_size}")
+        print(f"finetune_steps: {self.config.finetune_steps}")
         dataloader = cycle(DataLoader(self.PlannerDataset, self.config.finetune_batch_size, shuffle = True, pin_memory = True, num_workers = 8))
         total_loss = 0.0
         total_reward = 0.0
@@ -133,7 +135,7 @@ class OnlineFinetuner():
                   ) 
               
              step = step+1
-        self.save(step)
+        #self.save(step)
             
 
 
