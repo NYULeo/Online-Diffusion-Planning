@@ -18,6 +18,7 @@ from Pretrain.Planners.Backbone.UNet import TemporalUnet
 from Pretrain.Dataset import get_env
 
 
+
 @dataclass
 class Parallel_AdjointMatchingConfig:
     """Configuration for the adjoint matching fine‑tuner."""
@@ -67,9 +68,11 @@ class Parallel_AdjointMatchingFineTuner:
         # New trainable score net
         self.backbone_selection()
         # Wrap with DataParallel if multiple GPUs
+       
+        #self.reset_parameters()
+        self.parallel_reset_parameters()
         if torch.cuda.device_count() > 1:
             self.new_score_net = torch.nn.DataParallel(self.new_score_net)
-        self.reset_parameters()
         self.new_score_net.train()
         self.optimizer = torch.optim.Adam(self.new_score_net.parameters(), lr=self.config.lr)
         self.t_asc = torch.linspace(1.0, 0.0, self.config.num_steps + 1, device=self.config.device)
@@ -78,6 +81,13 @@ class Parallel_AdjointMatchingFineTuner:
     
     def reset_parameters(self):
         self.new_score_net.load_state_dict(self.old_score_net.state_dict())
+
+    def parallel_reset_parameters(self):
+        checkpoint = self.old_score_net.state_dict()
+        new_state_dict = {}
+        for k, v in checkpoint.items():
+            new_state_dict['module.' + k] = v
+        self.new_score_net.load_state_dict(new_state_dict)
 
     def backbone_selection(self):
         if self.config.backbone_name == 'transformer':
