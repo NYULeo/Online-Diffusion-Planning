@@ -109,10 +109,10 @@ class TotalReward(nn.Module):
         gradient = torch.zeros(H, D, device = self.config.device, requires_grad = False)
         for i in range(H-1):
             s = x[i][:self.config.d_s]
-            s_norm = self.reward_processor(s).unsqueeze(0)
-            a = x[i][self.config.d_s:].unsqueeze(0)
+            s_norm = self.reward_processor(s).unsqueeze(0).requires_grad_(True)
+            a = x[i][self.config.d_s:].unsqueeze(0).requires_grad_(True)
             s_next = x[i+1][:self.config.d_s]
-            s_next_norm = self.kernel_processor(s_next).unsqueeze(0)
+            s_next_norm = self.kernel_processor(s_next).unsqueeze(0).requires_grad_(True)
 
             r = self.reward_net.predict(s_norm, a)
             var = self.reward_net.variance(s_norm, a)

@@ -123,7 +123,7 @@ class AdjointMatchingFineTuner:
     
        # Use torch.autograd.functional.jacobian for efficient computation
        try:
-           jacobian = torch.autograd.functional.jacobian(score_fn, T_flat, create_graph=True)
+           jacobian = torch.autograd.functional.jacobian(score_fn, T_flat, create_graph=False)
            return jacobian
        except Exception as e:
            print(f"Warning: Vectorized Jacobian failed, falling back to element-wise: {e}")
@@ -212,7 +212,6 @@ class AdjointMatchingFineTuner:
         a = []
         self.reward_model.eval()
         T = X_reversed[0].to(self.config.device)
-        T.requires_grad_(True)
         T_squeezed = T.squeeze(0) 
         reward, gradient = self.reward_model(T_squeezed, self.Lam.get_lam())
         gradient_flat = -1 * gradient.view(-1)  # [H*dim]
