@@ -145,8 +145,8 @@ class AdjointMatchingFineTuner:
                 outputs=score,
                 inputs=T,
                 grad_outputs=grad_outputs,
-                create_graph=True,
-                retain_graph=True
+                create_graph=False,
+                retain_graph=False
            )[0]
             # Store j-th row of Jacobian
            Jov[j, :] = grad_j.view(-1)  # [H*dim]

@@ -119,53 +119,53 @@ class TotalReward(nn.Module):
             c = self.sigmoid(s_norm, a, s_next_norm)
             
             r_s, r_a = torch.autograd.grad(
-                 output = r,
-                 input = s_norm,
+                 outputs = r,
+                 inputs = s_norm,
                  grad_outputs = torch.ones_like(r),
-                 create_graph = True,  # Allows higher-order gradients
-                 retain_graph = True
+                 create_graph = False,  # Allows higher-order gradients
+                 retain_graph = False
             )[0].squeeze(0), torch.autograd.grad(
-                 output = r,
-                 input = a,
+                 outputs = r,
+                 inputs = a,
                  grad_outputs = torch.ones_like(r),
-                 create_graph = True,  # Allows higher-order gradients
-                 retain_graph = True
+                 create_graph = False,  # Allows higher-order gradients
+                 retain_graph = False
             )[0].squeeze(0)
             r_s_grad, r_a_grad = self.makeGrad(H, r_s, r_a, i)
 
             var_s, var_a = torch.autograd.grad(
-                 output = var,
-                 input = s_norm,
+                 outputs = var,
+                 inputs = s_norm,
                  grad_outputs = torch.ones_like(var),
-                 create_graph = True,  # Allows higher-order gradients
-                 retain_graph = True
+                 create_graph = False,  # Allows higher-order gradients
+                 retain_graph = False
             )[0].squeeze(0), torch.autograd.grad(
-                 output = var,
-                 input = a,
+                 outputs = var,
+                 inputs = a,
                  grad_outputs = torch.ones_like(var),
-                 create_graph = True,  # Allows higher-order gradients
-                 retain_graph = True
+                 create_graph = False,  # Allows higher-order gradients
+                 retain_graph = False
             )[0].squeeze(0)
             var_s_grad, var_a_grad = self.makeGrad(H, var_s, var_a, i)
 
             c_s, c_a, c_s_next =  torch.autograd.grad(
-                 output = c,
-                 input = s_norm,
+                 outputs = c,
+                 inputs = s_norm,
                  grad_outputs = torch.ones_like(c),
-                 create_graph = True,  # Allows higher-order gradients
-                 retain_graph = True
+                 create_graph = False,  # Allows higher-order gradients
+                 retain_graph = False
             )[0].squeeze(0), torch.autograd.grad(
-                 output = c,
-                 input = a,
+                 outputs = c,
+                 inputs = a,
                  grad_outputs = torch.ones_like(c),
-                 create_graph = True,  # Allows higher-order gradients
-                 retain_graph = True
+                 create_graph = False,  # Allows higher-order gradients
+                 retain_graph = False
             )[0].squeeze(0), torch.autograd.grad(
-                 output = c,
-                 input = s_next_norm,
+                 outputs = c,
+                 inputs = s_next_norm,
                  grad_outputs = torch.ones_like(c),
-                 create_graph = True,  # Allows higher-order gradients
-                 retain_graph = True
+                 create_graph = False,  # Allows higher-order gradients
+                 retain_graph = False
             )[0].squeeze(0)
             c_s_grad, c_a_grad, c_s_next_grad = self.makeGrad(H, c_s, c_a, i, c_s_next)
             gradient +=  (1/H)*((r_s_grad + r_a_grad) + self.config.gamma * (var_s_grad + var_a_grad)) - lam * (1/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad)
@@ -177,32 +177,32 @@ class TotalReward(nn.Module):
         r = self.reward_net.predict(s_norm, a)
         var = self.reward_net.variance(s_norm, a)
         r_s, r_a = torch.autograd.grad(
-                 output = r,
-                 input = s_norm,
+                 outputs = r,
+                 inputs = s_norm,
                  grad_outputs = torch.ones_like(r),
-                 create_graph = True,  # Allows higher-order gradients
-                 retain_graph = True
+                 create_graph = False,  # Allows higher-order gradients
+                 retain_graph = False
             )[0].squeeze(0), torch.autograd.grad(
-                 output = r,
-                 input = a,
+                 outputs = r,
+                 inputs = a,
                  grad_outputs = torch.ones_like(r),
-                 create_graph = True,  # Allows higher-order gradients
-                 retain_graph = True
+                 create_graph = False,  # Allows higher-order gradients
+                 retain_graph = False
         )[0].squeeze(0)
         r_s_grad, r_a_grad = self.makeGrad(H, r_s, r_a, H-1)
 
         var_s, var_a = torch.autograd.grad(
-                 output = var,
-                 input = s_norm,
+                 outputs = var,
+                 inputs = s_norm,
                  grad_outputs = torch.ones_like(var),
-                 create_graph = True,  # Allows higher-order gradients
-                 retain_graph = True
+                 create_graph = False,  # Allows higher-order gradients
+                 retain_graph = False
             )[0].squeeze(0), torch.autograd.grad(
-                 output = var,
-                 input = a,
+                 outputs = var,
+                 inputs = a,
                  grad_outputs = torch.ones_like(var),
-                 create_graph = True,  # Allows higher-order gradients
-                 retain_graph = True
+                 create_graph = False,  # Allows higher-order gradients
+                 retain_graph = False
             )[0].squeeze(0)
         var_s_grad, var_a_grad = self.makeGrad(H, var_s, var_a, H-1)
         gradient += (1/H) * ((r_s_grad + r_a_grad) + self.config.gamma * (var_s_grad + var_a_grad)) 
