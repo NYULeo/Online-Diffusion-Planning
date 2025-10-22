@@ -220,7 +220,6 @@ class ScalarReward(nn.Module):
         
         return alpha, beta
     
-    @torch.no_grad()
     def predict(self, obs, act, agg: str = "mean", ci:  Optional[float] = None):
         """
         Prediction head.
