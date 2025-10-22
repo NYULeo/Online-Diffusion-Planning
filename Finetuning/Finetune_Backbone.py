@@ -110,11 +110,8 @@ class OnlineFinetuner():
              current_lr = self.AMFineTuner.optimizer.param_groups[0]['lr']
              self.reward_tracker.log_reward(step, avg_reward, current_lr)
              
-
-
              if ((step % self.config.update_ema_every) == 0):
                 self.step_ema(step)
-
 
              if ((step % self.config.log_freq) == 0):
                  print('---------------------------------------------------------')
@@ -124,8 +121,6 @@ class OnlineFinetuner():
                  total_loss = 0.0
                  total_reward = 0.0
                  total_C = 0.0
-            
-
              
              if ((step % self.config.save_freq == 0) and (step!=0)):
                   model_name = get_PlannerName(self.config.dataset_name, self.config.specific_dataset)

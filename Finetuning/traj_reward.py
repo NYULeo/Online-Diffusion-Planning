@@ -68,13 +68,13 @@ class TotalReward(nn.Module):
     def reward_processor(self, s):
         s_n = s.detach().cpu().numpy()
         s_n = self.reward_stat.norm_obs(s_n)
-        s = torch.tensor(s_n, dtype = torch.float32, device = self.config.device)
+        s = torch.tensor(s_n, dtype = torch.float32, device = self.config.device, requires_grad = True)
         return s
     
     def kernel_processor(self, s):
         s_n = s.detach().cpu().numpy()
         s_n = self.kernel_stat.norm_obs(s_n)
-        s = torch.tensor(s_n, dtype = torch.float32, device = self.config.device)
+        s = torch.tensor(s_n, dtype = torch.float32, device = self.config.device, requires_grad = True)
         return s
 
     def makeGrad(self, H, s_grad, a_grad, i, s_next_grad: Optional[torch.Tensor] = None):
