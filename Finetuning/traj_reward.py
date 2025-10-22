@@ -32,14 +32,14 @@ class TotalReward(nn.Module):
         reward_state_dict, obs_dim, act_dim, reward_name = get_pretrained_reward(dataset_name, reward_checkpoint, specific_dataset)
         self.reward_net = ScalarReward(obs_dim, act_dim).to(self.config.device)
         self.reward_net.load_state_dict(reward_state_dict)
-        self.reward_net.eval()
+        self.reward_net
         self.kernels = []
         
         kernel_state_dicts, obs_dim, act_dim, kernel_name = get_pretrained_kernel(dataset_name, kernel_checkpoint, specific_dataset)
         for i in range(len(kernel_state_dicts)):
                 kernel_net = RobustTransitionKernel(obs_dim, act_dim).to(self.config.device)
                 kernel_net.load_state_dict(kernel_state_dicts[i])
-                kernel_net.eval()
+                kernel_net
                 self.kernels.append(kernel_net)
         
 
@@ -117,6 +117,13 @@ class TotalReward(nn.Module):
             r = self.reward_net.predict(s_norm, a)
             var = self.reward_net.variance(s_norm, a)
             c = self.sigmoid(s_norm, a, s_next_norm)
+
+            print(f"r requires_grad: {r.requires_grad}")
+            print(f"r grad_fn: {r.grad_fn}")
+            print(f"s_norm requires_grad: {s_norm.requires_grad}")
+            print(f"a requires_grad: {a.requires_grad}")
+            print(f"s_next_norm requires_grad: {s_next_norm.requires_grad}")
+            exit()
            
             grads = torch.autograd.grad(
                         outputs = r,
