@@ -26,12 +26,12 @@ class AdjointMatchingConfig:
     """Configuration for the adjoint matching fine‑tuner."""
 
     horizon: int
+    lr: float = 2e-4
     d_s: int = 0
     d_a: int = 0
     backbone_name: str = 'transformer'
     eta: float = 0.8
     num_steps: int = 500
-    lr: float = 2e-4
     s: float = 0.008  # cosine schedule offset used in base drift
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     lam: float = 1
@@ -75,10 +75,9 @@ class AdjointMatchingFineTuner:
         self.old_score_net.eval()
         self.reward_model = TotalReward(RewardConfig, env_name, specific_env, reward_model_checkpoint, kernel_model_checkpoint).to(self.config.device)
         self.reward_model.eval()
-        self.new_score_net = self.backbone_selection()
-        self.new_score_net = self.new_score_net.to(self.config.device)
-        self.new_score_net.train()
+        self.backbone_selection()
         self.reset_parameters()
+        self.new_score_net.train()
         self.optimizer = torch.optim.Adam(self.new_score_net.parameters(), lr= self.config.lr)
         self.t_asc = torch.linspace(1.0, 0.0, self.config.num_steps + 1, device = self.config.device)
         self.k = self.kt(self.t_asc) 
@@ -154,12 +153,12 @@ class AdjointMatchingFineTuner:
     
     def backbone_selection(self):
          if(self.config.backbone_name == 'transformer'):
-              model = DiT1d(
+              self.new_score_net = DiT1d(
                    in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128,
                    d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(self.config.device)
          elif(self.config.backbone_name == 'unet'):
-              model = TemporalUnet(self.config.horizon, self.config.d_s + self.config.d_a).to(self.device)
-         return model
+              self.new_score_net = TemporalUnet(self.config.horizon, self.config.d_s + self.config.d_a).to(self.config.device)
+    
 
     @torch.no_grad()
     def sample_Traj(self,
@@ -248,9 +247,9 @@ class AdjointMatchingFineTuner:
             v_new = self.vector_field(traj_x_i, self.t_asc[i], self.new_score_net).squeeze(0).flatten()
             v_old = self.vector_field(traj_x_i, self.t_asc[i], self.old_score_net).squeeze(0).flatten()
             sigma = self.sigma_t(self.k[i])
-            Loss += ((v_new - v_old) * (2/sigma) + sigma * adjoint_i).pow(2).sum()
+            Loss = Loss + ((v_new - v_old) * (2/sigma) + sigma * adjoint_i).pow(2).sum()
         return Loss
-
+ 
     def step(self, s0: torch.Tensor) -> float:
         self.optimizer.zero_grad()
         Loss = torch.tensor(0.0, device=self.config.device, requires_grad=True)

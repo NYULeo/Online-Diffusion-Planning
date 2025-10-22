@@ -5,6 +5,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 from Finetune_Backbone import OnlineFinetuner, FinetuningConfig
 from adjoint_matching import AdjointMatchingConfig
+from parallel_adjoint_matching import Parallel_AdjointMatchingConfig
 from traj_reward import RewardConfig
 
 
@@ -17,7 +18,8 @@ if __name__ == "__main__":
     # loading of your pretrained models (e.g. via torch.load).
     env_name = 'kitchen'
     specific_env = 'partial'
-    AMConfig = AdjointMatchingConfig(horizon=32) 
+    #AMConfig = AdjointMatchingConfig(horizon = 32) 
+    AMConfig = Parallel_AdjointMatchingConfig(horizon = 32)
     
     RWConfig = RewardConfig(beta = 1.0, min_log_prob = 150.0, explore = False) 
     

@@ -246,6 +246,8 @@ for i in range(len(traj['actions'])):
 env.close()
 media.write_video('video.mp4', frames, fps=50)
 """
-
+a = torch.tensor(0.0)
+if (a <5):
+     print('l am')
 
 

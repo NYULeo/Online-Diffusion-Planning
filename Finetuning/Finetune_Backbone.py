@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker
 from traj_reward import RewardConfig
 from adjoint_matching import AdjointMatchingFineTuner, AdjointMatchingConfig
+from parallel_adjoint_matching import Parallel_AdjointMatchingFineTuner, Parallel_AdjointMatchingConfig
 from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Dataset import get_PlannerName
 from Pretrain.Dataset import get_dataset
@@ -17,7 +18,7 @@ import os
 
 @dataclass
 class FinetuningConfig():
-    AMConfig: AdjointMatchingConfig
+    AMConfig: AdjointMatchingConfig | Parallel_AdjointMatchingConfig
     RewardConfig: RewardConfig
     dataset_name: str
     specific_dataset: str
@@ -30,7 +31,7 @@ class FinetuningConfig():
     ema_decay = 0.999
     update_ema_every = 2
     save_freq= 10000
-    log_freq = 1
+    log_freq = 10
     step_start_ema = 1000
 
 
@@ -40,7 +41,17 @@ class OnlineFinetuner():
     def __init__(self, config: FinetuningConfig):
         self.config = config
         
+        """
         self.AMFineTuner = AdjointMatchingFineTuner(
+            self.config.dataset_name, 
+            self.config.specific_dataset, 
+            self.config.planner_checkpoint, 
+            self.config.reward_model_checkpoint,
+            self.config.kernel_model_checkpoint,
+            self.config.AMConfig,
+            self.config.RewardConfig)
+        """
+        self.AMFineTuner = Parallel_AdjointMatchingFineTuner(
             self.config.dataset_name, 
             self.config.specific_dataset, 
             self.config.planner_checkpoint, 
@@ -95,8 +106,19 @@ class OnlineFinetuner():
 
     def finetune_planner(self):
         print(self.config.AMConfig.device)
+        print("Env Details: ------------------------------------------------------------------------------")
+        print(f"env_name: {self.config.dataset_name}")
+        print(f"specific_env: {self.config.specific_dataset}")
+        print('Pretrained Model Details: -----------------------------------------------------------------')
+        print(f"planner_checkpoint: {self.config.planner_checkpoint}")
+        print(f"reward_model_checkpoint: {self.config.reward_model_checkpoint}")
+        print(f"kernel_model_checkpoint: {self.config.kernel_model_checkpoint}")
+        print('Finetuning Hyperparameters: ---------------------------------------------------------------')
         print(f"finetune_batch_size: {self.config.finetune_batch_size}")
+        print(f"finetune_lr: {self.config.AMConfig.lr}")
         print(f"finetune_steps: {self.config.finetune_steps}")
+        print({f"sampling steps: {self.config.AMConfig.num_steps}"})
+        print('-------------------------------------------------------------------------------------------')
         dataloader = cycle(DataLoader(self.PlannerDataset, self.config.finetune_batch_size, shuffle = True, pin_memory = True, num_workers = 8))
         total_loss = 0.0
         total_reward = 0.0
@@ -135,7 +157,7 @@ class OnlineFinetuner():
                   ) 
               
              step = step+1
-        #self.save(step)
+        self.save(step)
             
 
 
