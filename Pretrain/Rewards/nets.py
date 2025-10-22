@@ -318,8 +318,8 @@ class ScalarReward(nn.Module):
        grad_input = torch.autograd.grad(
             outputs=pred_sum,
             inputs=x,
-            create_graph=False,
-            retain_graph=False)[0]
+            create_graph=True,
+            retain_graph=True)[0]
     
        if return_pred:
            return grad_input, pred
