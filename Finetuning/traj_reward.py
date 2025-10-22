@@ -32,14 +32,12 @@ class TotalReward(nn.Module):
         reward_state_dict, obs_dim, act_dim, reward_name = get_pretrained_reward(dataset_name, reward_checkpoint, specific_dataset)
         self.reward_net = ScalarReward(obs_dim, act_dim).to(self.config.device)
         self.reward_net.load_state_dict(reward_state_dict)
-        self.reward_net
         self.kernels = []
         
         kernel_state_dicts, obs_dim, act_dim, kernel_name = get_pretrained_kernel(dataset_name, kernel_checkpoint, specific_dataset)
         for i in range(len(kernel_state_dicts)):
                 kernel_net = RobustTransitionKernel(obs_dim, act_dim).to(self.config.device)
                 kernel_net.load_state_dict(kernel_state_dicts[i])
-                kernel_net
                 self.kernels.append(kernel_net)
         
 
@@ -117,13 +115,6 @@ class TotalReward(nn.Module):
             r = self.reward_net.predict(s_norm, a)
             var = self.reward_net.variance(s_norm, a)
             c = self.sigmoid(s_norm, a, s_next_norm)
-
-            print(f"r requires_grad: {r.requires_grad}")
-            print(f"r grad_fn: {r.grad_fn}")
-            print(f"s_norm requires_grad: {s_norm.requires_grad}")
-            print(f"a requires_grad: {a.requires_grad}")
-            print(f"s_next_norm requires_grad: {s_next_norm.requires_grad}")
-            exit()
            
             grads = torch.autograd.grad(
                         outputs = r,
@@ -135,6 +126,7 @@ class TotalReward(nn.Module):
             r_s = grads[0].squeeze(0)
             r_a = grads[1].squeeze(0)
             r_s_grad, r_a_grad = self.makeGrad(H, r_s, r_a, i)
+            print(1)
 
             grads = torch.autograd.grad(
                         outputs = var,
@@ -146,6 +138,7 @@ class TotalReward(nn.Module):
             var_s = grads[0].squeeze(0)
             var_a = grads[1].squeeze(0)
             var_s_grad, var_a_grad = self.makeGrad(H, var_s, var_a, i)
+            print(2)
 
             grads = torch.autograd.grad(
                         outputs = c,
@@ -161,6 +154,7 @@ class TotalReward(nn.Module):
            
             gradient +=  (1/H)*((r_s_grad + r_a_grad) + self.config.gamma * (var_s_grad + var_a_grad)) - lam * (1/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad)
             total_reward += (1/H)*(r.squeeze(0) + self.config.gamma * var.squeeze(0)) - lam * ((1/(H-1)) * c.squeeze(0))
+            print(3)
         
 
         s = x[H-1][:self.config.d_s]
