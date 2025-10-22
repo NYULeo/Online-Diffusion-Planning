@@ -1,3 +1,8 @@
+
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from typing import Optional
 from Dataset import KitchenDataset, PointMazeDataset, get_dataset, get_env
 import random
@@ -5,8 +10,8 @@ from torch.utils.data import Dataset, DataLoader
 import torch
 import torch.optim as optim
 import numpy as np
-from utils import set_seed, SAStats
-from Critic.train_critic import get_CriticName
+from Pretrain.utils import set_seed, SAStats
+#from Critic.train_critic import get_CriticName
 import torch.nn as nn
 import pickle
 from .nets import CategoricalReward, ScalarReward, gaussian_rewards
@@ -22,16 +27,16 @@ from sympy import factorint
 def save_model(reward_net, reward_name, num_steps):
     reward_net.eval()
     net_dict = reward_net.state_dict()
-    os.makedirs(f'./Rewards/{reward_name}/Models/', exist_ok=True)
-    save_path = f'Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
+    os.makedirs(f'./Pretrain/Rewards/{reward_name}/Models/', exist_ok=True)
+    save_path = f'/Pretrain/Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
     torch.save(net_dict, save_path)
     print(f"reward model save to {reward_name}_{num_steps}.pkl")
 
 def load_model(reward_name, num_steps):
-    load_path = f'./Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
+    load_path = f'./Pretrain/Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
     state_dict = torch.load(load_path, map_location='cpu')
     return state_dict
-
+"""
 class Reward_Processor():
      def __init__(self, dataset_name, specific_dataset):
           critic_name = get_CriticName(dataset_name, specific_dataset)
@@ -43,7 +48,7 @@ class Reward_Processor():
           obs = self.stats.norm_obs(obs)
           act = self.stats.norm_act(act)
           return obs, act
-
+"""
 def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None):
     if(dataset_name == 'kitchen'):
          data_1 = KitchenDataset('complete')
@@ -180,7 +185,7 @@ def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, specific_d
 
 class test_dataset(Dataset):
     def __init__(self, trajs, sigma, Reward_name):
-        stats_path = f'./Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
+        stats_path = f'./Pretrain/Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
         with open(stats_path, 'rb') as f:
               self.stats = pickle.load(f)
         transitions = []
@@ -242,8 +247,16 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
          avg_var = total_var / len(dataloader)
          print(f"model {num}, Loss {avg_mean_loss:.4f}, Variance {avg_var:.4f}")
          num += save_freq
-    
+
+def get_pretrained_reward(dataset_name, checkpoints, specific_dataset: Optional[str] = None):
+       _, name, obs_dim, act_dim  =  Train_Dataset(dataset_name, specific_dataset)
+       reward_model_state_dict = load_model(name, checkpoints)
+       return reward_model_state_dict, obs_dim, act_dim, name
 
 
-
+def get_pretrained_reward_stats(Reward_name):
+    stats_path = f'./Pretrain/Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
+    with open(stats_path, 'rb') as f:
+        stats = pickle.load(f)
+    return stats
 

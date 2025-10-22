@@ -42,6 +42,7 @@ from Planners.Backbone.Dit import DiT1d
 from Planners.Backbone.utils import compute_dot_alpha_beta
 from Planners.Backbone.Sampler import sample_reverse_sde
 from Dataset import Planner_Processor
+import torch.nn.functional as F
 
 
 
@@ -217,5 +218,34 @@ print(x.view(-1))
 """
 
 #plot_function(function, x_range=(-10, 10), num_points=1000, title="Function Plot", xlabel="x", ylabel="f(x)")
-print(function(0))
+
+
+"""
+
+env, d_s, d_a = get_env('pointmaze', 'medium', 'rgb_array')
+
+data = get_dataset('pointmaze', 'medium')
+frames = []
+
+
+
+trajs = data.get_trajectories()
+traj = trajs[5]
+env.reset(seed=1)
+frames.append(env.render())
+
+
+for i in range(len(traj['actions'])):
+     action = traj['actions'][i].copy()
+     obs, reward, terminated, truncated, info = env.step(action)
+     frames.append(env.render())
+     if(terminated or truncated):
+         break
+     
+
+env.close()
+media.write_video('video.mp4', frames, fps=50)
+"""
+
+
 

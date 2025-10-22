@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 import minari
 from sympy.core import I
@@ -465,7 +468,7 @@ class Planner_Processor():
      def __init__(self, dataset_name, specific_dataset):
           Planner_name = get_PlannerName(dataset_name, specific_dataset)
           stats_name = Planner_name + '_stats.pkl'  # Remove .pt replacement since Planner_name doesn't have .pt
-          stats_dir = f'./Planners/{dataset_name}/{specific_dataset}/Stats/'
+          stats_dir = f'./Pretrain/Planners/{dataset_name}/{specific_dataset}/Stats/'
           stats_path = os.path.join(stats_dir, stats_name)
           
 

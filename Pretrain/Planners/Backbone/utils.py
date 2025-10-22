@@ -350,11 +350,17 @@ def apply_conditioning(x, conditions, state_dim):
 
 def get_pretrained_planner(dataset_name, specific_dataset, checkpoint_steps):
       planner_name = get_PlannerName(dataset_name, specific_dataset)
-      checkpoint_path = f"./Planners/{dataset_name}/{specific_dataset}/Models/{planner_name}_{checkpoint_steps}.pt"
+      checkpoint_path = f"./Pretrain/Planners/{dataset_name}/{specific_dataset}/Models/{planner_name}_{checkpoint_steps}.pt"
       if not os.path.exists(checkpoint_path):
           raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
       checkpoint = torch.load(checkpoint_path, map_location='cpu')
       return checkpoint['ema']
+
+
+
+
+
+
 
 """
 

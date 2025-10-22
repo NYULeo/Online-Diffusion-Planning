@@ -1,0 +1,26 @@
+Using device: cuda
+Checkpoint 2000: mean_log_prob = 129.5241, min_log_prob = -382.3184
+Checkpoint 4000: mean_log_prob = 151.0202, min_log_prob = -451.0382
+Checkpoint 6000: mean_log_prob = 162.6689, min_log_prob = -464.7970
+Checkpoint 8000: mean_log_prob = 167.3525, min_log_prob = -480.4475
+Checkpoint 10000: mean_log_prob = 170.8075, min_log_prob = -477.7574
+Checkpoint 12000: mean_log_prob = 175.4663, min_log_prob = -476.5794
+Checkpoint 14000: mean_log_prob = 177.5651, min_log_prob = -474.9623
+Checkpoint 16000: mean_log_prob = 179.6666, min_log_prob = -473.0965
+Checkpoint 18000: mean_log_prob = 182.3151, min_log_prob = -474.2249
+Checkpoint 20000: mean_log_prob = 184.4522, min_log_prob = -534.0639
+Checkpoint 22000: mean_log_prob = 186.0148, min_log_prob = -474.2884
+Checkpoint 24000: mean_log_prob = 187.7098, min_log_prob = -540.1148
+Checkpoint 26000: mean_log_prob = 189.6494, min_log_prob = -515.8891
+Checkpoint 28000: mean_log_prob = 191.2169, min_log_prob = -493.8704
+Checkpoint 30000: mean_log_prob = 193.1466, min_log_prob = -532.4895
+Checkpoint 32000: mean_log_prob = 193.9679, min_log_prob = -525.3854
+Checkpoint 34000: mean_log_prob = 194.5819, min_log_prob = -695.7907
+Checkpoint 36000: mean_log_prob = 195.9406, min_log_prob = -658.1524
+Checkpoint 38000: mean_log_prob = 195.8858, min_log_prob = -666.2883
+Checkpoint 40000: mean_log_prob = 197.3285, min_log_prob = -695.4492
+Checkpoint 42000: mean_log_prob = 197.9162, min_log_prob = -745.0325
+Checkpoint 44000: mean_log_prob = 199.3305, min_log_prob = -761.9140
+Checkpoint 46000: mean_log_prob = 199.3458, min_log_prob = -795.3465
+Checkpoint 48000: mean_log_prob = 199.2735, min_log_prob = -780.4479
+Checkpoint 50000: mean_log_prob = 200.8253, min_log_prob = -648.5982

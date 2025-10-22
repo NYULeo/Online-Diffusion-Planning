@@ -1,0 +1,353 @@
+Training kernel for pointmaze_medium
+Using device: cuda
+saved stats to ./Transition_Kernel/2DMaze_Kernel_medium/Stats/2DMaze_Kernel_medium_stats.pkl
+Step 500, avg_loss: -4.375406
+Step 1000, avg_loss: -5.372848
+Step 1500, avg_loss: -5.402087
+Step 2000, avg_loss: -5.417190
+Kernel model save to 2DMaze_Kernel_medium_2000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_2000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_2000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_2000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_2000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_2000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_2000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_2000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_2000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_2000_9.pkl
+Step 2500, avg_loss: -5.398358
+Step 3000, avg_loss: -5.406750
+Step 3500, avg_loss: -5.424035
+Step 4000, avg_loss: -5.429993
+Kernel model save to 2DMaze_Kernel_medium_4000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_4000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_4000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_4000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_4000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_4000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_4000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_4000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_4000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_4000_9.pkl
+Step 4500, avg_loss: -5.424507
+Step 5000, avg_loss: -5.426401
+Step 5500, avg_loss: -5.417290
+Step 6000, avg_loss: -5.435059
+Kernel model save to 2DMaze_Kernel_medium_6000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_6000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_6000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_6000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_6000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_6000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_6000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_6000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_6000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_6000_9.pkl
+Step 6500, avg_loss: -5.438526
+Step 7000, avg_loss: -5.432400
+Step 7500, avg_loss: -5.436501
+Step 8000, avg_loss: -5.428179
+Kernel model save to 2DMaze_Kernel_medium_8000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_8000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_8000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_8000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_8000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_8000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_8000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_8000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_8000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_8000_9.pkl
+Step 8500, avg_loss: -5.426112
+Step 9000, avg_loss: -5.441948
+Step 9500, avg_loss: -5.432866
+Step 10000, avg_loss: -5.430861
+Kernel model save to 2DMaze_Kernel_medium_10000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_10000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_10000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_10000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_10000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_10000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_10000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_10000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_10000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_10000_9.pkl
+Step 10500, avg_loss: -5.439864
+Step 11000, avg_loss: -5.445852
+Step 11500, avg_loss: -5.427502
+Step 12000, avg_loss: -5.452563
+Kernel model save to 2DMaze_Kernel_medium_12000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_12000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_12000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_12000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_12000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_12000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_12000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_12000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_12000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_12000_9.pkl
+Step 12500, avg_loss: -5.438642
+Step 13000, avg_loss: -5.428405
+Step 13500, avg_loss: -5.445036
+Step 14000, avg_loss: -5.424437
+Kernel model save to 2DMaze_Kernel_medium_14000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_14000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_14000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_14000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_14000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_14000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_14000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_14000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_14000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_14000_9.pkl
+Step 14500, avg_loss: -5.446070
+Step 15000, avg_loss: -5.445434
+Step 15500, avg_loss: -5.448936
+Step 16000, avg_loss: -5.436999
+Kernel model save to 2DMaze_Kernel_medium_16000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_16000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_16000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_16000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_16000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_16000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_16000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_16000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_16000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_16000_9.pkl
+Step 16500, avg_loss: -5.457229
+Step 17000, avg_loss: -5.426701
+Step 17500, avg_loss: -5.450092
+Step 18000, avg_loss: -5.440188
+Kernel model save to 2DMaze_Kernel_medium_18000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_18000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_18000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_18000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_18000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_18000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_18000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_18000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_18000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_18000_9.pkl
+Step 18500, avg_loss: -5.447748
+Step 19000, avg_loss: -5.435294
+Step 19500, avg_loss: -5.445948
+Step 20000, avg_loss: -5.445025
+Kernel model save to 2DMaze_Kernel_medium_20000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_20000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_20000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_20000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_20000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_20000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_20000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_20000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_20000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_20000_9.pkl
+Step 20500, avg_loss: -5.438346
+Step 21000, avg_loss: -5.432793
+Step 21500, avg_loss: -5.461575
+Step 22000, avg_loss: -5.452944
+Kernel model save to 2DMaze_Kernel_medium_22000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_22000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_22000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_22000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_22000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_22000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_22000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_22000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_22000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_22000_9.pkl
+Step 22500, avg_loss: -5.443450
+Step 23000, avg_loss: -5.438653
+Step 23500, avg_loss: -5.443030
+Step 24000, avg_loss: -5.442910
+Kernel model save to 2DMaze_Kernel_medium_24000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_24000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_24000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_24000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_24000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_24000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_24000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_24000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_24000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_24000_9.pkl
+Step 24500, avg_loss: -5.438506
+Step 25000, avg_loss: -5.441836
+Step 25500, avg_loss: -5.456216
+Step 26000, avg_loss: -5.444737
+Kernel model save to 2DMaze_Kernel_medium_26000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_26000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_26000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_26000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_26000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_26000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_26000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_26000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_26000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_26000_9.pkl
+Step 26500, avg_loss: -5.454679
+Step 27000, avg_loss: -5.435563
+Step 27500, avg_loss: -5.464186
+Step 28000, avg_loss: -5.450497
+Kernel model save to 2DMaze_Kernel_medium_28000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_28000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_28000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_28000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_28000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_28000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_28000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_28000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_28000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_28000_9.pkl
+Step 28500, avg_loss: -5.455895
+Step 29000, avg_loss: -5.439725
+Step 29500, avg_loss: -5.438600
+Step 30000, avg_loss: -5.465951
+Kernel model save to 2DMaze_Kernel_medium_30000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_30000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_30000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_30000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_30000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_30000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_30000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_30000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_30000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_30000_9.pkl
+Step 30500, avg_loss: -5.444969
+Step 31000, avg_loss: -5.456141
+Step 31500, avg_loss: -5.436537
+Step 32000, avg_loss: -5.455593
+Kernel model save to 2DMaze_Kernel_medium_32000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_32000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_32000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_32000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_32000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_32000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_32000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_32000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_32000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_32000_9.pkl
+Step 32500, avg_loss: -5.468041
+Step 33000, avg_loss: -5.442365
+Step 33500, avg_loss: -5.461277
+Step 34000, avg_loss: -5.436801
+Kernel model save to 2DMaze_Kernel_medium_34000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_34000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_34000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_34000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_34000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_34000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_34000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_34000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_34000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_34000_9.pkl
+Step 34500, avg_loss: -5.449967
+Step 35000, avg_loss: -5.435289
+Step 35500, avg_loss: -5.470803
+Step 36000, avg_loss: -5.452036
+Kernel model save to 2DMaze_Kernel_medium_36000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_36000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_36000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_36000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_36000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_36000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_36000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_36000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_36000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_36000_9.pkl
+Step 36500, avg_loss: -5.448383
+Step 37000, avg_loss: -5.455090
+Step 37500, avg_loss: -5.449361
+Step 38000, avg_loss: -5.454056
+Kernel model save to 2DMaze_Kernel_medium_38000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_38000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_38000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_38000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_38000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_38000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_38000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_38000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_38000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_38000_9.pkl
+Step 38500, avg_loss: -5.435936
+Step 39000, avg_loss: -5.448563
+Step 39500, avg_loss: -5.459262
+Step 40000, avg_loss: -5.453505
+Kernel model save to 2DMaze_Kernel_medium_40000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_40000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_40000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_40000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_40000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_40000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_40000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_40000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_40000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_40000_9.pkl
+Step 40500, avg_loss: -5.452011
+Step 41000, avg_loss: -5.467215
+Step 41500, avg_loss: -5.439326
+Step 42000, avg_loss: -5.461950
+Kernel model save to 2DMaze_Kernel_medium_42000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_42000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_42000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_42000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_42000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_42000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_42000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_42000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_42000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_42000_9.pkl
+Step 42500, avg_loss: -5.459099
+Step 43000, avg_loss: -5.435354
+Step 43500, avg_loss: -5.455025
+Step 44000, avg_loss: -5.450430
+Kernel model save to 2DMaze_Kernel_medium_44000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_44000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_44000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_44000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_44000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_44000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_44000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_44000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_44000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_44000_9.pkl
+Step 44500, avg_loss: -5.456286
+Step 45000, avg_loss: -5.456024
+Step 45500, avg_loss: -5.459165
+Step 46000, avg_loss: -5.446516
+Kernel model save to 2DMaze_Kernel_medium_46000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_46000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_46000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_46000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_46000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_46000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_46000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_46000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_46000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_46000_9.pkl
+Step 46500, avg_loss: -5.446378
+Step 47000, avg_loss: -5.460636
+Step 47500, avg_loss: -5.451387
+Step 48000, avg_loss: -5.451028
+Kernel model save to 2DMaze_Kernel_medium_48000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_48000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_48000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_48000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_48000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_48000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_48000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_48000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_48000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_48000_9.pkl
+Step 48500, avg_loss: -5.462441
+Step 49000, avg_loss: -5.462873
+Step 49500, avg_loss: -5.447848
+Step 50000, avg_loss: -5.454230
+Kernel model save to 2DMaze_Kernel_medium_50000_0.pkl
+Kernel model save to 2DMaze_Kernel_medium_50000_1.pkl
+Kernel model save to 2DMaze_Kernel_medium_50000_2.pkl
+Kernel model save to 2DMaze_Kernel_medium_50000_3.pkl
+Kernel model save to 2DMaze_Kernel_medium_50000_4.pkl
+Kernel model save to 2DMaze_Kernel_medium_50000_5.pkl
+Kernel model save to 2DMaze_Kernel_medium_50000_6.pkl
+Kernel model save to 2DMaze_Kernel_medium_50000_7.pkl
+Kernel model save to 2DMaze_Kernel_medium_50000_8.pkl
+Kernel model save to 2DMaze_Kernel_medium_50000_9.pkl

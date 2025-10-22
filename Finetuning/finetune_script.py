@@ -1,33 +1,39 @@
-from adjoint_matching import train_adjoint_matching
-from Pretrain.Rewards.nets import ScalarReward
-from Pretrain.Planners.Backbone.Dit import DiT1d
-from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel
-import torch
+import sys
+import os
+# Change to project root directory
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(project_root)
+from Finetune_Backbone import OnlineFinetuner, FinetuningConfig
+from adjoint_matching import AdjointMatchingConfig
+from traj_reward import RewardConfig
 
 
+              
 if __name__ == "__main__":
     # Example usage of the Adjoint Matching training without a dataset.
-    # In practice, replace the reward and backbone initialisations with
+    # In practice, 
+    # 
+    # replace the reward and backbone initialisations with
     # loading of your pretrained models (e.g. via torch.load).
-    horizon = 10
-    state_dim = 4
-    action_dim = 2
+    env_name = 'kitchen'
+    specific_env = 'partial'
+    AMConfig = AdjointMatchingConfig(horizon=32) 
+    
+    RWConfig = RewardConfig(beta = 1.0, min_log_prob = 150.0, explore = False) 
+    
+    FTConfig = FinetuningConfig(
+        AMConfig = AMConfig, 
+        RewardConfig = RWConfig, 
+        dataset_name = env_name,
+        specific_dataset = specific_env,
+        planner_checkpoint = 990000,
+        reward_model_checkpoint = 950,
+        kernel_model_checkpoint = 50000)
+    
+    OnlineFinetuner = OnlineFinetuner(FTConfig)
+    OnlineFinetuner.finetune_planner()
 
-    # Instantiate a dummy reward network (Beta distribution model) and backbone.
-    reward_net = ScalarReward(obs_dim=state_dim, act_dim=action_dim)
-    backbone = DiT1d(horizon=horizon, transition_dim=state_dim + action_dim)
-
-    # Train the control network via Adjoint Matching without a dataset.
-    trained_control = train_adjoint_matching(
-        horizon=horizon,
-        state_dim=state_dim,
-        action_dim=action_dim,
-        reward_net=reward_net,
-        backbone=backbone,
-        num_iterations=3,
-        batch_size=2,
-        lr=5e-4,
-    )
-
-    # Save the trained control network if desired
-    torch.save(trained_control.state_dict(), "control_net_no_dataset.pt")
+    
+   
+   
+    

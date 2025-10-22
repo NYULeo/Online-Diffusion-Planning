@@ -81,6 +81,7 @@ class SDETrainer:
     def reset_parameters(self):
         self.ema_model.load_state_dict(self.model.state_dict())
 
+
     def step_ema(self):
         if self.step < self.step_start_ema:
             self.reset_parameters()
