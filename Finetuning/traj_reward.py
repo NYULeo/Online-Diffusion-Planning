@@ -58,7 +58,7 @@ class TotalReward(nn.Module):
             lp = self.kernels[i].log_prob(s_next, mu, log_std)
             total = total + lp 
         avg = total / len(self.kernels)
-        x =  torch.tensor([self.config.min_log_prob - avg], device = self.config.device, requires_grad = False)
+        x =  torch.tensor([self.config.min_log_prob - avg], device = self.config.device, requires_grad = True)
         c = F.softplus(x, beta = self.config.beta)
         return c
     
@@ -126,7 +126,7 @@ class TotalReward(nn.Module):
             r_s = grads[0].squeeze(0)
             r_a = grads[1].squeeze(0)
             r_s_grad, r_a_grad = self.makeGrad(H, r_s, r_a, i)
-            print(1)
+            
 
             grads = torch.autograd.grad(
                         outputs = var,
@@ -138,7 +138,7 @@ class TotalReward(nn.Module):
             var_s = grads[0].squeeze(0)
             var_a = grads[1].squeeze(0)
             var_s_grad, var_a_grad = self.makeGrad(H, var_s, var_a, i)
-            print(2)
+            
 
             grads = torch.autograd.grad(
                         outputs = c,
@@ -154,7 +154,7 @@ class TotalReward(nn.Module):
            
             gradient +=  (1/H)*((r_s_grad + r_a_grad) + self.config.gamma * (var_s_grad + var_a_grad)) - lam * (1/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad)
             total_reward += (1/H)*(r.squeeze(0) + self.config.gamma * var.squeeze(0)) - lam * ((1/(H-1)) * c.squeeze(0))
-            print(3)
+            
         
 
         s = x[H-1][:self.config.d_s]
