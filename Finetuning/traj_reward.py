@@ -148,6 +148,7 @@ class TotalReward(nn.Module):
                         grad_outputs = torch.ones_like(c),
                         create_graph = True,
                         retain_graph = True
+                        
                     )
             c_s = grads[0].squeeze(0)
             c_a = grads[1].squeeze(0)   

@@ -26,11 +26,11 @@ class FinetuningConfig():
     kernel_model_checkpoint: int
     epoch: int = 100
     finetune_steps: int = 1000000
-    finetune_batch_size: int = 128
+    finetune_batch_size: int = 64
     ema_decay = 0.999
     update_ema_every = 2
     save_freq= 10000
-    log_freq = 10
+    log_freq = 1
     step_start_ema = 1000
 
 
