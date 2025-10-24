@@ -27,13 +27,13 @@ from sympy import factorint
 def save_model(reward_net, reward_name, num_steps):
     reward_net.eval()
     net_dict = reward_net.state_dict()
-    os.makedirs(f'./Rewards/{reward_name}/Models/', exist_ok=True)
-    save_path = f'./Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
+    os.makedirs(f'./Pretrain/Rewards/{reward_name}/Models/', exist_ok=True)
+    save_path = f'./Pretrain/Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
     torch.save(net_dict, save_path)
     print(f"reward model save to {reward_name}_{num_steps}.pkl")
 
 def load_model(reward_name, num_steps):
-    load_path = f'./Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
+    load_path = f'./Pretrain/Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
     state_dict = torch.load(load_path, map_location='cpu')
     return state_dict
 """
