@@ -7,22 +7,25 @@ import copy
 
 
 if __name__ == '__main__':
-    with open('./Rollouts/kitchen/partial/Generated_trajs_Info.pkl', 'rb') as f:
+    with open('./Rollouts/pointmaze/medium/Generated_trajs_Info.pkl', 'rb') as f:
          trajs_info = pickle.load(f)
     Gen_trajs = trajs_info['trajs']
     
+    """
     data1 = get_dataset('kitchen', 'complete')
     traj1 = data1.get_trajectories()
     data2 = get_dataset('kitchen', 'partial')
     traj2 = data2.get_trajectories()
     data3 = get_dataset('kitchen', 'mixed')
     traj3 = data3.get_trajectories()
+    """
 
     
     print(f"Testing on the Generated Trajectories")
     set_seed(1)
     test_Model(
-    dataset_name = 'kitchen', 
+    dataset_name = 'pointmaze',
+    specific_dataset = 'medium',
     trajs = Gen_trajs,
     sigma = 3, 
     save_freq = 100, 
