@@ -19,7 +19,7 @@ import os
 from scipy.ndimage import gaussian_filter1d, convolve
 from utils import cycle
 import copy
-from sympy import factorint
+from sympy import Predicate, factorint
 
 
 
@@ -180,7 +180,6 @@ def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, specific_d
               checkpoint = copy.deepcopy(reward_net)
               save_model(checkpoint, reward_name, step)
            
-    save_model(reward_net, reward_name, num_steps)
 
 
 class test_dataset(Dataset):
@@ -239,12 +238,12 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
              s = s.to(device)
              a = a.to(device)
              r = r.to(device)
-             mean = reward_net.predict(s, a)
+             pred = reward_net.predict(s, a)
              var = reward_net.variance(s, a)
-             mean_loss = ((mean - r).abs()).mean()
+             mean_loss = ((pred - r).abs()).mean()
              total_mean_loss += mean_loss.item()
              total_var += var.mean().item()
-             total_reward += r.mean().item()
+             total_reward += pred.mean().item()
          avg_mean_loss = total_mean_loss / len(dataloader)
          avg_var = total_var / len(dataloader)
          avg_reward = total_reward / len(dataloader)

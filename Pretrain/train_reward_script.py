@@ -9,7 +9,7 @@ if __name__ == '__main__':
     dataset_name = 'kitchen',  
     batch_size=1024, 
     num_steps=10000,   
-    lr=1e-4,
+    lr=2e-3,
     sigma=3)
 
 
