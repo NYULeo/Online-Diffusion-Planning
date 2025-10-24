@@ -185,7 +185,7 @@ def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, specific_d
 
 class test_dataset(Dataset):
     def __init__(self, trajs, sigma, Reward_name):
-        stats_path = f'./Pretrain/Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
+        stats_path = f'./Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
         with open(stats_path, 'rb') as f:
               self.stats = pickle.load(f)
         transitions = []
