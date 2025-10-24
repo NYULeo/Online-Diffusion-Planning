@@ -29,7 +29,7 @@ if __name__ == "__main__":
         dataset_name = env_name,
         specific_dataset = specific_env,
         planner_checkpoint = 990000,
-        reward_model_checkpoint = 950,
+        reward_model_checkpoint = 10000,
         kernel_model_checkpoint = 50000,
         finetune_steps = 1000000,
         finetune_batch_size  = 12,
