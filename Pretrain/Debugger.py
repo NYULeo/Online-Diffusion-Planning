@@ -1,6 +1,9 @@
 from pstats import StatsProfile
 import sys
 import os
+
+from minari.storage.local import gen_dataset_id
+os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import logging
 import numpy as np
 from pandas._libs.algos import take_2d_axis0_float32_float32
@@ -43,6 +46,9 @@ from Planners.Backbone.utils import compute_dot_alpha_beta
 from Planners.Backbone.Sampler import sample_reverse_sde
 from Dataset import Planner_Processor
 import torch.nn.functional as F
+from Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
+from Dataset import get_dataset
+from Rewards.nets import ScalarReward
 
 
 
@@ -246,8 +252,97 @@ for i in range(len(traj['actions'])):
 env.close()
 media.write_video('video.mp4', frames, fps=50)
 """
-a = torch.tensor(0.0)
-if (a <5):
-     print('l am')
+
+save_path = f'./Pretrain/Rollouts/{'kitchen'}/{'partial'}/Generated_trajs_Info.pkl'
+with open(save_path, 'rb') as f:
+    data = pickle.load(f)
+gen_trajs = data['trajs']
+
+
+data_partial = get_dataset('kitchen', 'partial')
+trajs_partial = data_partial.get_trajectories()
+
+data_complete = get_dataset('kitchen', 'complete')
+trajs_complete = data_complete.get_trajectories()
+
+
+reward_model_state_dict, obs_dim, act_dim, name = get_pretrained_reward('kitchen', 950, 'partial')
+reward_model = ScalarReward(obs_dim, act_dim)
+reward_model.load_state_dict(reward_model_state_dict)
+reward_model.eval()
+stats = get_pretrained_reward_stats('Kitchen_Reward')
+
+
+
+
+total = 0.0
+for i in range(len(trajs_complete)):
+     traj = trajs_complete[i]
+     traj_reward = 0.0
+     for j in range(len(traj['actions'])):
+          obs = traj['observations'][j].copy()
+          action = traj['actions'][j].copy()
+          obs_norm = stats.norm_obs(obs)
+          action_norm = action
+          obs_norm = torch.tensor(obs_norm, dtype = torch.float32).unsqueeze(0)
+          action_norm = torch.tensor(action_norm, dtype = torch.float32).unsqueeze(0)
+          pred = reward_model.predict(obs_norm, action_norm)
+          traj_reward += pred.item()
+     traj_reward = traj_reward / len(traj['actions'])
+     #print(f"Traj {i} reward: {traj_reward:.4f}")
+     total += traj_reward
+     
+total = total / len(trajs_complete)
+print(f"Complete Total reward: {total:.4f}")
+
+
+
+total = 0.0
+for i in range(len(trajs_partial)):
+     traj = trajs_partial[i]
+     traj_reward = 0.0
+     for j in range(len(traj['actions'])):
+          obs = traj['observations'][j].copy()
+          action = traj['actions'][j].copy()
+          obs_norm = stats.norm_obs(obs)
+          action_norm = action
+          obs_norm = torch.tensor(obs_norm, dtype = torch.float32).unsqueeze(0)
+          action_norm = torch.tensor(action_norm, dtype = torch.float32).unsqueeze(0)
+          pred = reward_model.predict(obs_norm, action_norm)
+          traj_reward += pred.item()
+     traj_reward = traj_reward / len(traj['actions'])
+     #print(f"Traj {i} reward: {traj_reward:.4f}")
+     total += traj_reward
+     
+total = total / len(trajs_partial)
+print(f"Partial Total reward: {total:.4f}")
+
+
+
+
+
+
+
+
+total = 0.0
+for i in range(len(gen_trajs)):
+     traj = gen_trajs[i]
+     traj_reward = 0.0
+     for j in range(len(traj['actions'])):
+          obs = traj['observations'][j].copy()
+          action = traj['actions'][j].copy()
+          obs_norm = stats.norm_obs(obs)
+          action_norm = action
+          obs_norm = torch.tensor(obs_norm, dtype = torch.float32).unsqueeze(0)
+          action_norm = torch.tensor(action_norm, dtype = torch.float32).unsqueeze(0)
+          pred = reward_model.predict(obs_norm, action_norm)
+          traj_reward += pred.item()
+     traj_reward = traj_reward / len(traj['actions'])
+     #print(f"Traj {i} reward: {traj_reward:.4f}")
+     total += traj_reward
+     
+total = total / len(gen_trajs)
+print(f"gen_Total reward: {total:.4f}")
+
 
 

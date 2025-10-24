@@ -5,7 +5,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 from Finetune_Backbone import OnlineFinetuner, FinetuningConfig
 from adjoint_matching import AdjointMatchingConfig
-from parallel_adjoint_matching import Parallel_AdjointMatchingConfig
+from acc_adjoint_matching import Acc_AdjointMatchingConfig
 from traj_reward import RewardConfig
 
 
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     env_name = 'pointmaze'
     specific_env = 'medium'
     #AMConfig = AdjointMatchingConfig(horizon = 32) 
-    AMConfig = Parallel_AdjointMatchingConfig(horizon = 32)
+    AMConfig = Acc_AdjointMatchingConfig(horizon = 32)
     
     RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
     
@@ -30,7 +30,12 @@ if __name__ == "__main__":
         specific_dataset = specific_env,
         planner_checkpoint = 1000000,
         reward_model_checkpoint = 9900,
-        kernel_model_checkpoint = 34000)
+        kernel_model_checkpoint = 34000,
+        finetune_steps = 1000000,
+        finetune_batch_size  = 12,
+        finetune_lr = 2e-4)
     
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
+
+

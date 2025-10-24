@@ -6,6 +6,7 @@ from Dataset import get_env
 import pickle
 import os
 from gymnasium.vector import AsyncVectorEnv
+from Dataset import get_dataset
 
 def render(dataset_name, specific_dataset, traj):
      env, _, _ = get_env(dataset_name, specific_dataset, render_mode = 'rgb_array')
@@ -61,11 +62,15 @@ def check_speration(trajs):
 
 if __name__ == "__main__":
      set_seed(1)
+     """
      with open('Rollouts/pointmaze/medium/Generated_trajs_Info.pkl', 'rb') as f:
         info = pickle.load(f)
      trajs = info['trajs']
      best_traj = info['best_traj']
-     render(info['env_name'], info['specific_env'], best_traj)
+     """
+     data = get_dataset('kitchen', 'partial')
+     trajs = data.get_trajectories()
+     render('kitchen', 'partial', trajs[0])
      """
      env_name = info['env_name']
      specific_env = info['specific_env']

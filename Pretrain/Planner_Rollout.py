@@ -1,3 +1,5 @@
+import sys
+import os
 import math
 import numpy as np
 import torch
@@ -16,7 +18,10 @@ import os
 from Planners.Backbone.Dit import DiT1d
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
 import mediapy as media
+from Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 
+
+     
 
 """
 def get_pretrained_planner(planner_name, checkpoint_steps):
@@ -66,6 +71,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      device = "cuda" if torch.cuda.is_available() else "cpu"
      print(f"Using device {device}")
+
      if critic:
             action_selector = ActionSelector(env_name, specific_env, device)
      else:
@@ -303,8 +309,8 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 500, eta = 
 if __name__ == "__main__":
     set_seed(1)
     horizon = 32
-    env_name = 'pointmaze'
-    specific_train_dataset = 'medium'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 3000, critic = False, checkpoint_steps = 1000000, render = True)
+    env_name = 'kitchen'
+    specific_train_dataset = 'partial'
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 3000, critic = False, checkpoint_steps = 990000, render = True)
     #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 1000000, num_envs = 8)
   
