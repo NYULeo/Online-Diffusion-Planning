@@ -27,8 +27,8 @@ if __name__ == '__main__':
     dataset_name = 'kitchen',
     trajs = Gen_trajs,
     sigma = 3, 
-    save_freq = 100, 
-    num_steps = 10000)
+    save_freq = 1000, 
+    num_steps = 100000)
 """
     print(f"Testing on the partial Trajectories")
     set_seed(1)
