@@ -327,7 +327,6 @@ class Acc_AdjointMatchingFineTuner:
           # 4. Gather loss tensors & reward floats across processes
         all_loss_tensors = self.accelerator.gather_for_metrics(local_loss_tensors, use_gather_object=True)
         all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=True)
-        exit()
         
         if self.accelerator.is_main_process:
              # Compute average reward for logging
