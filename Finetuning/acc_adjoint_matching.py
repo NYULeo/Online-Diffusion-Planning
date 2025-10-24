@@ -266,8 +266,6 @@ class Acc_AdjointMatchingFineTuner:
             #new_a = current_a  + dt * ( (self.k[i] * T) + (2 * self.k[i] * Jov_a) )
             new_a = current_a  + dt * ( (k_reversed[i] * T) + (2 * k_reversed[i] * Jov_a) )
             a.append(new_a)
-            print(new_a.shape)
-            exit()
         a.reverse()
         return a, reward.item()
         
