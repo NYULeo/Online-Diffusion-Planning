@@ -251,8 +251,8 @@ class Acc_AdjointMatchingFineTuner:
         T = X_reversed[0]
         T_squeezed = T.squeeze(0).to(self.device)
         reward, gradient = self.reward_model(T_squeezed, self.Lam.get_lam())
-        t_asc_reversed = self.t_asc[::-1]
-        k_reversed = self.k[::-1]
+        t_asc_reversed = torch.flip(self.t_asc, dims = [0]).to(self.device)
+        k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
         a.append(gradient.unsqueeze(0))
         for i in range(steps_T - 1):
             #t_now, t_next = self.t_asc[i], self.t_asc[i + 1]

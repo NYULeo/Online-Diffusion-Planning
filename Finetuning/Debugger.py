@@ -1,3 +1,4 @@
+import torch
 """
     @torch.no_grad()
     def sample_Trajs(self, s0: torch.Tensor) -> Tuple[List[List[torch.Tensor]], float]:
