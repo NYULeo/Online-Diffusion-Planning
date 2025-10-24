@@ -266,6 +266,8 @@ class Acc_AdjointMatchingFineTuner:
             #new_a = current_a  + dt * ( (self.k[i] * T) + (2 * self.k[i] * Jov_a) )
             new_a = current_a  + dt * ( (k_reversed[i] * T) + (2 * k_reversed[i] * Jov_a) )
             a.append(new_a)
+            print(new_a.shape)
+            exit()
         a.reverse()
         return a, reward.item()
         
@@ -309,7 +311,8 @@ class Acc_AdjointMatchingFineTuner:
             self.Lam.update(total_avgC)
         else:
             total_avgC = 0.0
-
+        
+        self.accelerator.wait_for_everyone()
         # 3. Compute adjoints, rewards & loss tensors for each trajectory
         with self.accelerator.split_between_processes(all_trajs) as local_trajs2:
             local_loss_tensors = []
@@ -323,7 +326,8 @@ class Acc_AdjointMatchingFineTuner:
           # 4. Gather loss tensors & reward floats across processes
         all_loss_tensors = self.accelerator.gather_for_metrics(local_loss_tensors, use_gather_object=True)
         all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=True)
-
+        
+        self.accelerator.wait_for_everyone()
         if self.accelerator.is_main_process:
              # Compute average reward for logging
              avg_reward = float(sum(all_rewards) / len(all_rewards))
