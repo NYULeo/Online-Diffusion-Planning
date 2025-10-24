@@ -260,3 +260,37 @@ def get_pretrained_reward_stats(Reward_name):
         stats = pickle.load(f)
     return stats
 
+
+
+def test_Single_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: float = 3, num: int = 10000):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device {device}")
+    if(trajs is None): 
+        train_Trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
+        dataset = RewardDataset(train_Trajs, sigma, reward_name)
+    else:
+        _, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
+        dataset = test_dataset(trajs, sigma, reward_name)
+    print(f"Testing the reward model on {len(dataset)} samples")
+    a = factorint(len(dataset))
+    batch_size = int(np.min(list(a.keys())))
+    dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8)
+    
+    state_dict = load_model(reward_name, num)
+    reward_net = ScalarReward(obs_dim, act_dim).to(device)
+    reward_net.load_state_dict(state_dict)
+    reward_net.eval()
+    total_mean_loss = 0
+    total_var = 0
+    for s, a, r in dataloader:
+        s = s.to(device)
+        a = a.to(device)
+        r = r.to(device)
+        mean = reward_net.predict(s, a)
+        var = reward_net.variance(s, a)
+        mean_loss = ((mean - r).abs()).mean()
+        total_mean_loss += mean_loss.item()
+        total_var += var.mean().item()
+    avg_mean_loss = total_mean_loss / len(dataloader)
+    avg_var = total_var / len(dataloader)
+    print(f"model {num}, Loss {avg_mean_loss:.4f}, Variance {avg_var:.4f}")
