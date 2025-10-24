@@ -261,7 +261,7 @@ class Acc_AdjointMatchingFineTuner:
             T = X_reversed[i].to(self.device)
             T.requires_grad_(True)
             current_a = a[i].to(self.device)  
-            y, jvp_out = jvp(self.new_score_net, (T,), (current_a,)) 
+            y, jvp_out = jvp(self.new_score_net, (T,t_now.unsqueeze(0)), (current_a, torch.zeros_like(t_now.unsqueeze(0)).to(self.device).requires_grad_(True))) 
             Jov_a = jvp_out.to(self.device)
             #new_a = current_a  + dt * ( (self.k[i] * T) + (2 * self.k[i] * Jov_a) )
             new_a = current_a  + dt * ( (k_reversed[i] * T) + (2 * k_reversed[i] * Jov_a) )
