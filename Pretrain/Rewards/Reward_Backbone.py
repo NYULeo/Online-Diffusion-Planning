@@ -107,7 +107,7 @@ class RewardDataset(Dataset):
             obs = np.asarray(traj['observations'])      
             acts = np.asarray(traj['actions'])
             rews = np.asarray(traj['rewards'])
-            rews = gaussian_filter1d(rews, sigma)
+            #rews = gaussian_filter1d(rews, sigma)
             for t in range(len(acts)):
                 obs_t = self.stats.norm_obs(obs[t])
                 a_t   = acts[t]
