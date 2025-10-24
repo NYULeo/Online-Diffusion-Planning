@@ -139,7 +139,7 @@ class RewardDataset(Dataset):
     
 
 def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, specific_dataset: Optional[str] = None):
-    save_freq = 100
+    save_freq = 1000
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
     print(f"Training reward approximator for {dataset_name} Dataset") 
@@ -171,8 +171,8 @@ def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, specific_d
            total_loss += loss.item()
            step += 1
 
-           if step % 10 == 0:
-              avg_loss = total_loss / 10
+           if step % 100 == 0:
+              avg_loss = total_loss / 100
               print(f"Step {step}, loss {avg_loss:.4f}")
               total_loss = 0
 
