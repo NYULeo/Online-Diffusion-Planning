@@ -27,7 +27,7 @@ if __name__ == '__main__':
     sigma = 3, 
     save_freq = 100, 
     num_steps = 10000)
-
+"""
     print(f"Testing on the partial Trajectories")
     set_seed(1)
     test_Model(
@@ -55,4 +55,4 @@ if __name__ == '__main__':
     save_freq = 100, 
     num_steps = 10000)
 
-
+"""
