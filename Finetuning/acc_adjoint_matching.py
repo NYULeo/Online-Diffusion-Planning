@@ -281,7 +281,7 @@ class Acc_AdjointMatchingFineTuner:
         Loss = torch.tensor(0.0, device = self.device, requires_grad=True)
         for i in range(len(traj_x)):
             traj_x_i = traj_x[i].to(self.device)
-            adjoint_i = adjoints[i].to(self.device)
+            adjoint_i = adjoints[i].unsqueeze(0).flatten().to(self.device)
             v_new = self.vector_field(traj_x_i, self.t_asc[i], self.new_score_net).squeeze(0).flatten()
             v_old = self.vector_field(traj_x_i, self.t_asc[i], self.old_score_net).squeeze(0).flatten()
             sigma = self.sigma_t(self.k[i])
@@ -323,13 +323,13 @@ class Acc_AdjointMatchingFineTuner:
                 loss_tensor = self.adjoint_matching_loss(traj, adjoints)  # tensor with grad
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
-
+        
 
         self.accelerator.wait_for_everyone()
           # 4. Gather loss tensors & reward floats across processes
         all_loss_tensors = self.accelerator.gather_for_metrics(local_loss_tensors, use_gather_object=True)
         all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=True)
-        
+        exit()
         
         if self.accelerator.is_main_process:
              # Compute average reward for logging
