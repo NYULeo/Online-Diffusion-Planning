@@ -72,7 +72,6 @@ class OnlineFinetuner():
     
     def Initialize_reward_model(self):
         self.reward_model = TotalReward(self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
-        self.reward_model = self.accelerator.prepare(self.reward_model)
  
     def update_dataset(self, trajs: List[TrajectoryDict]):
         self.Buffer.extend(trajs)

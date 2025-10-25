@@ -87,14 +87,14 @@ class Acc_AdjointMatchingFineTuner:
         self.set_lambda()
         self.set_reward_tracker()
     
-    def Accelerate_Prepare(self, dataloader: DataLoader):
-         self.new_score_net, self.optimizer, self.scheduler, dataloader = self.accelerator.prepare(self.new_score_net, self.optimizer, self.scheduler, dataloader)
+    def Accelerate_Prepare(self, dataloader: DataLoader, reward_model: TotalReward):
+         self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model = self.accelerator.prepare(self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model)
          self.new_score_net.train()
-         return dataloader
+         self.old_score_net.eval()
+         return dataloader, reward_model
 
     def set_ema_model(self):
           self.ema_model = copy.deepcopy(self.new_score_net)
-          self.ema_model.to(self.device)
           for p in self.ema_model.parameters():
               p.requires_grad_(False)
           self.ema_model.eval()
@@ -121,9 +121,9 @@ class Acc_AdjointMatchingFineTuner:
     def set_old_score_net(self, planner_checkpoint: int):
         state_dict = get_pretrained_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
         if( self.config.dataset_name == 'kitchen'):
-              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(self.device)
+              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
         elif (self.config.dataset_name == 'pointmaze'):
-              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(self.device)
+              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
         else:
               raise ValueError(f"Invalid Environment: {self.config.dataset_name}")
         self.old_score_net.load_state_dict(state_dict)
@@ -148,10 +148,11 @@ class Acc_AdjointMatchingFineTuner:
         self.reward_tracker = RewardTracker(save_dir=f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/logs/")
 
     def step_ema(self, step):
+        base_new_score_net = self.accelerator.unwrap_model(self.new_score_net)
         if step < self.config.step_start_ema:
-            self.ema_model.load_state_dict(self.new_score_net.state_dict())
+            self.ema_model.load_state_dict(base_new_score_net.state_dict())
             return
-        self.ema.update_model_average(self.ema_model, self.new_score_net)
+        self.ema.update_model_average(self.ema_model, base_new_score_net)
         
     def save(self, step):
         self.ema_model.eval()
@@ -270,7 +271,8 @@ class Acc_AdjointMatchingFineTuner:
         return  X
 
     def make_a(self, X, reward_model: TotalReward):
-        for p in self.old_score_net.parameters():
+        base_old_score_net = self.accelerator.unwrap_model(self.old_score_net)
+        for p in base_old_score_net.parameters():
               p.requires_grad_(True)
         X = [x.to(self.device) if x.device != self.device else x for x in X]
         steps_T = len(X)
@@ -296,7 +298,7 @@ class Acc_AdjointMatchingFineTuner:
             new_a = new_a.detach().clone().to(self.device)
             a.append(new_a)
         a.reverse()
-        for p in self.old_score_net.parameters():
+        for p in base_old_score_net.parameters():
               p.requires_grad_(False)
         return a, reward.item()
            
@@ -379,7 +381,7 @@ class Acc_AdjointMatchingFineTuner:
         self.set_lambda(reward_model.get_beta())
         self.set_reward_tracker()
         
-        dataloader = self.Accelerate_Prepare(dataloader)
+        dataloader, reward_model = self.Accelerate_Prepare(dataloader, reward_model)
         dataloader = cycle(dataloader)
 
         step = 0
