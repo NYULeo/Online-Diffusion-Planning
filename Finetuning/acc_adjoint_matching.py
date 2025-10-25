@@ -101,9 +101,9 @@ class Acc_AdjointMatchingFineTuner:
           
     def set_lambda(self, beta: Optional[float] = None):
         if beta is None:
-           self.Lam = Lambda(lam = self.config.lam, beta = 1.0, eta_lam = self.config.finetune_lr).to(self.device)
+           self.Lam = Lambda(lam = self.config.lam, beta = 1.0, eta_lam = self.config.finetune_lr)
         else:
-           self.Lam = Lambda(lam = self.config.lam, beta = beta, eta_lam = self.config.finetune_lr).to(self.device)
+           self.Lam = Lambda(lam = self.config.lam, beta = beta, eta_lam = self.config.finetune_lr)
 
     def set_optimizer_and_scheduler(self, new_lr=None, new_steps=None):
           # Use provided values or fall back to config defaults
