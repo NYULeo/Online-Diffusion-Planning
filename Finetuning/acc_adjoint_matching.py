@@ -85,6 +85,8 @@ class Acc_AdjointMatchingFineTuner:
         else:
           raise ValueError(f"Invalid Environment: {self.config.dataset_name}")
         self.old_score_net.load_state_dict(state_dict)
+        for p in self.old_score_net.parameters():
+             p.requires_grad_(False)
         self.old_score_net.eval()
         self.reward_model = TotalReward(RewardConfig, self.config.dataset_name, self.config.specific_dataset, reward_model_checkpoint, kernel_model_checkpoint).to(self.device)
         self.reward_model.eval()
@@ -265,6 +267,7 @@ class Acc_AdjointMatchingFineTuner:
             Jov_a = jvp_out.to(self.device)
             #new_a = current_a  + dt * ( (self.k[i] * T) + (2 * self.k[i] * Jov_a) )
             new_a = current_a  + dt * ( (k_reversed[i] * T) + (2 * k_reversed[i] * Jov_a) )
+            new_a.requires_grad_(False)
             a.append(new_a)
         a.reverse()
         return a, reward.item()
