@@ -20,7 +20,7 @@ class RewardConfig:
     min_log_prob: float
     explore: bool = True
     gamma: float = 0.8
-    device: None
+    device = None
     d_s: int = 0 
     d_a: int = 0
     
