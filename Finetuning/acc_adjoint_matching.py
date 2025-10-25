@@ -391,9 +391,8 @@ class Acc_AdjointMatchingFineTuner:
         print('Prepare')
         self.accelerator.wait_for_everyone()
         dataloader, reward_model = self.Accelerate_Prepare(dataloader, reward_model)
-        self.accelerator.wait_for_evedryone()
+        self.accelerator.wait_for_everyone()
         dataloader = cycle(dataloader)
-
         print(f"Starting Finetuning")
         
         step = 0
