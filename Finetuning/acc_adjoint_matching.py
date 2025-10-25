@@ -330,7 +330,8 @@ class Acc_AdjointMatchingFineTuner:
                 final_x = traj[-1].squeeze(0).to(self.device)
                 C_val = base_reward_model.get_c(final_x)
                 local_final_Cs.append(C_val)
-
+        
+        print('Hello World')
         # 2. Gather C values and update lambda on main process
         all_final_Cs = self.accelerator.gather_for_metrics(local_final_Cs, use_gather_object=True)
         all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=True)
@@ -382,6 +383,8 @@ class Acc_AdjointMatchingFineTuner:
         self.set_lambda(reward_model.get_beta())
         self.set_reward_tracker()
         
+        print(f"[rank {self.accelerator.process_index}] Number of New parameters: {sum(p.numel() for p in self.new_score_net.parameters())}")
+        print(f"[rank {self.accelerator.process_index}] Number of Old parameters: {sum(p.numel() for p in self.old_score_net.parameters())}")
         dataloader, reward_model = self.Accelerate_Prepare(dataloader, reward_model)
         dataloader = cycle(dataloader)
 
