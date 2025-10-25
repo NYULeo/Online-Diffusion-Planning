@@ -390,8 +390,10 @@ class Acc_AdjointMatchingFineTuner:
         
         self.accelerator.wait_for_everyone()
         dataloader, reward_model = self.Accelerate_Prepare(dataloader, reward_model)
-        dataloader = cycle(dataloader)
         self.accelerator.wait_for_everyone()
+        dataloader = cycle(dataloader)
+
+        print(f"Starting Finetuning")
 
         step = 0
         total_loss = 0.0
@@ -404,10 +406,10 @@ class Acc_AdjointMatchingFineTuner:
              total_reward += avg_reward
              total_C += avg_C
              
-             self.accelerator.wait_for_everyone()
              num_params = sum(p.numel() for p in self.new_score_net.parameters())
              print(f"[rank {self.accelerator.process_index}] num_params: {num_params}")
-             
+             self.accelerator.wait_for_everyone()
+           
 
              if self.accelerator.is_main_process:
                 current_lr = self.optimizer.param_groups[0]['lr']
