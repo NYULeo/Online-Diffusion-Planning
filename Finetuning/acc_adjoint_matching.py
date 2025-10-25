@@ -172,7 +172,7 @@ class Acc_AdjointMatchingFineTuner:
     
     def vector_field(self, x: torch.Tensor, t: torch.Tensor, score_model: DiT1d) -> torch.Tensor:
         # Compute beta(t) from cosine schedule
-        k = self.kt(t)
+        k = self.kt(t).detach().to(self.device)
         v = k * x + k * score_model(x, t.unsqueeze(0))
         return v
     
@@ -289,7 +289,7 @@ class Acc_AdjointMatchingFineTuner:
             T = X_reversed[i].to(self.device)
             T.requires_grad_(True)
             current_a = a[i].to(self.device)  
-            y, jvp_out = jvp(self.new_score_net, (T,t_now.unsqueeze(0)), (current_a, torch.zeros_like(t_now.unsqueeze(0)).to(self.device).requires_grad_(True))) 
+            y, jvp_out = jvp(self.old_score_net, (T,t_now.unsqueeze(0)), (current_a, torch.zeros_like(t_now.unsqueeze(0)).to(self.device).requires_grad_(True))) 
             Jov_a = jvp_out.to(self.device)
             #new_a = current_a  + dt * ( (self.k[i] * T) + (2 * self.k[i] * Jov_a) )
             new_a = current_a  + dt * ( (k_reversed[i] * T) + (2 * k_reversed[i] * Jov_a) )
@@ -297,9 +297,7 @@ class Acc_AdjointMatchingFineTuner:
             a.append(new_a)
         a.reverse()
         return a, reward.item()
-        
-    
-
+           
     def adjoint_matching_loss(
         self,
         traj_x: List[torch.Tensor],
@@ -307,16 +305,14 @@ class Acc_AdjointMatchingFineTuner:
     ) -> torch.Tensor:
         Loss = torch.tensor(0.0, device = self.device, requires_grad=True)
         for i in range(len(traj_x)):
-            traj_x_i = traj_x[i].to(self.device).detach()
+            traj_x_i = traj_x[i].detach().to(self.device)
             adjoint_i = adjoints[i].unsqueeze(0).flatten().detach().to(self.device)
-            v_new = self.vector_field(traj_x_i, self.t_asc[i], self.new_score_net).squeeze(0).flatten()
+            v_new = self.vector_field(traj_x_i, self.t_asc[i].detach().to(self.device), self.new_score_net).squeeze(0).flatten()
             v_old = self.vector_field(traj_x_i, self.t_asc[i], self.old_score_net).squeeze(0).flatten().detach().to(self.device)
-            sigma = self.sigma_t(self.k[i].detach())
+            sigma = self.sigma_t(self.k[i]).detach().to(self.device)
             Loss = Loss + ((v_new - v_old) * (2/sigma) + sigma * adjoint_i).pow(2).sum()
         return Loss
     
-
-
     def step(self, s0_batch: torch.Tensor, reward_model: TotalReward) -> Tuple[float, float, float]:
          # 1. Split batch across processes
         with self.accelerator.split_between_processes(s0_batch) as local_s0:
