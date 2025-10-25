@@ -115,7 +115,7 @@ class OnlineFinetuner():
             print(f"The GPU name is: {torch.cuda.get_device_name(0)}")
             print('-------------------------------------------------------------------------------------------')
         
-        dataloader = DataLoader(self.PlannerDataset, self.config.finetune_batch_size, shuffle = True, pin_memory = True, num_workers = 8)
+        dataloader = DataLoader(self.PlannerDataset, self.config.finetune_batch_size, shuffle = True, pin_memory = True, num_workers = 2)
         self.AMFineTuner.finetune_planner(dataloader, self.reward_model)
             
 

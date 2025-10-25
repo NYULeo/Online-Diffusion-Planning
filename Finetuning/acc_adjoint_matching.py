@@ -86,6 +86,7 @@ class Acc_AdjointMatchingFineTuner:
         self.set_optimizer_and_scheduler()
         self.set_lambda()
         self.set_reward_tracker()
+        self.accelerator.wa
     
     def Accelerate_Prepare(self, dataloader: DataLoader, reward_model: TotalReward):
          self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model = self.accelerator.prepare(self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model)
@@ -319,7 +320,7 @@ class Acc_AdjointMatchingFineTuner:
     
     def step(self, s0_batch: torch.Tensor, reward_model: TotalReward) -> Tuple[float, float, float]:
          # 1. Split batch across processes
-        base_reward_model = self.accelerator.unwrap_model(self.old_score_net)
+        base_reward_model = self.accelerator.unwrap_model(reward_model)
         with self.accelerator.split_between_processes(s0_batch) as local_s0:
             local_trajs = []
             local_final_Cs = []
@@ -387,11 +388,10 @@ class Acc_AdjointMatchingFineTuner:
         self.set_lambda(reward_model.get_beta())
         self.set_reward_tracker()
         self.accelerator.wait_for_everyone()
-
-        print(f"[rank {self.accelerator.process_index}] Number of New parameters: {sum(p.numel() for p in self.new_score_net.parameters())}")
-        print(f"[rank {self.accelerator.process_index}] Number of Old parameters: {sum(p.numel() for p in self.old_score_net.parameters())}")
+ 
         dataloader, reward_model = self.Accelerate_Prepare(dataloader, reward_model)
         dataloader = cycle(dataloader)
+        self.accelerator.wait_for_everyone()
 
         step = 0
         total_loss = 0.0
