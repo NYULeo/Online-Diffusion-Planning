@@ -173,7 +173,6 @@ class Acc_AdjointMatchingFineTuner:
         # Compute beta(t) from cosine schedule
         k = self.kt(t).detach().to(self.device)
         v = k * x + k * score_model(x, t.unsqueeze(0))
-        v.to(self.device)
         return v
     
     def sigma_t(self, k: torch.Tensor) -> torch.Tensor:
@@ -313,7 +312,7 @@ class Acc_AdjointMatchingFineTuner:
             traj_x_i = traj_x[i].detach().to(self.device)
             adjoint_i = adjoints[i].unsqueeze(0).flatten().detach().to(self.device)
             v_new = self.vector_field(traj_x_i, self.t_asc[i].detach().to(self.device), self.new_score_net).squeeze(0).flatten().to(self.device)
-            v_old = self.vector_field(traj_x_i, self.t_asc[i], self.old_score_net).squeeze(0).flatten().detach().to(self.device)
+            v_old = self.vector_field(traj_x_i, self.t_asc[i].detach().to(self.device), self.old_score_net).squeeze(0).flatten().detach().to(self.device)
             sigma = self.sigma_t(self.k[i]).detach().to(self.device)
             Loss = Loss + ((v_new - v_old) * (2/sigma) + sigma * adjoint_i).pow(2).sum()
         return Loss
@@ -359,6 +358,7 @@ class Acc_AdjointMatchingFineTuner:
         self.accelerator.wait_for_everyone()
           # 4. Gather loss tensors & reward floats across processes
         all_loss_tensors = self.accelerator.gather_for_metrics(local_loss_tensors, use_gather_object=True)
+        print(f"Device of Loss: {all_loss_tensors.device}")
         all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=True)
         
         self.accelerator.wait_for_everyone()
@@ -367,7 +367,7 @@ class Acc_AdjointMatchingFineTuner:
              avg_reward = float(sum(all_rewards) / len(all_rewards))
 
               # Choose how to backprop: e.g., mean of loss tensors
-             loss_for_backprop = sum(all_loss_tensors) / len(all_loss_tensors)
+             loss_for_backprop = float(sum(all_loss_tensors) / len(all_loss_tensors))
 
              self.optimizer.zero_grad()
              self.accelerator.backward(loss_for_backprop)
@@ -392,8 +392,9 @@ class Acc_AdjointMatchingFineTuner:
         dataloader, reward_model = self.Accelerate_Prepare(dataloader, reward_model)
         self.accelerator.wait_for_everyone()
         dataloader = cycle(dataloader)
-
-        print(f"Starting Finetuning")
+        
+        if self.accelerator.is_main_process:
+              print(f"Starting Finetuning")
 
         step = 0
         total_loss = 0.0
