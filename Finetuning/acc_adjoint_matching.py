@@ -173,6 +173,7 @@ class Acc_AdjointMatchingFineTuner:
         # Compute beta(t) from cosine schedule
         k = self.kt(t).detach().to(self.device)
         v = k * x + k * score_model(x, t.unsqueeze(0))
+        v.to(self.device)
         return v
     
     def sigma_t(self, k: torch.Tensor) -> torch.Tensor:
@@ -311,7 +312,7 @@ class Acc_AdjointMatchingFineTuner:
         for i in range(len(traj_x)):
             traj_x_i = traj_x[i].detach().to(self.device)
             adjoint_i = adjoints[i].unsqueeze(0).flatten().detach().to(self.device)
-            v_new = self.vector_field(traj_x_i, self.t_asc[i].detach().to(self.device), self.new_score_net).squeeze(0).flatten()
+            v_new = self.vector_field(traj_x_i, self.t_asc[i].detach().to(self.device), self.new_score_net).squeeze(0).flatten().to(self.device)
             v_old = self.vector_field(traj_x_i, self.t_asc[i], self.old_score_net).squeeze(0).flatten().detach().to(self.device)
             sigma = self.sigma_t(self.k[i]).detach().to(self.device)
             Loss = Loss + ((v_new - v_old) * (2/sigma) + sigma * adjoint_i).pow(2).sum()
