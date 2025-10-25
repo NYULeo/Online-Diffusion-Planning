@@ -87,18 +87,23 @@ class Acc_AdjointMatchingFineTuner:
         self.set_lambda()
         self.set_reward_tracker()
     
+    def Accelerate_Prepare(self, dataloader: DataLoader):
+         self.new_score_net, self.optimizer, self.scheduler, dataloader = self.accelerator.prepare(self.new_score_net, self.optimizer, self.scheduler, dataloader)
+         self.new_score_net.train()
+         return dataloader
+
     def set_ema_model(self):
           self.ema_model = copy.deepcopy(self.new_score_net)
-          self.ema_model = self.accelerator.prepare(self.ema_model)
+          self.ema_model.to(self.device)
           for p in self.ema_model.parameters():
               p.requires_grad_(False)
           self.ema_model.eval()
           
     def set_lambda(self, beta: Optional[float] = None):
         if beta is None:
-           self.Lam = Lambda(lam = self.config.lam, beta = 1.0, eta_lam = self.config.finetune_lr)
+           self.Lam = Lambda(lam = self.config.lam, beta = 1.0, eta_lam = self.config.finetune_lr).to(self.device)
         else:
-           self.Lam = Lambda(lam = self.config.lam, beta = beta, eta_lam = self.config.finetune_lr)
+           self.Lam = Lambda(lam = self.config.lam, beta = beta, eta_lam = self.config.finetune_lr).to(self.device)
 
     def set_optimizer_and_scheduler(self, new_lr=None, new_steps=None):
           # Use provided values or fall back to config defaults
@@ -113,20 +118,15 @@ class Acc_AdjointMatchingFineTuner:
          self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer, steps)
     
-         # Re-prepare with accelerator for distributed training
-         self.optimizer, self.scheduler = self.accelerator.prepare(
-              self.optimizer, self.scheduler)
-    
     def set_old_score_net(self, planner_checkpoint: int):
         state_dict = get_pretrained_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
         if( self.config.dataset_name == 'kitchen'):
-              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
+              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(self.device)
         elif (self.config.dataset_name == 'pointmaze'):
-              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
+              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(self.device)
         else:
               raise ValueError(f"Invalid Environment: {self.config.dataset_name}")
         self.old_score_net.load_state_dict(state_dict)
-        self.old_score_net = self.accelerator.prepare(self.old_score_net)
         for p in self.old_score_net.parameters():
               p.requires_grad_(False)
         self.old_score_net.eval()
@@ -136,12 +136,10 @@ class Acc_AdjointMatchingFineTuner:
               self.new_score_net = DiT1d(
                    in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128,
                    d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
-              self.new_score_net = self.accelerator.prepare(self.new_score_net)
               self.new_score_net.load_state_dict(self.old_score_net.state_dict())
               self.new_score_net.train()
          elif(self.config.backbone_name == 'unet'):
               self.new_score_net = TemporalUnet(self.config.horizon, self.config.d_s + self.config.d_a)
-              self.new_score_net = self.accelerator.prepare(self.new_score_net)
               self.new_score_net.load_state_dict(self.old_score_net.state_dict())
               self.new_score_net.train()
 
@@ -272,6 +270,8 @@ class Acc_AdjointMatchingFineTuner:
         return  X
 
     def make_a(self, X, reward_model: TotalReward):
+        for p in self.old_score_net.parameters():
+              p.requires_grad_(True)
         X = [x.to(self.device) if x.device != self.device else x for x in X]
         steps_T = len(X)
         X_reversed = X[::-1] 
@@ -296,6 +296,8 @@ class Acc_AdjointMatchingFineTuner:
             new_a = new_a.detach().clone().to(self.device)
             a.append(new_a)
         a.reverse()
+        for p in self.old_score_net.parameters():
+              p.requires_grad_(False)
         return a, reward.item()
            
     def adjoint_matching_loss(
@@ -326,7 +328,6 @@ class Acc_AdjointMatchingFineTuner:
                 C_val = reward_model.get_c(final_x)
                 local_final_Cs.append(C_val)
 
-        self.accelerator.wait_for_everyone()
         # 2. Gather C values and update lambda on main process
         all_final_Cs = self.accelerator.gather_for_metrics(local_final_Cs, use_gather_object=True)
         all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=True)
@@ -347,12 +348,11 @@ class Acc_AdjointMatchingFineTuner:
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
         
-
-        self.accelerator.wait_for_everyone()
           # 4. Gather loss tensors & reward floats across processes
         all_loss_tensors = self.accelerator.gather_for_metrics(local_loss_tensors, use_gather_object=True)
         all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=True)
         
+        self.accelerator.wait_for_everyone()
         if self.accelerator.is_main_process:
              # Compute average reward for logging
              avg_reward = float(sum(all_rewards) / len(all_rewards))
@@ -374,12 +374,13 @@ class Acc_AdjointMatchingFineTuner:
 
     def finetune_planner(self, dataloader: DataLoader, reward_model: TotalReward):
         reward_model.eval()
-        dataloader = self.accelerator.prepare(dataloader)
-        dataloader = cycle(dataloader)
         self.set_optimizer_and_scheduler()
         self.set_ema_model()
         self.set_lambda(reward_model.config.beta)
         self.set_reward_tracker()
+        
+        dataloader = self.Accelerate_Prepare(dataloader)
+        dataloader = cycle(dataloader)
 
         step = 0
         total_loss = 0.0
