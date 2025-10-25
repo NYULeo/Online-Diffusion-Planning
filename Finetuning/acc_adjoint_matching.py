@@ -86,7 +86,6 @@ class Acc_AdjointMatchingFineTuner:
         self.set_optimizer_and_scheduler()
         self.set_lambda()
         self.set_reward_tracker()
-        self.accelerator.wa
     
     def Accelerate_Prepare(self, dataloader: DataLoader, reward_model: TotalReward):
          self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model = self.accelerator.prepare(self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model)
