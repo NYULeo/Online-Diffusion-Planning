@@ -49,7 +49,7 @@ class OnlineFinetuner():
         self.env, d_s, d_a = get_env(self.config.dataset_name, self.config.specific_dataset)
         self.config.AMConfig.d_s = d_s
         self.config.AMConfig.d_a = d_a
-        self.accelerator = Accelerator()
+       
 
         self.Initialize_reward_model()
 
@@ -61,6 +61,7 @@ class OnlineFinetuner():
         self.Initialize_Buffer()
 
         self.PlannerDataset = PlannerDataset(self.Buffer, self.config.AMConfig.horizon, self.config.dataset_name, self.config.specific_dataset)
+        self.accelerator = Accelerator()
         #self.logdir =  f"./Results/{self.config.dataset_name}/{self.config.specific_dataset}/{'Models'}/"
         #self.reward_tracker = RewardTracker(save_dir="./logs/")
     

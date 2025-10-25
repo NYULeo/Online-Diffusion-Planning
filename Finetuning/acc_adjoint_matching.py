@@ -319,6 +319,7 @@ class Acc_AdjointMatchingFineTuner:
     
     def step(self, s0_batch: torch.Tensor, reward_model: TotalReward) -> Tuple[float, float, float]:
          # 1. Split batch across processes
+        base_reward_model = self.accelerator.unwrap_model(self.old_score_net)
         with self.accelerator.split_between_processes(s0_batch) as local_s0:
             local_trajs = []
             local_final_Cs = []
@@ -327,7 +328,7 @@ class Acc_AdjointMatchingFineTuner:
                 traj = self.sample_Traj(s0)               # get trajectory list
                 local_trajs.append(traj)
                 final_x = traj[-1].squeeze(0).to(self.device)
-                C_val = reward_model.get_c(final_x)
+                C_val = base_reward_model.get_c(final_x)
                 local_final_Cs.append(C_val)
 
         # 2. Gather C values and update lambda on main process
