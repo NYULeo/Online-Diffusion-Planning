@@ -267,7 +267,7 @@ class Acc_AdjointMatchingFineTuner:
             Jov_a = jvp_out.to(self.device)
             #new_a = current_a  + dt * ( (self.k[i] * T) + (2 * self.k[i] * Jov_a) )
             new_a = current_a  + dt * ( (k_reversed[i] * T) + (2 * k_reversed[i] * Jov_a) )
-            new_a.requires_grad_(False)
+            new_a = new_a.detach()
             a.append(new_a)
         a.reverse()
         return a, reward.item()
