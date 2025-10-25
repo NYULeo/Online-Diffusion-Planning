@@ -386,8 +386,8 @@ class Acc_AdjointMatchingFineTuner:
         self.set_ema_model()
         self.set_lambda(reward_model.get_beta())
         self.set_reward_tracker()
+        
         self.accelerator.wait_for_everyone()
- 
         dataloader, reward_model = self.Accelerate_Prepare(dataloader, reward_model)
         dataloader = cycle(dataloader)
         self.accelerator.wait_for_everyone()
@@ -434,6 +434,7 @@ class Acc_AdjointMatchingFineTuner:
                   ) 
              
              step = step+1
+             self.accelerator.wait_for_everyone()
         
             
           
