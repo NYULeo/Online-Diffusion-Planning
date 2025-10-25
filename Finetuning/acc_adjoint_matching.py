@@ -331,7 +331,8 @@ class Acc_AdjointMatchingFineTuner:
                 C_val = base_reward_model.get_c(final_x)
                 local_final_Cs.append(C_val)
         
-        print('Hello World')
+
+        self.accelerator.wait_for_everyone()
         # 2. Gather C values and update lambda on main process
         all_final_Cs = self.accelerator.gather_for_metrics(local_final_Cs, use_gather_object=True)
         all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=True)
@@ -341,7 +342,9 @@ class Acc_AdjointMatchingFineTuner:
         else:
             total_avgC = 0.0
         
-        
+
+
+        self.accelerator.wait_for_everyone()
         # 3. Compute adjoints, rewards & loss tensors for each trajectory
         with self.accelerator.split_between_processes(all_trajs) as local_trajs2:
             local_loss_tensors = []
@@ -352,6 +355,7 @@ class Acc_AdjointMatchingFineTuner:
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
         
+        self.accelerator.wait_for_everyone()
           # 4. Gather loss tensors & reward floats across processes
         all_loss_tensors = self.accelerator.gather_for_metrics(local_loss_tensors, use_gather_object=True)
         all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=True)
@@ -382,7 +386,8 @@ class Acc_AdjointMatchingFineTuner:
         self.set_ema_model()
         self.set_lambda(reward_model.get_beta())
         self.set_reward_tracker()
-        
+        self.accelerator.wait_for_everyone()
+
         print(f"[rank {self.accelerator.process_index}] Number of New parameters: {sum(p.numel() for p in self.new_score_net.parameters())}")
         print(f"[rank {self.accelerator.process_index}] Number of Old parameters: {sum(p.numel() for p in self.old_score_net.parameters())}")
         dataloader, reward_model = self.Accelerate_Prepare(dataloader, reward_model)

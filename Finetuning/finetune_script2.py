@@ -7,6 +7,7 @@ from Finetune_Backbone import OnlineFinetuner, FinetuningConfig
 from adjoint_matching import AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig
 from traj_reward import RewardConfig
+from utils import set_seed
 
 
               
@@ -34,7 +35,7 @@ if __name__ == "__main__":
         finetune_steps = 1000000,
         finetune_batch_size  = 12,
         finetune_lr = 2e-4)
-    
+    set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
 
