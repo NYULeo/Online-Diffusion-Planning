@@ -20,7 +20,7 @@ class RewardConfig:
     min_log_prob: float
     explore: bool = True
     gamma: float = 0.8
-    device: str  = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     d_s: int = 0 
     d_a: int = 0
     

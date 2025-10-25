@@ -16,6 +16,8 @@ from torch.utils.data import DataLoader
 import torch
 import copy
 import os
+from accelerate import Accelerator
+from traj_reward import TotalReward
 
 @dataclass
 class FinetuningConfig():
@@ -40,7 +42,6 @@ class FinetuningConfig():
 class OnlineFinetuner():
     def __init__(self, config: FinetuningConfig):
         self.config = config
-        
         self.config.AMConfig.finetune_steps = self.config.finetune_steps
         self.config.AMConfig.dataset_name =self.config.dataset_name
         self.config.AMConfig.specific_dataset = self.config.specific_dataset
@@ -48,23 +49,30 @@ class OnlineFinetuner():
         self.env, d_s, d_a = get_env(self.config.dataset_name, self.config.specific_dataset)
         self.config.AMConfig.d_s = d_s
         self.config.AMConfig.d_a = d_a
-        
+        self.accelerator = Accelerator()
+
+        self.Initialize_reward_model()
 
         self.AMFineTuner = Acc_AdjointMatchingFineTuner(
+            self.accelerator,
             self.config.planner_checkpoint, 
-            self.config.reward_model_checkpoint,
-            self.config.kernel_model_checkpoint,
-            self.config.AMConfig,
-            self.config.RewardConfig)
+            self.config.AMConfig)
 
-        self.Buffer = []
-        dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
-        trajs = dataset.get_trajectories()
-        self.Buffer.extend(trajs)
+        self.Initialize_Buffer()
+
         self.PlannerDataset = PlannerDataset(self.Buffer, self.config.AMConfig.horizon, self.config.dataset_name, self.config.specific_dataset)
         #self.logdir =  f"./Results/{self.config.dataset_name}/{self.config.specific_dataset}/{'Models'}/"
         #self.reward_tracker = RewardTracker(save_dir="./logs/")
     
+    def Initialize_Buffer(self):
+        self.Buffer = []
+        dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
+        trajs = dataset.get_trajectories()
+        self.Buffer.extend(trajs)
+    
+    def Initialize_reward_model(self):
+        self.reward_model = TotalReward(self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
+        self.reward_model = self.accelerator.prepare(self.reward_model)
  
     def update_dataset(self, trajs: List[TrajectoryDict]):
         self.Buffer.extend(trajs)
@@ -88,7 +96,6 @@ class OnlineFinetuner():
     """
 
     def finetune_planner(self):
-        print(self.config.AMConfig.device)
         print("Env Details: ------------------------------------------------------------------------------")
         print(f"env_name: {self.config.dataset_name}")
         print(f"specific_env: {self.config.specific_dataset}")
@@ -101,11 +108,14 @@ class OnlineFinetuner():
         print(f"finetune_lr: {self.config.finetune_lr}")
         print(f"finetune_steps: {self.config.finetune_steps}")
         print(f"sampling steps: {self.config.AMConfig.num_steps}")
+        print('Device Details: ---------------------------------------------------------------------------')
+        print(f"The device is: {self.config.AMConfig.device}")
+        print(f"The number of GPUs is: {torch.cuda.device_count()}")
+        print(f"The GPU name is: {torch.cuda.get_device_name(0)}")
         print('-------------------------------------------------------------------------------------------')
-        print(torch.cuda.is_available(), torch.cuda.device_count())
-        print(torch.cuda.get_device_name(0))
-        dataloader = cycle(DataLoader(self.PlannerDataset, self.config.finetune_batch_size, shuffle = True, pin_memory = True, num_workers = 8))
-        self.AMFineTuner.finetune_planner(dataloader)
+        
+        dataloader = DataLoader(self.PlannerDataset, self.config.finetune_batch_size, shuffle = True, pin_memory = True, num_workers = 8)
+        self.AMFineTuner.finetune_planner(dataloader, self.reward_model)
             
 
 

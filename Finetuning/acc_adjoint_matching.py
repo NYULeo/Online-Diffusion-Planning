@@ -67,54 +67,93 @@ class Acc_AdjointMatchingFineTuner:
 
     def __init__(
         self,
+        accelerator: Accelerator,
         planner_checkpoint: int,
-        reward_model_checkpoint: int,
-        kernel_model_checkpoint: int,
         AMConfig: Acc_AdjointMatchingConfig,
-        RewardConfig: RewardConfig
         ) -> None:
        
         self.config = AMConfig
-        self.accelerator = Accelerator()
+        self.accelerator = accelerator
         self.device = self.accelerator.device
+        
+        self.ema = EMA(self.config.ema_decay)
+        self.t_asc = torch.linspace(1.0, 0.0, self.config.num_steps + 1, device = self.device)
+        self.k = self.kt(self.t_asc) 
+        
+        self.set_old_score_net(planner_checkpoint)
+        self.set_new_score_net()
+        self.set_ema_model()
+        self.set_optimizer_and_scheduler()
+        self.set_lambda()
+        self.set_reward_tracker()
+    
+    def set_ema_model(self):
+          self.ema_model = copy.deepcopy(self.new_score_net)
+          self.ema_model = self.accelerator.prepare(self.ema_model)
+          for p in self.ema_model.parameters():
+              p.requires_grad_(False)
+          self.ema_model.eval()
+          
+    def set_lambda(self, beta: Optional[float] = None):
+        if beta is None:
+           self.Lam = Lambda(lam = self.config.lam, beta = 1.0, eta_lam = self.config.finetune_lr)
+        else:
+           self.Lam = Lambda(lam = self.config.lam, beta = beta, eta_lam = self.config.finetune_lr)
+
+    def set_optimizer_and_scheduler(self, new_lr=None, new_steps=None):
+          # Use provided values or fall back to config defaults
+         lr = new_lr if new_lr is not None else self.config.finetune_lr
+         steps = new_steps if new_steps is not None else self.config.finetune_steps
+    
+          # Create new optimizer
+         self.optimizer = torch.optim.Adam(
+             self.new_score_net.parameters(), lr=lr)
+    
+         # Create new scheduler
+         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            self.optimizer, steps)
+    
+         # Re-prepare with accelerator for distributed training
+         self.optimizer, self.scheduler = self.accelerator.prepare(
+              self.optimizer, self.scheduler)
+    
+    def set_old_score_net(self, planner_checkpoint: int):
         state_dict = get_pretrained_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
         if( self.config.dataset_name == 'kitchen'):
-            self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
+              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
         elif (self.config.dataset_name == 'pointmaze'):
-            self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
+              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
         else:
-          raise ValueError(f"Invalid Environment: {self.config.dataset_name}")
+              raise ValueError(f"Invalid Environment: {self.config.dataset_name}")
         self.old_score_net.load_state_dict(state_dict)
         self.old_score_net = self.accelerator.prepare(self.old_score_net)
         for p in self.old_score_net.parameters():
-             p.requires_grad_(False)
+              p.requires_grad_(False)
         self.old_score_net.eval()
-        self.reward_model = TotalReward(RewardConfig, self.config.dataset_name, self.config.specific_dataset, reward_model_checkpoint, kernel_model_checkpoint).to(self.device)
-        self.reward_model.eval()
-        self.backbone_selection()
-        self.new_score_net.load_state_dict(self.old_score_net.state_dict())
-        self.new_score_net.train()
-        self.ema = EMA(self.config.ema_decay)
-        self.ema_model = copy.deepcopy(self.new_score_net).to(self.device)
-        for p in self.ema_model.parameters():
-             p.requires_grad_(False)
-        self.optimizer = torch.optim.Adam(self.new_score_net.parameters(), lr = self.config.finetune_lr)
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, self.config.finetune_steps)
-        self.optimizer, self.scheduler = self.accelerator.prepare(
-                self.optimizer, self.scheduler
-        )
-        self.t_asc = torch.linspace(1.0, 0.0, self.config.num_steps + 1, device = self.device)
-        self.k = self.kt(self.t_asc) 
-        self.Lam = Lambda(lam = self.config.lam, beta = self.reward_model.config.beta, eta_lam = self.config.finetune_lr)
+
+    def set_new_score_net(self):
+         if(self.config.backbone_name == 'transformer'):
+              self.new_score_net = DiT1d(
+                   in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128,
+                   d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
+              self.new_score_net = self.accelerator.prepare(self.new_score_net)
+              self.new_score_net.load_state_dict(self.old_score_net.state_dict())
+              self.new_score_net.train()
+         elif(self.config.backbone_name == 'unet'):
+              self.new_score_net = TemporalUnet(self.config.horizon, self.config.d_s + self.config.d_a)
+              self.new_score_net = self.accelerator.prepare(self.new_score_net)
+              self.new_score_net.load_state_dict(self.old_score_net.state_dict())
+              self.new_score_net.train()
+
+    def set_reward_tracker(self):
         self.logdir =  f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/Models/"
         self.reward_tracker = RewardTracker(save_dir=f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/logs/")
-        
+
     def step_ema(self, step):
         if step < self.config.step_start_ema:
             self.ema_model.load_state_dict(self.new_score_net.state_dict())
             return
         self.ema.update_model_average(self.ema_model, self.new_score_net)
-    
         
     def save(self, step):
         self.ema_model.eval()
@@ -137,10 +176,6 @@ class Acc_AdjointMatchingFineTuner:
         v = k * x + k * score_model(x, t.unsqueeze(0))
         return v
     
-    """
-    def reset_parameters(self):
-        self.new_score_net.load_state_dict(self.old_score_net.state_dict())
-    """
     def sigma_t(self, k: torch.Tensor) -> torch.Tensor:
         if(float(k) < 0):
            return torch.sqrt(-2 * k)
@@ -191,17 +226,6 @@ class Acc_AdjointMatchingFineTuner:
             # Store j-th row of Jacobian
            Jov[j, :] = grad_j.view(-1)  # [H*dim]
        return Jov
-    
-    def backbone_selection(self):
-         if(self.config.backbone_name == 'transformer'):
-              self.new_score_net = DiT1d(
-                   in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128,
-                   d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
-              self.new_score_net = self.accelerator.prepare(self.new_score_net)
-         elif(self.config.backbone_name == 'unet'):
-              self.new_score_net = TemporalUnet(self.config.horizon, self.config.d_s + self.config.d_a)
-              self.new_score_net = self.accelerator.prepare(self.new_score_net)
-    
 
     @torch.no_grad()
     def sample_Traj(self,
@@ -242,20 +266,19 @@ class Acc_AdjointMatchingFineTuner:
                x = x + ((self.k[i] * x) +  (2*self.k[i] * score)) * dt
         
             x = mask * y + (1 - mask) * x
-            X.append(x.detach().clone())
+            X.append(x.detach().clone().to(self.device))
         #x = apply_conditioning(x, conditions, d_s)
         self.new_score_net.train()
         return  X
 
-    def make_a(self, X):
+    def make_a(self, X, reward_model: TotalReward):
         X = [x.to(self.device) if x.device != self.device else x for x in X]
         steps_T = len(X)
         X_reversed = X[::-1] 
         a = []
-        self.reward_model.eval()
         T = X_reversed[0]
         T_squeezed = T.squeeze(0).to(self.device)
-        reward, gradient = self.reward_model(T_squeezed, self.Lam.get_lam())
+        reward, gradient = reward_model(T_squeezed, self.Lam.get_lam())
         t_asc_reversed = torch.flip(self.t_asc, dims = [0]).to(self.device)
         k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
         a.append(gradient.unsqueeze(0))
@@ -270,7 +293,7 @@ class Acc_AdjointMatchingFineTuner:
             Jov_a = jvp_out.to(self.device)
             #new_a = current_a  + dt * ( (self.k[i] * T) + (2 * self.k[i] * Jov_a) )
             new_a = current_a  + dt * ( (k_reversed[i] * T) + (2 * k_reversed[i] * Jov_a) )
-            new_a = new_a.detach()
+            new_a = new_a.detach().clone().to(self.device)
             a.append(new_a)
         a.reverse()
         return a, reward.item()
@@ -284,17 +307,17 @@ class Acc_AdjointMatchingFineTuner:
     ) -> torch.Tensor:
         Loss = torch.tensor(0.0, device = self.device, requires_grad=True)
         for i in range(len(traj_x)):
-            traj_x_i = traj_x[i].to(self.device)
-            adjoint_i = adjoints[i].unsqueeze(0).flatten().to(self.device).detach()
+            traj_x_i = traj_x[i].to(self.device).detach()
+            adjoint_i = adjoints[i].unsqueeze(0).flatten().detach().to(self.device)
             v_new = self.vector_field(traj_x_i, self.t_asc[i], self.new_score_net).squeeze(0).flatten()
-            v_old = self.vector_field(traj_x_i, self.t_asc[i], self.old_score_net).squeeze(0).flatten().to(self.device).detach()
-            sigma = self.sigma_t(self.k[i])
+            v_old = self.vector_field(traj_x_i, self.t_asc[i], self.old_score_net).squeeze(0).flatten().detach().to(self.device)
+            sigma = self.sigma_t(self.k[i].detach())
             Loss = Loss + ((v_new - v_old) * (2/sigma) + sigma * adjoint_i).pow(2).sum()
         return Loss
     
 
 
-    def step(self, s0_batch: torch.Tensor) -> Tuple[float, float, float]:
+    def step(self, s0_batch: torch.Tensor, reward_model: TotalReward) -> Tuple[float, float, float]:
          # 1. Split batch across processes
         with self.accelerator.split_between_processes(s0_batch) as local_s0:
             local_trajs = []
@@ -304,7 +327,7 @@ class Acc_AdjointMatchingFineTuner:
                 traj = self.sample_Traj(s0)               # get trajectory list
                 local_trajs.append(traj)
                 final_x = traj[-1].squeeze(0).to(self.device)
-                C_val = self.reward_model.get_c(final_x)
+                C_val = reward_model.get_c(final_x)
                 local_final_Cs.append(C_val)
 
         self.accelerator.wait_for_everyone()
@@ -323,8 +346,8 @@ class Acc_AdjointMatchingFineTuner:
             local_loss_tensors = []
             local_rewards = []
             for traj in local_trajs2:
-                adjoints, reward = self.make_a(traj)
-                loss_tensor = self.adjoint_matching_loss(traj, adjoints)  # tensor with grad
+                adjoint, reward = self.make_a(traj, reward_model)
+                loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
         
@@ -353,21 +376,33 @@ class Acc_AdjointMatchingFineTuner:
 
         return 0.0, 0.0, total_avgC
 
-    def finetune_planner(self, dataloader: DataLoader):
+    def finetune_planner(self, dataloader: DataLoader, reward_model: TotalReward):
+        reward_model.eval()
+        dataloader = self.accelerator.prepare(dataloader)
+        dataloader = cycle(dataloader)
+        self.set_optimizer_and_scheduler()
+        self.set_ema_model()
+        self.set_lambda(reward_model.config.beta)
+        self.set_reward_tracker()
+
         step = 0
         total_loss = 0.0
         total_reward = 0.0
         total_C = 0.0
         while step < self.config.finetune_steps:
              conds = next(dataloader)
-             loss, avg_reward, avg_C = self.step(conds)
+             loss, avg_reward, avg_C = self.step(conds, reward_model)
              total_loss += loss
              total_reward += avg_reward
              total_C += avg_C
              
+             self.accelerator.wait_for_everyone()
+             
+
              if self.accelerator.is_main_process:
                 current_lr = self.optimizer.param_groups[0]['lr']
                 self.reward_tracker.log_reward(step, avg_reward, current_lr)
+                
                 if ((step % self.config.update_ema_every) == 0):
                      self.step_ema(step)
 
@@ -391,8 +426,6 @@ class Acc_AdjointMatchingFineTuner:
                     smooth_window=50
                   ) 
              
-             self.accelerator.wait_for_everyone()
-            
              step = step+1
         
             
