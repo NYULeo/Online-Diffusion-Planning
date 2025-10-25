@@ -52,7 +52,8 @@ class OnlineFinetuner():
        
 
         self.Initialize_reward_model()
-
+        
+        self.accelerator = Accelerator()
         self.AMFineTuner = Acc_AdjointMatchingFineTuner(
             self.accelerator,
             self.config.planner_checkpoint, 
@@ -61,7 +62,6 @@ class OnlineFinetuner():
         self.Initialize_Buffer()
 
         self.PlannerDataset = PlannerDataset(self.Buffer, self.config.AMConfig.horizon, self.config.dataset_name, self.config.specific_dataset)
-        self.accelerator = Accelerator()
         #self.logdir =  f"./Results/{self.config.dataset_name}/{self.config.specific_dataset}/{'Models'}/"
         #self.reward_tracker = RewardTracker(save_dir="./logs/")
     
