@@ -376,7 +376,7 @@ class Acc_AdjointMatchingFineTuner:
         reward_model.eval()
         self.set_optimizer_and_scheduler()
         self.set_ema_model()
-        self.set_lambda(reward_model.config.beta)
+        self.set_lambda(reward_model.get_beta())
         self.set_reward_tracker()
         
         dataloader = self.Accelerate_Prepare(dataloader)

@@ -50,9 +50,10 @@ class TotalReward(nn.Module):
         self.config.d_a = act_dim
         if(not self.config.explore):
               self.config.gamma = 0.0
-
         
-    
+    def get_beta(self):
+        return self.config.beta
+
     def sigmoid(self, s, a, s_next):
         total = torch.tensor([0.0], device = self.config.device, requires_grad = True)
         for i in range(len(self.kernels)):
