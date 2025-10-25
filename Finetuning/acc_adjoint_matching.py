@@ -358,7 +358,6 @@ class Acc_AdjointMatchingFineTuner:
         self.accelerator.wait_for_everyone()
           # 4. Gather loss tensors & reward floats across processes
         all_loss_tensors = self.accelerator.gather_for_metrics(local_loss_tensors, use_gather_object=True)
-        print(f"Device of Loss: {all_loss_tensors.device}")
         all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=True)
         
         self.accelerator.wait_for_everyone()
