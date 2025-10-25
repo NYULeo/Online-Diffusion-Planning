@@ -51,9 +51,11 @@ class OnlineFinetuner():
         self.config.AMConfig.d_a = d_a
        
 
-        self.Initialize_reward_model()
-        
         self.accelerator = Accelerator()
+        self.device = self.accelerator.device
+
+        
+        self.Initialize_reward_model(self.device)
         self.AMFineTuner = Acc_AdjointMatchingFineTuner(
             self.accelerator,
             self.config.planner_checkpoint, 
@@ -71,8 +73,8 @@ class OnlineFinetuner():
         trajs = dataset.get_trajectories()
         self.Buffer.extend(trajs)
     
-    def Initialize_reward_model(self):
-        self.reward_model = TotalReward(self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
+    def Initialize_reward_model(self, device):
+        self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
  
     def update_dataset(self, trajs: List[TrajectoryDict]):
         self.Buffer.extend(trajs)

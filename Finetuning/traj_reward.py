@@ -20,13 +20,13 @@ class RewardConfig:
     min_log_prob: float
     explore: bool = True
     gamma: float = 0.8
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device: None
     d_s: int = 0 
     d_a: int = 0
     
 
 class TotalReward(nn.Module):
-    def __init__(self, config: RewardConfig, dataset_name: str, specific_dataset: str, reward_checkpoint: int, kernel_checkpoint: int):
+    def __init__(self, device, config: RewardConfig, dataset_name: str, specific_dataset: str, reward_checkpoint: int, kernel_checkpoint: int):
         super().__init__()
         self.config = config
         reward_state_dict, obs_dim, act_dim, reward_name = get_pretrained_reward(dataset_name, reward_checkpoint, specific_dataset)
@@ -34,6 +34,10 @@ class TotalReward(nn.Module):
         self.reward_net.load_state_dict(reward_state_dict)
         self.reward_net.eval()
         self.kernels = []
+        self.config.device = device
+
+
+
         
         kernel_state_dicts, obs_dim, act_dim, kernel_name = get_pretrained_kernel(dataset_name, kernel_checkpoint, specific_dataset)
         for i in range(len(kernel_state_dicts)):
@@ -89,7 +93,6 @@ class TotalReward(nn.Module):
            return S, A, S_next
         return S, A
         
-
     def get_c(self, x):
         H, D = x.shape
         C = 0.0
