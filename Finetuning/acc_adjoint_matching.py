@@ -378,7 +378,7 @@ class Acc_AdjointMatchingFineTuner:
              # For logging compute float of loss
              avg_loss = loss_for_backprop.detach().cpu().item()
              return avg_loss, avg_reward, total_avgC
-
+        
         return 0.0, 0.0, total_avgC
 
     def finetune_planner(self, dataloader: DataLoader, reward_model: TotalReward):
@@ -405,6 +405,8 @@ class Acc_AdjointMatchingFineTuner:
              total_C += avg_C
              
              self.accelerator.wait_for_everyone()
+             num_params = sum(p.numel() for p in self.new_score_net.parameters())
+             print(f"[rank {self.accelerator.process_index}] num_params: {num_params}")
              
 
              if self.accelerator.is_main_process:
