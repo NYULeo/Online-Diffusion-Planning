@@ -79,12 +79,13 @@ class Acc_AdjointMatchingFineTuner:
         self.device = self.accelerator.device
         state_dict = get_pretrained_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
         if( self.config.dataset_name == 'kitchen'):
-            self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(self.device)
+            self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
         elif (self.config.dataset_name == 'pointmaze'):
-            self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(self.device)
+            self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
         else:
           raise ValueError(f"Invalid Environment: {self.config.dataset_name}")
         self.old_score_net.load_state_dict(state_dict)
+        self.old_score_net = self.accelerator.prepare(self.old_score_net)
         for p in self.old_score_net.parameters():
              p.requires_grad_(False)
         self.old_score_net.eval()
@@ -195,9 +196,11 @@ class Acc_AdjointMatchingFineTuner:
          if(self.config.backbone_name == 'transformer'):
               self.new_score_net = DiT1d(
                    in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128,
-                   d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(self.device)
+                   d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
+              self.new_score_net = self.accelerator.prepare(self.new_score_net)
          elif(self.config.backbone_name == 'unet'):
-              self.new_score_net = TemporalUnet(self.config.horizon, self.config.d_s + self.config.d_a).to(self.device)
+              self.new_score_net = TemporalUnet(self.config.horizon, self.config.d_s + self.config.d_a)
+              self.new_score_net = self.accelerator.prepare(self.new_score_net)
     
 
     @torch.no_grad()
@@ -282,9 +285,9 @@ class Acc_AdjointMatchingFineTuner:
         Loss = torch.tensor(0.0, device = self.device, requires_grad=True)
         for i in range(len(traj_x)):
             traj_x_i = traj_x[i].to(self.device)
-            adjoint_i = adjoints[i].unsqueeze(0).flatten().to(self.device)
+            adjoint_i = adjoints[i].unsqueeze(0).flatten().to(self.device).detach()
             v_new = self.vector_field(traj_x_i, self.t_asc[i], self.new_score_net).squeeze(0).flatten()
-            v_old = self.vector_field(traj_x_i, self.t_asc[i], self.old_score_net).squeeze(0).flatten()
+            v_old = self.vector_field(traj_x_i, self.t_asc[i], self.old_score_net).squeeze(0).flatten().to(self.device).detach()
             sigma = self.sigma_t(self.k[i])
             Loss = Loss + ((v_new - v_old) * (2/sigma) + sigma * adjoint_i).pow(2).sum()
         return Loss

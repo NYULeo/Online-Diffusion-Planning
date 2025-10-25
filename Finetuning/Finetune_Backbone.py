@@ -102,6 +102,8 @@ class OnlineFinetuner():
         print(f"finetune_steps: {self.config.finetune_steps}")
         print(f"sampling steps: {self.config.AMConfig.num_steps}")
         print('-------------------------------------------------------------------------------------------')
+        print(torch.cuda.is_available(), torch.cuda.device_count())
+        print(torch.cuda.get_device_name(0))
         dataloader = cycle(DataLoader(self.PlannerDataset, self.config.finetune_batch_size, shuffle = True, pin_memory = True, num_workers = 8))
         self.AMFineTuner.finetune_planner(dataloader)
             
