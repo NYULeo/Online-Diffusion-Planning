@@ -12,7 +12,7 @@ def main():
     dataloader = DataLoader(data, batch_size = 2, shuffle = True, num_workers = 0, pin_memory = True, drop_last = True)
     print(f"Process {accelerator.process_index}: Starting prepare...")
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = 100)
-    dataloader, optimizer, scheduler = accelerator.prepare(dataloader, optimizer, scheduler)
+    model = accelerator.prepare(model)
     print(f"Process {accelerator.process_index}: Prepare done!")
 
 if __name__ == "__main__":
