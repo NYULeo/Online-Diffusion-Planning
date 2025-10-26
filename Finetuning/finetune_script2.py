@@ -43,7 +43,7 @@ if __name__ == "__main__":
         reward_model_checkpoint = 9900,
         kernel_model_checkpoint = 34000,
         finetune_steps = 1000000,
-        finetune_batch_size = 4,
+        finetune_batch_size = 12,
         finetune_lr = 2e-5)
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
