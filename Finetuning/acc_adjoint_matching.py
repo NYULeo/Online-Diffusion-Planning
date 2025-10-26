@@ -370,6 +370,7 @@ class Acc_AdjointMatchingFineTuner:
               # Choose how to backprop: e.g., mean of loss tensors
              #loss_for_backprop = float((all_loss_tensors)/ len(all_loss_tensors))
              # Replace line 370 with:
+             all_loss_tensors = [loss_tensor.to(self.device) for loss_tensor in all_loss_tensors]
              loss_for_backprop = torch.stack(all_loss_tensors).mean().to(self.device)
             
 

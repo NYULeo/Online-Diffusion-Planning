@@ -111,7 +111,9 @@ import torch
         return a, reward.item()
     """
 
-
+a  = [torch.tensor([1.0]), torch.tensor([1.0]), torch.tensor([1.0])]
+stack = torch.stack(a).mean()
+print(stack)
 
 
 
