@@ -292,7 +292,7 @@ class Acc_AdjointMatchingFineTuner:
             T = X_reversed[i].to(self.device)
             T.requires_grad_(True)
             current_a = a[i].to(self.device)  
-            y, jvp_out = jvp(self.old_score_net, (T,t_now.unsqueeze(0)), (current_a, torch.zeros_like(t_now.unsqueeze(0)).to(self.device).requires_grad_(True))) 
+            y, jvp_out = jvp(self.old_score_net, (T, t_now.unsqueeze(0)), (current_a, torch.zeros_like(t_now.unsqueeze(0)).to(self.device))) 
             Jov_a = jvp_out.to(self.device)
             #new_a = current_a  + dt * ( (self.k[i] * T) + (2 * self.k[i] * Jov_a) )
             new_a = current_a  + dt * ( (k_reversed[i] * T) + (2 * k_reversed[i] * Jov_a) )
@@ -409,8 +409,6 @@ class Acc_AdjointMatchingFineTuner:
              total_reward += avg_reward
              total_C += avg_C
              
-             num_params = sum(p.numel() for p in self.new_score_net.parameters())
-             print(f"[rank {self.accelerator.process_index}] num_params: {num_params}")
              self.accelerator.wait_for_everyone()
            
 
