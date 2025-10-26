@@ -12,7 +12,7 @@ from Pretrain.Dataset import get_dataset
 from typing import List
 from utils import TrajectoryDict
 from Pretrain.Dataset import get_env
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, DistributedSampler
 import torch
 import copy
 import os
@@ -51,7 +51,7 @@ class OnlineFinetuner():
         self.config.AMConfig.d_a = d_a
        
 
-        self.accelerator = Accelerator()
+        self.accelerator = Accelerator(mixed_precision="fp16")
         self.device = self.accelerator.device
 
         
@@ -116,8 +116,8 @@ class OnlineFinetuner():
             print(f"The number of GPUs is: {torch.cuda.device_count()}")
             print(f"The GPU name is: {torch.cuda.get_device_name(0)}")
             print('-------------------------------------------------------------------------------------------')
-        
-        dataloader = DataLoader(self.PlannerDataset, self.config.finetune_batch_size, shuffle = True, pin_memory = True, num_workers = 2)
+        sampler = DistributedSampler(self.PlannerDataset, shuffle=True, drop_last=True)
+        dataloader = DataLoader(self.PlannerDataset, self.config.finetune_batch_size, shuffle = True, pin_memory = True, num_workers = 2, sampler=sampler)
         self.AMFineTuner.finetune_planner(dataloader, self.reward_model)
             
 
