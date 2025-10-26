@@ -1,6 +1,7 @@
 from sched import scheduler
 import torch.nn as nn
 from accelerate import Accelerator
+from torch.utils.data import DataLoader
 import torch
 
 def main():
@@ -8,7 +9,7 @@ def main():
     model = nn.Linear(10, 10)  # Simple model
     optimizer = torch.optim.Adam(model.parameters())
     data = torch.randn(10, 10)
-    dataloader = dataloader(data, batch_size = 2, shuffle = True, num_workers = 0, pin_memory = True)
+    dataloader = DataLoader(data, batch_size = 2, shuffle = True, num_workers = 0, pin_memory = True)
     print(f"Process {accelerator.process_index}: Starting prepare...")
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = 100)
     model, optimizer, dataloader, scheduler = accelerator.prepare(model, optimizer, dataloader, scheduler)
