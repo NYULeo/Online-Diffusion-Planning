@@ -404,7 +404,9 @@ class Acc_AdjointMatchingFineTuner:
         total_C = 0.0
         while step < self.config.finetune_steps:
              conds = next(dataloader)
+            
              loss, avg_reward, avg_C = self.step(conds, reward_model)
+
              total_loss += loss
              total_reward += avg_reward
              total_C += avg_C
