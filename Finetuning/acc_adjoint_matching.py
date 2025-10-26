@@ -392,10 +392,11 @@ class Acc_AdjointMatchingFineTuner:
         self.set_lambda(reward_model.get_beta())
         self.set_reward_tracker()
         
-        print('Prepare')
+        print(f"[Rank {self.accelerator.process_index}] BEFORE prepare")
         dataloader, reward_model = self.Accelerate_Prepare(dataloader, reward_model)
         self.accelerator.wait_for_everyone()
         dataloader = cycle(dataloader)
+        print(f"[Rank {self.accelerator.process_index}] AFTER prepare")
         print(f"Starting Finetuning")
         
         step = 0

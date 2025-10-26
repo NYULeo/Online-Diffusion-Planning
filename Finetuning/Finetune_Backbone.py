@@ -112,12 +112,12 @@ class OnlineFinetuner():
             print(f"finetune_steps: {self.config.finetune_steps}")
             print(f"sampling steps: {self.config.AMConfig.num_steps}")
             print('Device Details: ---------------------------------------------------------------------------')
-            print(f"The device is: {self.config.AMConfig.device}")
+            print(f"The device is: {self.device}")
             print(f"The number of GPUs is: {torch.cuda.device_count()}")
             print(f"The GPU name is: {torch.cuda.get_device_name(0)}")
             print('-------------------------------------------------------------------------------------------')
         sampler = DistributedSampler(self.PlannerDataset, shuffle=True, drop_last=True)
-        dataloader = DataLoader(self.PlannerDataset, self.config.finetune_batch_size, pin_memory = True, num_workers = 2,  sampler = sampler)
+        dataloader = DataLoader(self.PlannerDataset, self.config.finetune_batch_size, pin_memory = True, num_workers = 2,  sampler = sampler,  drop_last = True)
         self.AMFineTuner.finetune_planner(dataloader, self.reward_model)
             
 
