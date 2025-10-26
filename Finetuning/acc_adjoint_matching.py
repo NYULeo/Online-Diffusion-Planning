@@ -87,6 +87,7 @@ class Acc_AdjointMatchingFineTuner:
         self.set_lambda()
         self.set_reward_tracker()
     
+
     def Accelerate_Prepare(self, dataloader: DataLoader, reward_model: TotalReward):
          self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model = self.accelerator.prepare(self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model)
          self.new_score_net.train()
@@ -388,10 +389,12 @@ class Acc_AdjointMatchingFineTuner:
         self.set_reward_tracker()
         
         print('Prepare')
-        dataloader, reward_model = self.Accelerate_Prepare(dataloader, reward_model)
+        #dataloader, reward_model = self.Accelerate_Prepare(dataloader, reward_model)
+        self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, reward_model = self.accelerator.prepare(self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, reward_model)
         self.accelerator.wait_for_everyone()
         dataloader = cycle(dataloader)
         print(f"Starting Finetuning")
+        exit()
         
         step = 0
         total_loss = 0.0
