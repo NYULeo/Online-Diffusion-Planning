@@ -52,6 +52,7 @@ class OnlineFinetuner():
        
 
         self.accelerator = Accelerator(mixed_precision="fp16")
+        self.accelerator.seed_all(1)
         self.device = self.accelerator.device
 
         
