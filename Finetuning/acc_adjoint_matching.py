@@ -77,7 +77,7 @@ class Acc_AdjointMatchingFineTuner:
         self.device = self.accelerator.device
         
         self.ema = EMA(self.config.ema_decay)
-        self.t_asc = torch.linspace(1.0, 0.0, self.config.num_steps + 1)
+        self.t_asc = torch.linspace(1.0, 0.0, self.config.num_steps + 1, device = self.device)
         self.k = self.kt(self.t_asc) 
         
         self.set_old_score_net(planner_checkpoint)
@@ -392,11 +392,10 @@ class Acc_AdjointMatchingFineTuner:
         self.set_lambda(reward_model.get_beta())
         self.set_reward_tracker()
         
-        print(f"[Rank {self.accelerator.process_index}] BEFORE prepare")
+        print(f"Starting Preparing")
         dataloader, reward_model = self.Accelerate_Prepare(dataloader, reward_model)
         self.accelerator.wait_for_everyone()
         dataloader = cycle(dataloader)
-        print(f"[Rank {self.accelerator.process_index}] AFTER prepare")
         print(f"Starting Finetuning")
         
         step = 0
