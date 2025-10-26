@@ -367,7 +367,10 @@ class Acc_AdjointMatchingFineTuner:
              avg_reward = float(sum(all_rewards) / len(all_rewards))
 
               # Choose how to backprop: e.g., mean of loss tensors
-             loss_for_backprop = float(sum(all_loss_tensors) / len(all_loss_tensors))
+             #loss_for_backprop = float((all_loss_tensors)/ len(all_loss_tensors))
+             # Replace line 370 with:
+             loss_for_backprop = torch.stack(all_loss_tensors).mean().to(self.device)
+            
 
              self.optimizer.zero_grad()
              self.accelerator.backward(loss_for_backprop)
