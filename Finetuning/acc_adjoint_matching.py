@@ -77,7 +77,7 @@ class Acc_AdjointMatchingFineTuner:
         self.device = self.accelerator.device
         
         self.ema = EMA(self.config.ema_decay)
-        self.t_asc = torch.linspace(1.0, 0.0, self.config.num_steps + 1, device = self.device)
+        self.t_asc = torch.linspace(1.0, 0.0, self.config.num_steps + 1)
         self.k = self.kt(self.t_asc) 
         
         self.set_old_score_net(planner_checkpoint)
