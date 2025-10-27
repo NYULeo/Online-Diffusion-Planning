@@ -354,9 +354,10 @@ class Acc_AdjointMatchingFineTuner:
             for traj in local_trajs2:
                 adjoint, reward = self.make_a(traj, reward_model)
                 loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
+                
+                dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)  # Sum first
+                loss_tensor = loss_tensor / dist.get_world_size()  # Then divide by num GPUs (3)
                 print(f"Loss Tensor: {loss_tensor}")
-                #dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)  # Sum first
-                #loss_tensor = loss_tensor / dist.get_world_size()  # Then divide by num GPUs (3)
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
         
