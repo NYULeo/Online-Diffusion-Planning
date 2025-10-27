@@ -391,7 +391,10 @@ class Acc_AdjointMatchingFineTuner:
         all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=True)
 
         if self.accelerator.is_main_process:
-            avg_loss = float(torch.cat(all_losses).mean().item())
+            if isinstance(all_losses, torch.Tensor):
+                 avg_loss = float(all_losses.mean().item())
+            else:
+                avg_loss = float(torch.cat(all_losses).mean().item())
             avg_reward = float(sum(all_rewards) / len(all_rewards))
             return avg_loss, avg_reward, total_avgC
         
