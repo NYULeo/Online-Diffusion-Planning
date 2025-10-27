@@ -359,8 +359,8 @@ class Acc_AdjointMatchingFineTuner:
                 adjoint, reward = self.make_a(traj, reward_model)
                 loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
                 #print(f"Rank {self.accelerator.process_index}, Pre-Reduce Loss: {loss_tensor.item()}")
-                dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)  # Sum first
-                loss_tensor = loss_tensor / dist.get_world_size()  # Then divide by num GPUs (3)
+                #dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)  # Sum first
+                #loss_tensor = loss_tensor / dist.get_world_size()  # Then divide by num GPUs (3)
                 #print(f"Rank {self.accelerator.process_index}, Post-Reduce Loss: {loss_tensor.item()}")
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
