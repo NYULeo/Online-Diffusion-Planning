@@ -23,7 +23,7 @@ try:
     from accelerate import Accelerator
 except ImportError:
     raise ImportError("accelerate is required but not installed. Run: pip install accelerate")
-
+import torch.distributed as dist
 
 
 
@@ -320,7 +320,7 @@ class Acc_AdjointMatchingFineTuner:
         return Loss
     
     def step(self, s0_batch: torch.Tensor, reward_model: TotalReward) -> Tuple[float, float, float]:
-         # 1. Split batch across processes
+        # 1. Split batch across processes
         base_reward_model = self.accelerator.unwrap_model(reward_model)
         with self.accelerator.split_between_processes(s0_batch) as local_s0:
             local_trajs = []
@@ -354,6 +354,9 @@ class Acc_AdjointMatchingFineTuner:
             for traj in local_trajs2:
                 adjoint, reward = self.make_a(traj, reward_model)
                 loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
+                print(f"Loss Tensor: {loss_tensor}")
+                dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)  # Sum first
+                loss_tensor = loss_tensor / dist.get_world_size()  # Then divide by num GPUs (3)
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
         
