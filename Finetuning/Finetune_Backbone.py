@@ -51,7 +51,7 @@ class OnlineFinetuner():
         self.config.AMConfig.d_a = d_a
        
 
-        self.accelerator = Accelerator(mixed_precision="no")
+        self.accelerator = Accelerator()
         self.device = self.accelerator.device
 
         
