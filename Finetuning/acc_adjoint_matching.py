@@ -430,6 +430,8 @@ class Acc_AdjointMatchingFineTuner:
                     total_loss = 0.0
                     total_reward = 0.0
                     total_C = 0.0
+                    exit()
+
              
                 if ((step % self.config.save_freq == 0) and (step!=0)):
                     self.save(step)
