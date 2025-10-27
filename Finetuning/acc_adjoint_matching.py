@@ -75,6 +75,9 @@ class Acc_AdjointMatchingFineTuner:
         self.config = AMConfig
         self.accelerator = accelerator
         self.device = self.accelerator.device
+        rank = self.accelerator.process_index
+        torch.manual_seed(42 + rank)
+        torch.cuda.manual_seed_all(42 + rank)
         
         self.ema = EMA(self.config.ema_decay)
         self.t_asc = torch.linspace(1.0, 0.0, self.config.num_steps + 1, device = self.device)
@@ -354,10 +357,10 @@ class Acc_AdjointMatchingFineTuner:
             for traj in local_trajs2:
                 adjoint, reward = self.make_a(traj, reward_model)
                 loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
-                
+                print(f"Rank {self.accelerator.process_index}, Pre-Reduce Loss: {loss_tensor.item()}")
                 dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)  # Sum first
                 loss_tensor = loss_tensor / dist.get_world_size()  # Then divide by num GPUs (3)
-                print(f"Loss Tensor: {loss_tensor}")
+                print(f"Rank {self.accelerator.process_index}, Post-Reduce Loss: {loss_tensor.item()}")
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
         
@@ -365,7 +368,7 @@ class Acc_AdjointMatchingFineTuner:
           # 4. Gather loss tensors & reward floats across processes
         all_loss_tensors = self.accelerator.gather_for_metrics(local_loss_tensors, use_gather_object=True)
         all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=True)
-        
+        print(f"All loss tensors: {all_loss_tensors}")
         self.accelerator.wait_for_everyone()
         if self.accelerator.is_main_process:
              # Compute average reward for logging
