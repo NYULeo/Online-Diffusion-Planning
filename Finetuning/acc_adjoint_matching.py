@@ -117,7 +117,7 @@ class Acc_AdjointMatchingFineTuner:
     
          # Create new scheduler
          self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            self.optimizer, steps, weight_decay = 1e-5)
+            self.optimizer, steps)
     
     def set_old_score_net(self, planner_checkpoint: int):
         state_dict = get_pretrained_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
