@@ -385,13 +385,15 @@ class Acc_AdjointMatchingFineTuner:
             
 
              self.optimizer.zero_grad()
+             print(f"Loss before backward: {loss_for_backprop}")
              self.accelerator.backward(loss_for_backprop)
              self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
              self.optimizer.step()
              self.scheduler.step()
+             print(f"Loss after backward: {loss_for_backprop}")
 
              # For logging compute float of loss
-             avg_loss = loss_for_backprop.detach().cpu().item()
+             avg_loss = loss_for_backprop.detach().item()
              return avg_loss, avg_reward, total_avgC
         
         return 0.0, 0.0, total_avgC
