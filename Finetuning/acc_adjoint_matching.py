@@ -364,6 +364,7 @@ class Acc_AdjointMatchingFineTuner:
                 #print(f"Rank {self.accelerator.process_index}, Post-Reduce Loss: {loss_tensor.item()}")
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
+            loss_loss_tensors = torch.stack(local_loss_tensors)
         
         self.accelerator.wait_for_everyone()
           # 4. Gather loss tensors & reward floats across processes
@@ -376,13 +377,14 @@ class Acc_AdjointMatchingFineTuner:
         if self.accelerator.is_main_process:
              # Compute average reward for logging
              avg_reward = float(sum(all_rewards) / len(all_rewards))
-
-              # Choose how to backprop: e.g., mean of loss tensors
-             #loss_for_backprop = float((all_loss_tensors)/ len(all_loss_tensors))
-             # Replace line 370 with:
-             all_loss_tensors = [loss_tensor.to(self.device) for loss_tensor in all_loss_tensors]
+             all_loss_tensors.to(self.device)
              print(f"All loss tensors: {all_loss_tensors}")
-             loss_for_backprop = torch.stack(all_loss_tensors).mean().to(self.device)
+             loss_for_backprop = all_loss_tensors.mean()
+
+    
+             #all_loss_tensors = [loss_tensor.to(self.device) for loss_tensor in all_loss_tensors]
+             #print(f"All loss tensors: {all_loss_tensors}")
+             #loss_for_backprop = torch.stack(all_loss_tensors).mean().to(self.device)
              
              
 

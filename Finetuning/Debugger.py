@@ -115,5 +115,9 @@ a = torch.tensor([1,2,3])
 print(a.sum())
 
 
+a  = torch.tensor( [1.0,2.0], requires_grad = True     )
+b = torch.tensor( [4.0,5.0], requires_grad = True     )
+A = torch.stack([a,b]).mean()
+print(A)
 
 
