@@ -285,6 +285,7 @@ class Acc_AdjointMatchingFineTuner:
         T = X_reversed[0]
         T_squeezed = T.squeeze(0).to(self.device)
         reward, gradient = reward_model(T_squeezed, self.Lam.get_lam())
+        print(f"gradient norm: {gradient.norm()}")
         t_asc_reversed = torch.flip(self.t_asc, dims = [0]).to(self.device)
         k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
         a.append(gradient.unsqueeze(0))
@@ -339,8 +340,8 @@ class Acc_AdjointMatchingFineTuner:
 
         self.accelerator.wait_for_everyone()
         # 2. Gather C values and update lambda on main process
-        all_final_Cs = self.accelerator.gather_for_metrics(local_final_Cs, use_gather_object=True)
-        all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=True)
+        all_final_Cs = self.accelerator.gather_for_metrics(local_final_Cs, use_gather_object=False)
+        all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=False)
         if self.accelerator.is_main_process:
             total_avgC = float(sum(all_final_Cs) / len(all_final_Cs))
             self.Lam.update(total_avgC)
@@ -357,17 +358,17 @@ class Acc_AdjointMatchingFineTuner:
             for traj in local_trajs2:
                 adjoint, reward = self.make_a(traj, reward_model)
                 loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
-                print(f"Rank {self.accelerator.process_index}, Pre-Reduce Loss: {loss_tensor.item()}")
+                #print(f"Rank {self.accelerator.process_index}, Pre-Reduce Loss: {loss_tensor.item()}")
                 dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)  # Sum first
                 loss_tensor = loss_tensor / dist.get_world_size()  # Then divide by num GPUs (3)
-                print(f"Rank {self.accelerator.process_index}, Post-Reduce Loss: {loss_tensor.item()}")
+                #print(f"Rank {self.accelerator.process_index}, Post-Reduce Loss: {loss_tensor.item()}")
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
         
         self.accelerator.wait_for_everyone()
           # 4. Gather loss tensors & reward floats across processes
-        all_loss_tensors = self.accelerator.gather_for_metrics(local_loss_tensors, use_gather_object=True)
-        all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=True)
+        all_loss_tensors = self.accelerator.gather_for_metrics(local_loss_tensors, use_gather_object=False)
+        all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=False)
         #print(f"All loss tensors: {all_loss_tensors}")
 
 
@@ -380,7 +381,6 @@ class Acc_AdjointMatchingFineTuner:
              #loss_for_backprop = float((all_loss_tensors)/ len(all_loss_tensors))
              # Replace line 370 with:
              all_loss_tensors = [loss_tensor.to(self.device) for loss_tensor in all_loss_tensors]
-             print(f'All loss tensors: {all_loss_tensors}')
              loss_for_backprop = torch.stack(all_loss_tensors).mean().to(self.device)
             
 
