@@ -340,7 +340,7 @@ class Acc_AdjointMatchingFineTuner:
 
         self.accelerator.wait_for_everyone()
         # 2. Gather C values and update lambda on main process
-        all_final_Cs = self.accelerator.gather_for_metrics(local_final_Cs, use_gather_object=True)
+        all_final_Cs = self.accelerator.gather_for_metrics(local_final_Cs, use_gather_object=False)
         all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=True)
         if self.accelerator.is_main_process:
             total_avgC = float(sum(all_final_Cs) / len(all_final_Cs))
@@ -368,7 +368,7 @@ class Acc_AdjointMatchingFineTuner:
         self.accelerator.wait_for_everyone()
           # 4. Gather loss tensors & reward floats across processes
         all_loss_tensors = self.accelerator.gather_for_metrics(local_loss_tensors, use_gather_object=False)
-        all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=False)
+        all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=True)
         #print(f"All loss tensors: {all_loss_tensors}")
 
 
