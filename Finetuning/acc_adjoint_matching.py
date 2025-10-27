@@ -368,7 +368,9 @@ class Acc_AdjointMatchingFineTuner:
           # 4. Gather loss tensors & reward floats across processes
         all_loss_tensors = self.accelerator.gather_for_metrics(local_loss_tensors, use_gather_object=True)
         all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=True)
-        print(f"All loss tensors: {all_loss_tensors}")
+        #print(f"All loss tensors: {all_loss_tensors}")
+
+
         self.accelerator.wait_for_everyone()
         if self.accelerator.is_main_process:
              # Compute average reward for logging
@@ -378,6 +380,7 @@ class Acc_AdjointMatchingFineTuner:
              #loss_for_backprop = float((all_loss_tensors)/ len(all_loss_tensors))
              # Replace line 370 with:
              all_loss_tensors = [loss_tensor.to(self.device) for loss_tensor in all_loss_tensors]
+             print(f'All loss tensors: {all_loss_tensors}')
              loss_for_backprop = torch.stack(all_loss_tensors).mean().to(self.device)
             
 

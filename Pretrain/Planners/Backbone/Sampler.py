@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .UNet import  TemporalUnet
+#from .UNet import  TemporalUnet
 from .Dit import DiT1d
 from .utils import cosine_alpha_sigma, cosine_beta
 from torch import Tensor
