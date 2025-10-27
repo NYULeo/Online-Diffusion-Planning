@@ -113,7 +113,7 @@ class Acc_AdjointMatchingFineTuner:
     
           # Create new optimizer
          self.optimizer = torch.optim.AdamW(
-             self.new_score_net.parameters(), lr=lr, weight_decay = 1e-5)
+             self.new_score_net.parameters(), lr=lr, weight_decay = 1e-2)
     
          # Create new scheduler
          self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
