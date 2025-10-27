@@ -381,7 +381,11 @@ class Acc_AdjointMatchingFineTuner:
              #loss_for_backprop = float((all_loss_tensors)/ len(all_loss_tensors))
              # Replace line 370 with:
              all_loss_tensors = [loss_tensor.to(self.device) for loss_tensor in all_loss_tensors]
+             print(f"All loss tensors: {all_loss_tensors}")
              loss_for_backprop = torch.stack(all_loss_tensors).mean().to(self.device)
+             
+             
+
             
 
              self.optimizer.zero_grad()
