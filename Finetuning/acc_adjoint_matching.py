@@ -112,12 +112,12 @@ class Acc_AdjointMatchingFineTuner:
          steps = new_steps if new_steps is not None else self.config.finetune_steps
     
           # Create new optimizer
-         self.optimizer = torch.optim.Adam(
-             self.new_score_net.parameters(), lr=lr)
+         self.optimizer = torch.optim.AdamW(
+             self.new_score_net.parameters(), lr=lr, weight_decay = 1e-5)
     
          # Create new scheduler
          self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            self.optimizer, steps)
+            self.optimizer, steps, weight_decay = 1e-5)
     
     def set_old_score_net(self, planner_checkpoint: int):
         state_dict = get_pretrained_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
