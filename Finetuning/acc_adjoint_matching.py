@@ -315,8 +315,8 @@ class Acc_AdjointMatchingFineTuner:
             v_new = self.vector_field(traj_x_i, self.t_asc[i].detach().to(self.device), self.new_score_net).squeeze(0).flatten().to(self.device)
             v_old = self.vector_field(traj_x_i, self.t_asc[i].detach().to(self.device), self.old_score_net).squeeze(0).flatten().detach().to(self.device)
             sigma = self.sigma_t(self.k[i]).detach().to(self.device)
-            Loss = Loss + ((v_new - v_old) * (2/sigma) + sigma * adjoint_i).pow(2).sum()
-        #Loss = Loss / len(traj_x)
+            Loss = Loss + ((v_new - v_old) * (2/sigma) + sigma * adjoint_i).pow(2).mean()
+        Loss = Loss / len(traj_x)
         return Loss
     
     def step(self, s0_batch: torch.Tensor, reward_model: TotalReward) -> Tuple[float, float, float]:
@@ -430,7 +430,7 @@ class Acc_AdjointMatchingFineTuner:
                     total_loss = 0.0
                     total_reward = 0.0
                     total_C = 0.0
-                    exit()
+                    
 
              
                 if ((step % self.config.save_freq == 0) and (step!=0)):
