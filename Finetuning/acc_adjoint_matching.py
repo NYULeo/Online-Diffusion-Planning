@@ -364,7 +364,7 @@ class Acc_AdjointMatchingFineTuner:
                 #print(f"Rank {self.accelerator.process_index}, Post-Reduce Loss: {loss_tensor.item()}")
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
-            loss_loss_tensors = torch.stack(local_loss_tensors)
+            local_loss_tensors = torch.stack(local_loss_tensors)
         
         self.accelerator.wait_for_everyone()
           # 4. Gather loss tensors & reward floats across processes
