@@ -340,7 +340,7 @@ class Acc_AdjointMatchingFineTuner:
 
         self.accelerator.wait_for_everyone()
         # 2. Gather C values and update lambda on main process
-        all_final_Cs = self.accelerator.gather_for_metrics(local_final_Cs, use_gather_object=False)
+        all_final_Cs = self.accelerator.gather_for_metrics(local_final_Cs, use_gather_object=True)
         all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=True)
         if self.accelerator.is_main_process:
             total_avgC = float(sum(all_final_Cs) / len(all_final_Cs))
@@ -364,45 +364,39 @@ class Acc_AdjointMatchingFineTuner:
                 #print(f"Rank {self.accelerator.process_index}, Post-Reduce Loss: {loss_tensor.item()}")
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
-            local_loss_tensors = torch.stack(local_loss_tensors)
+            local_loss = torch.stack(local_loss_tensors).mean()
         
         self.accelerator.wait_for_everyone()
           # 4. Gather loss tensors & reward floats across processes
-        all_loss_tensors = self.accelerator.gather_for_metrics(local_loss_tensors, use_gather_object=False)
-        all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=True)
-        #print(f"All loss tensors: {all_loss_tensors}")
-
-
-        self.accelerator.wait_for_everyone()
+        #all_loss_tensors = self.accelerator.gather_for_metrics(local_loss_tensors, use_gather_object=False)
+        
+        loss_global = self.accelerator.reduce(local_loss, reduction="mean")
+         # Check whether the loss_global still has gradient
+         # (print only on main process)
         if self.accelerator.is_main_process:
-             # Compute average reward for logging
-             avg_reward = float(sum(all_rewards) / len(all_rewards))
-             all_loss_tensors.to(self.device)
-             print(f"All loss tensors: {all_loss_tensors}")
-             loss_for_backprop = all_loss_tensors.mean()
+             print(f"loss_global.requires_grad = {loss_global.requires_grad}")
 
-    
-             #all_loss_tensors = [loss_tensor.to(self.device) for loss_tensor in all_loss_tensors]
-             #print(f"All loss tensors: {all_loss_tensors}")
-             #loss_for_backprop = torch.stack(all_loss_tensors).mean().to(self.device)
-             
-             
+         # 5. Backward and optimizer step only on main process or all processes?
+           #    Typically each process steps; here we assume full DDP coherence.
+        self.optimizer.zero_grad()
+        self.accelerator.backward(loss_global)
+        self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
+        self.optimizer.step()
+        self.scheduler.step()
 
-            
+         # 6. Logging: gather detached metrics
+          # Detach local_loss and rewards for metrics gathering
+        local_loss_det = local_loss.detach()
+        all_losses = self.accelerator.gather_for_metrics(local_loss_det, use_gather_object=False)
+        all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=True)
 
-             self.optimizer.zero_grad()
-             print(f"Loss before backward: {loss_for_backprop}")
-             self.accelerator.backward(loss_for_backprop)
-             self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
-             self.optimizer.step()
-             self.scheduler.step()
-             print(f"Loss after backward: {loss_for_backprop}")
-
-             # For logging compute float of loss
-             avg_loss = loss_for_backprop.detach().item()
-             return avg_loss, avg_reward, total_avgC
+        if self.accelerator.is_main_process:
+            avg_loss = float(torch.cat(all_losses).mean().item())
+            avg_reward = float(sum(all_rewards) / len(all_rewards))
+            return avg_loss, avg_reward, total_avgC
         
         return 0.0, 0.0, total_avgC
+
 
     def finetune_planner(self, dataloader: DataLoader, reward_model: TotalReward):
         reward_model.eval()

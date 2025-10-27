@@ -117,7 +117,40 @@ print(a.sum())
 
 a  = torch.tensor( [1.0,2.0], requires_grad = True     )
 b = torch.tensor( [4.0,5.0], requires_grad = True     )
-A = torch.stack([a,b]).mean()
+A = torch.stack([a,b])
 print(A)
+
+"""
+        all_loss_tensors = self.accelerator.gather(local_loss_tensors)
+        all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=True)
+        #print(f"All loss tensors: {all_loss_tensors}")
+
+        self.accelerator.wait_for_everyone()
+        if self.accelerator.is_main_process:
+             # Compute average reward for logging
+             avg_reward = float(sum(all_rewards) / len(all_rewards))
+             all_loss_tensors.to(self.device)
+             print(f"All loss tensors: {all_loss_tensors}")
+             loss_for_backprop = all_loss_tensors.mean()
+
+    
+             #all_loss_tensors = [loss_tensor.to(self.device) for loss_tensor in all_loss_tensors]
+             #print(f"All loss tensors: {all_loss_tensors}")
+             #loss_for_backprop = torch.stack(all_loss_tensors).mean().to(self.device)
+             
+        
+
+             self.optimizer.zero_grad()
+             print(f"Loss before backward: {loss_for_backprop}")
+             self.accelerator.backward(loss_for_backprop)
+             self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
+             self.optimizer.step()
+             self.scheduler.step()
+             print(f"Loss after backward: {loss_for_backprop}")
+
+             # For logging compute float of loss
+             avg_loss = loss_for_backprop.detach().item()
+             return avg_loss, avg_reward, total_avgC
+    """
 
 
