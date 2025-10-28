@@ -285,10 +285,12 @@ class Acc_AdjointMatchingFineTuner:
         T = X_reversed[0]
         T_squeezed = T.squeeze(0).to(self.device)
         reward, gradient = reward_model(T_squeezed, self.Lam.get_lam())
+        
         #print(f"gradient norm: {gradient.norm()}")
         t_asc_reversed = torch.flip(self.t_asc, dims = [0]).to(self.device)
         k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
-        a.append(gradient.unsqueeze(0))
+        a0 = -1 * gradient.unsqueeze(0)
+        a.append(a0)
         #a.append(torch.zeros_like(gradient).unsqueeze(0).to(self.device))
         for i in range(steps_T - 1):
             #t_now, t_next = self.t_asc[i], self.t_asc[i + 1]
@@ -300,7 +302,7 @@ class Acc_AdjointMatchingFineTuner:
             y, jvp_out = jvp(self.old_score_net, (T, t_now.unsqueeze(0)), (current_a, torch.zeros_like(t_now.unsqueeze(0)).to(self.device))) 
             Jov_a = jvp_out.to(self.device)
             #new_a = current_a  + dt * ( (self.k[i] * T) + (2 * self.k[i] * Jov_a) )
-            new_a = current_a  + dt * ( (k_reversed[i] * T) + (2 * k_reversed[i] * Jov_a) )
+            new_a = current_a  + dt * ( (k_reversed[i] * current_a) + (2 * k_reversed[i] * Jov_a) )
             new_a = new_a.detach().clone().to(self.device)
             a.append(new_a)
         a.reverse()
