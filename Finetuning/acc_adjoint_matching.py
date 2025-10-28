@@ -379,8 +379,13 @@ class Acc_AdjointMatchingFineTuner:
          # 5. Backward and optimizer step only on main process or all processes?
            #    Typically each process steps; here we assume full DDP coherence.
         self.optimizer.zero_grad()
-        self.accelerator.backward(loss_global)
-        self.accelerator.wait_for_everyone()
+        #self.accelerator.backward(loss_global)
+        
+        for param in self.accelerator.unwrap_model(self.new_score_net).parameters():
+              if param.requires_grad:
+                   # Random gradient with same shape
+                   param.grad = torch.randn_like(param) * 0.01  # scale by 0.01
+                   
         self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
         self.optimizer.step()
         self.scheduler.step()
