@@ -112,13 +112,9 @@ import torch
     """
 
 a = torch.tensor([1,2,3])
-print(a.sum())
+a = -1 * a.unsqueeze(0)
+print(a)
 
-
-a  = torch.tensor( [1.0,2.0], requires_grad = True     )
-b = torch.tensor( [4.0,5.0], requires_grad = True     )
-A = torch.stack([a,b])
-print(A)
 
 """
         all_loss_tensors = self.accelerator.gather(local_loss_tensors)

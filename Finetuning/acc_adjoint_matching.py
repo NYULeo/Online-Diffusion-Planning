@@ -290,7 +290,9 @@ class Acc_AdjointMatchingFineTuner:
         t_asc_reversed = torch.flip(self.t_asc, dims = [0]).to(self.device)
         k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
         #a0 = -1 * gradient.unsqueeze(0)
-        a0 = gradient.unsqueeze(0)
+        print(gradient)
+        a0 = -1 * gradient.unsqueeze(0)
+        print(a0)
         a.append(a0)
         #a.append(torch.zeros_like(gradient).unsqueeze(0).to(self.device))
         for i in range(steps_T - 1):
@@ -300,6 +302,7 @@ class Acc_AdjointMatchingFineTuner:
             T = X_reversed[i].to(self.device)
             T.requires_grad_(True)
             current_a = a[i].to(self.device)  
+            print(current_a)
             y, jvp_out = jvp(self.old_score_net, (T, t_now.unsqueeze(0)), (current_a, torch.zeros_like(t_now.unsqueeze(0)).to(self.device))) 
             Jov_a = jvp_out.to(self.device)
             #new_a = current_a  + dt * ( (self.k[i] * T) + (2 * self.k[i] * Jov_a) )
