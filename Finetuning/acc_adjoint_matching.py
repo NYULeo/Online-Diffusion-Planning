@@ -140,11 +140,11 @@ class Acc_AdjointMatchingFineTuner:
               self.new_score_net = DiT1d(
                    in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128,
                    d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
-              #self.new_score_net.load_state_dict(self.old_score_net.state_dict())
+              self.new_score_net.load_state_dict(self.old_score_net.state_dict())
               self.new_score_net.train()
          elif(self.config.backbone_name == 'unet'):
               self.new_score_net = TemporalUnet(self.config.horizon, self.config.d_s + self.config.d_a)
-              #self.new_score_net.load_state_dict(self.old_score_net.state_dict())
+              self.new_score_net.load_state_dict(self.old_score_net.state_dict())
               self.new_score_net.train()
 
     def set_reward_tracker(self):
