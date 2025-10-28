@@ -380,6 +380,7 @@ class Acc_AdjointMatchingFineTuner:
            #    Typically each process steps; here we assume full DDP coherence.
         self.optimizer.zero_grad()
         self.accelerator.backward(loss_global)
+        self.accelerator.wait_for_everyone()
         self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
         self.optimizer.step()
         self.scheduler.step()
