@@ -34,7 +34,7 @@ class Acc_AdjointMatchingConfig:
 
     horizon: int
     finetune_lr: float = 2e-4
-    finetune_steps: int = 1000000
+    finetune_steps: int = 1000
     d_s: Optional[int] = None
     d_a: Optional[int] = None
     dataset_name: Optional[str] = None
@@ -45,10 +45,10 @@ class Acc_AdjointMatchingConfig:
     s: float = 0.008  # cosine schedule offset used in base drift
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     lam: float = 0.1
-    step_start_ema = 1000
+    step_start_ema = 50
     ema_decay = 0.999
     update_ema_every = 2
-    save_freq = 10000
+    save_freq = 50
     log_freq = 1
 
 
@@ -288,8 +288,8 @@ class Acc_AdjointMatchingFineTuner:
         #print(f"gradient norm: {gradient.norm()}")
         t_asc_reversed = torch.flip(self.t_asc, dims = [0]).to(self.device)
         k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
-        #a.append(gradient.unsqueeze(0))
-        a.append(torch.zeros_like(gradient).unsqueeze(0).to(self.device))
+        a.append(gradient.unsqueeze(0))
+        #a.append(torch.zeros_like(gradient).unsqueeze(0).to(self.device))
         for i in range(steps_T - 1):
             #t_now, t_next = self.t_asc[i], self.t_asc[i + 1]
             t_now, t_next = t_asc_reversed[i], t_asc_reversed[i+1]
