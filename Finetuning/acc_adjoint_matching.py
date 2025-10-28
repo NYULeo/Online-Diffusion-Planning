@@ -49,7 +49,7 @@ class Acc_AdjointMatchingConfig:
     ema_decay = 0.999
     update_ema_every = 2
     save_freq = 10000
-    log_freq = 10
+    log_freq = 1
 
 
 
@@ -392,7 +392,8 @@ class Acc_AdjointMatchingFineTuner:
              if param.grad is not None:
                     total_grad_norm += param.grad.data.norm(2).item() ** 2
         total_grad_norm = total_grad_norm ** (1. / 2)
-        print(f"Gradient norm before clipping: {total_grad_norm}")
+        if self.accelerator.is_main_process:
+               print(f"Gradient norm before clipping: {total_grad_norm}")
         self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
         self.optimizer.step()
         self.scheduler.step()
