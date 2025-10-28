@@ -140,11 +140,11 @@ class Acc_AdjointMatchingFineTuner:
               self.new_score_net = DiT1d(
                    in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128,
                    d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
-              self.new_score_net.load_state_dict(self.old_score_net.state_dict())
+              #self.new_score_net.load_state_dict(self.old_score_net.state_dict())
               self.new_score_net.train()
          elif(self.config.backbone_name == 'unet'):
               self.new_score_net = TemporalUnet(self.config.horizon, self.config.d_s + self.config.d_a)
-              self.new_score_net.load_state_dict(self.old_score_net.state_dict())
+              #self.new_score_net.load_state_dict(self.old_score_net.state_dict())
               self.new_score_net.train()
 
     def set_reward_tracker(self):
@@ -285,10 +285,13 @@ class Acc_AdjointMatchingFineTuner:
         T = X_reversed[0]
         T_squeezed = T.squeeze(0).to(self.device)
         reward, gradient = reward_model(T_squeezed, self.Lam.get_lam())
-        print(f"gradient norm: {gradient.norm()}")
+        #print(f"gradient norm: {gradient.norm()}")
         t_asc_reversed = torch.flip(self.t_asc, dims = [0]).to(self.device)
         k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
-        a.append(gradient.unsqueeze(0))
+        #a.append(gradient.unsqueeze(0))
+        a.append(torch.zeros_like(gradient).unsqueeze(0).to(self.device))
+        
+        a.append(torch.zeros_like(gradient).unsqueeze(0).to(self.device))
         for i in range(steps_T - 1):
             #t_now, t_next = self.t_asc[i], self.t_asc[i + 1]
             t_now, t_next = t_asc_reversed[i], t_asc_reversed[i+1]
@@ -319,6 +322,7 @@ class Acc_AdjointMatchingFineTuner:
             v_new = self.vector_field(traj_x_i, self.t_asc[i].detach().to(self.device), self.new_score_net).squeeze(0).flatten().to(self.device)
             v_old = self.vector_field(traj_x_i, self.t_asc[i].detach().to(self.device), self.old_score_net).squeeze(0).flatten().detach().to(self.device)
             sigma = self.sigma_t(self.k[i]).detach().to(self.device)
+            print(f"Sigma: {sigma}, Adjoint: {adjoint_i}")
             Loss = Loss + ((v_new - v_old) * (2/sigma) + sigma * adjoint_i).pow(2).mean()
         Loss = Loss / len(traj_x)
         return Loss
@@ -379,13 +383,19 @@ class Acc_AdjointMatchingFineTuner:
          # 5. Backward and optimizer step only on main process or all processes?
            #    Typically each process steps; here we assume full DDP coherence.
         self.optimizer.zero_grad()
-        #self.accelerator.backward(loss_global)
-        
+        self.accelerator.backward(loss_global)
+        """
         for param in self.accelerator.unwrap_model(self.new_score_net).parameters():
               if param.requires_grad:
                    # Random gradient with same shape
                    param.grad = torch.randn_like(param) * 0.01  # scale by 0.01
-                   
+        """           
+        total_grad_norm = 0.0
+        for param in self.accelerator.unwrap_model(self.new_score_net).parameters():
+             if param.grad is not None:
+                    total_grad_norm += param.grad.data.norm(2).item() ** 2
+        total_grad_norm = total_grad_norm ** (1. / 2)
+        print(f"Gradient norm before clipping: {total_grad_norm}")
         self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
         self.optimizer.step()
         self.scheduler.step()
