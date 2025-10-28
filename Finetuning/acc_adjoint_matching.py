@@ -289,7 +289,8 @@ class Acc_AdjointMatchingFineTuner:
         #print(f"gradient norm: {gradient.norm()}")
         t_asc_reversed = torch.flip(self.t_asc, dims = [0]).to(self.device)
         k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
-        a0 = -1 * gradient.unsqueeze(0)
+        #a0 = -1 * gradient.unsqueeze(0)
+        a0 = gradient.unsqueeze(0)
         a.append(a0)
         #a.append(torch.zeros_like(gradient).unsqueeze(0).to(self.device))
         for i in range(steps_T - 1):
@@ -383,12 +384,7 @@ class Acc_AdjointMatchingFineTuner:
            #    Typically each process steps; here we assume full DDP coherence.
         self.optimizer.zero_grad()
         self.accelerator.backward(loss_global)
-        """
-        for param in self.accelerator.unwrap_model(self.new_score_net).parameters():
-              if param.requires_grad:
-                   # Random gradient with same shape
-                   param.grad = torch.randn_like(param) * 0.01  # scale by 0.01
-        """           
+                
         total_grad_norm = 0.0
         for param in self.accelerator.unwrap_model(self.new_score_net).parameters():
              if param.grad is not None:
