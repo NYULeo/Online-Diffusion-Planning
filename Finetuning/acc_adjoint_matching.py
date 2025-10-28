@@ -2,6 +2,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from typing import Callable, List, Tuple
+
+from pandas._libs.tslibs import dt64arr_to_periodarr
 from Pretrain.Planners.Backbone.Dit import DiT1d
 import torch
 import torch.nn as nn
@@ -305,7 +307,8 @@ class Acc_AdjointMatchingFineTuner:
             print(current_a)
             y, jvp_out = jvp(self.old_score_net, (T, t_now.unsqueeze(0)), (current_a, torch.zeros_like(t_now.unsqueeze(0)).to(self.device))) 
             Jov_a = jvp_out.to(self.device)
-            #new_a = current_a  + dt * ( (self.k[i] * T) + (2 * self.k[i] * Jov_a) )
+            print(dt)
+            exit()
             new_a = current_a  + dt * ( (k_reversed[i] * current_a) + (2 * k_reversed[i] * Jov_a) )
             new_a = new_a.detach().clone().to(self.device)
             a.append(new_a)
