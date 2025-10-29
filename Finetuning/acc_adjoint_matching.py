@@ -160,6 +160,7 @@ class Acc_AdjointMatchingFineTuner:
             self.ema_model.load_state_dict(base_new_score_net.state_dict())
             return
         self.ema.update_model_average(self.ema_model, base_new_score_net)
+        print(f"EMA model updated")
         
     def save(self, step):
         self.ema_model.eval()
@@ -449,7 +450,6 @@ class Acc_AdjointMatchingFineTuner:
                 
                 if ((step % self.config.update_ema_every) == 0):
                      self.step_ema(step)
-                     exit()
 
                 if ((step % self.config.log_freq) == 0):
                     print('---------------------------------------------------------')
