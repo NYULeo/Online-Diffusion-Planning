@@ -25,7 +25,6 @@ try:
     from accelerate import Accelerator
 except ImportError:
     raise ImportError("accelerate is required but not installed. Run: pip install accelerate")
-import torch.distributed as dist
 
 
 
@@ -414,7 +413,6 @@ class Acc_AdjointMatchingFineTuner:
         
         return 0.0, 0.0, total_avgC
 
-
     def finetune_planner(self, dataloader: DataLoader, reward_model: TotalReward):
         reward_model.eval()
         self.set_optimizer_and_scheduler()
@@ -476,7 +474,3 @@ class Acc_AdjointMatchingFineTuner:
              step = step+1
              self.accelerator.wait_for_everyone()
         
-            
-          
-
-

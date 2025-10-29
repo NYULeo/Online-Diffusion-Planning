@@ -3,7 +3,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dataclasses import dataclass
 from utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker
-from traj_reward import RewardConfig
+from traj_reward import RewardConfig, TotalReward
 from adjoint_matching import AdjointMatchingFineTuner, AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
 from Pretrain.Planners.Backbone.Dit import DiT1d
@@ -17,7 +17,7 @@ import torch
 import copy
 import os
 from accelerate import Accelerator
-from traj_reward import TotalReward
+
 
 @dataclass
 class FinetuningConfig():
@@ -56,10 +56,11 @@ class OnlineFinetuner():
 
         
         self.Initialize_reward_model(self.device)
+      
         self.AMFineTuner = Acc_AdjointMatchingFineTuner(
-            self.accelerator,
-            self.config.planner_checkpoint, 
-            self.config.AMConfig)
+                   self.accelerator,
+                   self.config.planner_checkpoint, 
+                   self.config.AMConfig)
 
         self.Initialize_Buffer()
 
@@ -79,23 +80,6 @@ class OnlineFinetuner():
     def update_dataset(self, trajs: List[TrajectoryDict]):
         self.Buffer.extend(trajs)
         self.PlannerDataset = PlannerDataset(self.Buffer, self.config.AMConfig.horizon, self.config.dataset_name, self.config.specific_dataset)
-    
-    """
-    def save(self, step):
-        self.eval()
-        data = {
-            'dataset_name': self.config.dataset_name,
-            'specific_dataset': self.config.specific_dataset,
-            'step': step,
-            'ema': self.ema_model.state_dict()
-        }
-        model_name = get_PlannerName(self.config.dataset_name, self.config.specific_dataset)
-        file_name = model_name + '_' + str(step) + '.pt'
-        os.makedirs(self.logdir, exist_ok=True)
-        savepath = os.path.join(self.logdir, file_name)
-        torch.save(data, savepath)
-        print(f'Saved model to {savepath}', flush=True)
-    """
 
     def finetune_planner(self):
         if self.accelerator.is_main_process:
@@ -121,6 +105,7 @@ class OnlineFinetuner():
              dataloader = DataLoader(self.PlannerDataset, self.config.finetune_batch_size, pin_memory = True, num_workers = 2,  sampler = sampler,  drop_last = True)
         else:
              dataloader = DataLoader(self.PlannerDataset, self.config.finetune_batch_size, pin_memory = True, num_workers = 2, shuffle = True, drop_last = True)
+        
         self.AMFineTuner.finetune_planner(dataloader, self.reward_model)
             
 
