@@ -10,6 +10,7 @@ from traj_reward import RewardConfig
 import random
 import numpy as np
 import torch
+import torch.multiprocessing as mp
 
 
 def set_seed(seed: int):
@@ -48,6 +49,6 @@ if __name__ == "__main__":
         finetune_lr = 1e-4)
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
-    OnlineFinetuner.finetune_planner()
+    mp.spawn(OnlineFinetuner.finetune_planner(), args=(), nprocs=4)
 
 
