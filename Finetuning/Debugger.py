@@ -111,9 +111,9 @@ import torch
         return a, reward.item()
     """
 
-a = torch.tensor([1,2,3])
+a = torch.tensor([1.0,2.0,3.0], requires_grad = True)
 a = -1 * a.unsqueeze(0)
-print(a)
+print(a.detach())
 
 
 """

@@ -47,7 +47,7 @@ class Acc_AdjointMatchingConfig:
     s: float = 0.008  # cosine schedule offset used in base drift
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     lam: float = 0.1
-    step_start_ema = 50
+    step_start_ema = 1
     ema_decay = 0.999
     update_ema_every = 2
     save_freq = 50
@@ -154,6 +154,7 @@ class Acc_AdjointMatchingFineTuner:
         self.reward_tracker = RewardTracker(save_dir=f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/logs/")
 
     def step_ema(self, step):
+        self.ema_model.to(self.device)
         base_new_score_net = self.accelerator.unwrap_model(self.new_score_net)
         if step < self.config.step_start_ema:
             self.ema_model.load_state_dict(base_new_score_net.state_dict())
@@ -448,6 +449,7 @@ class Acc_AdjointMatchingFineTuner:
                 
                 if ((step % self.config.update_ema_every) == 0):
                      self.step_ema(step)
+                     exit()
 
                 if ((step % self.config.log_freq) == 0):
                     print('---------------------------------------------------------')
