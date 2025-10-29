@@ -35,8 +35,8 @@ class Acc_AdjointMatchingConfig:
     """Configuration for the adjoint matching fine‑tuner."""
 
     horizon: int
-    finetune_lr: float = 2e-4
-    finetune_steps: int = 1000
+    finetune_lr: float = 1e-4
+    finetune_steps: int = 10000
     d_s: Optional[int] = None
     d_a: Optional[int] = None
     dataset_name: Optional[str] = None
@@ -47,7 +47,7 @@ class Acc_AdjointMatchingConfig:
     s: float = 0.008  # cosine schedule offset used in base drift
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     lam: float = 0.1
-    step_start_ema = 1
+    step_start_ema = 50
     ema_decay = 0.999
     update_ema_every = 2
     save_freq = 50
@@ -160,7 +160,7 @@ class Acc_AdjointMatchingFineTuner:
             self.ema_model.load_state_dict(base_new_score_net.state_dict())
             return
         self.ema.update_model_average(self.ema_model, base_new_score_net)
-        print(f"EMA model updated")
+        
         
     def save(self, step):
         self.ema_model.eval()
@@ -175,7 +175,7 @@ class Acc_AdjointMatchingFineTuner:
         os.makedirs(self.logdir, exist_ok=True)
         savepath = os.path.join(self.logdir, file_name)
         torch.save(data, savepath)
-        print(f'Saved model to {savepath}', flush=True)
+        print(f"saved model to {savepath}")
     
     def vector_field(self, x: torch.Tensor, t: torch.Tensor, score_model: DiT1d) -> torch.Tensor:
         # Compute beta(t) from cosine schedule
