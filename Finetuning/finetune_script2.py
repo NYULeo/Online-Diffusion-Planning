@@ -49,6 +49,7 @@ if __name__ == "__main__":
         finetune_lr = 1e-4)
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
-    mp.spawn(OnlineFinetuner.finetune_planner(), args=(), nprocs=4)
+    #mp.spawn(OnlineFinetuner.finetune_planner(), args=(), nprocs=4)
+    OnlineFinetuner.finetune_planner()
 
 
