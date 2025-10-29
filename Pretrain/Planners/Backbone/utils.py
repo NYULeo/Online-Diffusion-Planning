@@ -353,7 +353,8 @@ def get_pretrained_planner(dataset_name, specific_dataset, checkpoint_steps):
       checkpoint_path = f"./Pretrain/Planners/{dataset_name}/{specific_dataset}/Models/{planner_name}_{checkpoint_steps}.pt"
       if not os.path.exists(checkpoint_path):
           raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
-      checkpoint = torch.load(checkpoint_path, map_location='cpu')
+      #checkpoint = torch.load(checkpoint_path, map_location='cpu')
+      checkpoint = torch.load(checkpoint_path,  weights_only=True)
       return checkpoint['ema']
 
 

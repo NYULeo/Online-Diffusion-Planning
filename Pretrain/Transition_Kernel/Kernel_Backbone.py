@@ -65,7 +65,8 @@ def count_files_in_folder(folder_path):
 
 def load_model(kernel_name, num_steps, ensemble_idx):
     load_path = f'./Pretrain/Transition_Kernel/{kernel_name}/Models/{num_steps}/{kernel_name}_{num_steps}_{ensemble_idx}.pkl'
-    state_dict = torch.load(load_path, map_location='cpu')
+    #state_dict = torch.load(load_path, map_location='cpu')
+    state_dict = torch.load(load_path, weights_only=True)
     return state_dict
 
 

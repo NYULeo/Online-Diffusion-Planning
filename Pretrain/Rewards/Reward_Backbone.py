@@ -34,7 +34,8 @@ def save_model(reward_net, reward_name, num_steps):
 
 def load_model(reward_name, num_steps):
     load_path = f'./Pretrain/Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
-    state_dict = torch.load(load_path, map_location='cpu')
+    #state_dict = torch.load(load_path, map_location='cpu')
+    state_dict = torch.load(load_path, weights_only=True)
     return state_dict
 """
 class Reward_Processor():
