@@ -413,7 +413,7 @@ class Acc_AdjointMatchingFineTuner:
         
         return 0.0, 0.0, total_avgC
 
-    def finetune_planner(self, dataloader: DataLoader, reward_model: TotalReward):
+    def finetune_planner(self, rank: int, dataloader: DataLoader, reward_model: TotalReward):
         reward_model.eval()
         self.set_optimizer_and_scheduler()
         self.set_ema_model()
