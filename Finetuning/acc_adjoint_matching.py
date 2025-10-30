@@ -298,8 +298,8 @@ class Acc_AdjointMatchingFineTuner:
         for i in range(steps_T - 1):
             #t_now, t_next = self.t_asc[i], self.t_asc[i + 1]
             t_now, t_next = t_asc_reversed[i], t_asc_reversed[i+1]
-            #dt = (t_now - t_next)
-            dt = (t_next - t_now)
+            dt = (t_now - t_next)
+            #dt = (t_next - t_now)
             T = X_reversed[i].to(self.device)
             T.requires_grad_(True)
             current_a = a[i].to(self.device) 
