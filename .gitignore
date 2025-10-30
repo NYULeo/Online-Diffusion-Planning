@@ -120,3 +120,46 @@ logs/
 *_backup.*
 *.backup
 *.bak
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+*.log
+
+# Large artifacts
+*.pt
+*.pkl
+*.pth
+*.ckpt
+*.npz
+*.npy
+
+# Model directories
+Pretrain/Planners/**/Models/
+Pretrain/Rewards/**/Models/
+Pretrain/Transition_Kernel/**/Models/
+Pretrain/**/Stats/*.pkl
+Pretrain/Rollouts/**/Generated_trajs_Info.pkl
+
+# Outputs
+*.txt
+output.txt
