@@ -45,7 +45,7 @@ class Acc_AdjointMatchingConfig:
     num_steps: int = 500
     s: float = 0.008  # cosine schedule offset used in base drift
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    lam: float = 0.1
+    lam: float = 0.0
     step_start_ema = 50
     ema_decay = 0.999
     update_ema_every = 2
