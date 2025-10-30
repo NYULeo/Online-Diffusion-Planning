@@ -148,6 +148,7 @@ print(a.detach())
              avg_loss = loss_for_backprop.detach().item()
              return avg_loss, avg_reward, total_avgC
     """
-import torch.nn.functional as F
-delta = F.softplus(torch.tensor([0.0], requires_grad=False), beta=1.0)
-print(delta)
+t_asc = torch.linspace(1.0, 0.0, 10)
+a = torch.flip(t_asc, dims = [0])
+print(a)
+
