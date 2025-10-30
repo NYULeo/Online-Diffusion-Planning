@@ -326,7 +326,8 @@ class Acc_AdjointMatchingFineTuner:
             v_new = self.vector_field(traj_x_i, self.t_asc[i].detach().to(self.device), self.new_score_net).squeeze(0).flatten().to(self.device)
             v_old = self.vector_field(traj_x_i, self.t_asc[i].detach().to(self.device), self.old_score_net).squeeze(0).flatten().detach().to(self.device)
             sigma = self.sigma_t(self.k[i]).detach().to(self.device)
-            Loss = Loss + ((v_new - v_old) * (2/sigma) + sigma * adjoint_i).pow(2).mean()
+            #Loss = Loss + ((v_new - v_old)*(2/sigma) + (sigma * adjoint_i)).pow(2).mean()
+            Loss = Loss + ((v_new * (2/sigma)) + (sigma * adjoint_i)).pow(2).mean()
         Loss = Loss / len(traj_x)
         return Loss
     
@@ -378,7 +379,7 @@ class Acc_AdjointMatchingFineTuner:
         #all_loss_tensors = self.accelerator.gather_for_metrics(local_loss_tensors, use_gather_object=False)
         
         #loss_global = self.accelerator.reduce(local_loss, reduction="mean")
-        loss_global = self.accelerator.reduce(local_loss, reduction="sum")
+        loss_global = self.accelerator.reduce(local_loss, reduction="mean")
          # Check whether the loss_global still has gradient
          # (print only on main process)
         if self.accelerator.is_main_process:
