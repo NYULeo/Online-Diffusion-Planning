@@ -106,10 +106,9 @@ class OnlineFinetuner():
              dataloader = DataLoader(self.PlannerDataset, self.config.finetune_batch_size, pin_memory = True, num_workers = 2,  sampler = sampler,  drop_last = True)
         else:
              dataloader = DataLoader(self.PlannerDataset, self.config.finetune_batch_size, pin_memory = True, num_workers = 2, shuffle = True, drop_last = True)
-        mp.set_start_method("spawn")
-        mp.set_sharing_strategy('file_system')
-        mp.spawn(self.AMFineTuner.finetune_planner, args=(dataloader, self.reward_model), nprocs = 2)
-        #self.AMFineTuner.finetune_planner(dataloader, self.reward_model)
+       
+        #mp.spawn(self.AMFineTuner.finetune_planner, args=(dataloader, self.reward_model), nprocs = 2)
+        self.AMFineTuner.finetune_planner(dataloader, self.reward_model)
             
 
 
