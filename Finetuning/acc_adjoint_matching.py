@@ -436,6 +436,7 @@ class Acc_AdjointMatchingFineTuner:
              conds = next(dataloader)
             
              loss, avg_reward, avg_C = self.step(conds, reward_model)
+             print(f"Lambda: {self.Lam.get_lam()}")
 
              total_loss += loss
              total_reward += avg_reward
