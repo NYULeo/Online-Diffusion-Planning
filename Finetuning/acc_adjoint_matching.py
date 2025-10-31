@@ -415,10 +415,9 @@ class Acc_AdjointMatchingFineTuner:
                 avg_loss = float(all_losses.sum().item())
             avg_reward = float(sum(all_rewards) / len(all_rewards))
             var_reward = np.var(all_rewards)
-            print
             return avg_loss, avg_reward, total_avgC, var_reward
         
-        return 0.0, 0.0, total_avgC, var_reward
+        return 0.0, 0.0, total_avgC, 0.0
 
     def finetune_planner(self, dataloader: DataLoader, reward_model: TotalReward):
         reward_model.eval()
