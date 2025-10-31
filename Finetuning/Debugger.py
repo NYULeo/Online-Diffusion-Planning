@@ -111,9 +111,7 @@ import torch
         return a, reward.item()
     """
 
-a = torch.tensor([1.0,2.0,3.0], requires_grad = True)
-a = -1 * a.unsqueeze(0)
-print(a.detach())
+
 
 
 """
@@ -144,11 +142,28 @@ print(a.detach())
              self.scheduler.step()
              print(f"Loss after backward: {loss_for_backprop}")
 
-             # For logging compute float of loss
+             # For logging compute float of 
+             # loss
              avg_loss = loss_for_backprop.detach().item()
              return avg_loss, avg_reward, total_avgC
     """
-t_asc = torch.linspace(1.0, 0.0, 10)
-a = torch.flip(t_asc, dims = [0])
-print(a)
+
+import math
+def sigma_t(k: torch.Tensor) -> torch.Tensor:
+        if(float(k) < 0):
+           return torch.sqrt(-2 * k)
+        else:
+           raise ValueError(f'K should be negative, but got {k}')
+
+def kt(t: torch.Tensor) -> torch.Tensor:
+       t = t.clamp(0.0, 1.0 - 1e-3)
+       a = (math.pi / 2.0) * ((t + 0.008) / (1.0 + 0.008))
+       return (-0.5) * (math.pi / (1.0 + 0.008)) * torch.tan(a)   
+
+t_asc = torch.linspace(1.0, 0.0, 500)
+kts = kt(t_asc)
+sigmas = []
+for k in kts:
+    sigmas.append(sigma_t(k))
+print(sigmas)
 

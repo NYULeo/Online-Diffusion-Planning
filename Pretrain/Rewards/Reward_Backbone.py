@@ -35,7 +35,7 @@ def save_model(reward_net, reward_name, num_steps):
 def load_model(reward_name, num_steps):
     load_path = f'./Pretrain/Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
     #state_dict = torch.load(load_path, map_location='cpu')
-    state_dict = torch.load(load_path, weights_only=True)
+    state_dict = torch.load(load_path, weights_only=True, map_location='cpu')
     return state_dict
 """
 class Reward_Processor():
@@ -108,7 +108,7 @@ class RewardDataset(Dataset):
             obs = np.asarray(traj['observations'])      
             acts = np.asarray(traj['actions'])
             rews = np.asarray(traj['rewards'])
-            #rews = gaussian_filter1d(rews, sigma)
+            rews = gaussian_filter1d(rews, sigma)
             for t in range(len(acts)):
                 obs_t = self.stats.norm_obs(obs[t])
                 a_t   = acts[t]

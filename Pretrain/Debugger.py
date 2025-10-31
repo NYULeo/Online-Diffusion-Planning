@@ -253,50 +253,58 @@ env.close()
 media.write_video('video.mp4', frames, fps=50)
 """
 
-save_path = f'./Pretrain/Rollouts/{'kitchen'}/{'partial'}/Generated_trajs_Info.pkl'
+save_path = f'./Pretrain/Rollouts/{'pointmaze'}/{'medium'}/Generated_trajs_Info.pkl'
 with open(save_path, 'rb') as f:
     data = pickle.load(f)
 gen_trajs = data['trajs']
 
 
-data_partial = get_dataset('kitchen', 'partial')
-trajs_partial = data_partial.get_trajectories()
-
-data_complete = get_dataset('kitchen', 'complete')
+data_complete = get_dataset('pointmaze', 'medium')
 trajs_complete = data_complete.get_trajectories()
 
 
-reward_model_state_dict, obs_dim, act_dim, name = get_pretrained_reward('kitchen', 950, 'partial')
+reward_model_state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', 9900, 'medium')
 reward_model = ScalarReward(obs_dim, act_dim)
 reward_model.load_state_dict(reward_model_state_dict)
 reward_model.eval()
-stats = get_pretrained_reward_stats('Kitchen_Reward')
+stats = get_pretrained_reward_stats(name)
 
 
 
 
 total = 0.0
-for i in range(len(trajs_complete)):
-     traj = trajs_complete[i]
+for i in range(len(gen_trajs)):
+     traj = gen_trajs[i]
      traj_reward = 0.0
+     Grad_sum = 0.0
      for j in range(len(traj['actions'])):
           obs = traj['observations'][j].copy()
           action = traj['actions'][j].copy()
           obs_norm = stats.norm_obs(obs)
           action_norm = action
-          obs_norm = torch.tensor(obs_norm, dtype = torch.float32).unsqueeze(0)
-          action_norm = torch.tensor(action_norm, dtype = torch.float32).unsqueeze(0)
+          obs_norm = torch.tensor(obs_norm, dtype = torch.float32, requires_grad = True).unsqueeze(0)
+          action_norm = torch.tensor(action_norm, dtype = torch.float32, requires_grad = True).unsqueeze(0)
           pred = reward_model.predict(obs_norm, action_norm)
+          grad = torch.autograd.grad(
+                 outputs=pred,
+                 inputs=(obs_norm, action_norm),
+                 grad_outputs=torch.ones_like(pred),
+                 create_graph=False,
+                 retain_graph=False)
+          grad_obs = grad[0].squeeze(0)
+          grad_action = grad[1].squeeze(0)
+          Grad_sum += grad_obs.norm().item() + grad_action.norm().item()
           traj_reward += pred.item()
+     print(f"Grad_sum: {Grad_sum / len(traj['actions'])}")
      traj_reward = traj_reward / len(traj['actions'])
      #print(f"Traj {i} reward: {traj_reward:.4f}")
      total += traj_reward
      
-total = total / len(trajs_complete)
+total = total / len(gen_trajs)
 print(f"Complete Total reward: {total:.4f}")
 
 
-
+"""
 total = 0.0
 for i in range(len(trajs_partial)):
      traj = trajs_partial[i]
@@ -344,5 +352,5 @@ for i in range(len(gen_trajs)):
 total = total / len(gen_trajs)
 print(f"gen_Total reward: {total:.4f}")
 
-
+"""
 
