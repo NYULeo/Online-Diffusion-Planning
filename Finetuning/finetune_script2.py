@@ -44,8 +44,8 @@ if __name__ == "__main__":
         reward_model_checkpoint = 9900,
         kernel_model_checkpoint = 34000,
         finetune_steps = 10000,
-        finetune_batch_size = 128,
-        finetune_lr = 2e-4)
+        finetune_batch_size = 64,
+        finetune_lr = 1e-4)
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     #mp.spawn(OnlineFinetuner.finetune_planner(), args=(), nprocs=4)

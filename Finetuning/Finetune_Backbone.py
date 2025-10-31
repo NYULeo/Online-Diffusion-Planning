@@ -94,6 +94,7 @@ class OnlineFinetuner():
             print('Finetuning Hyperparameters: ---------------------------------------------------------------')
             print(f"finetune_batch_size: {self.config.finetune_batch_size}")
             print(f"finetune_lr: {self.config.finetune_lr}")
+            print(f"reward_scaling_factor: {self.config.AMConfig.reward_scaling_factor}")
             print(f"finetune_steps: {self.config.finetune_steps}")
             print(f"sampling steps: {self.config.AMConfig.num_steps}")
             print('Device Details: ---------------------------------------------------------------------------')
