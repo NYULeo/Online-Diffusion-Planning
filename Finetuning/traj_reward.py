@@ -10,6 +10,7 @@ from Pretrain.Transition_Kernel.Kernel_Backbone import get_pretrained_kernel, ge
 from typing import Optional
 from torch.nn import functional as F
 from dataclasses import dataclass
+import numpy as np
 
 
 
@@ -114,8 +115,10 @@ class TotalReward(nn.Module):
         for i in range(H-1):
             s = x[i][:self.config.d_s]
             s_norm = self.reward_processor(s).unsqueeze(0).requires_grad_(True)
+            #s_norm_reward = self.reward_processor(s).unsqueeze(0).requires_grad_(True)
             a = x[i][self.config.d_s:].unsqueeze(0).requires_grad_(True)
             s_next = x[i+1][:self.config.d_s]
+            #s_norm_kernel = self.kernel_processor(s).unsqueeze(0).requires_grad_(True)
             s_next_norm = self.kernel_processor(s_next).unsqueeze(0).requires_grad_(True)
 
             r = self.reward_net.predict(s_norm, a)
@@ -129,7 +132,7 @@ class TotalReward(nn.Module):
                         create_graph = False,
                         retain_graph = False
                     )
-            r_s = grads[0].squeeze(0)
+            r_s = grads[0].squeeze(0) * ((np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)))
             r_a = grads[1].squeeze(0)
             r_s_grad, r_a_grad = self.makeGrad(H, r_s, r_a, i)
             
@@ -141,7 +144,7 @@ class TotalReward(nn.Module):
                         create_graph = False,
                         retain_graph = False
                     )
-            var_s = grads[0].squeeze(0)
+            var_s = grads[0].squeeze(0) * (np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor))
             var_a = grads[1].squeeze(0)
             var_s_grad, var_a_grad = self.makeGrad(H, var_s, var_a, i)
             
@@ -154,9 +157,9 @@ class TotalReward(nn.Module):
                         retain_graph = True
                         
                     )
-            c_s = grads[0].squeeze(0)
+            c_s = grads[0].squeeze(0) 
             c_a = grads[1].squeeze(0)   
-            c_s_next = grads[2].squeeze(0)
+            c_s_next = grads[2].squeeze(0) * (np.maximum(self.kernel_stat.obs_std, self.kernel_stat.std_floor))
             c_s_grad, c_a_grad, c_s_next_grad = self.makeGrad(H, c_s, c_a, i, c_s_next)
            
             gradient +=  (1/H)*((r_s_grad + r_a_grad) + self.config.gamma * (var_s_grad + var_a_grad)) - lam * (1/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad)
@@ -177,7 +180,7 @@ class TotalReward(nn.Module):
                         create_graph = False,
                         retain_graph = False
                 )
-        r_s = grads[0].squeeze(0)
+        r_s = grads[0].squeeze(0) * (np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor))
         r_a = grads[1].squeeze(0)
         r_s_grad, r_a_grad = self.makeGrad(H, r_s, r_a, H-1)
 
@@ -189,7 +192,7 @@ class TotalReward(nn.Module):
                         create_graph = False,
                         retain_graph = False
                     )
-        var_s = grads[0].squeeze(0)
+        var_s = grads[0].squeeze(0) * (np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor))
         var_a = grads[1].squeeze(0)
         var_s_grad, var_a_grad = self.makeGrad(H, var_s, var_a, H-1)
 
