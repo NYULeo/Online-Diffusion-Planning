@@ -288,6 +288,7 @@ class Acc_AdjointMatchingFineTuner:
         T = X_reversed[0]
         T_squeezed = T.squeeze(0).to(self.device)
         reward, gradient = reward_model(T_squeezed, self.Lam.get_lam())
+        print(f'reward gradient norm: {gradient.norm()}')
         
         #print(f"gradient norm: {gradient.norm()}")
         t_asc_reversed = torch.flip(self.t_asc, dims = [0]).to(self.device)
@@ -414,7 +415,9 @@ class Acc_AdjointMatchingFineTuner:
                 #avg_loss = float(torch.cat(all_losses).mean().item())
                 avg_loss = float(all_losses.sum().item())
             avg_reward = float(sum(all_rewards) / len(all_rewards))
-            return avg_loss, avg_reward, total_avgC
+            var_reward = np.var(all_rewards)
+            print
+            return avg_loss, avg_reward, total_avgC, var_reward
         
         return 0.0, 0.0, total_avgC
 
@@ -435,15 +438,17 @@ class Acc_AdjointMatchingFineTuner:
         total_loss = 0.0
         total_reward = 0.0
         total_C = 0.0
+        total_var_reward = 0.0
         while step < self.config.finetune_steps:
              conds = next(dataloader)
             
-             loss, avg_reward, avg_C = self.step(conds, reward_model)
+             loss, avg_reward, avg_C, var_reward = self.step(conds, reward_model)
              print(f"Lambda: {self.Lam.get_lam()}")
 
              total_loss += loss
              total_reward += avg_reward
              total_C += avg_C
+             total_var_reward += var_reward
              
              self.accelerator.wait_for_everyone()
            
@@ -459,6 +464,7 @@ class Acc_AdjointMatchingFineTuner:
                     print('---------------------------------------------------------')
                     print(f"step: {step}, loss {total_loss / self.config.log_freq}")
                     print(f"step: {step}, reward {total_reward / self.config.log_freq}")
+                    print(f'step: {step}, var_reward {total_var_reward / self.config.log_freq}')
                     print(f"step: {step}, constraint {total_C / self.config.log_freq}")
                     total_loss = 0.0
                     total_reward = 0.0
