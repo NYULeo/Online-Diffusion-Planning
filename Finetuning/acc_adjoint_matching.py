@@ -418,7 +418,7 @@ class Acc_AdjointMatchingFineTuner:
             print
             return avg_loss, avg_reward, total_avgC, var_reward
         
-        return 0.0, 0.0, total_avgC
+        return 0.0, 0.0, total_avgC, var_reward
 
     def finetune_planner(self, dataloader: DataLoader, reward_model: TotalReward):
         reward_model.eval()
