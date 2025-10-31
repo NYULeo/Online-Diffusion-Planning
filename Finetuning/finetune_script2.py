@@ -10,7 +10,6 @@ from traj_reward import RewardConfig
 import random
 import numpy as np
 import torch
-import torch.multiprocessing as mp
 
 
 def set_seed(seed: int):
