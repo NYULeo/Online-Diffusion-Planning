@@ -17,5 +17,5 @@ if __name__ == '__main__':
     trajs = trajs,
     sigma = 3, 
     target_reward = 5.0,
-    save_freq = 50, 
-    num_steps = 1000)
+    save_freq = 1000, 
+    num_steps = 100000)
