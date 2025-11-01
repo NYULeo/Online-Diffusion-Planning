@@ -2,8 +2,6 @@
 
 import sys
 import os
-
-from torch._dynamo.polyfills import predicate
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from typing import Optional
 from Dataset import KitchenDataset, PointMazeDataset, get_dataset, get_env
