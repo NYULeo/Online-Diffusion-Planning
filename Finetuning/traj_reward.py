@@ -132,7 +132,7 @@ class TotalReward(nn.Module):
                         create_graph = False,
                         retain_graph = False
                     )
-            r_s = grads[0].squeeze(0) * torch.tensor((np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)), 
+            r_s = grads[0].squeeze(0) * torch.tensor((1/np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)), 
                                                    device = self.config.device, dtype=torch.float32, requires_grad = False)
             r_a = grads[1].squeeze(0)
             r_s_grad, r_a_grad = self.makeGrad(H, r_s, r_a, i)
@@ -145,7 +145,7 @@ class TotalReward(nn.Module):
                         create_graph = False,
                         retain_graph = False
                     )
-            var_s = grads[0].squeeze(0) * torch.tensor((np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)), 
+            var_s = grads[0].squeeze(0) * torch.tensor((1/np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)), 
                                                    device = self.config.device, dtype=torch.float32, requires_grad = False)
             var_a = grads[1].squeeze(0)
             var_s_grad, var_a_grad = self.makeGrad(H, var_s, var_a, i)
@@ -161,7 +161,7 @@ class TotalReward(nn.Module):
                     )
             c_s = grads[0].squeeze(0) 
             c_a = grads[1].squeeze(0)   
-            c_s_next = grads[2].squeeze(0) * torch.tensor(np.maximum(self.kernel_stat.obs_std, self.kernel_stat.std_floor),
+            c_s_next = grads[2].squeeze(0) * torch.tensor(1/np.maximum(self.kernel_stat.obs_std, self.kernel_stat.std_floor),
                                                    device = self.config.device, dtype=torch.float32, requires_grad = False)
             c_s_grad, c_a_grad, c_s_next_grad = self.makeGrad(H, c_s, c_a, i, c_s_next)
            
@@ -183,7 +183,7 @@ class TotalReward(nn.Module):
                         create_graph = False,
                         retain_graph = False
                 )
-        r_s = grads[0].squeeze(0) * torch.tensor((np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)), 
+        r_s = grads[0].squeeze(0) * torch.tensor((1/np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)), 
                                                device = self.config.device, dtype=torch.float32, requires_grad = False)
         r_a = grads[1].squeeze(0)
         r_s_grad, r_a_grad = self.makeGrad(H, r_s, r_a, H-1)
@@ -196,7 +196,7 @@ class TotalReward(nn.Module):
                         create_graph = False,
                         retain_graph = False
                     )
-        var_s = grads[0].squeeze(0) * torch.tensor((np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)), 
+        var_s = grads[0].squeeze(0) * torch.tensor((1/np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)), 
                                                 device = self.config.device, dtype=torch.float32, requires_grad = False)
         var_a = grads[1].squeeze(0)
         var_s_grad, var_a_grad = self.makeGrad(H, var_s, var_a, H-1)
@@ -204,3 +204,6 @@ class TotalReward(nn.Module):
         gradient += (1/H) * ((r_s_grad + r_a_grad) + self.config.gamma * (var_s_grad + var_a_grad)) 
         total_reward +=  (1/H) * (r.squeeze(0) + self.config.gamma * var.squeeze(0))
         return total_reward, gradient
+
+
+

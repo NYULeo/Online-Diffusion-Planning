@@ -147,23 +147,9 @@ import torch
              avg_loss = loss_for_backprop.detach().item()
              return avg_loss, avg_reward, total_avgC
     """
+import numpy as np
 
-import math
-def sigma_t(k: torch.Tensor) -> torch.Tensor:
-        if(float(k) < 0):
-           return torch.sqrt(-2 * k)
-        else:
-           raise ValueError(f'K should be negative, but got {k}')
-
-def kt(t: torch.Tensor) -> torch.Tensor:
-       t = t.clamp(0.0, 1.0 - 1e-3)
-       a = (math.pi / 2.0) * ((t + 0.008) / (1.0 + 0.008))
-       return (-0.5) * (math.pi / (1.0 + 0.008)) * torch.tan(a)   
-
-t_asc = torch.linspace(1.0, 0.0, 500)
-kts = kt(t_asc)
-sigmas = []
-for k in kts:
-    sigmas.append(sigma_t(k))
-print(sigmas)
-
+a = np.array([1,2,3,4])
+b = torch.tensor(1/np.maximum(a, 5))
+c = torch.tensor([2,2,2,2])
+print(c * b)
