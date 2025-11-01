@@ -148,8 +148,5 @@ import torch
              return avg_loss, avg_reward, total_avgC
     """
 import numpy as np
-
-a = np.array([1,2,3,4])
-b = torch.tensor(1/np.maximum(a, 5))
-c = torch.tensor([2,2,2,2])
-print(c * b)
+rews = np.array([1,2,3,3,3,3,3,3,4,4])
+print(np.all(np.isin(rews, [1,2,3,4,5])))

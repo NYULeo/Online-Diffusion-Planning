@@ -84,7 +84,7 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None):
          
 
 class RewardDataset(Dataset):
-    def __init__(self, trajs, sigma, reward_name):
+    def __init__(self, trajs, sigma, reward_name, target_reward: Optional[float] = None):
             
         # ----- gather raw obs/actions to fit stats -----
         obs_list, act_list = [], []
@@ -97,7 +97,7 @@ class RewardDataset(Dataset):
         obs_all = np.concatenate(obs_list, axis=0)  # [N, d_s]
         #act_all = np.concatenate(act_list, axis=0)  # [N, d_a]
         
-        
+        allowed_values = [0,1]
         #get stats
         self.stats = SAStats()
         self.stats.obs_mean = obs_all.mean(axis=0)
@@ -108,6 +108,10 @@ class RewardDataset(Dataset):
             obs = np.asarray(traj['observations'])      
             acts = np.asarray(traj['actions'])
             rews = np.asarray(traj['rewards'])
+            if(not np.all(np.isin(rews, allowed_values))):
+                raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
+            if(target_reward is not None):
+                rews = self.boost_signal(target_reward, rews)
             rews = gaussian_filter1d(rews, sigma)
             for t in range(len(acts)):
                 obs_t = self.stats.norm_obs(obs[t])
@@ -126,6 +130,12 @@ class RewardDataset(Dataset):
         with open(savepath, 'wb') as f:
               pickle.dump(self.stats, f)
         print(f"saved stats to {savepath}")
+    
+    def boost_signal(self, target_reward, rews):
+        for t in range(len(rews)):
+            if(rews[t] == 1):
+                 rews[t] = target_reward
+        return rews
 
     def __len__(self):
         return len(self.transitions)
@@ -139,12 +149,12 @@ class RewardDataset(Dataset):
         )
     
 
-def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, specific_dataset: Optional[str] = None):
+def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None):
     save_freq = 1000
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
     print(f"Training reward approximator for {dataset_name} Dataset") 
-    dataset = RewardDataset(trajs, sigma, reward_name)
+    dataset = RewardDataset(trajs, sigma, reward_name, target_reward)
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
     
    
@@ -184,15 +194,20 @@ def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, specific_d
 
 
 class test_dataset(Dataset):
-    def __init__(self, trajs, sigma, Reward_name):
+    def __init__(self, trajs, sigma, Reward_name, target_reward: Optional[float] = None):
         stats_path = f'./Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
         with open(stats_path, 'rb') as f:
               self.stats = pickle.load(f)
         transitions = []
+        allowed_values = [0,1]
         for traj in trajs:
             obs = np.asarray(traj['observations'])      
             acts = np.asarray(traj['actions'])
             rews = np.asarray(traj['rewards'])
+            if(not np.all(np.isin(rews, allowed_values))):
+                raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
+            if(target_reward is not None):
+                rews = self.boost_signal(target_reward, rews)
             rews = gaussian_filter1d(rews, sigma)
             for t in range(len(acts)):
                 obs_t = self.stats.norm_obs(obs[t])
@@ -202,6 +217,12 @@ class test_dataset(Dataset):
 
         self.transitions = transitions
     
+    def boost_signal(self, target_reward, rews):
+        for t in range(len(rews)):
+            if(rews[t] == 1):
+                 rews[t] = target_reward
+        return rews
+
     def __len__(self):
         return len(self.transitions)
 
@@ -213,15 +234,15 @@ class test_dataset(Dataset):
             torch.tensor(r, dtype=torch.float32),
         )
         
-def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: float = 3, save_freq: int = 50, num_steps: int = 500):
+def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: float = 3, target_reward: Optional[float] = None, save_freq: int = 50, num_steps: int = 500):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device {device}")
     if(trajs is None): 
         train_Trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
-        dataset = RewardDataset(train_Trajs, sigma, reward_name)
+        dataset = RewardDataset(train_Trajs, sigma, reward_name, target_reward)
     else:
         _, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
-        dataset = test_dataset(trajs, sigma, reward_name)
+        dataset = test_dataset(trajs, sigma, reward_name, target_reward)
     print(f"Testing the reward model on {len(dataset)} samples")
     a = factorint(len(dataset))
     batch_size = int(np.min(list(a.keys())))
@@ -266,15 +287,15 @@ def get_pretrained_reward_stats(Reward_name):
 
 
 
-def test_Single_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: float = 3, num: int = 10000):
+def test_Single_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: float = 3, target_reward: Optional[float] = None, num: int = 10000):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device {device}")
     if(trajs is None): 
         train_Trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
-        dataset = RewardDataset(train_Trajs, sigma, reward_name)
+        dataset = RewardDataset(train_Trajs, sigma, reward_name, target_reward)
     else:
         _, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
-        dataset = test_dataset(trajs, sigma, reward_name)
+        dataset = test_dataset(trajs, sigma, reward_name, target_reward)
     print(f"Testing the reward model on {len(dataset)} samples")
     a = factorint(len(dataset))
     batch_size = int(np.min(list(a.keys())))
