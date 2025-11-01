@@ -289,6 +289,7 @@ class Acc_AdjointMatchingFineTuner:
         T = X_reversed[0]
         T_squeezed = T.squeeze(0).to(self.device)
         reward, gradient = reward_model(T_squeezed, self.Lam.get_lam())
+        print(f"gradient norm: {gradient.norm().item()}")
         
         #print(f"gradient norm: {gradient.norm()}")
         t_asc_reversed = torch.flip(self.t_asc, dims = [0]).to(self.device)
@@ -313,7 +314,7 @@ class Acc_AdjointMatchingFineTuner:
         a.reverse()
         for p in base_old_score_net.parameters():
               p.requires_grad_(False)
-        return a, reward.item(), gradient
+        return a, reward.item()
            
     def adjoint_matching_loss(
         self,
@@ -364,9 +365,8 @@ class Acc_AdjointMatchingFineTuner:
         with self.accelerator.split_between_processes(all_trajs) as local_trajs2:
             local_loss_tensors = []
             local_rewards = []
-            Grads = []
             for traj in local_trajs2:
-                adjoint, reward, gradient = self.make_a(traj, reward_model)
+                adjoint, reward = self.make_a(traj, reward_model)
                 loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
                 #print(f"Rank {self.accelerator.process_index}, Pre-Reduce Loss: {loss_tensor.item()}")
                 #dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)  # Sum first
@@ -374,15 +374,10 @@ class Acc_AdjointMatchingFineTuner:
                 #print(f"Rank {self.accelerator.process_index}, Post-Reduce Loss: {loss_tensor.item()}")
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
-                Grads.append(gradient)
             local_loss = torch.stack(local_loss_tensors).mean()
-            local_Grads = torch.stack(Grads).mean().norm()
+           
         
         self.accelerator.wait_for_everyone()
-        all_Grads = self.accelerator.gather_for_metrics(local_Grads, use_gather_object=True)
-        if self.accelerator.is_main_process:
-              Grad_norm =  float(sum(all_Grads) / len(all_Grads))
-              print(f"Reward Gradient Norm: {Grad_norm}")
           # 4. Gather loss tensors & reward floats across processes
         #all_loss_tensors = self.accelerator.gather_for_metrics(local_loss_tensors, use_gather_object=False)
         
