@@ -327,23 +327,30 @@ def test_Single_Model(dataset_name, specific_dataset: Optional[str] = None, traj
 """
 
 
-
 def grad_norm(s, a, reward_net):
      s.requires_grad_(True)
      a.requires_grad_(True)
      pred = reward_net(s, a)
-     grad_norm_total = 0.0
-     for i in range(len(pred)):
-            grads = torch.autograd.grad(
-                 outputs = pred[i],
-                 inputs = (s[i].unsqueeze(0), a[i].unsqueeze(0)),
-                 grad_outputs = torch.ones_like(pred.sum()),
-                 create_graph = False,
-                 retain_graph = False
-             )
-            grad_s = grads[0].squeeze(0)
-            grad_a = grads[1].squeeze(0)
-            grad_norm = torch.cat([grad_s, grad_a], dim = 0).norm(p=2).item()
-            grad_norm_total += grad_norm
-     grad_norm_avg = grad_norm_total / len(pred)
+     
+     # Compute gradients with respect to the full batch
+     grad_outputs = torch.ones_like(pred)
+     grads_s, grads_a = torch.autograd.grad(
+         outputs=pred,
+         inputs=(s, a),
+         grad_outputs=grad_outputs,
+         create_graph=False,
+         retain_graph=False,
+         allow_unused=True  # In case one input is not used
+     )
+     
+     # Handle case where one input might not be used
+     if grads_s is None:
+         grads_s = torch.zeros_like(s)
+     if grads_a is None:
+         grads_a = torch.zeros_like(a)
+     
+     # Compute per-sample gradient norms
+     grad_norms = torch.cat([grads_s, grads_a], dim=-1).norm(p=2, dim=-1)  # [batch_size]
+     grad_norm_avg = grad_norms.mean().item()
+     
      return pred, grad_norm_avg
