@@ -293,10 +293,10 @@ class ScalarReward(nn.Module):
        # Forward pass through the network
        # We need to manually pass through the network since it expects separate obs, act
        # So we'll split and call forward
-       obs_split = x[..., :self.reward_net.obs_dim]
-       act_split = x[..., self.reward_net.obs_dim:]
+       obs_split = x[..., :self.obs_dim]
+       act_split = x[..., self.obs_dim:]
     
-       alpha, beta = self.reward_net.forward(obs_split, act_split)
+       alpha, beta = self.forward(obs_split, act_split)
     
        # Compute prediction based on aggregation method
        if agg == "mean":
@@ -416,6 +416,7 @@ class LargeScalarReward(nn.Module):
         self.act = nn.ReLU()
         self.norm1 = nn.LayerNorm(hidden_dims[0])
         self.norm2 = nn.LayerNorm(hidden_dims[1])
+        self.norm3 = nn.LayerNorm(hidden_dims[2])
         self.grad_reg_coeff = grad_reg_coeff
         
     def forward(self, s: torch.Tensor, a: torch.Tensor, g: torch.Tensor = None):
@@ -442,7 +443,7 @@ class LargeScalarReward(nn.Module):
         r_hat = self.forward(s, a)
         loss_reg = F.mse_loss(r_hat, r)
         s.requires_grad_(True)
-        r_hat_for_grad = self.model(s, a)
+        r_hat_for_grad = self.forward(s, a)
         grads = torch.autograd.grad(
             outputs=r_hat_for_grad.sum(),
             inputs=s,
@@ -454,9 +455,6 @@ class LargeScalarReward(nn.Module):
         loss = loss_reg + loss_grad_reg
         return loss
         
-
-
-
 
 class Reward(nn.Module):
     def __init__(self, obs_dim, act_dim, hidden = 256):

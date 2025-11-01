@@ -125,7 +125,7 @@ class RewardDataset(Dataset):
     
     def save_stats(self, reward_name):
         stats_name =  str(reward_name) + '_stats.pkl'
-        stats_dir = f'./Rewards/{reward_name}/Stats/'
+        stats_dir = f'./Pretrain/Rewards/{reward_name}/Stats/'
         os.makedirs(stats_dir, exist_ok=True)
         savepath = os.path.join(stats_dir, stats_name)
         with open(savepath, 'wb') as f:
@@ -199,7 +199,7 @@ def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, target_rew
 
 class test_dataset(Dataset):
     def __init__(self, trajs, sigma, Reward_name, target_reward: Optional[float] = None):
-        stats_path = f'./Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
+        stats_path = f'./Pretrain/Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
         with open(stats_path, 'rb') as f:
               self.stats = pickle.load(f)
         transitions = []
@@ -339,7 +339,7 @@ def grad_norm(s, a, reward_net):
                  inputs = (s[i].unsqueeze(0), a[i].unsqueeze(0)),
                  grad_outputs = torch.ones_like(pred.sum()),
                  create_graph = False,
-                 retrain_graph = False
+                 retain_graph = False
              )
             grad_s = grads[0].squeeze(0)
             grad_a = grads[1].squeeze(0)
