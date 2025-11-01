@@ -147,6 +147,3 @@ import torch
              avg_loss = loss_for_backprop.detach().item()
              return avg_loss, avg_reward, total_avgC
     """
-import numpy as np
-rews = np.array([1,2,3,3,3,3,3,3,4,4])
-print(np.all(np.isin(rews, [1,2,3,4,5])))

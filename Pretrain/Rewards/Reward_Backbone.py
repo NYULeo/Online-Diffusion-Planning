@@ -2,6 +2,8 @@
 
 import sys
 import os
+
+from torch._dynamo.polyfills import predicate
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from typing import Optional
 from Dataset import KitchenDataset, PointMazeDataset, get_dataset, get_env
@@ -14,12 +16,13 @@ from Pretrain.utils import set_seed, SAStats
 #from Critic.train_critic import get_CriticName
 import torch.nn as nn
 import pickle
-from .nets import CategoricalReward, ScalarReward, gaussian_rewards
+from .nets import CategoricalReward, ScalarReward, gaussian_rewards, LargeScalarReward
 import os
 from scipy.ndimage import gaussian_filter1d, convolve
 from utils import cycle
 import copy
 from sympy import Predicate, factorint
+import torch.nn.functional as F
 
 
 
@@ -112,7 +115,7 @@ class RewardDataset(Dataset):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
-            rews = gaussian_filter1d(rews, sigma)
+            rews = gaussian_filter1d(rews, sigma, mode="nearest")
             for t in range(len(acts)):
                 obs_t = self.stats.norm_obs(obs[t])
                 a_t   = acts[t]
@@ -158,12 +161,15 @@ def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, target_rew
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
     
    
-    #reward_net = Reward(obs_dim, act_dim).to(device)
+    
+    """
     reward_net = ScalarReward(
         obs_dim,
         act_dim,
         hidden_units=1024,
         num_layers=5).to(device)
+    """
+    reward_net = LargeScalarReward(obs_dim, act_dim, output_scale = target_reward).to(device)
 
     optimizer = optim.Adam(reward_net.parameters(), lr = lr, weight_decay = 1e-5)
     total_loss = 0
@@ -176,7 +182,7 @@ def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, target_rew
         
            # Predicted Reward
            optimizer.zero_grad()
-           loss = reward_net.loss(s, a, r)  # r_batch in [0,1]
+           loss = reward_net.loss(s, a, r)  
            loss.backward()
            optimizer.step()
            total_loss += loss.item()
@@ -250,27 +256,28 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
     num = save_freq
     while num <= num_steps:
          state_dict = load_model(reward_name, num)
-         reward_net = ScalarReward(obs_dim, act_dim).to(device)
+         reward_net = LargeScalarReward(obs_dim, act_dim, output_scale = target_reward).to(device)
          reward_net.load_state_dict(state_dict)
          reward_net.eval()
          total_mean_loss = 0.0
          total_var = 0.0
          total_reward = 0.0
+         Grad_norm_total = 0.0
          for s, a, r in dataloader:
              s = s.to(device)
              a = a.to(device)
              r = r.to(device)
-             pred = reward_net.predict(s, a)
-             var = reward_net.variance(s, a)
-             mean_loss = ((pred - r).abs()).mean()
-             total_mean_loss += mean_loss.item()
-             total_var += var.mean().item()
+             pred, norm = grad_norm(s, a, reward_net)
+             loss = F.mse_loss(pred, r)
+             total_mean_loss += loss.item()
+             total_var += torch.var(pred).item()
              total_reward += pred.mean().item()
+             Grad_norm_total += norm
          avg_mean_loss = total_mean_loss / len(dataloader)
          avg_var = total_var / len(dataloader)
          avg_reward = total_reward / len(dataloader)
-         print(f"model {num}, Loss {avg_mean_loss:.4f}, Variance {avg_var:.4f}, Reward: {avg_reward:.4f}")
-
+         grad_norm_avg = Grad_norm_total / len(dataloader)
+         print(f"model {num}, Loss {avg_mean_loss:.4f}, Reward: {avg_reward:.4f}, Variance: {avg_var:.4f}, Grad_norm: {grad_norm_avg}")
          num += save_freq
 
 def get_pretrained_reward(dataset_name, checkpoints, specific_dataset: Optional[str] = None):
@@ -286,7 +293,7 @@ def get_pretrained_reward_stats(Reward_name):
     return stats
 
 
-
+"""
 def test_Single_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: float = 3, target_reward: Optional[float] = None, num: int = 10000):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device {device}")
@@ -319,8 +326,26 @@ def test_Single_Model(dataset_name, specific_dataset: Optional[str] = None, traj
     avg_mean_loss = total_mean_loss / len(dataloader)
     avg_var = total_var / len(dataloader)
     print(f"model {num}, Loss {avg_mean_loss:.4f}, Variance {avg_var:.4f}")
+"""
 
 
 
-
-    
+def grad_norm(s, a, reward_net):
+     s.requires_grad_(True)
+     a.requires_grad_(True)
+     pred = reward_net(s, a)
+     grad_norm_total = 0.0
+     for i in range(len(pred)):
+            grads = torch.autograd.grad(
+                 outputs = pred[i],
+                 inputs = (s[i].unsqueeze(0), a[i].unsqueeze(0)),
+                 grad_outputs = torch.ones_like(pred.sum()),
+                 create_graph = False,
+                 retrain_graph = False
+             )
+            grad_s = grads[0].squeeze(0)
+            grad_a = grads[1].squeeze(0)
+            grad_norm = torch.cat([grad_s, grad_a], dim = 0).norm(p=2).item()
+            grad_norm_total += grad_norm
+     grad_norm_avg = grad_norm_total / len(pred)
+     return pred, grad_norm_avg

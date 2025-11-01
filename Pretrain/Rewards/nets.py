@@ -382,6 +382,81 @@ def compute_reward_gradients_per_sample(reward_net, obs, act, agg: str = "mean")
       return grad_input, pred
 
 
+class LargeScalarReward(nn.Module):
+    def __init__(
+        self,
+        state_dim: int,
+        action_dim: int,
+        goal_dim: int = 0,
+        hidden_dims=(256, 256, 128),
+        embedding_dim: int = 64,
+        output_scale: float = 5.0,
+        grad_reg_coeff: float = 1e-4,
+    ):
+        """
+        Reward-model head: (s, a[, g]) → r_hat in [0, output_scale]
+        """
+        super().__init__()
+        in_dim = state_dim + action_dim + (goal_dim if goal_dim > 0 else 0)
+        
+        # Feature extractor MLP with residual blocks
+        self.fc1 = nn.Linear(in_dim, hidden_dims[0])
+        self.fc2 = nn.Linear(hidden_dims[0], hidden_dims[1])
+        self.fc3 = nn.Linear(hidden_dims[1], hidden_dims[2])
+        
+        # Residual connection optionally
+        self.residual = nn.Linear(in_dim, hidden_dims[2]) if in_dim != hidden_dims[2] else nn.Identity()
+        
+        self.emb = nn.Linear(hidden_dims[2], embedding_dim)
+        
+        # Final head to scalar reward
+        self.head = nn.Linear(embedding_dim, 1)
+        
+        self.output_scale = output_scale
+        self.act = nn.ReLU()
+        self.norm1 = nn.LayerNorm(hidden_dims[0])
+        self.norm2 = nn.LayerNorm(hidden_dims[1])
+        self.grad_reg_coeff = grad_reg_coeff
+        
+    def forward(self, s: torch.Tensor, a: torch.Tensor, g: torch.Tensor = None):
+        if g is not None:
+            x = torch.cat([s, a, g], dim=-1)
+        else:
+            x = torch.cat([s, a], dim=-1)
+        
+        x0 = self.act(self.norm1(self.fc1(x)))
+        x1 = self.act(self.norm2(self.fc2(x0)))
+        x2 = self.act(self.norm3(self.fc3(x1)))
+        
+        # add residual
+        x2 = x2 + self.residual(x)
+        
+        h = self.act(self.emb(x2))
+        z = self.head(h).squeeze(-1)
+        
+        # Bound output to [0, output_scale] using sigmoid then scaling
+        r_hat = self.output_scale * torch.sigmoid(z)
+        return r_hat
+    
+    def loss(self, s, a, r):
+        r_hat = self.forward(s, a)
+        loss_reg = F.mse_loss(r_hat, r)
+        s.requires_grad_(True)
+        r_hat_for_grad = self.model(s, a)
+        grads = torch.autograd.grad(
+            outputs=r_hat_for_grad.sum(),
+            inputs=s,
+            create_graph=True,
+            retain_graph=True,
+        )[0]
+        grad_norm2 = grads.pow(2).sum(dim=-1).mean()
+        loss_grad_reg = self.grad_reg_coeff * grad_norm2
+        loss = loss_reg + loss_grad_reg
+        return loss
+        
+
+
+
 
 class Reward(nn.Module):
     def __init__(self, obs_dim, act_dim, hidden = 256):
@@ -399,6 +474,9 @@ class Reward(nn.Module):
     def forward(self, obs, act):
         x = torch.cat([obs, act], dim=-1)
         return self.net(x).squeeze(-1)
+
+
+
 
 def gaussian_rewards(episode, sigma):
     if sigma > 0:

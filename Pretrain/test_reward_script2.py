@@ -7,7 +7,7 @@ import copy
 
 
 if __name__ == '__main__':
-    with open('Rollouts/kitchen/partial/Generated_trajs_Info.pkl', 'rb') as f:
+    with open('Rollouts/pointmaze/medium/Generated_trajs_Info.pkl', 'rb') as f:
          trajs_info = pickle.load(f)
     trajs = trajs_info['trajs']
     set_seed(1)
@@ -16,5 +16,6 @@ if __name__ == '__main__':
     specific_dataset = 'partial', 
     trajs = trajs,
     sigma = 3, 
+    target_reward = 5.0,
     save_freq = 50, 
     num_steps = 1000)
