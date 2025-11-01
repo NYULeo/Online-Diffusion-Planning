@@ -12,8 +12,8 @@ if __name__ == '__main__':
     trajs = trajs_info['trajs']
     set_seed(1)
     test_Model(
-    dataset_name = 'kitchen', 
-    specific_dataset = 'partial', 
+    dataset_name = 'pointmaze', 
+    specific_dataset = 'medium', 
     trajs = trajs,
     sigma = 3, 
     target_reward = 5.0,

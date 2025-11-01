@@ -417,10 +417,9 @@ class Acc_AdjointMatchingFineTuner:
                 #avg_loss = float(torch.cat(all_losses).mean().item())
                 avg_loss = float(all_losses.sum().item())
             avg_reward = float(sum(all_rewards) / len(all_rewards))
-            var_reward = np.var(all_rewards)
-            return avg_loss, avg_reward, total_avgC, var_reward
+            return avg_loss, avg_reward, total_avgC
         
-        return 0.0, 0.0, total_avgC, 0.0
+        return 0.0, 0.0, total_avgC
 
     def finetune_planner(self, dataloader: DataLoader, reward_model: TotalReward):
         reward_model.eval()
@@ -439,17 +438,17 @@ class Acc_AdjointMatchingFineTuner:
         total_loss = 0.0
         total_reward = 0.0
         total_C = 0.0
-        total_var_reward = 0.0
+        #total_var_reward = 0.0
         while step < self.config.finetune_steps:
              conds = next(dataloader)
             
-             loss, avg_reward, avg_C, var_reward = self.step(conds, reward_model)
+             loss, avg_reward, avg_C = self.step(conds, reward_model)
              print(f"Lambda: {self.Lam.get_lam()}")
 
              total_loss += loss
              total_reward += avg_reward
              total_C += avg_C
-             total_var_reward += var_reward
+            
              
              self.accelerator.wait_for_everyone()
            
@@ -465,7 +464,6 @@ class Acc_AdjointMatchingFineTuner:
                     print('---------------------------------------------------------')
                     print(f"step: {step}, loss {total_loss / self.config.log_freq}")
                     print(f"step: {step}, reward {total_reward / self.config.log_freq}")
-                    print(f'step: {step}, var_reward {total_var_reward / self.config.log_freq}')
                     print(f"step: {step}, constraint {total_C / self.config.log_freq}")
                     total_loss = 0.0
                     total_reward = 0.0
@@ -476,7 +474,8 @@ class Acc_AdjointMatchingFineTuner:
                 if ((step % self.config.save_freq == 0) and (step!=0)):
                     self.save(step)
                     model_name = get_PlannerName(self.config.dataset_name, self.config.specific_dataset)
-                    self.reward_tracker.save_logs(f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/logs/{model_name}_finetune_reward_logs.pkl")
+                    #self.reward_tracker.save_logs(f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/logs/{model_name}_finetune_reward_logs.pkl")
+                    self.reward_tracker.save_logs(f"{model_name}_finetune_reward_logs.pkl")
                     self.reward_tracker.plot_reward_curve(
                     save_path=f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/logs/{model_name}_finetune_reward_curve.png",
                     title=f"{model_name} Finetuning Avg Reward",
