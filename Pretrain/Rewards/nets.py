@@ -382,73 +382,7 @@ def compute_reward_gradients_per_sample(reward_net, obs, act, agg: str = "mean")
       return grad_input, pred
 
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-class LargeScalarReward(nn.Module):
-    def __init__(
-        self,
-        state_dim: int,
-        action_dim: int,
-        goal_dim: int = 0,
-        hidden_dims=(256,256,128),
-        emb_dim=64,
-        output_scale: float = 1.0
-    ):
-        super().__init__()
-        self.lam = 0.001
-        in_dim = state_dim + action_dim + (goal_dim if goal_dim>0 else 0)
-        self.fc1 = nn.Linear(in_dim, hidden_dims[0])
-        self.act1 = nn.LeakyReLU(0.1)
-        self.fc2 = nn.Linear(hidden_dims[0], hidden_dims[1])
-        self.act2 = nn.LeakyReLU(0.1)
-        self.fc3 = nn.Linear(hidden_dims[1], hidden_dims[2])
-        self.act3 = nn.LeakyReLU(0.1)
-        self.emb = nn.Linear(hidden_dims[2], emb_dim)
-        self.act_emb = nn.LeakyReLU(0.1)
-        self.head = nn.Linear(emb_dim, 1)
-        self.output_scale = output_scale
-
-    def forward(self, s: torch.Tensor, a: torch.Tensor, g: torch.Tensor = None):
-        if g is not None:
-            x = torch.cat([s, a, g], dim=-1)
-        else:
-            x = torch.cat([s, a], dim=-1)
-        x = self.act1(self.fc1(x))
-        x = self.act2(self.fc2(x))
-        x = self.act3(self.fc3(x))
-        h = self.act_emb(self.emb(x))
-        z = self.head(h).squeeze(-1)
-        # Tanh‐based scaling to [‐output_scale, +output_scale]
-        # Then shift to [0, output_scale] if you want only non‐negative
-        r_hat = self.output_scale * torch.tanh(z / (self.output_scale/2))
-        # Optionally shift and scale to [0, output_scale]:
-        # r_hat = (self.output_scale/2) * (torch.tanh(z/(self.output_scale/2)) + 1.0)
-        return r_hat
-
-    
-    def loss(self, s, a, r):
-        pred = self.forward(s, a)
-        loss_mse = F.mse_loss(pred, r)
-        # Compute gradients
-        s = s.detach().requires_grad_(True)
-        a = a.detach().requires_grad_(True)
-
-        r_grad = self.forward(s, a)
-        grads_s = torch.autograd.grad(outputs=r_grad.sum(), inputs=s,
-                              create_graph=True)[0]
-        grads_a = torch.autograd.grad(outputs=r_grad.sum(), inputs=a,
-                              create_graph=True)[0]
-
-        grad_norm_s = grads_s.norm(dim=-1).mean()
-        grad_norm_a = grads_a.norm(dim=-1).mean()
-
-        loss = loss_mse - (self.lam * grad_norm_s) - (self.lam * grad_norm_a)
-        return loss
-
-
-    
+ 
         
 
 class Reward(nn.Module):

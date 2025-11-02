@@ -14,7 +14,7 @@ from Pretrain.utils import set_seed, SAStats
 #from Critic.train_critic import get_CriticName
 import torch.nn as nn
 import pickle
-from Rewards.nets import LargeScalarReward
+from Rewards.nets import ScalarReward
 import os
 from scipy.ndimage import gaussian_filter1d, convolve
 from Pretrain.utils import cycle
@@ -38,19 +38,7 @@ def load_model(reward_name, num_steps):
     #state_dict = torch.load(load_path, map_location='cpu')
     state_dict = torch.load(load_path, weights_only=True, map_location='cpu')
     return state_dict
-"""
-class Reward_Processor():
-     def __init__(self, dataset_name, specific_dataset):
-          critic_name = get_CriticName(dataset_name, specific_dataset)
-          stats_name = critic_name.replace('.pt', '_stats.pkl')
-          with open(stats_name, 'rb') as f:
-                self.stats = pickle.load(f)
-     
-     def preprocess(self, obs, act):
-          obs = self.stats.norm_obs(obs)
-          act = self.stats.norm_act(act)
-          return obs, act
-"""
+
 def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None):
     if(dataset_name == 'kitchen'):
          data_1 = KitchenDataset('complete')
@@ -165,8 +153,8 @@ def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, target_rew
         hidden_units=1024,
         num_layers=5).to(device)
     """
-    reward_net = LargeScalarReward(obs_dim, act_dim, output_scale = target_reward).to(device)
-
+    #reward_net = LargeScalarReward(obs_dim, act_dim, output_scale = target_reward).to(device)
+    reward_net = ScalarReward(obs_dim, act_dim).to(device)
     optimizer = optim.Adam(reward_net.parameters(), lr = lr, weight_decay = 1e-5)
     total_loss = 0
     step = 0
@@ -208,7 +196,7 @@ class test_dataset(Dataset):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
-            rews = gaussian_filter1d(rews, sigma)
+            rews = gaussian_filter1d(rews, sigma, mode = 'nearest')
             for t in range(len(acts)):
                 obs_t = self.stats.norm_obs(obs[t])
                 a_t   = acts[t]
@@ -250,29 +238,23 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
     num = save_freq
     while num <= num_steps:
          state_dict = load_model(reward_name, num)
-         reward_net = LargeScalarReward(obs_dim, act_dim, output_scale = target_reward).to(device)
+         reward_net = ScalarReward(obs_dim, act_dim).to(device)
          reward_net.load_state_dict(state_dict)
          reward_net.eval()
          total_mean_loss = 0.0
-         total_var = 0.0
          total_reward = 0.0
-         Grad_norm_total = 0.0
          for s, a, r in dataloader:
-             #s_norm = Reward_Processor.preprocess(s.squeeze(0)).unsqueeze(0)
              s = s.to(device)
              a = a.to(device)
              r = r.to(device)
-             pred, norm = grad_norm(s, a, reward_net)
+             pred, _, _ = reward_net.predict(s, a)
              loss = F.mse_loss(pred, r)
              total_mean_loss += loss.item()
-             total_var += torch.var(pred).item()
              total_reward += pred.mean().item()
-             Grad_norm_total += norm
+             
          avg_mean_loss = total_mean_loss / len(dataloader)
-         avg_var = total_var / len(dataloader)
          avg_reward = total_reward / len(dataloader)
-         grad_norm_avg = Grad_norm_total / len(dataloader)
-         print(f"model {num}, Loss {avg_mean_loss:.4f}, Reward: {avg_reward:.4f}, Variance: {avg_var:.4f}, Grad_norm: {grad_norm_avg}")
+         print(f"model {num}, Loss {avg_mean_loss:.4f}, Reward: {avg_reward:.4f}")
          num += save_freq
 
 def get_pretrained_reward(dataset_name, checkpoints, specific_dataset: Optional[str] = None):
