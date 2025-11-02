@@ -13,7 +13,7 @@ if __name__ == '__main__':
     batch_size=256, 
     num_steps=100000,   
     lr=1e-4,
-    sigma=50,
+    sigma=3,
     target_reward=1.0,
     specific_dataset='medium')
 
