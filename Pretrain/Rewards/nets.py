@@ -159,9 +159,6 @@ class CategoricalReward(nn.Module):
             predicted_rewards = self.symexp(reward_mean)
             return predicted_rewards
 
-
-
-
 class ScalarReward(nn.Module):
   
     
@@ -325,7 +322,6 @@ class ScalarReward(nn.Module):
            return grad_input, pred
        else:
            return grad_input
-
 
 def compute_reward_gradients_per_sample(reward_net, obs, act, agg: str = "mean"):
       """
