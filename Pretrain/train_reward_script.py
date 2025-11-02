@@ -1,5 +1,8 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Rewards.Reward_Backbone import train_reward
-from utils import set_seed
+from Pretrain.utils import set_seed
 
 
 
@@ -13,7 +16,5 @@ if __name__ == '__main__':
     sigma=50,
     target_reward=1.0,
     specific_dataset='medium')
-
-
 
 

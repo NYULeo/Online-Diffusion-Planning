@@ -14,28 +14,27 @@ from Pretrain.utils import set_seed, SAStats
 #from Critic.train_critic import get_CriticName
 import torch.nn as nn
 import pickle
-from .nets import CategoricalReward, ScalarReward, gaussian_rewards, LargeScalarReward
+from Rewards.nets import LargeScalarReward
 import os
 from scipy.ndimage import gaussian_filter1d, convolve
-from utils import cycle
+from Pretrain.utils import cycle
 import copy
 from sympy import Predicate, factorint
 import torch.nn.functional as F
 
 
 
-
 def save_model(reward_net, reward_name, num_steps):
     reward_net.eval()
     net_dict = reward_net.state_dict()
-    os.makedirs(f'./Pretrain/Rewards/{reward_name}/Models/', exist_ok=True)
-    save_path = f'./Pretrain/Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
+    os.makedirs(f'./Rewards/{reward_name}/Models/', exist_ok=True)
+    save_path = f'./Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
+    print("Exists:", os.path.isfile(save_path), "Size:", os.path.getsize(save_path) if os.path.isfile(save_path) else None)
     torch.save(net_dict, save_path)
     print(f"reward model save to {reward_name}_{num_steps}.pkl")
-    exit()
 
 def load_model(reward_name, num_steps):
-    load_path = f'./Pretrain/Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
+    load_path = f'./Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
     #state_dict = torch.load(load_path, map_location='cpu')
     state_dict = torch.load(load_path, weights_only=True, map_location='cpu')
     return state_dict
@@ -126,7 +125,7 @@ class RewardDataset(Dataset):
     
     def save_stats(self, reward_name):
         stats_name =  str(reward_name) + '_stats.pkl'
-        stats_dir = f'./Pretrain/Rewards/{reward_name}/Stats/'
+        stats_dir = f'./Rewards/{reward_name}/Stats/'
         os.makedirs(stats_dir, exist_ok=True)
         savepath = os.path.join(stats_dir, stats_name)
         with open(savepath, 'wb') as f:
@@ -198,11 +197,11 @@ def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, target_rew
 
 class test_dataset(Dataset):
     def __init__(self, trajs, sigma, Reward_name, target_reward: Optional[float] = None):
-        """
-        stats_path = f'./Pretrain/Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
+    
+        stats_path = f'./Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
         with open(stats_path, 'rb') as f:
               self.stats = pickle.load(f)
-         """
+        
         transitions = []
         allowed_values = [0,1]
         for traj in trajs:
@@ -287,7 +286,7 @@ def get_pretrained_reward(dataset_name, checkpoints, specific_dataset: Optional[
 
 
 def get_pretrained_reward_stats(Reward_name):
-    stats_path = f'./Pretrain/Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
+    stats_path = f'./Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
     with open(stats_path, 'rb') as f:
         stats = pickle.load(f)
     return stats
@@ -356,8 +355,5 @@ def grad_norm(s, a, reward_net):
      grad_norm_avg = grad_norms.mean().item()
      
      return pred, grad_norm_avg
-
-
-
 
 

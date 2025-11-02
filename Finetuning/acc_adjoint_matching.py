@@ -480,7 +480,7 @@ class Acc_AdjointMatchingFineTuner:
                     save_path=f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/logs/{model_name}_finetune_reward_curve.png",
                     title=f"{model_name} Finetuning Avg Reward",
                     show_lr=True,
-                    smooth_window=50
+                    smooth_window=5,
                   ) 
              
              step = step+1
