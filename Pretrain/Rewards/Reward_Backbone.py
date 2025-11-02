@@ -32,6 +32,7 @@ def save_model(reward_net, reward_name, num_steps):
     save_path = f'./Pretrain/Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
     torch.save(net_dict, save_path)
     print(f"reward model save to {reward_name}_{num_steps}.pkl")
+    exit()
 
 def load_model(reward_name, num_steps):
     load_path = f'./Pretrain/Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
