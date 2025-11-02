@@ -2,6 +2,8 @@
 
 import sys
 import os
+
+from Pretrain.Debugger import act_dim
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from typing import Optional
 from Dataset import KitchenDataset, PointMazeDataset, get_dataset, get_env
@@ -197,11 +199,7 @@ def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, target_rew
 
 class test_dataset(Dataset):
     def __init__(self, trajs, sigma, Reward_name, target_reward: Optional[float] = None):
-    
-        stats_path = f'./Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
-        with open(stats_path, 'rb') as f:
-              self.stats = pickle.load(f)
-        
+        self.stats = get_pretrained_reward_stats(Reward_name)
         transitions = []
         allowed_values = [0,1]
         for traj in trajs:
@@ -214,8 +212,7 @@ class test_dataset(Dataset):
                 rews = self.boost_signal(target_reward, rews)
             rews = gaussian_filter1d(rews, sigma)
             for t in range(len(acts)):
-                #obs_t = self.stats.norm_obs(obs[t])
-                obs_t = obs[t]
+                obs_t = self.stats.norm_obs(obs[t])
                 a_t   = acts[t]
                 r_t   = rews[t]
                 transitions.append((obs_t, a_t, r_t))
@@ -263,6 +260,7 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
          total_reward = 0.0
          Grad_norm_total = 0.0
          for s, a, r in dataloader:
+             #s_norm = Reward_Processor.preprocess(s.squeeze(0)).unsqueeze(0)
              s = s.to(device)
              a = a.to(device)
              r = r.to(device)
@@ -355,5 +353,9 @@ def grad_norm(s, a, reward_net):
      grad_norm_avg = grad_norms.mean().item()
      
      return pred, grad_norm_avg
+
+
+
+
 
 

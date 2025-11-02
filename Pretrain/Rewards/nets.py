@@ -432,8 +432,8 @@ class LargeScalarReward(nn.Module):
         pred = self.forward(s, a)
         loss_mse = F.mse_loss(pred, r)
         # Compute gradients
-        s.requires_grad_(True)
-        a.requires_grad_(True)
+        s = s.detach().requires_grad_(True)
+        a = a.detach().requires_grad_(True)
 
         r_grad = self.forward(s, a)
         grads_s = torch.autograd.grad(outputs=r_grad.sum(), inputs=s,
