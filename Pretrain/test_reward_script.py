@@ -26,9 +26,10 @@ if __name__ == '__main__':
     test_Model(
     dataset_name = 'kitchen',
     trajs = Gen_trajs,
-    sigma = 3, 
-    save_freq = 1000, 
-    num_steps = 100000)
+    sigma = 50, 
+    target_reward = 1.0,
+    save_freq = 100, 
+    num_steps = 1000)
 """
     print(f"Testing on the partial Trajectories")
     set_seed(1)

@@ -7,11 +7,11 @@ if __name__ == '__main__':
     set_seed(1)
     train_reward(
     dataset_name = 'pointmaze',
-    batch_size=128, 
+    batch_size=256, 
     num_steps=100000,   
     lr=1e-4,
-    sigma=3,
-    target_reward=5.0,
+    sigma=50,
+    target_reward=1.0,
     specific_dataset='medium')
 
 

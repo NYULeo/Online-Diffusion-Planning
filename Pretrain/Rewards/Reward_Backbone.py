@@ -151,14 +151,12 @@ class RewardDataset(Dataset):
     
 
 def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None):
-    save_freq = 1000
+    #save_freq = 1000
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
     print(f"Training reward approximator for {dataset_name} Dataset") 
     dataset = RewardDataset(trajs, sigma, reward_name, target_reward)
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
-    
-   
     
     """
     reward_net = ScalarReward(
@@ -191,7 +189,7 @@ def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, target_rew
               print(f"Step {step}, loss {avg_loss:.4f}")
               total_loss = 0
 
-           if step % save_freq == 0:
+           if step % 1000 == 0:
               checkpoint = copy.deepcopy(reward_net)
               save_model(checkpoint, reward_name, step)
            
@@ -199,9 +197,11 @@ def train_reward(dataset_name: str, batch_size, num_steps, lr, sigma, target_rew
 
 class test_dataset(Dataset):
     def __init__(self, trajs, sigma, Reward_name, target_reward: Optional[float] = None):
+        """
         stats_path = f'./Pretrain/Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
         with open(stats_path, 'rb') as f:
               self.stats = pickle.load(f)
+         """
         transitions = []
         allowed_values = [0,1]
         for traj in trajs:
@@ -214,7 +214,8 @@ class test_dataset(Dataset):
                 rews = self.boost_signal(target_reward, rews)
             rews = gaussian_filter1d(rews, sigma)
             for t in range(len(acts)):
-                obs_t = self.stats.norm_obs(obs[t])
+                #obs_t = self.stats.norm_obs(obs[t])
+                obs_t = obs[t]
                 a_t   = acts[t]
                 r_t   = rews[t]
                 transitions.append((obs_t, a_t, r_t))
@@ -354,3 +355,8 @@ def grad_norm(s, a, reward_net):
      grad_norm_avg = grad_norms.mean().item()
      
      return pred, grad_norm_avg
+
+
+
+
+
