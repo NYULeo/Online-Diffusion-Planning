@@ -405,7 +405,7 @@ class Acc_AdjointMatchingFineTuner:
         total_grad_norm = total_grad_norm ** (1. / 2)
         if self.accelerator.is_main_process:
                print(f"Gradient norm before clipping: {total_grad_norm}")
-        #self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
+        self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
         self.optimizer.step()
         self.scheduler.step()
 
