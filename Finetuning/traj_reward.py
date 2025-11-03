@@ -216,7 +216,7 @@ class TotalReward(nn.Module):
 
 
 
-
+"""
 import pickle
 
 save_path = f'./Pretrain/Rollouts/{'pointmaze'}/{'medium'}/Generated_trajs_Info.pkl'
@@ -266,3 +266,4 @@ for i in range(len(gen_trajs)):
 total = total / len(gen_trajs)
 print(f"Complete Total reward: {total}")
 
+"""
