@@ -123,8 +123,8 @@ class TotalReward(nn.Module):
             #s_norm_kernel = self.kernel_processor(s).unsqueeze(0).requires_grad_(True)
             s_next_norm = self.kernel_processor(s_next).unsqueeze(0).requires_grad_(True)
 
-            r = self.reward_net.predict(s_norm, a)
-            var = self.reward_net.variance(s_norm, a)
+            r = self.reward_net(s_norm, a)
+            #var = self.reward_net.variance(s_norm, a)
             c = self.sigmoid(s_norm, a, s_next_norm)
            
             grads = torch.autograd.grad(
@@ -139,7 +139,7 @@ class TotalReward(nn.Module):
             r_a = grads[1].squeeze(0)
             r_s_grad, r_a_grad = self.makeGrad(H, r_s, r_a, i)
             
-
+            """
             grads = torch.autograd.grad(    
                         outputs = var,
                         inputs = (s_norm, a),
@@ -151,7 +151,7 @@ class TotalReward(nn.Module):
                                                    device = self.config.device, dtype=torch.float32, requires_grad = False)
             var_a = grads[1].squeeze(0)
             var_s_grad, var_a_grad = self.makeGrad(H, var_s, var_a, i)
-            
+            """
 
             grads = torch.autograd.grad(
                         outputs = c,
@@ -167,16 +167,18 @@ class TotalReward(nn.Module):
                                                    device = self.config.device, dtype=torch.float32, requires_grad = False)
             c_s_grad, c_a_grad, c_s_next_grad = self.makeGrad(H, c_s, c_a, i, c_s_next)
            
-            gradient +=  (1/H)*((r_s_grad + r_a_grad) + self.config.gamma * (var_s_grad + var_a_grad)) - lam * (1/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad)
-            total_reward += (1/H)*(r.squeeze(0) + self.config.gamma * var.squeeze(0)) - lam * ((1/(H-1)) * c.squeeze(0) - (1/(H-1)))
+            #gradient +=  (1/H)*((r_s_grad + r_a_grad) + self.config.gamma * (var_s_grad + var_a_grad)) - lam * (1/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad)
+            gradient +=  (1/H)*((r_s_grad + r_a_grad)) - lam * (1/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad)
+            #total_reward += (1/H)*(r.squeeze(0) + self.config.gamma * var.squeeze(0)) - lam * ((1/(H-1)) * c.squeeze(0) - (1/(H-1)))
+            total_reward += (1/H)*(r.squeeze(0)) - lam * ((1/(H-1)) * c.squeeze(0) - (1/(H-1)))
             
         
 
         s = x[H-1][:self.config.d_s]
         s_norm = self.reward_processor(s).unsqueeze(0).requires_grad_(True)
         a = x[H-1][self.config.d_s:].unsqueeze(0).requires_grad_(True)
-        r = self.reward_net.predict(s_norm, a)
-        var = self.reward_net.variance(s_norm, a)
+        r = self.reward_net(s_norm, a)
+        #var = self.reward_net.variance(s_norm, a)
 
         grads = torch.autograd.grad(
                         outputs = r,
@@ -190,7 +192,7 @@ class TotalReward(nn.Module):
         r_a = grads[1].squeeze(0)
         r_s_grad, r_a_grad = self.makeGrad(H, r_s, r_a, H-1)
 
-
+        """
         grads = torch.autograd.grad(
                         outputs = var,
                         inputs = (s_norm, a),
@@ -202,9 +204,11 @@ class TotalReward(nn.Module):
                                                 device = self.config.device, dtype=torch.float32, requires_grad = False)
         var_a = grads[1].squeeze(0)
         var_s_grad, var_a_grad = self.makeGrad(H, var_s, var_a, H-1)
-
-        gradient += (1/H) * ((r_s_grad + r_a_grad) + self.config.gamma * (var_s_grad + var_a_grad)) 
-        total_reward +=  (1/H) * (r.squeeze(0) + self.config.gamma * var.squeeze(0))
+        """
+        #gradient += (1/H) * ((r_s_grad + r_a_grad) + self.config.gamma * (var_s_grad + var_a_grad)) 
+        gradient += (1/H) * ((r_s_grad + r_a_grad)) 
+        #total_reward +=  (1/H) * (r.squeeze(0) + self.config.gamma * var.squeeze(0))
+        total_reward +=  (1/H) * (r.squeeze(0))
         return total_reward, gradient
 
 
