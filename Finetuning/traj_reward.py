@@ -1,5 +1,7 @@
 import sys
 import os
+
+from torch.utils.data import DataLoader
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -212,4 +214,55 @@ class TotalReward(nn.Module):
         return total_reward, gradient
 
 
+
+
+
+import pickle
+
+save_path = f'./Pretrain/Rollouts/{'pointmaze'}/{'medium'}/Generated_trajs_Info.pkl'
+with open(save_path, 'rb') as f:
+    data = pickle.load(f)
+gen_trajs = data['trajs']
+
+
+
+
+
+
+reward_model_state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', 44000, 'medium')
+reward_model = Reward(obs_dim, act_dim)
+reward_model.load_state_dict(reward_model_state_dict)
+reward_model.eval()
+stats = get_pretrained_reward_stats(name)
+
+total = 0.0
+for i in range(len(gen_trajs)):
+     traj = gen_trajs[i]
+     traj_reward = 0.0
+     Grad_sum = 0.0
+     for j in range(len(traj['actions'])):
+          obs = traj['observations'][j].copy()
+          action = traj['actions'][j].copy()
+          obs_norm = stats.norm_obs(obs)
+          action_norm = action
+          obs_norm = torch.tensor(obs_norm, dtype = torch.float32, requires_grad = True).unsqueeze(0)
+          action_norm = torch.tensor(action_norm, dtype = torch.float32, requires_grad = True).unsqueeze(0)
+          pred =   reward_model(obs_norm, action_norm)
+          grad = torch.autograd.grad(
+                 outputs=pred,
+                 inputs=(obs_norm, action_norm),
+                 grad_outputs=torch.ones_like(pred),
+                 create_graph=False,
+                 retain_graph=False)
+          grad_obs = grad[0].squeeze(0)
+          grad_action = grad[1].squeeze(0)
+          Grad_sum += grad_obs.norm().item() + grad_action.norm().item()
+          traj_reward += pred.item()
+     print(f"Grad_sum: {Grad_sum / len(traj['actions'])}")
+     traj_reward = traj_reward / len(traj['actions'])
+     print(f"Traj {i} reward: {traj_reward}")
+     total += traj_reward
+     
+total = total / len(gen_trajs)
+print(f"Complete Total reward: {total}")
 
