@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from typing import Callable, List, Tuple
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+#sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(project_root)
 from pandas._libs.tslibs import dt64arr_to_periodarr
 from Pretrain.Planners.Backbone.Dit import DiT1d
 import torch
