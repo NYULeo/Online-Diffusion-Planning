@@ -298,7 +298,7 @@ class Acc_AdjointMatchingFineTuner:
         t_asc_reversed = torch.flip(self.t_asc, dims = [0]).to(self.device)
         k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
         a0 = (-1 * self.config.reward_scaling_factor * gradient).detach().unsqueeze(0).to(self.device)
-        print(f"a0 Norm: {a0.norm().item()}")
+        #print(f"a0 Norm: {a0.norm().item()}")
         a.append(a0)
         #a.append(torch.zeros_like(gradient).unsqueeze(0).to(self.device))
         for i in range(steps_T - 1):
@@ -404,7 +404,7 @@ class Acc_AdjointMatchingFineTuner:
         total_grad_norm = total_grad_norm ** (1. / 2)
         if self.accelerator.is_main_process:
                print(f"Gradient norm before clipping: {total_grad_norm}")
-        self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
+        #self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
         self.optimizer.step()
         self.scheduler.step()
 
