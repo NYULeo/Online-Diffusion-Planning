@@ -2,11 +2,15 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from typing import Callable, List, Tuple
-from Pretrain.Planners.Backbone.Dit import DiT1d
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(project_root)
+from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Planners.Backbone.utils import cosine_alpha_sigma, cosine_beta, compute_dot_alpha_beta, get_pretrained_planner
 import numpy as np
 from typing import Optional

@@ -3,6 +3,8 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+os.chdir(project_root)
 from typing import Optional
 from Dataset import KitchenDataset, PointMazeDataset, get_dataset, get_env
 import random

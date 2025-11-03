@@ -1,9 +1,10 @@
 import sys
 import os
 # Change to project root directory
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
-#sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from Finetune_Backbone import OnlineFinetuner, FinetuningConfig
 from adjoint_matching import AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig

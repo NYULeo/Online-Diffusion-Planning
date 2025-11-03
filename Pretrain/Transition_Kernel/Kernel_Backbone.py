@@ -1,6 +1,8 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+os.chdir(project_root)
 import torch
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
@@ -33,8 +35,8 @@ def compute_log_prob(model, s, a, s_next):
 def save_model(kernel_net, kernel_name, num_steps, ensemble_idx):
     kernel_net.eval()
     net_dict =  kernel_net.state_dict()
-    os.makedirs(f'./Pretrain/Transition_Kernel/{kernel_name}/Models/{num_steps}', exist_ok=True)
-    save_path = f'./Pretrain/Transition_Kernel/{kernel_name}/Models/{num_steps}/{kernel_name}_{num_steps}_{ensemble_idx}.pkl'
+    os.makedirs(f'./Transition_Kernel/{kernel_name}/Models/{num_steps}', exist_ok=True)
+    save_path = f'./Transition_Kernel/{kernel_name}/Models/{num_steps}/{kernel_name}_{num_steps}_{ensemble_idx}.pkl'
     torch.save(net_dict, save_path)
     print(f"Kernel model save to {kernel_name}_{num_steps}_{ensemble_idx}.pkl")
 
@@ -64,7 +66,7 @@ def count_files_in_folder(folder_path):
         return 0
 
 def load_model(kernel_name, num_steps, ensemble_idx):
-    load_path = f'./Pretrain/Transition_Kernel/{kernel_name}/Models/{num_steps}/{kernel_name}_{num_steps}_{ensemble_idx}.pkl'
+    load_path = f'./Transition_Kernel/{kernel_name}/Models/{num_steps}/{kernel_name}_{num_steps}_{ensemble_idx}.pkl'
     #state_dict = torch.load(load_path, map_location='cpu')
     state_dict = torch.load(load_path, weights_only=True)
     return state_dict
@@ -151,7 +153,7 @@ class KernelDataset(Dataset):
 
 class test_dataset(Dataset):
     def __init__(self, trajs, kernel_name):
-        stats_path = f'./Pretrain/Transition_Kernel/{kernel_name}/Stats/{kernel_name}_stats.pkl'
+        stats_path = f'./Transition_Kernel/{kernel_name}/Stats/{kernel_name}_stats.pkl'
         with open(stats_path, 'rb') as f:
               self.stats = pickle.load(f)
         transitions = []
@@ -398,7 +400,7 @@ def test_kernel(dataset_name, specific_dataset: str = None,
 
 def get_pretrained_kernel(dataset_name, checkpoints, specific_dataset: Optional[str] = None):
        _, name, obs_dim, act_dim  =  Train_Dataset(dataset_name, specific_dataset)
-       path = f'./Pretrain/Transition_Kernel/{name}/Models/{checkpoints}'
+       path = f'./Transition_Kernel/{name}/Models/{checkpoints}'
        file_count = count_files_in_folder(path)
        kernel_state_dicts = []
        for i in range(file_count):
@@ -408,7 +410,7 @@ def get_pretrained_kernel(dataset_name, checkpoints, specific_dataset: Optional[
 
 
 def get_pretrained_kernel_stats(kernel_name):
-     stats_path = f'./Pretrain/Transition_Kernel/{kernel_name}/Stats/{kernel_name}_stats.pkl'
+     stats_path = f'./Transition_Kernel/{kernel_name}/Stats/{kernel_name}_stats.pkl'
      with open(stats_path, 'rb') as f:
         stats = pickle.load(f)
      return stats
