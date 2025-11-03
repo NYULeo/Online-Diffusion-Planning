@@ -1,9 +1,9 @@
-from pstats import StatsProfile
+#from pstats import StatsProfile
 import sys
 import os
 
 from minari.storage.local import gen_dataset_id
-os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import logging
 import numpy as np
 from pandas._libs.algos import take_2d_axis0_float32_float32
@@ -48,7 +48,8 @@ from Dataset import Planner_Processor
 import torch.nn.functional as F
 from Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 from Dataset import get_dataset
-from Rewards.nets import ScalarReward
+from Rewards.nets import Reward
+from Finetuning.traj_reward import TotalReward
 
 
 
@@ -83,177 +84,9 @@ def function(x, beta: float):
     return (1/beta)* np.log(1 + np.exp(x*beta))
 
 
-"""
-
-def kt(t: torch.Tensor, s: float = 0.008) -> torch.Tensor:
-    
-    t = t.clamp(0.0, 1.0 - 1e-3)
-    a = (math.pi / 2.0) * ((t + s) / (1.0 + s))
-    return (-0.5)* (math.pi / (1.0 + s)) * torch.tan(a)
-
-@torch.no_grad()
-def sample_reverse_sde2(
-    s0: np.ndarray,
-    score_model: DiT1d,
-    d_s: int,
-    d_a: int,
-    horizon: int,
-    steps_T: int,
-    eta: float,
-    device: Optional[str] = None,
-) -> np.ndarray:
-    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    s0_t = torch.tensor(s0, device=device, dtype=torch.float32)
-    if ( (s0_t.shape[0] != d_s)   ):
-        raise ValueError(f"s0 should have shape ({d_s},), but got {s0_t.shape}")
-    dim = d_s + d_a
-    t_asc = torch.linspace(1.0, 0.0, steps_T + 1, device=device)
-    #beta = cosine_beta(t_asc, s=0.008)
-    #alpha, sigma = cosine_alpha_sigma(t_asc, s = 0.008)
-    k = kt(t_asc, s = 0.008)
-    
-    # Initialize x_T ~ N(0, I) with shape (horizon, dim)
-    x = torch.randn(horizon, dim, dtype=torch.float32, device=device).unsqueeze(0)
-    conditions = s0_t.unsqueeze(0)
-    mask = torch.zeros((1, horizon, dim), dtype = torch.float32, device = device)
-    mask[:, 0, :d_s] = 1
-    y = torch.zeros((1, horizon, dim), dtype = torch.float32, device = device)
-    y[:, 0, :d_s] = conditions.clone()
-    #x = apply_conditioning(x, conditions, d_s)
-    x = mask * y + (1 - mask) * x
-    
-    
-
-    for i in range(len(t_asc) - 1):
-        t_now, t_next = t_asc[i], t_asc[i + 1]
-        dt = (t_next - t_now).item()
-        score = score_model(x, t_now.unsqueeze(0))
-        drift = k[i] * x
-        
-       
-
-        if eta > 0:
-            noise = torch.randn_like(x)
-            noise_scale = eta * math.sqrt((-2*k[i]) * (-dt))
-            x = x + (drift +  2*k[i] * score ) * dt + noise_scale * noise
-        else:
-            x = x + (drift + 2*k[i] * score) * dt
-        
-        x = mask * y + (1 - mask) * x
-        
-        
-        #x = apply_conditioning(x, conditions, d_s)
-
-    return x.squeeze(0).detach().cpu().numpy()
 
 
-
-
-
-
-def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, critic, checkpoint_steps, render = False):
-     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checpoint_steps; {checkpoint_steps}")
-     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     device = "cuda" if torch.cuda.is_available() else "cpu"
-     print(f"Using device {device}")
-     
-     
-     #get environment
-     if(render):
-         env, d_s, d_a = get_env(env_name, specific_env, 'rgb_array')
-     else:
-         env, d_s, d_a = get_env(env_name, specific_env, None)
-
-     #get Planner
-     state_dict = get_pretrained_planner(env_name, specific_env, checkpoint_steps)
-     if( env_name == 'kitchen'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
-     elif (env_name == 'pointmaze'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
-     else:
-          raise ValueError(f"Invalid Environment: {env_name}")
-     model.load_state_dict(state_dict)
-     model.eval()
-
-    #get Processor
-     planner_processor = Planner_Processor(env_name, specific_env)
-
-     
-     #reset
-     s0 = env.reset(seed=1)
-     s0 = s0[0]['observation']
-     current_state = s0
-     frames = []
-     observations = []
-     actions = []
-     rewards = []
-     for i in range(episode_length):
-           current_state_norm = planner_processor.preprocess(current_state)
-    
-           #x1 = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
-           x2 = sample_reverse_sde3(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
-
-
-
-           action = x2[0, d_s:(d_s+d_a)].copy()
-           
-           obs, reward, terminated, truncated, info = env.step(action)
-           if(render):
-                frames.append(env.render())
-           
-           observations.append(obs['observation'].copy())
-           actions.append(action.copy())
-           rewards.append(reward)
-           current_state = obs['observation'].copy()
-           #print(f"Episode {i} reward: {reward}")
-           if(terminated or truncated):
-                #print(f"Episode {i} terminated or truncated")
-                break
-     
-     env.close()
-     traj = {'observations': observations, 'actions': actions, 'rewards': rewards}
-     traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
-     if(render):
-          media.write_video("demo.mp4", frames, fps=50)
-    
-
-
-x = torch.tensor([[1,2,3], [4,5,6]]).unsqueeze(0)
-print(x.view(-1))
-"""
-
-#plot_function(function, x_range=(-10, 10), num_points=1000, title="Function Plot", xlabel="x", ylabel="f(x)")
-
-
-"""
-
-env, d_s, d_a = get_env('pointmaze', 'medium', 'rgb_array')
-
-data = get_dataset('pointmaze', 'medium')
-frames = []
-
-
-
-trajs = data.get_trajectories()
-traj = trajs[5]
-env.reset(seed=1)
-frames.append(env.render())
-
-
-for i in range(len(traj['actions'])):
-     action = traj['actions'][i].copy()
-     obs, reward, terminated, truncated, info = env.step(action)
-     frames.append(env.render())
-     if(terminated or truncated):
-         break
-     
-
-env.close()
-media.write_video('video.mp4', frames, fps=50)
-"""
-
-save_path = f'./Pretrain/Rollouts/{'pointmaze'}/{'medium'}/Generated_trajs_Info.pkl'
+save_path = f'./Rollouts/{'pointmaze'}/{'medium'}/Generated_trajs_Info.pkl'
 with open(save_path, 'rb') as f:
     data = pickle.load(f)
 gen_trajs = data['trajs']
@@ -263,8 +96,8 @@ data_complete = get_dataset('pointmaze', 'medium')
 trajs_complete = data_complete.get_trajectories()
 
 
-reward_model_state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', 9900, 'medium')
-reward_model = ScalarReward(obs_dim, act_dim)
+reward_model_state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', 44000, 'medium')
+reward_model = Reward(obs_dim, act_dim)
 reward_model.load_state_dict(reward_model_state_dict)
 reward_model.eval()
 stats = get_pretrained_reward_stats(name)
@@ -284,7 +117,7 @@ for i in range(len(gen_trajs)):
           action_norm = action
           obs_norm = torch.tensor(obs_norm, dtype = torch.float32, requires_grad = True).unsqueeze(0)
           action_norm = torch.tensor(action_norm, dtype = torch.float32, requires_grad = True).unsqueeze(0)
-          pred = reward_model.predict(obs_norm, action_norm)
+          pred =   (100000/1024) *reward_model(obs_norm, action_norm)
           grad = torch.autograd.grad(
                  outputs=pred,
                  inputs=(obs_norm, action_norm),
@@ -297,60 +130,14 @@ for i in range(len(gen_trajs)):
           traj_reward += pred.item()
      print(f"Grad_sum: {Grad_sum / len(traj['actions'])}")
      traj_reward = traj_reward / len(traj['actions'])
-     #print(f"Traj {i} reward: {traj_reward:.4f}")
+     #print(f"Traj {i} reward: {traj_reward}")
      total += traj_reward
      
 total = total / len(gen_trajs)
-print(f"Complete Total reward: {total:.4f}")
-
-
-"""
-total = 0.0
-for i in range(len(trajs_partial)):
-     traj = trajs_partial[i]
-     traj_reward = 0.0
-     for j in range(len(traj['actions'])):
-          obs = traj['observations'][j].copy()
-          action = traj['actions'][j].copy()
-          obs_norm = stats.norm_obs(obs)
-          action_norm = action
-          obs_norm = torch.tensor(obs_norm, dtype = torch.float32).unsqueeze(0)
-          action_norm = torch.tensor(action_norm, dtype = torch.float32).unsqueeze(0)
-          pred = reward_model.predict(obs_norm, action_norm)
-          traj_reward += pred.item()
-     traj_reward = traj_reward / len(traj['actions'])
-     #print(f"Traj {i} reward: {traj_reward:.4f}")
-     total += traj_reward
-     
-total = total / len(trajs_partial)
-print(f"Partial Total reward: {total:.4f}")
+print(f"Complete Total reward: {total}")
 
 
 
 
 
-
-
-
-total = 0.0
-for i in range(len(gen_trajs)):
-     traj = gen_trajs[i]
-     traj_reward = 0.0
-     for j in range(len(traj['actions'])):
-          obs = traj['observations'][j].copy()
-          action = traj['actions'][j].copy()
-          obs_norm = stats.norm_obs(obs)
-          action_norm = action
-          obs_norm = torch.tensor(obs_norm, dtype = torch.float32).unsqueeze(0)
-          action_norm = torch.tensor(action_norm, dtype = torch.float32).unsqueeze(0)
-          pred = reward_model.predict(obs_norm, action_norm)
-          traj_reward += pred.item()
-     traj_reward = traj_reward / len(traj['actions'])
-     #print(f"Traj {i} reward: {traj_reward:.4f}")
-     total += traj_reward
-     
-total = total / len(gen_trajs)
-print(f"gen_Total reward: {total:.4f}")
-
-"""
 

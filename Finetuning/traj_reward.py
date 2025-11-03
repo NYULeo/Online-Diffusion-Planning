@@ -3,7 +3,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch
 import torch.nn as nn
-from Pretrain.Rewards.nets import ScalarReward
+from Pretrain.Rewards.nets import Reward
 from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 from Pretrain.Transition_Kernel.Kernel_Backbone import get_pretrained_kernel, get_pretrained_kernel_stats
@@ -31,7 +31,7 @@ class TotalReward(nn.Module):
         super().__init__()
         self.config = config
         reward_state_dict, obs_dim, act_dim, reward_name = get_pretrained_reward(dataset_name, reward_checkpoint, specific_dataset)
-        self.reward_net = ScalarReward(obs_dim, act_dim).to(device)
+        self.reward_net = Reward(obs_dim, act_dim).to(device)
         self.reward_net.load_state_dict(reward_state_dict)
         self.reward_net.eval()
         self.kernels = []

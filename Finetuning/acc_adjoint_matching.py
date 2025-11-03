@@ -2,7 +2,9 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from typing import Callable, List, Tuple
-
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pandas._libs.tslibs import dt64arr_to_periodarr
 from Pretrain.Planners.Backbone.Dit import DiT1d
 import torch
@@ -20,7 +22,6 @@ from Pretrain.Planners.Backbone.UNet import TemporalUnet
 from Pretrain.Dataset import get_env
 from torch.autograd.functional import jvp 
 import copy
-import os
 try:
     from accelerate import Accelerator
 except ImportError:

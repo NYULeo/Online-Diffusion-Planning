@@ -1,8 +1,9 @@
 import sys
 import os
 # Change to project root directory
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-os.chdir(project_root)
+#project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+#os.chdir(project_root)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Finetune_Backbone import OnlineFinetuner, FinetuningConfig
 from adjoint_matching import AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig
@@ -41,7 +42,7 @@ if __name__ == "__main__":
         dataset_name = env_name,
         specific_dataset = specific_env,
         planner_checkpoint = 1000000,
-        reward_model_checkpoint = 9900,
+        reward_model_checkpoint = 44000,
         kernel_model_checkpoint = 34000,
         finetune_steps = 10000,
         finetune_batch_size = 64,

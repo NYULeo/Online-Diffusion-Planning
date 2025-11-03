@@ -14,7 +14,7 @@ from Pretrain.utils import set_seed, SAStats
 #from Critic.train_critic import get_CriticName
 import torch.nn as nn
 import pickle
-from Rewards.nets import ScalarReward, Reward
+from Rewards.nets import Reward
 import os
 from scipy.ndimage import gaussian_filter1d, convolve
 from Pretrain.utils import cycle
@@ -273,7 +273,7 @@ def get_pretrained_reward_stats(Reward_name):
     return stats
 
 
-"""
+'''
 def test_Single_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: float = 3, target_reward: Optional[float] = None, num: int = 10000):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device {device}")
@@ -306,7 +306,7 @@ def test_Single_Model(dataset_name, specific_dataset: Optional[str] = None, traj
     avg_mean_loss = total_mean_loss / len(dataloader)
     avg_var = total_var / len(dataloader)
     print(f"model {num}, Loss {avg_mean_loss:.4f}, Variance {avg_var:.4f}")
-"""
+
 
 
 def grad_norm(s, a, reward_net):
@@ -336,8 +336,7 @@ def grad_norm(s, a, reward_net):
      grad_norm_avg = grad_norms.mean().item()
      
      return pred, grad_norm_avg
-
-
+'''
 
 
 
