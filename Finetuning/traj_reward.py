@@ -37,11 +37,11 @@ class TotalReward(nn.Module):
         super().__init__()
         self.config = config
         reward_state_dict, obs_dim, act_dim, reward_name = get_pretrained_reward(dataset_name, reward_checkpoint, specific_dataset)
+        self.config.device = device
         self.reward_net = MLPNetwork(input_dim = obs_dim + act_dim, out_dim = 1, hidden_dims = [200, 200, 200, 200], act_fn = 'swish', out_act_fn = 'identity').to(self.config.device)
         self.reward_net.load_state_dict(reward_state_dict)
         self.reward_net.eval()
         self.kernels = []
-        self.config.device = device
         self.config.delta = F.softplus(torch.tensor(0.0, requires_grad = False), beta = self.config.beta).to(self.config.device)
 
 
@@ -130,7 +130,7 @@ class TotalReward(nn.Module):
  
             input = torch.cat([s_norm_reward, a], dim = 0).unsqueeze(0).requires_grad_(True).to(self.config.device)
             r = self.reward_net(input)
-            c = self.sigmoid(s_norm_kernel, a, s_next_norm_kernel)
+            c = self.sigmoid(s_norm_kernel, a.unsqueeze(0).requires_grad_(True), s_next_norm_kernel)
            
             grads = torch.autograd.grad(
                         outputs = r,
