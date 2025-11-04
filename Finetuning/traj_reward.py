@@ -134,6 +134,7 @@ class TotalReward(nn.Module):
  
            
             r = self.reward_net(reward_input)
+            print(r)
             c = self.sigmoid(s_norm_kernel, a_kernel, s_next_norm_kernel)
            
             grads = torch.autograd.grad(
