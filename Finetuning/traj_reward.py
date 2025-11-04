@@ -123,7 +123,7 @@ class TotalReward(nn.Module):
             s = x[i][:self.config.d_s]
             s_norm_reward = self.reward_processor(s)
             a = x[i][self.config.d_s:]
-            reward_input = torch.cat([s_norm_reward, a], dim = 0).unsqueeze(0).requires_grad_(True).to(self.config.device)
+            reward_input = torch.cat([s_norm_reward, a], dim = 0).unsqueeze(0).to(self.config.device).requires_grad_(True)
            
             s_next = x[i+1][:self.config.d_s]
             a_kernel = a.unsqueeze(0).requires_grad_(True)
