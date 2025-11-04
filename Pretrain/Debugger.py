@@ -138,11 +138,42 @@ print(f"Complete Total reward: {total}")
 
 
 """
-a = torch.tensor([[1,2,3], [7,8,9]])
-b = torch.tensor([[4,5,6], [10,11,12]])
-c = torch.cat([a, b], dim = 1)
-print(c)
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
+sns.set_style("whitegrid", {'axes.grid': True, 'axes.edgecolor':'black'})
+plt.rcParams.update({'font.size': 14})
 
+def smooth(x, window=50):
+    return np.convolve(x, np.ones(window)/window, mode='valid')
+
+def plot_reward_curves(episode_rewards_list, labels, window=50, max_episodes=None):
+    """
+    episode_rewards_list : list of 1-d arrays (one per seed/method)
+    labels : list of same length, method names
+    window : smoothing window size
+    max_episodes : optionally truncate x-axis
+    """
+    fig, ax = plt.subplots(figsize=(8,5))
+    for rewards, label in zip(episode_rewards_list, labels):
+        if max_episodes:
+            rewards = rewards[:max_episodes]
+        sm = smooth(rewards, window)
+        x = np.arange(len(sm))
+        ax.plot(x, sm, label=label)
+        # optionally plot raw with alpha
+        ax.plot(np.arange(len(rewards)), rewards, color=ax.get_lines()[-1].get_color(),
+                alpha=0.2, linewidth=0.5)
+    ax.set_xlabel("Episodes")
+    ax.set_ylabel("Episode Return (Reward)")
+    ax.legend(frameon=True, fancybox=True)
+    sns.despine()
+    plt.tight_layout()
+    plt.show()
+
+episode_rewards_list = [np.array([1,2,3,4,5,6,7,8,9,10]) for _ in range(10)]
+
+plot_reward_curves(episode_rewards_list, labels = ['method1', 'method2', 'method3'])
 
 

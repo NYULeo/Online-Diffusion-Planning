@@ -3,6 +3,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
+from matplotlib import color_sequences
 import torch
 import numpy as np
 import torch
@@ -16,6 +17,7 @@ from Pretrain.Dataset import Planner_Processor
 from typing import Optional
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
+import seaborn as sns
 
 
 class Lambda:
@@ -25,8 +27,8 @@ class Lambda:
         self.eta_lam = eta_lam
     def update(self, C):
         delta = F.softplus(torch.tensor([0.0], requires_grad = False), beta = self.beta)
-        self.lam = 0.0
-        #self.lam = np.maximum(0.0, self.lam + self.eta_lam * (C - delta.item()))
+        #self.lam = 0.0
+        self.lam = np.maximum(0.0, self.lam + self.eta_lam * (C - delta.item()))
     def get_lam(self):
         return self.lam
 
@@ -266,33 +268,52 @@ class RewardTracker:
             print("No reward data to plot!")
             return
 
+        sns.set_style("whitegrid", {'axes.grid': True, 'axes.edgecolor':'black'})
+        plt.rcParams.update({'font.size': 14})
+
+        okabe_ito = ["#000000", "#E69F00", "#56B4E9", "#009E73",
+                       "#F0E442", "#0072B2", "#D55E00", "#CC79A7"]
+        raw_color    = okabe_ito[2]   # e.g., sky blue for raw reward
+        smooth_color = okabe_ito[1]  # e.g., orange for smoothed reward
+        lr_color     = okabe_ito[4]  # yellow (for learning rate curve)
+
         fig, ax1 = plt.subplots(figsize=(12, 8))
         steps = np.array(self.steps)
         rewards = np.array(self.rewards)
 
-        ax1.plot(steps, rewards, alpha=0.3, color='blue', label='Raw Reward')
 
-        if len(rewards) > smooth_window:
+         # Plot smoothed if possible
+        if len(rewards) > smooth_window and smooth_window > 1:
             smoothed = self._smooth_curve(rewards, smooth_window)
-            ax1.plot(steps, smoothed, color='red', linewidth=2,
+            # only plot where valid (not nan)
+            valid_idx = ~np.isnan(smoothed)
+            ax1.plot(steps[valid_idx], smoothed[valid_idx],
+                     color=smooth_color, linewidth=2.5,
                      label=f'Smoothed Reward (window={smooth_window})')
-
+        
+        
+        ax1.plot(steps, rewards, alpha=0.3, color=raw_color, linewidth=1.0, label='Raw Reward')
+        ax1.set_title(title, fontsize=16, fontweight='bold')
         ax1.set_xlabel('Steps', fontsize=12)
-        ax1.set_ylabel('Reward', fontsize=12, color='blue')
-        ax1.tick_params(axis='y', labelcolor='blue')
+        ax1.set_ylabel('Reward', fontsize=12, color=raw_color)
+        ax1.tick_params(axis='y', labelcolor=raw_color)
         ax1.grid(True, alpha=0.3)
-        ax1.legend()
+        ax1.legend(frameon=True, fancybox=True, fontsize=12)
+        sns.despine()
 
         if show_lr and self.learning_rates:
             ax2 = ax1.twinx()
-            ax2.plot(steps, self.learning_rates, color='green', alpha=0.7, label='Learning Rate')
-            ax2.set_ylabel('Learning Rate', fontsize=12, color='green')
-            ax2.tick_params(axis='y', labelcolor='green')
+            lr_vals = np.array(self.learning_rates)
+            ax2.plot(steps[:len(lr_vals)], lr_vals, color='green', alpha=0.7, linewidth=1.5, label='Learning Rate')
+            ax2.set_ylabel('Learning Rate', fontsize=12, color=lr_color)
+            ax2.tick_params(axis='y', labelcolor=lr_color)
             ax2.legend(loc='upper right')
-
-        plt.title(title, fontsize=14, fontweight='bold')
+        
+        sns.despine()
+        #plt.title(title, fontsize=14, fontweight='bold')
         plt.tight_layout()
 
+       
         if save_path is None:
             save_path = os.path.join(self.save_dir, "reward_curve.png")
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -301,6 +322,7 @@ class RewardTracker:
         plt.show()
         return fig
 
+
     def _smooth_curve(self, data: np.ndarray, window: int) -> np.ndarray:
         if window <= 1:
             return data
@@ -308,3 +330,6 @@ class RewardTracker:
         padded = np.full_like(data, np.nan)
         padded[window-1:] = smoothed
         return padded
+
+
+

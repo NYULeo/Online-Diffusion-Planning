@@ -7,6 +7,8 @@ import copy
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+os.chdir(project_root)
 from Rewards.Reward_Backbone import Train_Dataset, test_dataset
 from torch.utils.data import DataLoader
 from scipy.ndimage import gaussian_filter1d, convolve
@@ -14,7 +16,7 @@ import matplotlib.pyplot as plt
 from scipy import stats
 
 if __name__ == '__main__':
-    with open('Rollouts/pointmaze/medium/Generated_trajs_Info.pkl', 'rb') as f:
+    with open('./Rollouts/pointmaze/medium/Generated_trajs_Info.pkl', 'rb') as f:
          trajs_info = pickle.load(f)
     trajs = trajs_info['trajs']
     set_seed(1)
