@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 from scipy import stats
 
 if __name__ == '__main__':
-    with open('./Rollouts/pointmaze/medium/Generated_trajs_Info.pkl', 'rb') as f:
+    with open('./Pretrain/Rollouts/pointmaze/medium/Generated_trajs_Info.pkl', 'rb') as f:
          trajs_info = pickle.load(f)
     trajs = trajs_info['trajs']
     set_seed(1)
