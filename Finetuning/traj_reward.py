@@ -41,7 +41,7 @@ class TotalReward(nn.Module):
         self.reward_net.eval()
         self.kernels = []
         self.config.device = device
-        self.config.delta = F.softplus(torch.tensor(0.0, requires_grad = False), beta = self.config.beta).to(self.config.device)
+        self.config.delta = F.softplus(torch.tensor(0.0, requires_grad = False), beta = self.config.beta).item()
 
 
 
