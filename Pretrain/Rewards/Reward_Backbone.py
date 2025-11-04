@@ -170,7 +170,7 @@ def train_reward(dataset_name: str, batch_size, num_steps, save_freq, lr, sigma,
         
            # Predicted Reward
            optimizer.zero_grad()
-           pred = reward_net(s, a)
+           pred = reward_net(torch.cat([s, a], dim = 1))
            loss = F.mse_loss(pred, r)
            loss.backward()
            optimizer.step()
@@ -254,7 +254,7 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
              s = s.to(device)
              a = a.to(device)
              r = r.to(device)
-             pred = reward_net(s, a)
+             pred = reward_net(torch.cat([s, a], dim = 1))
              loss = F.mse_loss(pred, r)
              total_mean_loss += loss.item()
              total_reward += pred.mean().item()

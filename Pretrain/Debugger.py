@@ -85,7 +85,7 @@ def function(x, beta: float):
 
 
 
-
+"""
 save_path = f'./Rollouts/{'pointmaze'}/{'medium'}/Generated_trajs_Info.pkl'
 with open(save_path, 'rb') as f:
     data = pickle.load(f)
@@ -137,6 +137,11 @@ total = total / len(gen_trajs)
 print(f"Complete Total reward: {total}")
 
 
+"""
+a = torch.tensor([[1,2,3], [7,8,9]])
+b = torch.tensor([[4,5,6], [10,11,12]])
+c = torch.cat([a, b], dim = 1)
+print(c)
 
 
 
