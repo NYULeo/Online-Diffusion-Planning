@@ -38,7 +38,8 @@ class TotalReward(nn.Module):
         self.config = config
         reward_state_dict, obs_dim, act_dim, reward_name = get_pretrained_reward(dataset_name, reward_checkpoint, specific_dataset)
         self.config.device = device
-        self.reward_net = MLPNetwork(input_dim = obs_dim + act_dim, out_dim = 1, hidden_dims = [200, 200, 200, 200], act_fn = 'swish', out_act_fn = 'identity').to(self.config.device)
+        #self.reward_net = MLPNetwork(input_dim = obs_dim + act_dim, out_dim = 1, hidden_dims = [200, 200, 200, 200], act_fn = 'swish', out_act_fn = 'identity').to(self.config.device)
+        self.reward_net = Reward(obs_dim, act_dim).to(self.config.device)
         self.reward_net.load_state_dict(reward_state_dict)
         self.reward_net.eval()
         self.kernels = []
@@ -120,48 +121,36 @@ class TotalReward(nn.Module):
         total_reward = torch.tensor(0.0, device=self.config.device, requires_grad = False)
         gradient = torch.zeros(H, D, device = self.config.device, requires_grad = False)
         for i in range(H-1):
-            s = x[i][:self.config.d_s].clone()
-            s_norm_reward = self.reward_processor(s)
-            s_norm_reward.requires_grad_(True)
-            a = x[i][self.config.d_s:].clone()
-            a.requires_grad_(True)
-            reward_input = torch.cat([s_norm_reward.detach(), a.detach()], dim = 0).unsqueeze(0).to(self.config.device)
-            reward_input = reward_input.detach().requires_grad_(True) 
+            s = x[i][:self.config.d_s]
+            s_norm_reward = self.reward_processor(s).unsqueeze(0).requires_grad_(True)
+            a = x[i][self.config.d_s:].unsqueeze(0).requires_grad_(True)
+            
            
-            s_next = x[i+1][:self.config.d_s].clone()
-            a_kernel = a.unsqueeze(0).requires_grad_(True)
+            s_next = x[i+1][:self.config.d_s]
             s_norm_kernel = self.kernel_processor(s).unsqueeze(0).requires_grad_(True)
             s_next_norm_kernel = self.kernel_processor(s_next).unsqueeze(0).requires_grad_(True)
  
            
-            r = self.reward_net(reward_input)
-           
-            c = self.sigmoid(s_norm_kernel, a_kernel, s_next_norm_kernel)
+            r = self.reward_net(s_norm_reward, a)
+            c = self.sigmoid(s_norm_kernel, a, s_next_norm_kernel)
            
             grads = torch.autograd.grad(
                         outputs = r,
-                        inputs = reward_input,
+                        inputs = (s_norm_reward, a),
                         grad_outputs = torch.ones_like(r),
                         create_graph = False,
                         retain_graph = False,
                         allow_unused = False
                     )
-            
-           
-
-            #r_s = grads[0].squeeze(0) * torch.tensor((1/np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)), device = self.config.device, dtype=torch.float32, requires_grad = False)
-            #r_a = grads[1].squeeze(0)
-            grad_input = grads[0].squeeze(0)  # Shape: (d_s + d_a,)
-            r_s = grad_input[:self.config.d_s] * torch.tensor((1/np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)), 
-                                                   device = self.config.device, dtype=torch.float32, requires_grad = False)
-            r_a = grad_input[self.config.d_s:]
+            r_s = grads[0].squeeze(0) * torch.tensor((1/np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)), device = self.config.device, dtype=torch.float32, requires_grad = False)
+            r_a = grads[1].squeeze(0)
             r_s_grad, r_a_grad = self.makeGrad(H, r_s, r_a, i)
             
             
             
             grads = torch.autograd.grad(
                         outputs = c,
-                        inputs = (s_norm_kernel, a_kernel, s_next_norm_kernel),
+                        inputs = (s_norm_kernel, a, s_next_norm_kernel),
                         grad_outputs = torch.ones_like(c),
                         create_graph = True,
                         retain_graph = True
@@ -176,37 +165,33 @@ class TotalReward(nn.Module):
             
             gradient +=  (1/H)*((r_s_grad + r_a_grad)) - lam * (1/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad)
             
-            total_reward += (1/H)*(r.squeeze()) - lam  * (1/(H-1)) * ( c.squeeze() - self.config.delta)
+            total_reward += (1/H)*(r.squeeze(0)) - lam  * (1/(H-1)) * ( c.squeeze(0) - self.config.delta)
             
         
 
         s = x[H-1][:self.config.d_s]
         s_norm_reward = self.reward_processor(s).unsqueeze(0).requires_grad_(True)
         a = x[H-1][self.config.d_s:].unsqueeze(0).requires_grad_(True)
-        input = torch.cat([s_norm_reward.detach(), a.detach()], dim = 1).requires_grad_(True)
-        r = self.reward_net(input)
+        
+        r = self.reward_net(s_norm_reward, a)
         
 
         grads = torch.autograd.grad(
                         outputs = r,
-                        inputs = input,
+                        inputs = (s_norm_reward, a),
                         grad_outputs = torch.ones_like(r),
                         create_graph = False,
                         retain_graph = False
                 )
-        #r_s = grads[0].squeeze(0) * torch.tensor((1/np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)), device = self.config.device, dtype=torch.float32, requires_grad = False)
-        #r_a = grads[1].squeeze(0)
-        grad_input = grads[0].squeeze(0)  # Shape: (d_s + d_a,)
-        r_s = grad_input[:self.config.d_s] * torch.tensor((1/np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)), 
-                                                   device = self.config.device, dtype=torch.float32, requires_grad = False)
-        r_a = grad_input[self.config.d_s:]
+        r_s = grads[0].squeeze(0) * torch.tensor((1/np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)), device = self.config.device, dtype=torch.float32, requires_grad = False)
+        r_a = grads[1].squeeze(0)
         r_s_grad, r_a_grad = self.makeGrad(H, r_s, r_a, H-1)
 
        
        
         gradient += (1/H) * ((r_s_grad + r_a_grad)) 
        
-        total_reward +=  (1/H) * (r.squeeze())
+        total_reward +=  (1/H) * (r.squeeze(0))
         return total_reward, gradient
 
 
