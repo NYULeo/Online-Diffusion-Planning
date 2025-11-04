@@ -424,6 +424,7 @@ class MLPNetwork(nn.Module):
     def weights(self):
         return [net.weight for net in self.networks if isinstance(net, torch.nn.modules.linear.Linear)]
 
+
 """
 class EnsembleModel(nn.Module):
     def __init__(self, obs_dim, action_dim, hidden_dims, device, ensemble_size=7, num_elite=5, decay_weights=None,
@@ -482,5 +483,5 @@ class EnsembleModel(nn.Module):
     def load_state_dicts(self, state_dicts):
         for i in range(self.ensemble_size):
             self.ensemble_models[i].load_state_dict(state_dicts[i])
-"""
 
+"""
