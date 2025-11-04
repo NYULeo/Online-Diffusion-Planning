@@ -300,7 +300,7 @@ class Acc_AdjointMatchingFineTuner:
         k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
         #a0 = (-1 * self.config.reward_scaling_factor * gradient).detach().unsqueeze(0).to(self.device)
         a0 = ( self.config.reward_scaling_factor * gradient).detach().unsqueeze(0).to(self.device)
-        #print(f"a0 Norm: {a0.norm().item()}")
+        print(f"a0 Norm: {a0.norm().item()}")
         a.append(a0)
         #a.append(torch.zeros_like(gradient).unsqueeze(0).to(self.device))
         for i in range(steps_T - 1):
