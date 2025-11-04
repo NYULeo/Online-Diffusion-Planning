@@ -126,13 +126,14 @@ class TotalReward(nn.Module):
             s_next = x[i+1][:self.config.d_s]
             s_norm_kernel = self.kernel_processor(s).unsqueeze(0).requires_grad_(True)
             s_next_norm_kernel = self.kernel_processor(s_next).unsqueeze(0).requires_grad_(True)
-
-            r = self.reward_net(torch.cat([s_norm_reward, a], dim = 1))
+ 
+            input = torch.cat([s_norm_reward, a], dim = 1)
+            r = self.reward_net(input)
             c = self.sigmoid(s_norm_kernel, a, s_next_norm_kernel)
            
             grads = torch.autograd.grad(
                         outputs = r,
-                        inputs = torch.cat([s_norm_reward, a], dim = 1).to(self.config.device),
+                        inputs = input,
                         grad_outputs = torch.ones_like(r),
                         create_graph = False,
                         retain_graph = False
@@ -183,12 +184,13 @@ class TotalReward(nn.Module):
         s = x[H-1][:self.config.d_s]
         s_norm_reward = self.reward_processor(s).unsqueeze(0).requires_grad_(True)
         a = x[H-1][self.config.d_s:].unsqueeze(0).requires_grad_(True)
-        r = self.reward_net(torch.cat([s_norm_reward, a], dim = 1))
+        input = torch.cat([s_norm_reward, a], dim = 1)
+        r = self.reward_net(input)
         
 
         grads = torch.autograd.grad(
                         outputs = r,
-                        inputs = torch.cat([s_norm_reward, a], dim = 1).to(self.config.device),
+                        inputs = input,
                         grad_outputs = torch.ones_like(r),
                         create_graph = False,
                         retain_graph = False
