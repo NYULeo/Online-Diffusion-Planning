@@ -441,9 +441,9 @@ class Acc_AdjointMatchingFineTuner:
         total_C = 0.0
         Lambda_C = 0.0
         #total_var_reward = 0.0
-       
+        conds = next(dataloader)
         while step < self.config.finetune_steps:
-             conds = next(dataloader)
+             #conds = next(dataloader)
             
              loss, avg_reward, avg_C = self.step(conds, reward_model)
              print(f"Lambda: {self.Lam.get_lam()}")
