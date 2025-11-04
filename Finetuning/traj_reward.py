@@ -146,8 +146,7 @@ class TotalReward(nn.Module):
                         retain_graph = False,
                         allow_unused = False
                     )
-            print(grads[0])
-            exit()
+            
            
 
             #r_s = grads[0].squeeze(0) * torch.tensor((1/np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)), device = self.config.device, dtype=torch.float32, requires_grad = False)
@@ -184,7 +183,7 @@ class TotalReward(nn.Module):
         s = x[H-1][:self.config.d_s]
         s_norm_reward = self.reward_processor(s).unsqueeze(0).requires_grad_(True)
         a = x[H-1][self.config.d_s:].unsqueeze(0).requires_grad_(True)
-        input = torch.cat([s_norm_reward, a], dim = 1).requires_grad_(True)
+        input = torch.cat([s_norm_reward.detach(), a.detach()], dim = 1).requires_grad_(True)
         r = self.reward_net(input)
         
 
