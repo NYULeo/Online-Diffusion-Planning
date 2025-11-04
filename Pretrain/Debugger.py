@@ -138,42 +138,115 @@ print(f"Complete Total reward: {total}")
 
 
 """
-import numpy as np
-import matplotlib.pyplot as plt
+
+
 import seaborn as sns
+import matplotlib.colors as mcolors
+import colorsys
 
-sns.set_style("whitegrid", {'axes.grid': True, 'axes.edgecolor':'black'})
-plt.rcParams.update({'font.size': 14})
+def _lighten_color(color: str, amount: float=0.5) -> str:
+        """
+        Lightens the given color by multiplying (1-luminosity) by the given amount.
+        Works with matplotlib color string or hex string.
+        Source adapted from StackOverflow. :contentReference[oaicite:0]{index=0}
+        """
+        try:
+            c = mcolors.cnames[color]
+        except KeyError:
+            c = color
+        rgb = mcolors.to_rgb(c)
+        h, l, s = colorsys.rgb_to_hls(*rgb)
+        # l is lightness, we increase it toward 1
+        new_l = 1 - amount * (1 - l)
+        new_rgb = colorsys.hls_to_rgb(h, new_l, s)
+        return mcolors.to_hex(new_rgb)
 
-def smooth(x, window=50):
-    return np.convolve(x, np.ones(window)/window, mode='valid')
 
-def plot_reward_curves(episode_rewards_list, labels, window=50, max_episodes=None):
-    """
-    episode_rewards_list : list of 1-d arrays (one per seed/method)
-    labels : list of same length, method names
-    window : smoothing window size
-    max_episodes : optionally truncate x-axis
-    """
-    fig, ax = plt.subplots(figsize=(8,5))
-    for rewards, label in zip(episode_rewards_list, labels):
-        if max_episodes:
-            rewards = rewards[:max_episodes]
-        sm = smooth(rewards, window)
-        x = np.arange(len(sm))
-        ax.plot(x, sm, label=label)
-        # optionally plot raw with alpha
-        ax.plot(np.arange(len(rewards)), rewards, color=ax.get_lines()[-1].get_color(),
-                alpha=0.2, linewidth=0.5)
-    ax.set_xlabel("Episodes")
-    ax.set_ylabel("Episode Return (Reward)")
-    ax.legend(frameon=True, fancybox=True)
-    sns.despine()
-    plt.tight_layout()
-    plt.show()
+def smooth_curve(data: np.ndarray, window: int) -> np.ndarray:
+        if window <= 1:
+            return data
+        smoothed = np.convolve(data, np.ones(window)/window, mode='valid')
+        padded = np.full_like(data, np.nan)
+        padded[window-1:] = smoothed
+        return padded
 
-episode_rewards_list = [np.array([1,2,3,4,5,6,7,8,9,10]) for _ in range(10)]
+def plot_reward_curve(
+                          title: str = "Finetuning Reward Curve",
+                          show_lr: bool = False,
+                          smooth_window: int = 50):
+        
 
-plot_reward_curves(episode_rewards_list, labels = ['method1', 'method2', 'method3'])
+        sns.set_style("whitegrid", {'axes.grid': True, 'axes.edgecolor':'black'})
+        plt.rcParams.update({'font.size': 14})
+
+        okabe_ito = ["#D55E00","#000000", "#E69F00", "#56B4E9", "#009E73",
+                       "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#FF0000"]
+        raw_color    = okabe_ito[3]   
+        smooth_color = okabe_ito[4] 
+        lr_color     = okabe_ito[9]  # yellow (for learning rate curve)
+
+        fig, ax1 = plt.subplots(figsize=(12, 8))
+        steps = np.arange(100)
+        rewards = np.random.randn(len(steps))
+
+
+         # Plot smoothed if possible
+        if len(rewards) > smooth_window and smooth_window > 1:
+            smoothed = smooth_curve(rewards, smooth_window)
+            # only plot where valid (not nan)
+            valid_idx = ~np.isnan(smoothed)
+            ax1.plot(steps[valid_idx], smoothed[valid_idx],
+                     color=smooth_color, linewidth=2.5,
+                     label=f'Smoothed Reward (window={smooth_window})')
+
+            
+        
+        ax1.plot(steps, rewards, alpha=0.3, color=raw_color, linewidth=1.0, label='Raw Reward')
+        ax1.set_title(title, fontsize=16, fontweight='bold')
+        ax1.set_xlabel('Steps', fontsize=12)
+        ax1.set_ylabel('Reward', fontsize=12, color=raw_color)
+        ax1.tick_params(axis='y', labelcolor=raw_color)
+        ax1.grid(True, alpha=0.3)
+        ax1.legend(frameon=True, fancybox=True, fontsize=12)
+        sns.despine()
+        plt.show()
+
+
+
+
+
+
+
+
+
+
+
+        """
+        if show_lr and self.learning_rates:
+            ax2 = ax1.twinx()
+            lr_vals = np.array(self.learning_rates)
+            ax2.plot(steps[:len(lr_vals)], lr_vals, color='green', alpha=0.7, linewidth=1.5, label='Learning Rate')
+            ax2.set_ylabel('Learning Rate', fontsize=12, color=lr_color)
+            ax2.tick_params(axis='y', labelcolor=lr_color)
+            ax2.legend(loc='upper right')
+        
+        sns.despine()
+        #plt.title(title, fontsize=14, fontweight='bold')
+        plt.tight_layout()
+
+       
+        if save_path is None:
+            save_path = os.path.join(self.save_dir, "reward_curve.png")
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Reward curve saved to {save_path}")
+        plt.show()
+        return fig
+        """
+
+
+plot_reward_curve()
+
+
 
 

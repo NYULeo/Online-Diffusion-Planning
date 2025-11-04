@@ -49,10 +49,11 @@ class Acc_AdjointMatchingConfig:
     s: float = 0.008  # cosine schedule offset used in base drift
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     lam: float = 0.0
-    reward_scaling_factor: float = 100000
-    step_start_ema = 50
+    reward_scaling_factor: float = 10000
+    step_start_ema = 10
     ema_decay = 0.999
     update_ema_every = 2
+    update_lambda_every = 5
     save_freq = 50
     log_freq = 1
 
@@ -110,9 +111,9 @@ class Acc_AdjointMatchingFineTuner:
           
     def set_lambda(self, beta: Optional[float] = None):
         if beta is None:
-           self.Lam = Lambda(lam = self.config.lam, beta = 1.0, eta_lam = self.config.finetune_lr)
+           self.Lam = Lambda(lam = self.config.lam, beta = 1.0, eta_lam = 0.1 * self.config.finetune_lr)
         else:
-           self.Lam = Lambda(lam = self.config.lam, beta = beta, eta_lam = self.config.finetune_lr)
+           self.Lam = Lambda(lam = self.config.lam, beta = beta, eta_lam = 0.1 * self.config.finetune_lr)
 
     def set_optimizer_and_scheduler(self, new_lr=None, new_steps=None):
           # Use provided values or fall back to config defaults
@@ -359,7 +360,6 @@ class Acc_AdjointMatchingFineTuner:
         all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=True)
         if self.accelerator.is_main_process:
             total_avgC = float(sum(all_final_Cs) / len(all_final_Cs))
-            self.Lam.update(total_avgC)
         else:
             total_avgC = 0.0
         
@@ -373,10 +373,6 @@ class Acc_AdjointMatchingFineTuner:
             for traj in local_trajs2:
                 adjoint, reward = self.make_a(traj, reward_model)
                 loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
-                #print(f"Rank {self.accelerator.process_index}, Pre-Reduce Loss: {loss_tensor.item()}")
-                #dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)  # Sum first
-                #loss_tensor = loss_tensor / dist.get_world_size()  # Then divide by num GPUs (3)
-                #print(f"Rank {self.accelerator.process_index}, Post-Reduce Loss: {loss_tensor.item()}")
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
             local_loss = torch.stack(local_loss_tensors).mean()
@@ -419,8 +415,8 @@ class Acc_AdjointMatchingFineTuner:
             if isinstance(all_losses, torch.Tensor):
                  avg_loss = float(all_losses.mean().item())
             else:
-                #avg_loss = float(torch.cat(all_losses).mean().item())
-                avg_loss = float(all_losses.sum().item())
+                 #avg_loss = float(torch.cat(all_losses).mean().item())
+                 avg_loss = float(all_losses.mean().item())
             avg_reward = float(sum(all_rewards) / len(all_rewards))
             return avg_loss, avg_reward, total_avgC
         
@@ -443,10 +439,11 @@ class Acc_AdjointMatchingFineTuner:
         total_loss = 0.0
         total_reward = 0.0
         total_C = 0.0
+        Lambda_C = 0.0
         #total_var_reward = 0.0
-        conds = next(dataloader)
+       
         while step < self.config.finetune_steps:
-             #conds = next(dataloader)
+             conds = next(dataloader)
             
              loss, avg_reward, avg_C = self.step(conds, reward_model)
              print(f"Lambda: {self.Lam.get_lam()}")
@@ -454,6 +451,7 @@ class Acc_AdjointMatchingFineTuner:
              total_loss += loss
              total_reward += avg_reward
              total_C += avg_C
+             Lambda_C += avg_C
             
              
              self.accelerator.wait_for_everyone()
@@ -465,6 +463,10 @@ class Acc_AdjointMatchingFineTuner:
                 
                 if ((step % self.config.update_ema_every) == 0):
                      self.step_ema(step)
+                
+                if step % self.config.update_lambda_every == 0:
+                    self.Lam.update((Lambda_C / self.config.update_lambda_every))
+                    Lambda_C = 0.0
 
                 if ((step % self.config.log_freq) == 0):
                     print('---------------------------------------------------------')
@@ -480,7 +482,7 @@ class Acc_AdjointMatchingFineTuner:
                 if ((step % self.config.save_freq == 0) and (step!=0)):
                     self.save(step)
                     model_name = get_PlannerName(self.config.dataset_name, self.config.specific_dataset)
-                    #self.reward_tracker.save_logs(f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/logs/{model_name}_finetune_reward_logs.pkl")
+                    
                     self.reward_tracker.save_logs(f"{model_name}_finetune_reward_logs.pkl")
                     self.reward_tracker.plot_reward_curve(
                     save_path=f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/logs/{model_name}_finetune_reward_curve.png",

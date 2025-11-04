@@ -18,6 +18,8 @@ from typing import Optional
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import seaborn as sns
+import matplotlib.colors as mcolors
+import colorsys
 
 
 class Lambda:
@@ -271,11 +273,11 @@ class RewardTracker:
         sns.set_style("whitegrid", {'axes.grid': True, 'axes.edgecolor':'black'})
         plt.rcParams.update({'font.size': 14})
 
-        okabe_ito = ["#000000", "#E69F00", "#56B4E9", "#009E73",
-                       "#F0E442", "#0072B2", "#D55E00", "#CC79A7"]
-        raw_color    = okabe_ito[2]   # e.g., sky blue for raw reward
-        smooth_color = okabe_ito[1]  # e.g., orange for smoothed reward
-        lr_color     = okabe_ito[4]  # yellow (for learning rate curve)
+        okabe_ito = ["#D55E00","#000000", "#E69F00", "#56B4E9", "#009E73",
+                       "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#FF0000"]
+        raw_color    = okabe_ito[3]   
+        smooth_color = okabe_ito[4] 
+        lr_color     = okabe_ito[9]  
 
         fig, ax1 = plt.subplots(figsize=(12, 8))
         steps = np.array(self.steps)
