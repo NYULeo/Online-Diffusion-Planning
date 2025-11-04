@@ -35,7 +35,7 @@ class TotalReward(nn.Module):
     def __init__(self, device, config: RewardConfig, dataset_name: str, specific_dataset: str, reward_checkpoint: int, kernel_checkpoint: int):
         super().__init__()
         self.config = config
-        self.config.delta = F.softplus(torch.tensor([0.0], requires_grad = False), beta = self.config.beta)
+        self.config.delta = F.softplus(torch.tensor([0.0], requires_grad = False), beta = self.config.beta).to(self.config.device)
         reward_state_dict, obs_dim, act_dim, reward_name = get_pretrained_reward(dataset_name, reward_checkpoint, specific_dataset)
         self.reward_net = MLPNetwork(input_dim = obs_dim + act_dim, out_dim = 1, hidden_dims = [200, 200, 200, 200], act_fn = 'swish', out_act_fn = 'identity').to(self.config.device)
         self.reward_net.load_state_dict(reward_state_dict)
