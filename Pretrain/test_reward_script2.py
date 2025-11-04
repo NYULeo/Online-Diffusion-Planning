@@ -7,7 +7,7 @@ import copy
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 from Rewards.Reward_Backbone import Train_Dataset, test_dataset
 from torch.utils.data import DataLoader
