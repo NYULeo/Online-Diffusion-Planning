@@ -148,6 +148,8 @@ var/
 # Large artifacts
 *.pt
 *.pkl
+# Exception: include 2DMaze_Reward_medium Models pkl files
+!Pretrain/Rewards/2DMaze_Reward_medium/Models/*.pkl
 *.pth
 *.ckpt
 *.npz
@@ -156,6 +158,9 @@ var/
 # Model directories
 Pretrain/Planners/**/Models/
 Pretrain/Rewards/**/Models/
+# Exception: include 2DMaze_Reward_medium Models
+!Pretrain/Rewards/2DMaze_Reward_medium/Models/
+!Pretrain/Rewards/2DMaze_Reward_medium/Models/*.pkl
 Pretrain/Transition_Kernel/**/Models/
 Pretrain/**/Stats/*.pkl
 Pretrain/Rollouts/**/Generated_trajs_Info.pkl
