@@ -126,6 +126,7 @@ class TotalReward(nn.Module):
             a = x[i][self.config.d_s:].clone()
             a.requires_grad_(True)
             reward_input = torch.cat([s_norm_reward, a], dim = 0).unsqueeze(0).to(self.config.device)
+            reward_input = reward_input.detach().requires_grad_(True) 
            
             s_next = x[i+1][:self.config.d_s].clone()
             a_kernel = a.unsqueeze(0).requires_grad_(True)
@@ -134,7 +135,7 @@ class TotalReward(nn.Module):
  
            
             r = self.reward_net(reward_input)
-            print(r)
+           
             c = self.sigmoid(s_norm_kernel, a_kernel, s_next_norm_kernel)
            
             grads = torch.autograd.grad(
