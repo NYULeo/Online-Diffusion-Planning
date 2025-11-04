@@ -1,6 +1,7 @@
 import sys
 import os
 
+from torch.optim.optimizer import required
 from torch.utils.data import DataLoader
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -41,7 +42,7 @@ class TotalReward(nn.Module):
         self.reward_net.eval()
         self.kernels = []
         self.config.device = device
-        self.config.delta = F.softplus(torch.tensor(0.0, requires_grad = False), beta = self.config.beta).item()
+        self.config.delta = F.softplus(torch.tensor(0.0, requires_grad = False), beta = self.config.beta).to(self.config.device)
 
 
 
@@ -127,7 +128,7 @@ class TotalReward(nn.Module):
             s_norm_kernel = self.kernel_processor(s).unsqueeze(0).requires_grad_(True)
             s_next_norm_kernel = self.kernel_processor(s_next).unsqueeze(0).requires_grad_(True)
  
-            input = torch.cat([s_norm_reward, a], dim = 1)
+            input = torch.cat([s_norm_reward, a], dim = 1).requires_grad_(True)
             r = self.reward_net(input)
             c = self.sigmoid(s_norm_kernel, a, s_next_norm_kernel)
            
@@ -178,14 +179,14 @@ class TotalReward(nn.Module):
             
             gradient +=  (1/H)*((r_s_grad + r_a_grad)) - lam * (1/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad)
             
-            total_reward += (1/H)*(r.item()) - lam  * (1/(H-1)) * ( c.item() - self.config.delta )
+            total_reward += (1/H)*(r.squeeze()) - lam  * (1/(H-1)) * ( c.squeeze() - self.config.delta)
             
         
 
         s = x[H-1][:self.config.d_s]
         s_norm_reward = self.reward_processor(s).unsqueeze(0).requires_grad_(True)
         a = x[H-1][self.config.d_s:].unsqueeze(0).requires_grad_(True)
-        input = torch.cat([s_norm_reward, a], dim = 1)
+        input = torch.cat([s_norm_reward, a], dim = 1).requires_grad_(True)
         r = self.reward_net(input)
         
 
@@ -220,7 +221,7 @@ class TotalReward(nn.Module):
        
         gradient += (1/H) * ((r_s_grad + r_a_grad)) 
        
-        total_reward +=  (1/H) * (r.item())
+        total_reward +=  (1/H) * (r.squeeze())
         return total_reward, gradient
 
 

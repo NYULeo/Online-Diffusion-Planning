@@ -149,5 +149,5 @@ import torch
     """
 import torch.nn.functional as F
 a = torch.tensor([1])
-print(a.item())
+print(a.squeeze(0))
 
