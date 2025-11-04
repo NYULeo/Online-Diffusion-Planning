@@ -125,7 +125,7 @@ class TotalReward(nn.Module):
             s_norm_reward.requires_grad_(True)
             a = x[i][self.config.d_s:].clone()
             a.requires_grad_(True)
-            reward_input = torch.cat([s_norm_reward, a], dim = 0).unsqueeze(0).to(self.config.device)
+            reward_input = torch.cat([s_norm_reward.detach(), a.detach()], dim = 0).unsqueeze(0).to(self.config.device)
             reward_input = reward_input.detach().requires_grad_(True) 
            
             s_next = x[i+1][:self.config.d_s].clone()
