@@ -177,6 +177,10 @@ class TotalReward(nn.Module):
             c_s_grad, c_a_grad, c_s_next_grad = self.makeGrad(H, c_s, c_a, i, c_s_next)
             
             gradient +=  (1/H)*((r_s_grad + r_a_grad)) - lam * (1/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad)
+            print(r)
+            print(c)
+            print(self.config.delta)
+            exit()
             total_reward += (1/H)*(r.squeeze(0)) - lam  * (1/(H-1)) * ( c.squeeze(0) - self.config.delta )
             
         
