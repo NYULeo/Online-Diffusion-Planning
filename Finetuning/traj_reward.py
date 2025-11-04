@@ -142,6 +142,7 @@ class TotalReward(nn.Module):
                         create_graph = False,
                         retain_graph = False
                     )
+            print(grads[0])
            
 
             #r_s = grads[0].squeeze(0) * torch.tensor((1/np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)), device = self.config.device, dtype=torch.float32, requires_grad = False)
