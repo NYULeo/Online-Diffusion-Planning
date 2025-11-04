@@ -120,12 +120,14 @@ class TotalReward(nn.Module):
         total_reward = torch.tensor(0.0, device=self.config.device, requires_grad = False)
         gradient = torch.zeros(H, D, device = self.config.device, requires_grad = False)
         for i in range(H-1):
-            s = x[i][:self.config.d_s]
+            s = x[i][:self.config.d_s].clone()
             s_norm_reward = self.reward_processor(s)
-            a = x[i][self.config.d_s:]
-            reward_input = torch.cat([s_norm_reward, a], dim = 0).unsqueeze(0).to(self.config.device).requires_grad_(True)
+            s_norm_reward.requires_grad_(True)
+            a = x[i][self.config.d_s:].clone()
+            a.requires_grad_(True)
+            reward_input = torch.cat([s_norm_reward, a], dim = 0).unsqueeze(0).to(self.config.device)
            
-            s_next = x[i+1][:self.config.d_s]
+            s_next = x[i+1][:self.config.d_s].clone()
             a_kernel = a.unsqueeze(0).requires_grad_(True)
             s_norm_kernel = self.kernel_processor(s).unsqueeze(0).requires_grad_(True)
             s_next_norm_kernel = self.kernel_processor(s_next).unsqueeze(0).requires_grad_(True)
@@ -139,7 +141,8 @@ class TotalReward(nn.Module):
                         inputs = reward_input,
                         grad_outputs = torch.ones_like(r),
                         create_graph = False,
-                        retain_graph = False
+                        retain_graph = False,
+                        allow_unused = False
                     )
             print(grads[0])
             exit()
