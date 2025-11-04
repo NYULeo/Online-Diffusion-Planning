@@ -148,6 +148,6 @@ import torch
              return avg_loss, avg_reward, total_avgC
     """
 import torch.nn.functional as F
-delta = F.softplus(torch.tensor([0.0], requires_grad = False), beta = 1.0)
-print(delta.item())
+a = torch.tensor([1])
+print(a.item())
 
