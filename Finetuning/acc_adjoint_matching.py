@@ -373,8 +373,6 @@ class Acc_AdjointMatchingFineTuner:
             total_avgC = 0.0
         
        
-        print(all_trajs.shape)
-        exit()
         self.accelerator.wait_for_everyone()
         
         
@@ -384,7 +382,7 @@ class Acc_AdjointMatchingFineTuner:
             local_rewards = []
             for traj in local_trajs2:
                 #traj = traj.detach().cpu().numpy()
-                
+                print(traj.shape)
                 adjoint, reward = self.make_a(traj, reward_model)
                 loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
                 local_loss_tensors.append(loss_tensor)

@@ -267,7 +267,8 @@ a = torch.tensor([1,2])
 b = torch.tensor([3,4])
 c = [a, b]
 c = torch.stack(c)
-c = list(torch.chunk(c, 2, dim=0))
+print(c)
+c = [c[i] for i in range(2)] 
 print(c)
 
 
