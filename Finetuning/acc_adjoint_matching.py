@@ -379,9 +379,10 @@ class Acc_AdjointMatchingFineTuner:
                 loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
+                exit()
             local_loss = torch.stack(local_loss_tensors).mean()
             local_rewards = torch.stack(local_rewards).mean()
-            exit()
+            
             
            
         
