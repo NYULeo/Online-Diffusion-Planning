@@ -231,7 +231,7 @@ for batch in dataloader:
         local_rewards = []
         local_s_list = []
         local_a_list = []
-        
+        print(f"Local_batch: {len(local_batch)}")
         for s_item, a_item in local_batch:
             local_s_list.append(s_item)
             local_a_list.append(a_item)
