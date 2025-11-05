@@ -383,6 +383,7 @@ class Acc_AdjointMatchingFineTuner:
             for traj in local_trajs2:
                 #traj = traj.detach().cpu().numpy()
                 print(traj.shape)
+                exit()
                 adjoint, reward = self.make_a(traj, reward_model)
                 loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
                 local_loss_tensors.append(loss_tensor)
