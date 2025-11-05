@@ -115,9 +115,9 @@ class Acc_AdjointMatchingFineTuner:
           
     def set_lambda(self, beta: Optional[float] = None):
         if beta is None:
-           self.Lam = Lambda(lam = self.config.lam, beta = 1.0, eta_lam = 0.1 * self.config.finetune_lr)
+           self.Lam = Lambda(lam = self.config.lam, beta = 1.0, eta_lam = self.config.finetune_lr)
         else:
-           self.Lam = Lambda(lam = self.config.lam, beta = beta, eta_lam = 0.1 * self.config.finetune_lr)
+           self.Lam = Lambda(lam = self.config.lam, beta = beta, eta_lam = self.config.finetune_lr)
 
     def set_optimizer_and_scheduler(self, new_lr=None, new_steps=None):
           # Use provided values or fall back to config defaults
@@ -350,7 +350,6 @@ class Acc_AdjointMatchingFineTuner:
             local_trajs = []
             local_final_Cs = []
             for s0 in local_s0:
-                print(s0.flatten().sum().item())
                 s0 = s0.to(self.device)
                 traj = self.sample_Traj(s0)  
                 local_trajs.append(traj)
@@ -358,6 +357,7 @@ class Acc_AdjointMatchingFineTuner:
                 C_val = base_reward_model.get_c(final_x)
                 local_final_Cs.append(C_val)
             local_trajs = torch.stack(local_trajs).to(self.device)
+            local_final_Cs = torch.stack(local_final_Cs).mean()
             
 
             
@@ -366,12 +366,14 @@ class Acc_AdjointMatchingFineTuner:
         
         
         self.accelerator.wait_for_everyone()
-        exit()
+        
+        local_Cs_det = local_final_Cs.detach()
         # 2. Gather C values and update lambda on main process
-        all_final_Cs = self.accelerator.gather_for_metrics(local_final_Cs, use_gather_object=True)
+        all_final_Cs = self.accelerator.gather_for_metrics(local_Cs_det, use_gather_object=True)
         all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=False)
         if self.accelerator.is_main_process:
-            total_avgC = float(sum(all_final_Cs) / len(all_final_Cs))
+            #total_avgC = float(sum(all_final_Cs) / len(all_final_Cs))
+            total_avgC = float(all_final_Cs.mean().item())
         else:
             total_avgC = 0.0
         
@@ -495,7 +497,7 @@ class Acc_AdjointMatchingFineTuner:
                     
              
                 if ((step % self.config.save_freq == 0) and (step!=0)):
-                    self.save(step)
+                    #self.save(step)
                     model_name = get_PlannerName(self.config.dataset_name, self.config.specific_dataset)
                     self.reward_tracker.save_logs(f"{model_name}_finetune_reward_logs.pkl")
                     self.reward_tracker.plot_reward_curve(

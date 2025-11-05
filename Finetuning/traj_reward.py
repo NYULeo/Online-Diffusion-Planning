@@ -104,7 +104,7 @@ class TotalReward(nn.Module):
         
     def get_c(self, x):
         H, D = x.shape
-        C = 0.0
+        C = torch.tensor(0.0, device = self.config.device, requires_grad=False)
         for i in range(H-1):
             s = x[i][:self.config.d_s]
             s_norm = self.reward_processor(s).unsqueeze(0)
@@ -112,7 +112,7 @@ class TotalReward(nn.Module):
             s_next = x[i+1][:self.config.d_s]
             s_next_norm = self.kernel_processor(s_next).unsqueeze(0)
             c = self.sigmoid(s_norm, a, s_next_norm)
-            C += c.item()
+            C += c
         C = C / (H-1)
         return C
    

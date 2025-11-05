@@ -287,9 +287,10 @@ b = [-3.331496477127075,
 3.0114972591400146,
 -1.9939895868301392,
 0.8550270795822144]
-
-common = list(set(a) & set(b))
-print(common)
+import torch
+import torch.nn.functional as F
+delta = F.softplus(torch.tensor(0.0, requires_grad = False), beta = 1)
+print(delta.item())
 
 
 
