@@ -369,7 +369,7 @@ class Acc_AdjointMatchingFineTuner:
         
         local_Cs_det = local_final_Cs.detach()
         # 2. Gather C values and update lambda on main process
-        all_final_Cs = self.accelerator.gather_for_metrics(local_Cs_det, use_gather_object=True)
+        all_final_Cs = self.accelerator.gather_for_metrics(local_Cs_det, use_gather_object=False)
         all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=False)
         if self.accelerator.is_main_process:
             #total_avgC = float(sum(all_final_Cs) / len(all_final_Cs))
