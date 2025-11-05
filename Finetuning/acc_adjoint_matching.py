@@ -420,11 +420,13 @@ class Acc_AdjointMatchingFineTuner:
         if self.accelerator.is_main_process:
             if isinstance(all_losses, torch.Tensor):
                  avg_loss = float(all_losses.mean().item())
+                 
             else:
                  #avg_loss = float(torch.cat(all_losses).mean().item())
                  avg_loss = float(all_losses.mean().item())
             #avg_reward = float(sum(all_rewards) / len(all_rewards))
             print(f"All_rewards: {all_rewards}")
+            print(f"all_losses: {all_losses}")
             exit()
             #avg_reward = float(all_rewards.mean().item())
             return avg_loss, avg_reward, total_avgC
