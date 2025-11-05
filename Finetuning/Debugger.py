@@ -251,8 +251,7 @@ for batch in dataloader:
      all_rewards = accelerator.gather_for_metrics(local_rewards, use_gather_object=False)
      if accelerator.is_main_process:
         # Concatenate all rewards
-        all_rewards = all_rewards.numpy()
-        all_rewardas = all_rewards.flatten()
+        
         #all_rewards = [r.to(device) if isinstance(r, torch.Tensor) else r for r in all_rewards]
         print(f"All_reward: {all_rewards}")
         #print(f"Collected rewards: mean={all_rewards.mean().item():.4f}, shape={all_rewards.shape}")
