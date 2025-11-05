@@ -253,6 +253,7 @@ for batch in dataloader:
         # Concatenate all rewards
         all_rewards = [r.to(device) if isinstance(r, torch.Tensor) else r for r in all_rewards]
         all_rewards_tensor = torch.cat(all_rewards, dim=0)
+        print(f"All_reward: {all_rewards_tensor}")
         print(f"Collected rewards: mean={all_rewards_tensor.mean().item():.4f}, shape={all_rewards_tensor.shape}")
      exit()
 
