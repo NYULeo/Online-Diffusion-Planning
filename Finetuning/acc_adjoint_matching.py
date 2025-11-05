@@ -373,7 +373,7 @@ class Acc_AdjointMatchingFineTuner:
             total_avgC = 0.0
         
        
-        print(local_trajs.shape)
+        print(all_trajs.shape)
         exit()
         self.accelerator.wait_for_everyone()
         
