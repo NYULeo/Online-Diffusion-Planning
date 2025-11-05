@@ -350,12 +350,13 @@ class Acc_AdjointMatchingFineTuner:
             for s0 in local_s0:
                 s0 = s0.to(self.device)
                 traj = self.sample_Traj(s0)  
+                print(traj.flatten().sum().item())
                 local_trajs.append(traj)
                 final_x = traj[-1].squeeze(0).to(self.device)
                 C_val = base_reward_model.get_c(final_x)
                 local_final_Cs.append(C_val)
             local_trajs = torch.stack(local_trajs).to(self.device)
-            print(local_trajs.flatten().sum().item())
+            
 
             
             
