@@ -421,7 +421,9 @@ class Acc_AdjointMatchingFineTuner:
                  #avg_loss = float(torch.cat(all_losses).mean().item())
                  avg_loss = float(all_losses.mean().item())
             #avg_reward = float(sum(all_rewards) / len(all_rewards))
-            avg_reward = float(all_rewards.mean().item())
+            print(f"All_rewards: {all_rewards}")
+            exit()
+            #avg_reward = float(all_rewards.mean().item())
             return avg_loss, avg_reward, total_avgC
         
         return 0.0, 0.0, total_avgC
