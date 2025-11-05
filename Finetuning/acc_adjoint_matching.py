@@ -379,6 +379,8 @@ class Acc_AdjointMatchingFineTuner:
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
             local_loss = torch.stack(local_loss_tensors).mean()
+            local_rewards = torch.stack(local_rewards).mean()
+
            
         
         self.accelerator.wait_for_everyone()
@@ -411,8 +413,9 @@ class Acc_AdjointMatchingFineTuner:
          # 6. Logging: gather detached metrics
           # Detach local_loss and rewards for metrics gathering
         local_loss_det = local_loss.detach()
+        local_rewards_det = local_rewards.detach()
         all_losses = self.accelerator.gather_for_metrics(local_loss_det, use_gather_object=False)
-        all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=False)
+        all_rewards = self.accelerator.gather_for_metrics(local_rewards_det, use_gather_object=False)
 
         if self.accelerator.is_main_process:
             if isinstance(all_losses, torch.Tensor):
