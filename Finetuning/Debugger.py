@@ -1,4 +1,4 @@
-import torch
+
 """
     @torch.no_grad()
     def sample_Trajs(self, s0: torch.Tensor) -> Tuple[List[List[torch.Tensor]], float]:
@@ -156,21 +156,50 @@ from accelerate import Accelerator
 from Pretrain.Rewards.nets import Reward
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 from torch.utils.data import Dataset, DataLoader
+import random
+import numpy as np
+import torch
+
+
+def set_seed(seed: int):
+    """Set all random seeds for reproducibility."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+# Set seed before everything else
+seed = 42
+set_seed(seed)
+
+
 
 
 
 accelerator = Accelerator()
 device = accelerator.device
 rank = accelerator.process_index
-torch.manual_seed(42 + rank)
-torch.cuda.manual_seed_all(42 + rank)
+
+torch.manual_seed(seed + rank)
+torch.cuda.manual_seed_all(seed + rank)
+np.random.seed(seed + rank)
+random.seed(seed + rank)
+
+
 reward_state_dict, obs_dim, act_dim, reward_name = get_pretrained_reward('pointmaze', 44000, 'medium')
 reward_net = Reward(obs_dim, act_dim)
 reward_net.load_state_dict(reward_state_dict)
 reward_net.eval()
 reward_stats = get_pretrained_reward_stats(reward_name)
-s = torch.randn(100, obs_dim)  # [num_samples, obs_dim]
-a = torch.randn(100, act_dim)  # [num_samples, act_dim]
+
+
+
+s = torch.tensor([ [1, 2, 3], [4,5,6]], dtype = torch.float32)
+a = torch.tensor([[1,2], [3,4]], dtype = torch.float32)
 
 class SimpleDataset(Dataset):
     def __init__(self, s, a):
@@ -184,6 +213,8 @@ class SimpleDataset(Dataset):
         return self.s[idx], self.a[idx]
 
 dataset = SimpleDataset(s, a)
+generator = torch.Generator()
+generator.manual_seed(seed)
 dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 reward_net, dataloader = accelerator.prepare(reward_net, dataloader)
 reward_net.to(device)
