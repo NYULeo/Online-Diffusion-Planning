@@ -351,6 +351,7 @@ class Acc_AdjointMatchingFineTuner:
             local_final_Cs = []
             for s0 in local_s0:
                 s0 = s0.to(self.device)
+                print(s0.flatten().sum().item())
                 traj = self.sample_Traj(s0)  
                 local_trajs.append(traj)
                 final_x = traj[-1].squeeze(0).to(self.device)
@@ -358,6 +359,8 @@ class Acc_AdjointMatchingFineTuner:
                 local_final_Cs.append(C_val)
             local_trajs = torch.stack(local_trajs).to(self.device)
             local_final_Cs = torch.stack(local_final_Cs).mean()
+        
+        exit()
             
 
             
