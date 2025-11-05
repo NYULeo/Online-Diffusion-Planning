@@ -268,7 +268,7 @@ b = torch.tensor([3,4])
 c = [a, b]
 c = torch.stack(c)
 print(c)
-c = [c[i] for i in range(2)] 
+c = [c[i] for i in range(c.shape[0])] 
 print(c)
 
 
