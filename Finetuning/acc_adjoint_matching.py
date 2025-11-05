@@ -282,7 +282,7 @@ class Acc_AdjointMatchingFineTuner:
             X.append(x.detach().clone().to(self.device))
         #x = apply_conditioning(x, conditions, d_s)
         self.new_score_net.train()
-        return  X
+        return  torch.tensor(X).to(self.device)
 
     def make_a(self, X, reward_model: TotalReward):
         base_old_score_net = self.accelerator.unwrap_model(self.old_score_net)
@@ -349,8 +349,10 @@ class Acc_AdjointMatchingFineTuner:
             local_final_Cs = []
             for s0 in local_s0:
                 s0 = s0.to(self.device)
-                traj = self.sample_Traj(s0)               # get trajectory list
-                local_trajs.append(traj)
+                traj = self.sample_Traj(s0)  
+                new_traj = traj.unsqueeze(0).to(self.device)
+                local_trajs.append(new_traj)
+                #local_trajs.append(traj)
                 final_x = traj[-1].squeeze(0).to(self.device)
                 C_val = base_reward_model.get_c(final_x)
                 local_final_Cs.append(C_val)
@@ -360,7 +362,8 @@ class Acc_AdjointMatchingFineTuner:
         self.accelerator.wait_for_everyone()
         # 2. Gather C values and update lambda on main process
         all_final_Cs = self.accelerator.gather_for_metrics(local_final_Cs, use_gather_object=True)
-        all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=True)
+        #all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=True)
+        all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=False)
         if self.accelerator.is_main_process:
             total_avgC = float(sum(all_final_Cs) / len(all_final_Cs))
         else:
@@ -374,17 +377,12 @@ class Acc_AdjointMatchingFineTuner:
             local_loss_tensors = []
             local_rewards = []
             for traj in local_trajs2:
-                
-                s = 0.0
-                for t in traj:
-                    s = s + t.flatten().norm(2).item()
-                print(s)
-                exit()
+                traj = traj.numpy()
                 adjoint, reward = self.make_a(traj, reward_model)
                 loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
-                
+            
             local_loss = torch.stack(local_loss_tensors).mean()
             local_rewards = torch.stack(local_rewards).mean()
             
