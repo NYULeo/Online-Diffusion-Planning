@@ -322,7 +322,7 @@ class Acc_AdjointMatchingFineTuner:
         a.reverse()
         for p in base_old_score_net.parameters():
               p.requires_grad_(False)
-        return a, reward.item()
+        return a, reward
            
     def adjoint_matching_loss(
         self,
@@ -354,6 +354,7 @@ class Acc_AdjointMatchingFineTuner:
                 final_x = traj[-1].squeeze(0).to(self.device)
                 C_val = base_reward_model.get_c(final_x)
                 local_final_Cs.append(C_val)
+                
         
 
         self.accelerator.wait_for_everyone()
@@ -411,7 +412,7 @@ class Acc_AdjointMatchingFineTuner:
           # Detach local_loss and rewards for metrics gathering
         local_loss_det = local_loss.detach()
         all_losses = self.accelerator.gather_for_metrics(local_loss_det, use_gather_object=False)
-        all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=True)
+        all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object=False)
 
         if self.accelerator.is_main_process:
             if isinstance(all_losses, torch.Tensor):
@@ -419,7 +420,8 @@ class Acc_AdjointMatchingFineTuner:
             else:
                  #avg_loss = float(torch.cat(all_losses).mean().item())
                  avg_loss = float(all_losses.mean().item())
-            avg_reward = float(sum(all_rewards) / len(all_rewards))
+            #avg_reward = float(sum(all_rewards) / len(all_rewards))
+            avg_reward = float(all_rewards.mean().item())
             return avg_loss, avg_reward, total_avgC
         
         return 0.0, 0.0, total_avgC
