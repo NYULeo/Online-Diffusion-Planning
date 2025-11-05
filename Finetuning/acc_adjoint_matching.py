@@ -350,22 +350,22 @@ class Acc_AdjointMatchingFineTuner:
             for s0 in local_s0:
                 s0 = s0.to(self.device)
                 traj = self.sample_Traj(s0)  
-                #new_traj = traj.unsqueeze(0).to(self.device)
-                #local_trajs.append(new_traj)
                 local_trajs.append(traj)
                 final_x = traj[-1].squeeze(0).to(self.device)
                 C_val = base_reward_model.get_c(final_x)
                 local_final_Cs.append(C_val)
             local_trajs = torch.stack(local_trajs).to(self.device)
+            print(local_trajs.flatten().sum().item())
+
             
             
                 
         
-     
+        
         self.accelerator.wait_for_everyone()
+        exit()
         # 2. Gather C values and update lambda on main process
         all_final_Cs = self.accelerator.gather_for_metrics(local_final_Cs, use_gather_object=True)
-        #all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=True)
         all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=False)
         if self.accelerator.is_main_process:
             total_avgC = float(sum(all_final_Cs) / len(all_final_Cs))
@@ -375,26 +375,17 @@ class Acc_AdjointMatchingFineTuner:
        
         self.accelerator.wait_for_everyone()
         
+        
         # 3. Compute adjoints, rewards & loss tensors for each trajectory
         with self.accelerator.split_between_processes(all_trajs) as local_trajs2:
             local_loss_tensors = []
             local_rewards = []
-            t = 0
             for traj in local_trajs2:
-                #traj = traj.detach().cpu().numpy()
-                print(traj.flatten().sum().item())
                 traj = [traj[i] for i in range(traj.shape[0])]
                 adjoint, reward = self.make_a(traj, reward_model)
                 loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
-                t = t+1
-                self.accelerator.wait_for_everyone()
-                if(t == 2):
-                    exit()
-              
-                
-            
             local_loss = torch.stack(local_loss_tensors).mean()
             local_rewards = torch.stack(local_rewards).mean()
             
