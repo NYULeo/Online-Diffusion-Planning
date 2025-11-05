@@ -1,4 +1,5 @@
 
+
 """
     @torch.no_grad()
     def sample_Trajs(self, s0: torch.Tensor) -> Tuple[List[List[torch.Tensor]], float]:
@@ -198,7 +199,7 @@ reward_stats = get_pretrained_reward_stats(reward_name)
 
 
 
-s = torch.tensor([ [1, 2, 3], [4,5,6]], dtype = torch.float32)
+s = torch.tensor([ [1, 2, 3, 4], [4,5,6, 7]], dtype = torch.float32)
 a = torch.tensor([[1,2], [3,4]], dtype = torch.float32)
 
 class SimpleDataset(Dataset):
