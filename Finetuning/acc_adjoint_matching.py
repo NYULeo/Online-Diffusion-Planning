@@ -84,10 +84,10 @@ class Acc_AdjointMatchingFineTuner:
         rank = self.accelerator.process_index
         torch.backends.cudnn.deterministic=True
         torch.backends.cudnn.benchmark=False
-        #torch.manual_seed(42 + rank)
-        #torch.cuda.manual_seed_all(42 + rank)
-        torch.manual_seed(42)
-        torch.cuda.manual_seed_all(42)
+        torch.manual_seed(42 + rank)
+        torch.cuda.manual_seed_all(42 + rank)
+        #torch.manual_seed(42)
+        #torch.cuda.manual_seed_all(42)
         
         self.ema = EMA(self.config.ema_decay)
         self.t_asc = torch.linspace(1.0, 0.0, self.config.num_steps + 1, device = self.device)
@@ -351,7 +351,6 @@ class Acc_AdjointMatchingFineTuner:
             local_final_Cs = []
             for s0 in local_s0:
                 s0 = s0.to(self.device)
-                print(s0.flatten().sum().item())
                 traj = self.sample_Traj(s0)  
                 local_trajs.append(traj)
                 final_x = traj[-1].squeeze(0).to(self.device)
@@ -360,7 +359,7 @@ class Acc_AdjointMatchingFineTuner:
             local_trajs = torch.stack(local_trajs).to(self.device)
             local_final_Cs = torch.stack(local_final_Cs).mean()
         
-        exit()
+        
             
 
             
