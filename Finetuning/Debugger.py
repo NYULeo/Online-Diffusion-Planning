@@ -216,7 +216,8 @@ class SimpleDataset(Dataset):
 dataset = SimpleDataset(s, a)
 generator = torch.Generator()
 generator.manual_seed(seed)
-dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
+dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
+print(len(dataloader))
 reward_net, dataloader = accelerator.prepare(reward_net, dataloader)
 reward_net.to(device)
 for batch in dataloader:
