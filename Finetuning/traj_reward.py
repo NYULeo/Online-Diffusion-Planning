@@ -112,7 +112,7 @@ class TotalReward(nn.Module):
             s_next = x[i+1][:self.config.d_s]
             s_next_norm = self.kernel_processor(s_next).unsqueeze(0)
             c = self.sigmoid(s_norm, a, s_next_norm)
-            C += c
+            C += c.squeeze(0)
         C = C / (H-1)
         return C
    
