@@ -350,15 +350,18 @@ class Acc_AdjointMatchingFineTuner:
             for s0 in local_s0:
                 s0 = s0.to(self.device)
                 traj = self.sample_Traj(s0)  
-                new_traj = traj.unsqueeze(0).to(self.device)
-                local_trajs.append(new_traj)
-                #local_trajs.append(traj)
+                #new_traj = traj.unsqueeze(0).to(self.device)
+                #local_trajs.append(new_traj)
+                local_trajs.append(traj)
                 final_x = traj[-1].squeeze(0).to(self.device)
                 C_val = base_reward_model.get_c(final_x)
                 local_final_Cs.append(C_val)
+            local_trajs = torch.stack(local_trajs).to(self.device)
+            
+            
                 
         
-
+     
         self.accelerator.wait_for_everyone()
         # 2. Gather C values and update lambda on main process
         all_final_Cs = self.accelerator.gather_for_metrics(local_final_Cs, use_gather_object=True)
@@ -370,19 +373,16 @@ class Acc_AdjointMatchingFineTuner:
             total_avgC = 0.0
         
        
-        
+        print(local_trajs.shape)
         self.accelerator.wait_for_everyone()
-        print(len(all_trajs))
-        exit()
+        
+        
         # 3. Compute adjoints, rewards & loss tensors for each trajectory
         with self.accelerator.split_between_processes(all_trajs) as local_trajs2:
             local_loss_tensors = []
             local_rewards = []
             for traj in local_trajs2:
                 #traj = traj.detach().cpu().numpy()
-                print(type(traj))
-                print(traj.shape)
-                exit()
                 
                 adjoint, reward = self.make_a(traj, reward_model)
                 loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
