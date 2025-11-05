@@ -7,7 +7,7 @@ from torch.distributions import Beta
 from typing import Optional
 import warnings
 
-"""
+
 class CategoricalReward(nn.Module):
     
     
@@ -298,7 +298,7 @@ def compute_reward_gradients_per_sample(reward_net, obs, act, agg: str = "mean")
     
       return grad_input, pred
 
-"""
+
         
 
 class Reward(nn.Module):
