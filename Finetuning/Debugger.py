@@ -193,7 +193,7 @@ random.seed(seed + rank)
 
 reward_state_dict, obs_dim, act_dim, reward_name = get_pretrained_reward('pointmaze', 44000, 'medium')
 reward_net = Reward(obs_dim, act_dim)
-reward_net.load_state_dict(reward_state_dict)
+#reward_net.load_state_dict(reward_state_dict)
 reward_net.eval()
 reward_stats = get_pretrained_reward_stats(reward_name)
 
@@ -244,6 +244,7 @@ for batch in dataloader:
             # Run inference
             with torch.no_grad():
                 local_reward = base_reward_net(local_s, local_a)
+                print(f'Local_reward: {local_reward}')
             local_rewards.append(local_reward)
     
      accelerator.wait_for_everyone()
