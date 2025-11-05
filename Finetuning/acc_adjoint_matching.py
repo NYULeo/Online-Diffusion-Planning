@@ -374,12 +374,17 @@ class Acc_AdjointMatchingFineTuner:
             local_loss_tensors = []
             local_rewards = []
             for traj in local_trajs2:
-                print(f'Traj: {traj}')
+                
+                s = 0.0
+                for t in traj:
+                    s = s + t.flatten().norm(2).item()
+                print(s)
+                exit()
                 adjoint, reward = self.make_a(traj, reward_model)
                 loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
-                exit()
+                
             local_loss = torch.stack(local_loss_tensors).mean()
             local_rewards = torch.stack(local_rewards).mean()
             
