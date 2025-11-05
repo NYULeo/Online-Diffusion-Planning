@@ -84,8 +84,10 @@ class Acc_AdjointMatchingFineTuner:
         rank = self.accelerator.process_index
         torch.backends.cudnn.deterministic=True
         torch.backends.cudnn.benchmark=False
-        torch.manual_seed(42 + rank)
-        torch.cuda.manual_seed_all(42 + rank)
+        #torch.manual_seed(42 + rank)
+        #torch.cuda.manual_seed_all(42 + rank)
+        torch.manual_seed(42)
+        torch.cuda.manual_seed_all(42)
         
         self.ema = EMA(self.config.ema_decay)
         self.t_asc = torch.linspace(1.0, 0.0, self.config.num_steps + 1, device = self.device)
@@ -454,6 +456,8 @@ class Acc_AdjointMatchingFineTuner:
         total_C = 0.0
         Lambda_C = 0.0
         #total_var_reward = 0.0
+
+       
         conds = next(dataloader)
         while step < self.config.finetune_steps:
              #conds = next(dataloader)
