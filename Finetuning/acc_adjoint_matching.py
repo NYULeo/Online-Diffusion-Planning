@@ -380,16 +380,21 @@ class Acc_AdjointMatchingFineTuner:
         with self.accelerator.split_between_processes(all_trajs) as local_trajs2:
             local_loss_tensors = []
             local_rewards = []
+            t = 0
             for traj in local_trajs2:
                 #traj = traj.detach().cpu().numpy()
                 traj = [traj[i] for i in range(traj.shape[0])]
+                print(traj)
                 adjoint, reward = self.make_a(traj, reward_model)
                 loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
-                print(f"Loss: {loss_tensor}")
-                print(f"Reward: {reward}")
-            exit()
+                t = t+1
+                if(t == 2):
+                    exit()
+              
+                
+            
             local_loss = torch.stack(local_loss_tensors).mean()
             local_rewards = torch.stack(local_rewards).mean()
             
