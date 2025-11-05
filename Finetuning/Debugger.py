@@ -236,7 +236,7 @@ for batch in dataloader:
             local_s_list.append(s_item)
             local_a_list.append(a_item)
         
-        if len(local_s_list) > 0:
+      
             # Stack into tensors
             local_s = torch.stack(local_s_list)
             local_a = torch.stack(local_a_list)
@@ -246,9 +246,11 @@ for batch in dataloader:
                 local_reward = base_reward_net(local_s, local_a)
                 print(f'Local_reward: {local_reward}')
             local_rewards.append(local_reward)
+            print(local_rewards)
     
      accelerator.wait_for_everyone()
      all_rewards = accelerator.gather_for_metrics(local_rewards, use_gather_object=False)
+     
      if accelerator.is_main_process:
         # Concatenate all rewards
         
