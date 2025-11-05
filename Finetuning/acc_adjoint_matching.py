@@ -243,7 +243,7 @@ class Acc_AdjointMatchingFineTuner:
     @torch.no_grad()
     def sample_Traj(self,
         s0: torch.Tensor,
-        ) ->  List[torch.Tensor]:
+        ) ->  torch.Tensor:
         self.new_score_net.eval()
 
         s0_t = s0.to(self.device)
@@ -282,7 +282,7 @@ class Acc_AdjointMatchingFineTuner:
             X.append(x.detach().clone().to(self.device))
         #x = apply_conditioning(x, conditions, d_s)
         self.new_score_net.train()
-        return  torch.tensor(X).to(self.device)
+        return  torch.stack(X).to(self.device)
 
     def make_a(self, X, reward_model: TotalReward):
         base_old_score_net = self.accelerator.unwrap_model(self.old_score_net)
@@ -377,7 +377,7 @@ class Acc_AdjointMatchingFineTuner:
             local_loss_tensors = []
             local_rewards = []
             for traj in local_trajs2:
-                traj = traj.numpy()
+                traj = traj.detach().cpu().numpy()
                 adjoint, reward = self.make_a(traj, reward_model)
                 loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
                 local_loss_tensors.append(loss_tensor)

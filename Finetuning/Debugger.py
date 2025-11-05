@@ -147,7 +147,7 @@
              # loss
              avg_loss = loss_for_backprop.detach().item()
              return avg_loss, avg_reward, total_avgC
-    """
+    
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -163,7 +163,7 @@ import torch
 
 
 def set_seed(seed: int):
-    """Set all random seeds for reproducibility."""
+    
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -259,8 +259,16 @@ for batch in dataloader:
         #print(f"Collected rewards: mean={all_rewards.mean().item():.4f}, shape={all_rewards.shape}")
      exit()
 
+"""
 
 
+import torch
+a = torch.tensor([1,2])
+b = torch.tensor([3,4])
+c = [a, b]
+c = torch.stack(c)
+c = c.numpy()
+print(c)
 
 
 
