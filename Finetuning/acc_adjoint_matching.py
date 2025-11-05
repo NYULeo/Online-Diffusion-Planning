@@ -375,7 +375,6 @@ class Acc_AdjointMatchingFineTuner:
        
         self.accelerator.wait_for_everyone()
         
-        
         # 3. Compute adjoints, rewards & loss tensors for each trajectory
         with self.accelerator.split_between_processes(all_trajs) as local_trajs2:
             local_loss_tensors = []
@@ -390,6 +389,7 @@ class Acc_AdjointMatchingFineTuner:
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
                 t = t+1
+                self.accelerator.wait_for_everyone()
                 if(t == 2):
                     exit()
               
