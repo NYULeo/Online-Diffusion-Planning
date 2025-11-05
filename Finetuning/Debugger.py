@@ -267,7 +267,7 @@ a = torch.tensor([1,2])
 b = torch.tensor([3,4])
 c = [a, b]
 c = torch.stack(c)
-c = c.numpy()
+c = list(torch.chunk(c, 2, dim=0))
 print(c)
 
 
