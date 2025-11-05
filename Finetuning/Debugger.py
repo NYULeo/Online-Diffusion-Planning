@@ -199,8 +199,8 @@ reward_stats = get_pretrained_reward_stats(reward_name)
 
 
 
-s = torch.tensor([ [1, 2, 3, 4], [4,5,6, 7]], dtype = torch.float32)
-a = torch.tensor([[1,2], [3,4]], dtype = torch.float32)
+s = torch.tensor([ [1, 2, 3, 4], [4,5,6, 7], [7,8,9,10], [10, 11, 12, 13]], dtype = torch.float32)
+a = torch.tensor([[1,2], [3,4], [5,6], [7,8]], dtype = torch.float32)
 
 class SimpleDataset(Dataset):
     def __init__(self, s, a):
