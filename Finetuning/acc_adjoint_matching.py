@@ -82,6 +82,8 @@ class Acc_AdjointMatchingFineTuner:
         self.accelerator = accelerator
         self.device = self.accelerator.device
         rank = self.accelerator.process_index
+        torch.backends.cudnn.deterministic=True
+        torch.backends.cudnn.benchmark=False
         torch.manual_seed(42 + rank)
         torch.cuda.manual_seed_all(42 + rank)
         
@@ -455,7 +457,10 @@ class Acc_AdjointMatchingFineTuner:
             
              
              self.accelerator.wait_for_everyone()
-           
+             
+             if step % self.config.update_lambda_every == 0:
+                self.Lam.update((Lambda_C / self.config.update_lambda_every))
+                Lambda_C = 0.0
 
              if self.accelerator.is_main_process:
                 current_lr = self.optimizer.param_groups[0]['lr']
@@ -464,10 +469,6 @@ class Acc_AdjointMatchingFineTuner:
                 if ((step % self.config.update_ema_every) == 0):
                      self.step_ema(step)
                 
-                if step % self.config.update_lambda_every == 0:
-                    self.Lam.update((Lambda_C / self.config.update_lambda_every))
-                    Lambda_C = 0.0
-
                 if ((step % self.config.log_freq) == 0):
                     print('---------------------------------------------------------')
                     print(f"step: {step}, loss {total_loss / self.config.log_freq}")
@@ -477,12 +478,10 @@ class Acc_AdjointMatchingFineTuner:
                     total_reward = 0.0
                     total_C = 0.0
                     
-
              
                 if ((step % self.config.save_freq == 0) and (step!=0)):
                     self.save(step)
                     model_name = get_PlannerName(self.config.dataset_name, self.config.specific_dataset)
-                    
                     self.reward_tracker.save_logs(f"{model_name}_finetune_reward_logs.pkl")
                     self.reward_tracker.plot_reward_curve(
                     save_path=f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/logs/{model_name}_finetune_reward_curve.png",

@@ -147,7 +147,82 @@ import torch
              avg_loss = loss_for_backprop.detach().item()
              return avg_loss, avg_reward, total_avgC
     """
-import torch.nn.functional as F
-a = torch.tensor([1])
-print(a.squeeze(0))
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(project_root)
+from accelerate import Accelerator
+from Pretrain.Rewards.nets import Reward
+from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
+from torch.utils.data import Dataset, DataLoader
+
+
+
+accelerator = Accelerator()
+device = accelerator.device
+rank = accelerator.process_index
+torch.manual_seed(42 + rank)
+torch.cuda.manual_seed_all(42 + rank)
+reward_state_dict, obs_dim, act_dim, reward_name = get_pretrained_reward('pointmaze', 44000, 'medium')
+reward_net = Reward(obs_dim, act_dim)
+reward_net.load_state_dict(reward_state_dict)
+reward_net.eval()
+reward_stats = get_pretrained_reward_stats(reward_name)
+s = torch.randn(100, obs_dim)  # [num_samples, obs_dim]
+a = torch.randn(100, act_dim)  # [num_samples, act_dim]
+
+class SimpleDataset(Dataset):
+    def __init__(self, s, a):
+        self.s = s
+        self.a = a
+    
+    def __len__(self):
+        return len(self.s)
+    
+    def __getitem__(self, idx):
+        return self.s[idx], self.a[idx]
+
+dataset = SimpleDataset(s, a)
+dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+reward_net, dataloader = accelerator.prepare(reward_net, dataloader)
+reward_net.to(device)
+for batch in dataloader:
+     s, a = batch
+     s = s.to(device)
+     a = a.to(device)
+     batch_data = list(zip(s, a))
+
+     base_reward_net = accelerator.unwrap_model(reward_net)
+     with accelerator.split_between_processes(batch_data) as local_batch:
+        local_rewards = []
+        local_s_list = []
+        local_a_list = []
+        
+        for s_item, a_item in local_batch:
+            local_s_list.append(s_item)
+            local_a_list.append(a_item)
+        
+        if len(local_s_list) > 0:
+            # Stack into tensors
+            local_s = torch.stack(local_s_list)
+            local_a = torch.stack(local_a_list)
+            
+            # Run inference
+            with torch.no_grad():
+                local_reward = base_reward_net(local_s, local_a)
+            local_rewards.append(local_reward)
+    
+     accelerator.wait_for_everyone()
+     all_rewards = accelerator.gather_for_metrics(local_rewards, use_gather_object=True)
+     if accelerator.is_main_process:
+        # Concatenate all rewards
+        all_rewards_tensor = torch.cat(all_rewards, dim=0)
+        print(f"Collected rewards: mean={all_rewards_tensor.mean().item():.4f}, shape={all_rewards_tensor.shape}")
+     exit()
+
+
+
+
+
 
