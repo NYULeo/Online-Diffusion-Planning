@@ -374,6 +374,7 @@ class Acc_AdjointMatchingFineTuner:
         
        
         print(local_trajs.shape)
+        exit()
         self.accelerator.wait_for_everyone()
         
         
