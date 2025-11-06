@@ -28,7 +28,7 @@ try:
     from accelerate import Accelerator
 except ImportError:
     raise ImportError("accelerate is required but not installed. Run: pip install accelerate")
-
+from accelerate.utils import broadcast
 
 
 
@@ -122,7 +122,7 @@ class Acc_AdjointMatchingFineTuner:
     def sync_lambda(self):
         lam_val = self.Lam.get_lam() if self.accelerator.is_main_process else 0.0
         lam_tensor = torch.tensor(lam_val, device=self.device)
-        lam_tensor = self.accelerator.broadcast(lam_tensor, src=0)
+        lam_tensor = broadcast(lam_tensor, src=0)
         self.Lam.set_lam(lam_tensor.item())
 
     def set_optimizer_and_scheduler(self, new_lr=None, new_steps=None):
@@ -470,11 +470,12 @@ class Acc_AdjointMatchingFineTuner:
                 current_lr = self.optimizer.param_groups[0]['lr']
                 self.reward_tracker.log_reward(step, avg_reward, current_lr)
                 
-
+                self.Lam.set_lam(10)
+                """
                 if step % self.config.update_lambda_every == 0:
                      self.Lam.update(Lambda_C / self.config.update_lambda_every)  # compute update only on main process
                      Lambda_C = 0.0
-                
+                """
                 if ((step % self.config.update_ema_every) == 0):
                      self.step_ema(step)
                 
@@ -499,10 +500,11 @@ class Acc_AdjointMatchingFineTuner:
                     smooth_window=5,
                   ) 
              
-             
+             self.sync_lambda()
+             """
              if(step % self.config.update_lambda_every == 0):
                  self.sync_lambda()
-
+             """
              step = step+1
              self.accelerator.wait_for_everyone()
         
