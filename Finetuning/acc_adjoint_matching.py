@@ -102,7 +102,7 @@ class Acc_AdjointMatchingFineTuner:
     
 
     def Accelerate_Prepare(self, dataloader: DataLoader, reward_model: TotalReward):
-         self.new_score_net, self.Lam,self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model = self.accelerator.prepare(self.new_score_net, self.Lam, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model)
+         self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model = self.accelerator.prepare(self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model)
          self.new_score_net.train()
          self.old_score_net.eval()
          return dataloader, reward_model
@@ -118,6 +118,12 @@ class Acc_AdjointMatchingFineTuner:
            self.Lam = Lambda(lam = self.config.lam, beta = 1.0, eta_lam = self.config.finetune_lr)
         else:
            self.Lam = Lambda(lam = self.config.lam, beta = beta, eta_lam = self.config.finetune_lr)
+    
+    def sync_lambda(self):
+        lam_val = self.Lam.get_lam() if self.accelerator.is_main_process else 0.0
+        lam_tensor = torch.tensor(lam_val, device=self.device)
+        lam_tensor = self.accelerator.broadcast(lam_tensor, src=0)
+        self.Lam.set_lam(lam_tensor.item())
 
     def set_optimizer_and_scheduler(self, new_lr=None, new_steps=None):
           # Use provided values or fall back to config defaults
@@ -339,7 +345,6 @@ class Acc_AdjointMatchingFineTuner:
             v_old = self.vector_field(traj_x_i, self.t_asc[i].detach().to(self.device), self.old_score_net).squeeze(0).flatten().detach().to(self.device)
             sigma = self.sigma_t(self.k[i]).detach().to(self.device)
             Loss = Loss + ((v_new -  v_old)*(2/sigma) + (sigma * adjoint_i)).pow(2).mean()
-            #Loss = Loss + ((v_new * (2/sigma)) + (sigma * adjoint_i)).pow(2).mean()
         Loss = Loss / len(traj_x)
         return Loss
     
@@ -359,14 +364,6 @@ class Acc_AdjointMatchingFineTuner:
             local_trajs = torch.stack(local_trajs).to(self.device)
             local_final_Cs = torch.stack(local_final_Cs).mean()
         
-        
-            
-
-            
-            
-                
-        
-        
         self.accelerator.wait_for_everyone()
         
         local_Cs_det = local_final_Cs.detach()
@@ -374,10 +371,7 @@ class Acc_AdjointMatchingFineTuner:
         all_final_Cs = self.accelerator.gather_for_metrics(local_Cs_det, use_gather_object=False)
         all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=False)
         if self.accelerator.is_main_process:
-            #total_avgC = float(sum(all_final_Cs) / len(all_final_Cs))
             total_avgC = float(all_final_Cs.mean().item())
-        else:
-            total_avgC = 0.0
         
        
         self.accelerator.wait_for_everyone()
@@ -401,17 +395,14 @@ class Acc_AdjointMatchingFineTuner:
         
         self.accelerator.wait_for_everyone()
           # 4. Gather loss tensors & reward floats across processes
-        #all_loss_tensors = self.accelerator.gather_for_metrics(local_loss_tensors, use_gather_object=False)
         
-        #loss_global = self.accelerator.reduce(local_loss, reduction="mean")
         loss_global = self.accelerator.reduce(local_loss, reduction="mean")
-         # Check whether the loss_global still has gradient
-         # (print only on main process)
+         
+        # Check whether the loss_global still has gradient
         if self.accelerator.is_main_process:
              print(f"loss_global.requires_grad = {loss_global.requires_grad}")
 
          # 5. Backward and optimizer step only on main process or all processes?
-           #    Typically each process steps; here we assume full DDP coherence.
         self.optimizer.zero_grad()
         self.accelerator.backward(loss_global)
                 
@@ -427,7 +418,6 @@ class Acc_AdjointMatchingFineTuner:
         self.scheduler.step()
 
          # 6. Logging: gather detached metrics
-          # Detach local_loss and rewards for metrics gathering
         local_loss_det = local_loss.detach()
         local_rewards_det = local_rewards.detach()
         all_losses = self.accelerator.gather_for_metrics(local_loss_det, use_gather_object=False)
@@ -439,7 +429,7 @@ class Acc_AdjointMatchingFineTuner:
                  avg_reward = float(all_rewards.mean().item())
                  return avg_loss, avg_reward, total_avgC
         
-        return 0.0, 0.0, total_avgC
+        return 0.0, 0.0, 0.0
 
     def finetune_planner(self, dataloader: DataLoader, reward_model: TotalReward):
         reward_model.eval()
@@ -465,25 +455,25 @@ class Acc_AdjointMatchingFineTuner:
         conds = next(dataloader)
         while step < self.config.finetune_steps:
              #conds = next(dataloader)
-            
+             
              loss, avg_reward, avg_C = self.step(conds, reward_model)
              print(f"Lambda: {self.Lam.get_lam()}")
 
-             total_loss += loss
-             total_reward += avg_reward
-             total_C += avg_C
-             Lambda_C += avg_C
-            
-             
              self.accelerator.wait_for_everyone()
              
-             if step % self.config.update_lambda_every == 0:
-                self.Lam.update((Lambda_C / self.config.update_lambda_every))
-                Lambda_C = 0.0
-
              if self.accelerator.is_main_process:
+                total_loss += loss
+                total_reward += avg_reward
+                total_C += avg_C
+                Lambda_C += avg_C
+            
                 current_lr = self.optimizer.param_groups[0]['lr']
                 self.reward_tracker.log_reward(step, avg_reward, current_lr)
+                
+
+                if step % self.config.update_lambda_every == 0:
+                     self.Lam.update(Lambda_C / self.config.update_lambda_every)  # compute update only on main process
+                     Lambda_C = 0.0
                 
                 if ((step % self.config.update_ema_every) == 0):
                      self.step_ema(step)
@@ -509,6 +499,10 @@ class Acc_AdjointMatchingFineTuner:
                     smooth_window=5,
                   ) 
              
+             
+             if(step % self.config.update_lambda_every == 0):
+                 self.sync_lambda()
+
              step = step+1
              self.accelerator.wait_for_everyone()
         
