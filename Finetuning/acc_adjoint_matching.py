@@ -470,12 +470,10 @@ class Acc_AdjointMatchingFineTuner:
                 current_lr = self.optimizer.param_groups[0]['lr']
                 self.reward_tracker.log_reward(step, avg_reward, current_lr)
                 
-                self.Lam.set_lam(step*1.0)
-                """
                 if step % self.config.update_lambda_every == 0:
                      self.Lam.update(Lambda_C / self.config.update_lambda_every)  # compute update only on main process
                      Lambda_C = 0.0
-                """
+                
                 if ((step % self.config.update_ema_every) == 0):
                      self.step_ema(step)
                 
@@ -500,11 +498,10 @@ class Acc_AdjointMatchingFineTuner:
                     smooth_window=5,
                   ) 
              
-             self.sync_lambda()
-             """
+            
              if(step % self.config.update_lambda_every == 0):
                  self.sync_lambda()
-             """
+             
              step = step+1
              self.accelerator.wait_for_everyone()
         

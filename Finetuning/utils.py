@@ -29,13 +29,13 @@ class Lambda:
         self.eta_lam = eta_lam
     
     def update(self, C):
-        delta = F.softplus(torch.tensor([0.0], requires_grad = False), beta = self.beta)
+        delta = F.softplus(torch.tensor([0.0], requires_grad = False, dtype = torch.float32), beta = self.beta)
         #self.lam = 0.0
         self.lam = np.maximum(0.0, self.lam + self.eta_lam * (C - delta.item()))
     
     def set_lam(self, lam: float):
         self.lam = lam
-        
+
     def get_lam(self):
         return self.lam
 
