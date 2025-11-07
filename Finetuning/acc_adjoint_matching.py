@@ -54,7 +54,7 @@ class Acc_AdjointMatchingConfig:
     ema_decay = 0.999
     update_ema_every = 2
     update_lambda_every = 5
-    save_freq = 50
+    save_freq = 10
     log_freq = 1
 
 
