@@ -472,6 +472,7 @@ class Acc_AdjointMatchingFineTuner:
                 
                 if step % self.config.update_lambda_every == 0:
                      self.Lam.update(Lambda_C / self.config.update_lambda_every)  # compute update only on main process
+                     self.Lam.set_lam(10+step*0.1)
                      Lambda_C = 0.0
                 
                 if ((step % self.config.update_ema_every) == 0):
