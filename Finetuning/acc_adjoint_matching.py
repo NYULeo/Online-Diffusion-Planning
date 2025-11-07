@@ -485,9 +485,14 @@ class Acc_AdjointMatchingFineTuner:
                 
                 if ((step % self.config.log_freq) == 0):
                     print('---------------------------------------------------------')
-                    print(f"step: {step}, loss {total_loss / self.config.log_freq}")
-                    print(f"step: {step}, reward {total_reward / self.config.log_freq}")
-                    print(f"step: {step}, constraint {total_C / self.config.log_freq}")
+                    if(step == 0):
+                         print(f"step: {step}, loss {total_loss}")
+                         print(f"step: {step}, reward {total_reward }")
+                         print(f"step: {step}, constraint {total_C}")
+                    else:
+                         print(f"step: {step}, loss {total_loss / self.config.log_freq}")
+                         print(f"step: {step}, reward {total_reward / self.config.log_freq}")
+                         print(f"step: {step}, constraint {total_C / self.config.log_freq}")
                     total_loss = 0.0
                     total_reward = 0.0
                     total_C = 0.0
@@ -503,7 +508,7 @@ class Acc_AdjointMatchingFineTuner:
                     smooth_window=5,
                   ) 
 
-                if ( step % self.config.save_model_freq == 0):
+                if ( (step % self.config.save_model_freq == 0) and (step!=0)):
                     self.save(step)
              
             
