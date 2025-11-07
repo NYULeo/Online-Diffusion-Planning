@@ -467,8 +467,9 @@ class Acc_AdjointMatchingFineTuner:
                 total_C += avg_C
                 Lambda_C += avg_C
             
-                current_lr = self.optimizer.param_groups[0]['lr']
-                self.reward_tracker.log_reward(step, avg_reward, current_lr)
+                #current_lr = self.optimizer.param_groups[0]['lr']
+                Reward = avg_reward + (self.Lam.get_lam() * avg_C)
+                self.reward_tracker.log_reward(step, Reward, avg_C)
                 
                 if step % self.config.update_lambda_every == 0:
                      self.Lam.update(Lambda_C / self.config.update_lambda_every)  # compute update only on main process
@@ -494,7 +495,7 @@ class Acc_AdjointMatchingFineTuner:
                     self.reward_tracker.plot_reward_curve(
                     save_path=f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/logs/{model_name}_finetune_reward_curve.png",
                     title=f"{model_name} Finetuning Avg Reward",
-                    show_lr=True,
+                    show_constraint=True,
                     smooth_window=5,
                   ) 
              

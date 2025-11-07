@@ -29,9 +29,9 @@ class Lambda:
         self.eta_lam = eta_lam
     
     def update(self, C):
-        delta = F.softplus(torch.tensor([0.0], requires_grad = False, dtype = torch.float32), beta = self.beta)
+        #delta = F.softplus(torch.tensor([0.0], requires_grad = False, dtype = torch.float32), beta = self.beta)
         #self.lam = 0.0
-        self.lam = np.maximum(0.0, self.lam + self.eta_lam * (C - delta.item()))
+        self.lam = np.maximum(0.0, self.lam + (self.eta_lam * C))
     
     def set_lam(self, lam: float):
         self.lam = lam
@@ -246,20 +246,21 @@ class RewardTracker:
         self.save_dir = save_dir
         self.steps = []
         self.rewards = []
-        self.learning_rates = []
+        #self.learning_rates = []
+        self.constraints = []
         os.makedirs(save_dir, exist_ok=True)
 
-    def log_reward(self, step: int, reward: float, lr: Optional[float] = None):
+    def log_reward(self, step: int, reward: float, constraint: Optional[float] = None):
         self.steps.append(step)
         self.rewards.append(reward)
-        if lr is not None:
-            self.learning_rates.append(lr)
+        if constraint is not None:
+            self.constraints.append(constraint)
 
     def save_logs(self, filename: str = "reward_logs.pkl"):
         data = {
             'steps': self.steps,
             'rewards': self.rewards,
-            'learning_rates': self.learning_rates
+            'constraints': self.constraints
         }
         save_path = os.path.join(self.save_dir, filename)
         with open(save_path, 'wb') as f:
@@ -269,7 +270,7 @@ class RewardTracker:
     def plot_reward_curve(self,
                           save_path: Optional[str] = None,
                           title: str = "Finetuning Reward Curve",
-                          show_lr: bool = False,
+                          show_constraint: bool = False,
                           smooth_window: int = 50):
         if not self.rewards:
             print("No reward data to plot!")
@@ -282,7 +283,7 @@ class RewardTracker:
                        "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#FF0000"]
         raw_color    = okabe_ito[3]   
         smooth_color = okabe_ito[4] 
-        lr_color     = okabe_ito[9]  
+        constraint_color     = okabe_ito[9]  
 
         fig, ax1 = plt.subplots(figsize=(12, 8))
         steps = np.array(self.steps)
@@ -308,12 +309,12 @@ class RewardTracker:
         ax1.legend(frameon=True, fancybox=True, fontsize=12)
         sns.despine()
 
-        if show_lr and self.learning_rates:
+        if show_constraint and self.constraints:
             ax2 = ax1.twinx()
-            lr_vals = np.array(self.learning_rates)
-            ax2.plot(steps[:len(lr_vals)], lr_vals, color='green', alpha=0.7, linewidth=1.5, label='Learning Rate')
-            ax2.set_ylabel('Learning Rate', fontsize=12, color=lr_color)
-            ax2.tick_params(axis='y', labelcolor=lr_color)
+            C_vals = np.array(self.constraints)
+            ax2.plot(steps[:len(C_vals)], C_vals, color=constraint_color, alpha=0.7, linewidth=1.5, label='Constraint')
+            ax2.set_ylabel('Constraint', fontsize=12, color=constraint_color)
+            ax2.tick_params(axis='y', labelcolor=constraint_color)
             ax2.legend(loc='upper right')
         
         sns.despine()

@@ -107,13 +107,14 @@ class TotalReward(nn.Module):
         C = torch.tensor(0.0, device = self.config.device, requires_grad=False)
         for i in range(H-1):
             s = x[i][:self.config.d_s]
-            s_norm = self.reward_processor(s).unsqueeze(0)
             a = x[i][self.config.d_s:].unsqueeze(0)
             s_next = x[i+1][:self.config.d_s]
-            s_next_norm = self.kernel_processor(s_next).unsqueeze(0)
-            c = self.sigmoid(s_norm, a, s_next_norm)
+            s_norm_kernel = self.kernel_processor(s).unsqueeze(0)
+            s_next_norm_kernel = self.kernel_processor(s_next).unsqueeze(0)
+            c = self.sigmoid(s_norm_kernel, a, s_next_norm_kernel)
             C += c.squeeze(0)
         C = C / (H-1)
+        C = C - self.config.delta
         return C
    
     def forward(self, x: torch.Tensor, lam: float):
@@ -165,7 +166,7 @@ class TotalReward(nn.Module):
             
             gradient +=  (1/H)*((r_s_grad + r_a_grad)) - lam * (1/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad)
             
-            total_reward += (1/H)*(r.squeeze(0)) - lam  * (1/(H-1)) * ( c.squeeze(0) - self.config.delta)
+            total_reward += (1/H)*(r.squeeze(0)) - lam  * ( (1/(H-1)) * c.squeeze(0))
             
         
 
@@ -192,6 +193,7 @@ class TotalReward(nn.Module):
         gradient += (1/H) * ((r_s_grad + r_a_grad)) 
        
         total_reward +=  (1/H) * (r.squeeze(0))
+        total_reward = total_reward + (lam  * self.config.delta)
         return total_reward, gradient
 
 
