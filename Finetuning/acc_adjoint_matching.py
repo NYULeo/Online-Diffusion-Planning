@@ -55,7 +55,7 @@ class Acc_AdjointMatchingConfig:
     update_ema_every = 2
     update_lambda_every = 5
     save_freq = 50
-    log_freq = 15
+    log_freq = 1
 
 
 
@@ -452,9 +452,9 @@ class Acc_AdjointMatchingFineTuner:
         #total_var_reward = 0.0
 
        
-        conds = next(dataloader)
+        #conds = next(dataloader)
         while step < self.config.finetune_steps:
-             #conds = next(dataloader)
+             conds = next(dataloader)
              
              loss, avg_reward, avg_C = self.step(conds, reward_model)
              print(f"Lambda: {self.Lam.get_lam()}")
