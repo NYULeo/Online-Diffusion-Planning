@@ -262,9 +262,4 @@ for batch in dataloader:
 """
 
 
-import torch
-import torch.nn.functional as F
-delta = F.softplus(torch.tensor(0.0, requires_grad = False), beta = 1)
-print(delta - 1)
-
 

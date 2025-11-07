@@ -7,7 +7,6 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
-from pandas._libs.tslibs import dt64arr_to_periodarr
 from Pretrain.Planners.Backbone.Dit import DiT1d
 import torch
 import torch.nn as nn
@@ -452,9 +451,9 @@ class Acc_AdjointMatchingFineTuner:
         #total_var_reward = 0.0
 
        
-        #conds = next(dataloader)
+        conds = next(dataloader)
         while step < self.config.finetune_steps:
-             conds = next(dataloader)
+             #conds = next(dataloader)
              
              loss, avg_reward, avg_C = self.step(conds, reward_model)
              print(f"Lambda: {self.Lam.get_lam()}")

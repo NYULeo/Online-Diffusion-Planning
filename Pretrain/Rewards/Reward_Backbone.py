@@ -16,7 +16,7 @@ from Pretrain.utils import set_seed, SAStats
 #from Critic.train_critic import get_CriticName
 import torch.nn as nn
 import pickle
-from Rewards.nets import Reward, MLPNetwork
+from Rewards.nets import Reward, MLPNetwork, ScalarReward
 import os
 from scipy.ndimage import gaussian_filter1d, convolve
 from Pretrain.utils import cycle
@@ -156,9 +156,9 @@ def train_reward(dataset_name: str, batch_size, num_steps, save_freq, lr, sigma,
         num_layers=5).to(device)
     """
     #reward_net = LargeScalarReward(obs_dim, act_dim, output_scale = target_reward).to(device)
-    #reward_net = ScalarReward(obs_dim, act_dim).to(device)
+    reward_net = ScalarReward(obs_dim, act_dim).to(device)
     #reward_net = Reward(obs_dim, act_dim).to(device)
-    reward_net = MLPNetwork(input_dim = obs_dim + act_dim, out_dim = 1, hidden_dims = [200, 200, 200, 200], act_fn = 'swish', out_act_fn = 'identity').to(device)
+    #reward_net = MLPNetwork(input_dim = obs_dim + act_dim, out_dim = 1, hidden_dims = [200, 200, 200, 200], act_fn = 'swish', out_act_fn = 'identity').to(device)
     optimizer = optim.Adam(reward_net.parameters(), lr = lr, weight_decay = 1e-5)
     total_loss = 0
     step = 0
@@ -170,8 +170,10 @@ def train_reward(dataset_name: str, batch_size, num_steps, save_freq, lr, sigma,
         
            # Predicted Reward
            optimizer.zero_grad()
-           pred = reward_net(torch.cat([s, a], dim = 1))
-           loss = F.mse_loss(pred, r)
+           #pred = reward_net(torch.cat([s, a], dim = 1))
+           #pred, _ = reward_net.predict(s, a)
+           #loss = F.mse_loss(pred, r)
+           loss = reward_net.loss(s, a, r)
            loss.backward()
            optimizer.step()
            total_loss += loss.item()
@@ -243,9 +245,9 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
     num = save_freq
     while num <= num_steps:
          state_dict = load_model(reward_name, num)
-         #reward_net = ScalarReward(obs_dim, act_dim).to(device)
+         reward_net = ScalarReward(obs_dim, act_dim).to(device)
          #reward_net = Reward(obs_dim, act_dim).to(device)
-         reward_net = MLPNetwork(input_dim = obs_dim + act_dim, out_dim = 1, hidden_dims = [200, 200, 200, 200], act_fn = 'swish', out_act_fn = 'identity').to(device)
+         #reward_net = MLPNetwork(input_dim = obs_dim + act_dim, out_dim = 1, hidden_dims = [200, 200, 200, 200], act_fn = 'swish', out_act_fn = 'identity').to(device)
          reward_net.load_state_dict(state_dict)
          reward_net.eval()
          total_mean_loss = 0.0
@@ -254,8 +256,10 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
              s = s.to(device)
              a = a.to(device)
              r = r.to(device)
-             pred = reward_net(torch.cat([s, a], dim = 1))
-             loss = F.mse_loss(pred, r)
+             #pred = reward_net(torch.cat([s, a], dim = 1))
+             pred, _ = reward_net.predict(s, a)
+             #loss = F.mse_loss(pred, r)
+             loss = reward_net.loss(s, a, r)
              total_mean_loss += loss.item()
              total_reward += pred.mean().item()
              
