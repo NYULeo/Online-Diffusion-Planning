@@ -166,8 +166,8 @@ class TotalReward(nn.Module):
             
             gradient +=  (1/H)*((r_s_grad + r_a_grad)) - lam * (1/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad)
             
-            #total_reward += (1/H)*(r.squeeze(0)) - lam  * ( (1/(H-1)) * c.squeeze(0))
-            total_reward += (1/H)*(r.squeeze(0)) - lam * (1/(H-1)) * (c.squeeze(0) - self.config.delta)
+            total_reward += (1/H)*(r.squeeze(0)) - lam  * ( (1/(H-1)) * c.squeeze(0))
+            #total_reward += (1/H)*(r.squeeze(0)) - lam * (1/(H-1)) * (c.squeeze(0) - self.config.delta)
             
         
 
@@ -193,8 +193,8 @@ class TotalReward(nn.Module):
        
         gradient += (1/H) * ((r_s_grad + r_a_grad)) 
        
-        total_reward +=  (1/H) * (r.squeeze(0))
-        #total_reward = total_reward + (lam  * self.config.delta)
+        #total_reward +=  (1/H) * (r.squeeze(0))
+        total_reward = total_reward + (lam  * self.config.delta)
         return total_reward, gradient
 
 
