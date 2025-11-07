@@ -53,8 +53,9 @@ class Acc_AdjointMatchingConfig:
     ema_decay = 0.999
     update_ema_every = 2
     update_lambda_every = 5
-    save_freq = 50
-    log_freq = 15
+    save_freq = 100
+    save_model_freq = 500
+    log_freq = 50
 
 
 
@@ -181,7 +182,8 @@ class Acc_AdjointMatchingFineTuner:
             'dataset_name': self.config.dataset_name,
             'specific_dataset': self.config.specific_dataset,
             'step': step,
-            'ema': self.ema_model.state_dict()
+            'ema': self.ema_model.state_dict(),
+            'model': self.new_score_net.state_dict()
         }
         model_name = get_PlannerName(self.config.dataset_name, self.config.specific_dataset)
         file_name = model_name + '_' + str(step) + '.pt'
@@ -398,8 +400,10 @@ class Acc_AdjointMatchingFineTuner:
         loss_global = self.accelerator.reduce(local_loss, reduction="mean")
          
         # Check whether the loss_global still has gradient
+        """
         if self.accelerator.is_main_process:
              print(f"loss_global.requires_grad = {loss_global.requires_grad}")
+        """
 
          # 5. Backward and optimizer step only on main process or all processes?
         self.optimizer.zero_grad()
@@ -410,8 +414,10 @@ class Acc_AdjointMatchingFineTuner:
              if param.grad is not None:
                     total_grad_norm += param.grad.data.norm(2).item() ** 2
         total_grad_norm = total_grad_norm ** (1. / 2)
+        """
         if self.accelerator.is_main_process:
                print(f"Gradient norm before clipping: {total_grad_norm}")
+        """
         self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
         self.optimizer.step()
         self.scheduler.step()
@@ -456,7 +462,7 @@ class Acc_AdjointMatchingFineTuner:
              conds = next(dataloader)
              
              loss, avg_reward, avg_C = self.step(conds, reward_model)
-             print(f"Lambda: {self.Lam.get_lam()}")
+             #print(f"Lambda: {self.Lam.get_lam()}")
 
              self.accelerator.wait_for_everyone()
              
@@ -471,8 +477,7 @@ class Acc_AdjointMatchingFineTuner:
                 self.reward_tracker.log_reward(step, Reward, avg_C)
                 
                 if step % self.config.update_lambda_every == 0:
-                     self.Lam.update(Lambda_C / self.config.update_lambda_every)  # compute update only on main process
-                     self.Lam.set_lam(10+step*0.1)
+                     self.Lam.update(Lambda_C / self.config.update_lambda_every) 
                      Lambda_C = 0.0
                 
                 if ((step % self.config.update_ema_every) == 0):
@@ -489,7 +494,6 @@ class Acc_AdjointMatchingFineTuner:
                     
              
                 if ((step % self.config.save_freq == 0) and (step!=0)):
-                    #self.save(step)
                     model_name = get_PlannerName(self.config.dataset_name, self.config.specific_dataset)
                     self.reward_tracker.save_logs(f"{model_name}_finetune_reward_logs.pkl")
                     self.reward_tracker.plot_reward_curve(
@@ -498,6 +502,9 @@ class Acc_AdjointMatchingFineTuner:
                     show_constraint=True,
                     smooth_window=5,
                   ) 
+
+                if ( step % self.config.save_model_freq == 0):
+                    self.save(step)
              
             
              if(step % self.config.update_lambda_every == 0):
