@@ -57,7 +57,7 @@ class Acc_AdjointMatchingConfig:
 
     save_freq = 100
     save_model_freq = 500
-    log_freq = 50
+    log_freq = 20
 
 
 
