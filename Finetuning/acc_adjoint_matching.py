@@ -34,10 +34,7 @@ from accelerate.utils import broadcast
 @dataclass
 class Acc_AdjointMatchingConfig:
     """Configuration for the adjoint matching fine‑tuner."""
-
     horizon: int
-    finetune_lr: float = 1e-4
-    finetune_steps: int = 10000
     d_s: Optional[int] = None
     d_a: Optional[int] = None
     dataset_name: Optional[str] = None
@@ -47,12 +44,17 @@ class Acc_AdjointMatchingConfig:
     num_steps: int = 500
     s: float = 0.008  # cosine schedule offset used in base drift
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    lam: float = 0.0
-    reward_scaling_factor: float = 100000
-    step_start_ema = 10
+    step_start_ema = 50
     ema_decay = 0.999
     update_ema_every = 2
+
+    finetune_lr: float = 1e-4
+    finetune_steps: int = 500
+    lam: float = 0.0
+    eta_lam: float = 0.001
+    reward_scaling_factor: float = 10000
     update_lambda_every = 5
+
     save_freq = 100
     save_model_freq = 500
     log_freq = 50
@@ -92,6 +94,7 @@ class Acc_AdjointMatchingFineTuner:
         self.ema = EMA(self.config.ema_decay)
         self.t_asc = torch.linspace(1.0, 0.0, self.config.num_steps + 1, device = self.device)
         self.k = self.kt(self.t_asc) 
+        self.gradient_step = 0
         
         self.set_old_score_net(planner_checkpoint)
         self.set_new_score_net()
@@ -115,9 +118,9 @@ class Acc_AdjointMatchingFineTuner:
           
     def set_lambda(self, beta: Optional[float] = None):
         if beta is None:
-           self.Lam = Lambda(lam = self.config.lam, beta = 1.0, eta_lam = self.config.finetune_lr)
+           self.Lam = Lambda(lam = self.config.lam, beta = 1.0, eta_lam = self.config.eta_lam)
         else:
-           self.Lam = Lambda(lam = self.config.lam, beta = beta, eta_lam = self.config.finetune_lr)
+           self.Lam = Lambda(lam = self.config.lam, beta = beta, eta_lam = self.config.eta_lam)
     
     def sync_lambda(self):
         lam_val = self.Lam.get_lam() if self.accelerator.is_main_process else 0.0
@@ -133,7 +136,7 @@ class Acc_AdjointMatchingFineTuner:
           # Create new optimizer
          self.optimizer = torch.optim.AdamW(
              self.new_score_net.parameters(), lr=lr, weight_decay = 1e-2)
-    
+         self.optimizer.zero_grad()
          # Create new scheduler
          self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer, steps)
@@ -406,7 +409,7 @@ class Acc_AdjointMatchingFineTuner:
         """
 
          # 5. Backward and optimizer step only on main process or all processes?
-        self.optimizer.zero_grad()
+        #self.optimizer.zero_grad()
         self.accelerator.backward(loss_global)
                 
         total_grad_norm = 0.0
@@ -419,8 +422,8 @@ class Acc_AdjointMatchingFineTuner:
                print(f"Gradient norm before clipping: {total_grad_norm}")
         """
         self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
-        self.optimizer.step()
-        self.scheduler.step()
+        #self.optimizer.step()
+        #self.scheduler.step()
 
          # 6. Logging: gather detached metrics
         local_loss_det = local_loss.detach()
@@ -442,6 +445,7 @@ class Acc_AdjointMatchingFineTuner:
         self.set_ema_model()
         self.set_lambda(reward_model.get_beta())
         self.set_reward_tracker()
+        self.gradient_step = 0
         
         print(f"Starting Preparing")
         dataloader, reward_model = self.Accelerate_Prepare(dataloader, reward_model)
@@ -460,10 +464,12 @@ class Acc_AdjointMatchingFineTuner:
         #conds = next(dataloader)
         while step < self.config.finetune_steps:
              conds = next(dataloader)
-             
-             loss, avg_reward, avg_C = self.step(conds, reward_model)
-             #print(f"Lambda: {self.Lam.get_lam()}")
-
+             with self.accelerator.accumulate(self.new_score_net):
+                loss, avg_reward, avg_C = self.step(conds, reward_model)
+                self.optimizer.step()
+                self.scheduler.step()
+                self.optimizer.zero_grad()
+            
              self.accelerator.wait_for_everyone()
              
              if self.accelerator.is_main_process:

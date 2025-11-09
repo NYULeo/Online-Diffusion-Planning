@@ -31,13 +31,15 @@ class FinetuningConfig():
     planner_checkpoint: int
     reward_model_checkpoint: int
     kernel_model_checkpoint: int
+    
     finetune_steps: int = 1000000
     finetune_batch_size: int = 12
     finetune_lr: float = 2e-4
-    epoch: int = 100
-    #save_freq= 10000
-    #log_freq = 10
-    #step_start_ema = 1000
+    eta_lam: float = 0.001
+    gradient_accumulate_every: int = 4
+    update_lambda_every: int = 5
+    reward_scaling_factor: float = 10000
+    
 
 
 
@@ -52,9 +54,13 @@ class OnlineFinetuner():
         self.env, d_s, d_a = get_env(self.config.dataset_name, self.config.specific_dataset)
         self.config.AMConfig.d_s = d_s
         self.config.AMConfig.d_a = d_a
+        self.config.AMConfig.eta_lam = self.config.eta_lam
+        self.config.AMConfig.update_ema_every = self.config.update_lambda_every
+        self.config.AMConfig.reward_scaling_factor = self.config.reward_scaling_factor
+        self.config.AMConfig.update_lambda_every = self.config.update_lambda_every
        
 
-        self.accelerator = Accelerator(mixed_precision='no')
+        self.accelerator = Accelerator(mixed_precision='no', gradient_accumulation_steps=self.config.gradient_accumulate_every)
         self.device = self.accelerator.device
 
         
@@ -98,7 +104,10 @@ class OnlineFinetuner():
             print(f"finetune_lr: {self.config.finetune_lr}")
             print(f"reward_scaling_factor: {self.config.AMConfig.reward_scaling_factor}")
             print(f"finetune_steps: {self.config.finetune_steps}")
+            print(f"gradient accumulate every: {self.config.gradient_accumulate_every}")
             print(f"sampling steps: {self.config.AMConfig.num_steps}")
+            print(f"eta_lam: {self.config.eta_lam}")
+            print(f"update_lambda_every: {self.config.update_lambda_every}")
             print('Device Details: ---------------------------------------------------------------------------')
             print(f"The device is: {self.device}")
             print(f"The number of GPUs is: {torch.cuda.device_count()}")
@@ -109,7 +118,10 @@ class OnlineFinetuner():
              dataloader = DataLoader(self.PlannerDataset, self.config.finetune_batch_size, pin_memory = True, num_workers = 2,  sampler = sampler,  drop_last = True)
         else:
              dataloader = DataLoader(self.PlannerDataset, self.config.finetune_batch_size, pin_memory = True, num_workers = 2, shuffle = True, drop_last = True)
-       
+        
+
+
+        
         #mp.spawn(self.AMFineTuner.finetune_planner, args=(dataloader, self.reward_model), nprocs = 2)
         self.AMFineTuner.finetune_planner(dataloader, self.reward_model)
             

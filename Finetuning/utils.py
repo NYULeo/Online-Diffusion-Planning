@@ -25,13 +25,13 @@ import colorsys
 class Lambda:
     def __init__(self, lam: float, beta: float, eta_lam: float):
         self.lam = lam
+        self.base_lam = lam
         self.beta = beta
         self.eta_lam = eta_lam
     
     def update(self, C):
-        #delta = F.softplus(torch.tensor([0.0], requires_grad = False, dtype = torch.float32), beta = self.beta)
-        #self.lam = 0.0
-        self.lam = np.maximum(0.0, self.lam + (self.eta_lam * C))
+        self.lam = np.maximum(self.base_lam, self.lam + (self.eta_lam * C))
+        self.lam = np.clip(self.lam, 0.0, 0.1)
     
     def set_lam(self, lam: float):
         self.lam = lam
@@ -338,6 +338,7 @@ class RewardTracker:
         padded = np.full_like(data, np.nan)
         padded[window-1:] = smoothed
         return padded
+
 
 
 
