@@ -486,8 +486,7 @@ class Acc_AdjointMatchingFineTuner:
                 self.scheduler.step()
                 self.optimizer.zero_grad()
             
-             current_lr = self.optimizer.param_groups[0]['lr']
-             print(f"step: {step}, lr {current_lr}")
+             
              self.accelerator.wait_for_everyone()
              
              if self.accelerator.is_main_process:
@@ -495,7 +494,7 @@ class Acc_AdjointMatchingFineTuner:
                 total_reward += avg_reward
                 total_C += avg_C
                 Lambda_C += avg_C
-            
+
                 #current_lr = self.optimizer.param_groups[0]['lr']
                 Reward = avg_reward + (self.Lam.get_lam() * avg_C)
                 self.reward_tracker.log_reward(step, Reward, avg_C)
@@ -503,6 +502,7 @@ class Acc_AdjointMatchingFineTuner:
                 if step % self.config.update_lambda_every == 0:
                      self.Lam.update(Lambda_C / self.config.update_lambda_every) 
                      Lambda_C = 0.0
+                     print(f"step: {step}, lambda: {self.Lam.get_lam()}")
                 
                 if ((step % self.config.update_ema_every) == 0):
                      self.step_ema(step)
