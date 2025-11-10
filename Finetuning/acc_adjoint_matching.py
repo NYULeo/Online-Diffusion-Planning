@@ -486,6 +486,8 @@ class Acc_AdjointMatchingFineTuner:
                 self.scheduler.step()
                 self.optimizer.zero_grad()
             
+             current_lr = self.optimizer.param_groups[0]['lr']
+             print(f"step: {step}, lr {current_lr}")
              self.accelerator.wait_for_everyone()
              
              if self.accelerator.is_main_process:
