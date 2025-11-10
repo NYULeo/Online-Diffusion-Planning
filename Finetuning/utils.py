@@ -18,8 +18,7 @@ from typing import Optional
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import seaborn as sns
-import matplotlib.colors as mcolors
-import colorsys
+from Pretrain.Dataset import get_PlannerName
 
 
 class Lambda:
@@ -339,6 +338,12 @@ class RewardTracker:
         padded[window-1:] = smoothed
         return padded
 
-
-
+def get_pretrained_planner(dataset_name, specific_dataset, steps):
+      planner_name = get_PlannerName(dataset_name, specific_dataset)
+      checkpoint_path = f"./Finetuning/Planners/{dataset_name}/{specific_dataset}/{planner_name}_{steps}.pt"
+      if not os.path.exists(checkpoint_path):
+          raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+      checkpoint = torch.load(checkpoint_path, weights_only = True,map_location='cpu')
+      #checkpoint = torch.load(checkpoint_path,  weights_only=True)
+      return checkpoint['ema']
 

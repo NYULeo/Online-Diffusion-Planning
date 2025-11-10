@@ -31,8 +31,8 @@ def sample_reverse_sde(
     if ( (s0_t.shape[0] != d_s)   ):
         raise ValueError(f"s0 should have shape ({d_s},), but got {s0_t.shape}")
     dim = d_s + d_a
-    #t_asc = torch.linspace(1.0, 0.0, steps_T + 1, device=device)
-    t_asc = torch.linspace(0.0, 1.0, steps_T + 1, device=device)
+    t_asc = torch.linspace(1.0, 0.0, steps_T + 1, device=device)
+    #t_asc = torch.linspace(0.0, 1.0, steps_T + 1, device=device)
     beta = cosine_beta(t_asc, s=0.008)
     alpha, sigma = cosine_alpha_sigma(t_asc, s = 0.008)
     

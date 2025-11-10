@@ -244,8 +244,17 @@ def plot_reward_curve(
         return fig
         """
 
-
-plot_reward_curve()
+from Dataset import get_dataset
+with open('./Pretrain/Rollouts/pointmaze/medium/Generated_trajs_Info.pkl', 'rb') as f:
+     trajs_info = pickle.load(f)
+trajs = trajs_info['trajs']
+rewards = []
+for traj in trajs:
+      Temp = np.array(traj['rewards'])
+      R = Temp.sum()
+      rewards.append(R)
+rewards = np.array(rewards)
+#print(rewards)
 
 
 

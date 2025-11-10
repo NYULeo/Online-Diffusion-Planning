@@ -6,6 +6,7 @@ import torch
 from dataclasses import dataclass
 #from Planners.Backbone.UNet import TemporalUnet
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from Finetuning.utils import RewardDataset
 from Planners.Backbone.Sampler import sample_reverse_sde
 import pickle
 from typing import Optional
@@ -80,11 +81,12 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
             action_selector = None
      
      #get environment
+     
      if(render):
          env, d_s, d_a = get_env(env_name, specific_env, 'rgb_array')
      else:
          env, d_s, d_a = get_env(env_name, specific_env, None)
-
+     
      #get Planner
      state_dict = get_pretrained_planner(env_name, specific_env, checkpoint_steps)
      if( env_name == 'kitchen'):
@@ -311,8 +313,8 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 500, eta = 
 if __name__ == "__main__":
     set_seed(1)
     horizon = 32
-    env_name = 'kitchen'
-    specific_train_dataset = 'partial'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 3000, critic = False, checkpoint_steps = 990000, render = True)
+    env_name = 'pointmaze'
+    specific_train_dataset = 'medium'
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 3000, critic = False, checkpoint_steps = 1000000, render = True)
     #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 1000000, num_envs = 8)
   

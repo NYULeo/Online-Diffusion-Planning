@@ -8,12 +8,29 @@ import numpy as np
 import mediapy as media
 from Pretrain.Dataset import get_env
 from Pretrain.Planners.Backbone.Dit import DiT1d
-from Pretrain.Planners.Backbone.utils import get_pretrained_planner
+#from Pretrain.Planners.Backbone.utils import get_pretrained_planner
+from utils import get_pretrained_planner
 from Pretrain.Dataset import Planner_Processor
 from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
 import pickle
+import random
+import gymnasium as gym
 
+def set_seed(seed=0):
+    # Python random
+    random.seed(seed)
+    # NumPy random
+    np.random.seed(seed)
+    # PyTorch random
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # if using multiple GPUs
+    # PyTorch deterministic algorithms
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    # Set environment variable for additional reproducibility
+    os.environ['PYTHONHASHSEED'] = str(seed)
 
 
 def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, checkpoint_steps, render = False):
@@ -24,10 +41,12 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, check
      print(f"Using device {device}")
      
      #get environment
+     
      if(render):
          env, d_s, d_a = get_env(env_name, specific_env, 'rgb_array')
      else:
          env, d_s, d_a = get_env(env_name, specific_env, None)
+     env = gym.make('PointMaze_Medium-v3', render_mode = 'rgb_array')
 
      #get Planner
      state_dict = get_pretrained_planner(env_name, specific_env, checkpoint_steps)
@@ -72,10 +91,13 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, check
      env.close()
      traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(rewards)}
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
+     print(rewards)
      if(render):
           media.write_video("demo.mp4", frames, fps=50)
+     """
      with open('Generated_trajectory.pkl', 'wb') as f:
                 pickle.dump(traj_info, f)
+     """
      
 
 def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 500, eta = 0.8, episode_length = 4000, critic = False, checkpoint_steps = 1000000, num_envs=8):
@@ -223,8 +245,8 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 500, eta = 
 if __name__ == "__main__":
     set_seed(1)
     horizon = 32
-    env_name = 'kitchen'
-    specific_train_dataset = 'partial'
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 2000, critic = False, checkpoint_steps = 1000000, render = True)
-    rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 990000, num_envs = 8)
+    env_name = 'pointmaze'
+    specific_train_dataset = 'medium'
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 2000, checkpoint_steps = 500, render = True)
+    #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 990000, num_envs = 8)
   
