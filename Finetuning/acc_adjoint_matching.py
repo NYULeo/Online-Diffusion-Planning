@@ -94,7 +94,6 @@ class Acc_AdjointMatchingFineTuner:
         self.ema = EMA(self.config.ema_decay)
         self.t_asc = torch.linspace(1.0, 0.0, self.config.num_steps + 1, device = self.device)
         self.k = self.kt(self.t_asc) 
-        self.gradient_step = 0
         
         self.set_old_score_net(planner_checkpoint)
         self.set_new_score_net()
@@ -150,6 +149,19 @@ class Acc_AdjointMatchingFineTuner:
         else:
               raise ValueError(f"Invalid Environment: {self.config.dataset_name}")
         self.old_score_net.load_state_dict(state_dict)
+        for p in self.old_score_net.parameters():
+              p.requires_grad_(False)
+        self.old_score_net.eval()
+    
+    def reset_old_score_net(self, old_score_net: DiT1d):
+        #state_dict = get_pretrained_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
+        if( self.config.dataset_name == 'kitchen'):
+              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
+        elif (self.config.dataset_name == 'pointmaze'):
+              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
+        else:
+              raise ValueError(f"Invalid Environment: {self.config.dataset_name}")
+        self.old_score_net.load_state_dict(old_score_net.state_dict())
         for p in self.old_score_net.parameters():
               p.requires_grad_(False)
         self.old_score_net.eval()
@@ -439,13 +451,17 @@ class Acc_AdjointMatchingFineTuner:
         
         return 0.0, 0.0, 0.0
 
-    def finetune_planner(self, dataloader: DataLoader, reward_model: TotalReward):
+    def finetune_planner(self, dataloader: DataLoader, reward_model: TotalReward, old_score_net: Optional[DiT1d] = None):
+        if old_score_net is not None:
+            self.reset_old_score_net(old_score_net)
+            self.set_new_score_net()
         reward_model.eval()
         self.set_optimizer_and_scheduler()
         self.set_ema_model()
         self.set_lambda(reward_model.get_beta())
         self.set_reward_tracker()
-        self.gradient_step = 0
+        
+
         
         print(f"Starting Preparing")
         dataloader, reward_model = self.Accelerate_Prepare(dataloader, reward_model)

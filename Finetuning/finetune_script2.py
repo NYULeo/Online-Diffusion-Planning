@@ -45,7 +45,7 @@ if __name__ == "__main__":
         planner_checkpoint = 1000000,
         reward_model_checkpoint = 44000,
         kernel_model_checkpoint = 34000,
-        finetune_steps = 500,
+        finetune_steps = 2000,
         finetune_batch_size = 12,
         finetune_lr = 5e-6,
         eta_lam = 0.001,
