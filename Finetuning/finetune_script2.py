@@ -45,11 +45,11 @@ if __name__ == "__main__":
         planner_checkpoint = 1000000,
         reward_model_checkpoint = 44000,
         kernel_model_checkpoint = 34000,
-        finetune_steps = 2000,
+        finetune_steps = 100000,
         finetune_batch_size = 12,
         finetune_lr = 5e-6,
         eta_lam = 0.001,
-        gradient_accumulate_every = 4,
+        gradient_accumulate_every = 1,
         update_lambda_every = 5,
         reward_scaling_factor = 100000
         )

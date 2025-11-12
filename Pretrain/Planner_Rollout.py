@@ -6,8 +6,13 @@ import torch
 from dataclasses import dataclass
 #from Planners.Backbone.UNet import TemporalUnet
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from Finetuning.utils import RewardDataset
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(project_root)
+#from Finetuning.utils import RewardDataset
+#from Planners.Backbone.Sampler import sample_dpm_karras_cosine
+#from Planners.Backbone.Sampler import sample_dpm_cosine
 from Planners.Backbone.Sampler import sample_reverse_sde
+#from Planners.Backbone.Sampler import sample_dpm_franka
 import pickle
 from typing import Optional
 from Dataset import get_env
@@ -23,7 +28,6 @@ import mediapy as media
 from Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 
 
-     
 
 """
 def get_pretrained_planner(planner_name, checkpoint_steps):
@@ -34,12 +38,14 @@ def get_pretrained_planner(planner_name, checkpoint_steps):
       return checkpoint['ema']
 """
 
+
 def save_trajs(trajs, env_name, specific_env):
-    os.makedirs(f'./Rollouts/{env_name}/{specific_env}/', exist_ok=True)
-    save_path = f'./Rollouts/{env_name}/{specific_env}/Generated_trajs_Info.pkl'
+    os.makedirs(f'./Finetuning/Rollouts/{env_name}/{specific_env}/', exist_ok=True)
+    save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info.pkl'
     with open(save_path, 'wb') as f:
          pickle.dump(trajs, f)
     print(f"trajectories saved")
+
 
 class ActionSelector:
      def __init__(self, dataset_name, specific_dataset, device):
@@ -101,7 +107,6 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
     #get Processor
      planner_processor = Planner_Processor(env_name, specific_env)
 
-     
      #reset
      s0 = env.reset(seed=1)
      s0 = s0[0]['observation']
@@ -129,6 +134,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
                #print(x[0])
                action = x[0, d_s:(d_s+d_a)].copy()
                #print(action)
+               #print(action.max(), action.min())
                #exit()
 
                #action = torch.tanh(torch.tensor(action))
@@ -157,15 +163,10 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, criti
      with open('Generated_trajectory.pkl', 'wb') as f:
                 pickle.dump(traj_info, f)
      """
-     
+    
 
-def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 500, eta = 0.8, episode_length = 4000, critic = False, checkpoint_steps = 1000000, num_envs=8):
-     """
-     Run rollout on multiple environments in parallel and save the best trajectory
+def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 100, eta = 0.8, episode_length = 4000, critic = False, checkpoint_steps = 1000000, num_envs=8):
      
-     Args:
-         num_envs: Number of parallel environments (default: 4)
-     """
      print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
      print(f"Running {num_envs} environments in parallel")
      
@@ -294,20 +295,12 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 500, eta = 
      # Save the best trajectory in the same format as single rollout
      trajs_info = {
          'best_traj': best_trajectory,
-         'trajs': trajs,
          'env_name': env_name,
          'specific_env': specific_env,
-         'total_reward': best_reward,
-         'num_envs_tested': num_envs,
          'all_rewards': all_rewards
      }
      save_trajs(trajs_info, env_name, specific_env)
-    
      
-
-
-
-
 
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
@@ -315,6 +308,6 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 3000, critic = False, checkpoint_steps = 1000000, render = True)
-    #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 1000000, num_envs = 8)
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, eta = 0.8, episode_length  = 2000, critic = False, checkpoint_steps = 1000000, render = True)
+    rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 200, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1000000, num_envs = 50)
   

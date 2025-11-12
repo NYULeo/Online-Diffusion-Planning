@@ -15,7 +15,6 @@ from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
 import pickle
 import random
-import gymnasium as gym
 
 def set_seed(seed=0):
     # Python random
@@ -32,6 +31,12 @@ def set_seed(seed=0):
     # Set environment variable for additional reproducibility
     os.environ['PYTHONHASHSEED'] = str(seed)
 
+def save_trajs(trajs, env_name, specific_env):
+    os.makedirs(f'./Finetuning/Rollouts/{env_name}/{specific_env}/', exist_ok=True)
+    save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info.pkl'
+    with open(save_path, 'wb') as f:
+         pickle.dump(trajs, f)
+    print(f"trajectories saved")
 
 def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, checkpoint_steps, render = False):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
@@ -46,7 +51,7 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, check
          env, d_s, d_a = get_env(env_name, specific_env, 'rgb_array')
      else:
          env, d_s, d_a = get_env(env_name, specific_env, None)
-     env = gym.make('PointMaze_Medium-v3', render_mode = 'rgb_array')
+     #env = gym.make('PointMaze_Medium-v3', render_mode = 'rgb_array')
 
      #get Planner
      state_dict = get_pretrained_planner(env_name, specific_env, checkpoint_steps)
@@ -91,9 +96,9 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, check
      env.close()
      traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(rewards)}
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
-     print(rewards)
+     #print(rewards)
      if(render):
-          media.write_video("demo.mp4", frames, fps=50)
+          media.write_video("demo.mp4", frames, fps=50) #save the video
      """
      with open('Generated_trajectory.pkl', 'wb') as f:
                 pickle.dump(traj_info, f)
@@ -224,15 +229,11 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 500, eta = 
      # Save the best trajectory in the same format as single rollout
      trajs_info = {
          'best_traj': best_trajectory,
-         'trajs': trajs,
          'env_name': env_name,
          'specific_env': specific_env,
-         'total_reward': best_reward,
-         'num_envs_tested': num_envs,
          'all_rewards': all_rewards
      }
-
-     return trajs
+     save_trajs(trajs_info, env_name, specific_env)
      
     
      
@@ -247,6 +248,6 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 2000, checkpoint_steps = 500, render = True)
-    #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 990000, num_envs = 8)
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 200, eta = 0.8, episode_length  = 5000, checkpoint_steps = 1500, render = True)
+    rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 200, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1500, num_envs = 50)
   

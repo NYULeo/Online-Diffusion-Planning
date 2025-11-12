@@ -55,17 +55,8 @@ from Finetuning.traj_reward import TotalReward
 
 
 def plot_function(func, x_range=(-10, 10), num_points=1000, title="Function Plot", xlabel="x", ylabel="f(x)"):
-    """
-    Plot a mathematical function.
     
-    Args:
-        func: A function that takes x and returns f(x)
-        x_range: Tuple of (min_x, max_x) for the plotting range
-        num_points: Number of points to plot
-        title: Title of the plot
-        xlabel: X-axis label
-        ylabel: Y-axis label
-    """
+    
     x = np.linspace(x_range[0], x_range[1], num_points)
     y = func(x)
     
@@ -137,7 +128,7 @@ total = total / len(gen_trajs)
 print(f"Complete Total reward: {total}")
 
 
-"""
+
 
 
 import seaborn as sns
@@ -145,11 +136,7 @@ import matplotlib.colors as mcolors
 import colorsys
 
 def _lighten_color(color: str, amount: float=0.5) -> str:
-        """
-        Lightens the given color by multiplying (1-luminosity) by the given amount.
-        Works with matplotlib color string or hex string.
-        Source adapted from StackOverflow. :contentReference[oaicite:0]{index=0}
-        """
+        
         try:
             c = mcolors.cnames[color]
         except KeyError:
@@ -221,7 +208,7 @@ def plot_reward_curve(
 
 
 
-        """
+        
         if show_lr and self.learning_rates:
             ax2 = ax1.twinx()
             lr_vals = np.array(self.learning_rates)
@@ -242,7 +229,7 @@ def plot_reward_curve(
         print(f"Reward curve saved to {save_path}")
         plt.show()
         return fig
-        """
+        
 
 from Dataset import get_dataset
 with open('./Pretrain/Rollouts/pointmaze/medium/Generated_trajs_Info.pkl', 'rb') as f:
@@ -257,5 +244,8 @@ rewards = np.array(rewards)
 #print(rewards)
 
 
+"""
 
 
+t_asc = torch.linspace(1000, 0.0, 100).long()[:-1]
+print(t_asc[10])

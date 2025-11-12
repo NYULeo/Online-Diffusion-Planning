@@ -56,7 +56,7 @@ class Acc_AdjointMatchingConfig:
     update_lambda_every = 5
 
     save_freq = 100
-    save_model_freq = 500
+    save_model_freq = 300
     log_freq = 20
 
 

@@ -38,7 +38,7 @@ class FinetuningConfig():
     eta_lam: float = 0.001
     gradient_accumulate_every: int = 4
     update_lambda_every: int = 5
-    reward_scaling_factor: float = 10000
+    reward_scaling_factor: float = 100000
     
 
 
