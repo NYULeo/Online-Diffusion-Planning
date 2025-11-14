@@ -11,7 +11,7 @@ from Pretrain.Planners.Backbone.Dit import DiT1d
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker
+from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, karras_beta_schedule, clip_actions
 from Pretrain.Planners.Backbone.utils import cosine_alpha_sigma, cosine_beta, compute_dot_alpha_beta, get_pretrained_planner
 import numpy as np
 from Pretrain.Dataset import get_PlannerName
@@ -41,8 +41,11 @@ class Acc_AdjointMatchingConfig:
     specific_dataset: Optional[str] = None
     backbone_name: str = 'transformer'
     eta: float = 0.8
-    num_steps: int = 500
+    num_steps: int = 30
+    num_karras: int = 2
     s: float = 0.008  # cosine schedule offset used in base drift
+    sigma_min: float = 0.01
+    sigma_max: float = 30.0
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     step_start_ema = 50
     ema_decay = 0.999
@@ -50,14 +53,14 @@ class Acc_AdjointMatchingConfig:
 
     finetune_lr: float = 1e-4
     finetune_steps: int = 500
-    lam: float = 0.0
+    lam: float = 0.01
     eta_lam: float = 0.001
     reward_scaling_factor: float = 10000
     update_lambda_every = 5
 
     save_freq = 100
     save_model_freq = 300
-    log_freq = 20
+    log_freq = 10
 
 
 
@@ -94,6 +97,9 @@ class Acc_AdjointMatchingFineTuner:
         self.ema = EMA(self.config.ema_decay)
         self.t_asc = torch.linspace(1.0, 0.0, self.config.num_steps + 1, device = self.device)
         self.k = self.kt(self.t_asc) 
+        self.config.num_karras = math.floor( (self.config.num_steps) * 0.2)
+        self.t_grid, self.beta_1, self.sigma_grid = karras_beta_schedule(self.config.num_steps, self.config.sigma_min, self.config.sigma_max, self.device)
+        self.beta_2 = cosine_beta(self.t_grid, s=self.config.s)
         
         self.set_old_score_net(planner_checkpoint)
         self.set_new_score_net()
@@ -263,7 +269,7 @@ class Acc_AdjointMatchingFineTuner:
             # Store j-th row of Jacobian
            Jov[j, :] = grad_j.view(-1)  # [H*dim]
        return Jov
-
+    
     @torch.no_grad()
     def sample_Traj(self,
         s0: torch.Tensor,
@@ -275,7 +281,6 @@ class Acc_AdjointMatchingFineTuner:
              raise ValueError(f"s0 should have shape ({self.config.d_s},), but got {s0_t.shape[-1]}")
         dim = self.config.d_s + self.config.d_a
         
-    
         # Initialize x_T ~ N(0, I) with shape (horizon, dim)
         x = torch.randn(self.config.horizon, dim, dtype=torch.float32, device=self.device).unsqueeze(0)
         conditions = s0_t.unsqueeze(0)
@@ -285,7 +290,6 @@ class Acc_AdjointMatchingFineTuner:
         y[:, 0, :self.config.d_s] = conditions.clone()
         #x = apply_conditioning(x, conditions, d_s)
         x = mask * y + (1 - mask) * x
-    
     
         X = []
         X.append(x.detach().clone())
@@ -307,7 +311,56 @@ class Acc_AdjointMatchingFineTuner:
         #x = apply_conditioning(x, conditions, d_s)
         self.new_score_net.train()
         return  torch.stack(X).to(self.device)
+    
+    @torch.no_grad()
+    def sample_Traj_karras(self,
+        s0: torch.Tensor,
+        ) ->  torch.Tensor:
+        self.new_score_net.eval()
 
+        s0_t = s0.to(self.device)
+        dim = self.config.d_s + self.config.d_a
+        # Karras β(t) + σ(t)
+        #t_grid, beta_1, sigma_grid = karras_beta_schedule(self.config.num_steps, self.device)
+        #t_grid, beta_1, _, sigma_grid =  karras_cosine_interpolated_beta(num_steps, device=device)
+        #beta_2 = cosine_beta(t_grid, s=0.008)
+
+        # Initialize x_T
+        x = torch.randn(1, self.config.horizon, dim, dtype=torch.float32, device=self.device) * self.sigma_grid[0]
+        mask = torch.zeros(1, self.config.horizon, dim, dtype=torch.float32, device=self.device)
+        mask[:, 0, :self.config.d_s] = 1.0
+        y = torch.zeros((1, self.config.horizon, dim), dtype = torch.float32, device = self.device)
+        y[:, 0, :self.config.d_s] = s0_t.unsqueeze(0)
+        x = mask * y + (1 - mask) * x
+
+        X = []
+        X.append(x.detach().clone())
+        for i in range(self.config.num_steps):
+             t_now = self.t_grid[i]
+             t_next = self.t_grid[i + 1] if i < self.config.num_steps - 1 else 0.0
+             dt = (t_next - t_now).item()
+             if( i < self.config.num_karras ):
+                  beta_now = self.beta_1[i].item()
+             else:
+                  beta_now = self.beta_2[i].item()
+             # Drift
+             drift = -0.5 * beta_now * x
+             # Score
+             score = self.new_score_net(x, t_now.unsqueeze(0))
+            # Euler step
+             if self.config.eta > 0:
+                 noise = torch.randn_like(x)
+                 noise_scale = self.config.eta * math.sqrt(beta_now * (-dt))
+                 x = x + ((drift - beta_now * score) * dt + noise_scale * noise)
+             else:
+                 x = x + (drift - beta_now * score) * dt
+             x = mask * y + (1 - mask) * x
+             x = clip_actions(x, self.config.d_s)
+             X.append(x.detach().clone().to(self.device))
+
+        self.new_score_net.train()
+        return torch.stack(X).to(self.device)
+        
     def make_a(self, X, reward_model: TotalReward):
         base_old_score_net = self.accelerator.unwrap_model(self.old_score_net)
         for p in base_old_score_net.parameters():
@@ -372,7 +425,7 @@ class Acc_AdjointMatchingFineTuner:
             local_final_Cs = []
             for s0 in local_s0:
                 s0 = s0.to(self.device)
-                traj = self.sample_Traj(s0)  
+                traj = self.sample_Traj_karras(s0)  
                 local_trajs.append(traj)
                 final_x = traj[-1].squeeze(0).to(self.device)
                 C_val = base_reward_model.get_c(final_x)

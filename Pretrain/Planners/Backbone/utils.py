@@ -61,6 +61,9 @@ def cosine_beta(t: torch.Tensor, s: float = 0.008) -> torch.Tensor:
     return (math.pi / (1.0 + s)) * torch.tan(a)
 
 
+
+
+
 def cosine_alpha_sigma(t: torch.Tensor, s: float = 0.008) -> Tuple[torch.Tensor, torch.Tensor]:
     """Continuous cosine schedule for α(t) and σ(t).
 

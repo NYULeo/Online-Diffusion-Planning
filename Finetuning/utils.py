@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import seaborn as sns
 from Pretrain.Dataset import get_PlannerName
+from typing import Tuple
 
 
 class Lambda:
@@ -347,3 +348,34 @@ def get_pretrained_planner(dataset_name, specific_dataset, steps):
       #checkpoint = torch.load(checkpoint_path,  weights_only=True)
       return checkpoint['ema']
 
+def karras_beta_schedule(
+    num_steps: int,
+    sigma_min: float,
+    sigma_max: float,
+    device: torch.device
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Returns: t_grid, beta_grid, sigma_grid
+    beta(t) computed from VP-SDE marginals using Karras timesteps.
+    """
+    t = torch.linspace(1.0, 0.0, num_steps + 1, device=device)
+    sigma_k = sigma_min * (sigma_max / sigma_min) ** t
+    alpha = 1.0 / torch.sqrt(1.0 + sigma_k**2)
+    sigma = sigma_k * alpha
+
+    # Compute β(t) from dσ²/dt = β(t) * σ²(t)
+    # From VP-SDE: dσ²/dt = β(t) * (1 - σ²(t))
+    # But we use numerical diff for stability
+    
+    sigma_sq = sigma**2
+    d_sigma_sq = torch.diff(sigma_sq, dim=0)
+    dt = torch.diff(t, dim=0)
+    beta = d_sigma_sq / (1 - sigma_sq[:-1]) / dt
+    beta = torch.cat([beta, beta[-1].unsqueeze(0)])  # pad last
+
+    return t, beta, sigma
+
+def clip_actions(x: torch.Tensor, d_s: int) -> torch.Tensor:
+    actions = torch.clamp(x[..., d_s:], -1.0, 1.0)
+    x[..., d_s:] = actions
+    return x

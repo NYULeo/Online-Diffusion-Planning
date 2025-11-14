@@ -33,10 +33,12 @@ class FinetuningConfig():
     kernel_model_checkpoint: int
     
     finetune_steps: int = 1000000
+    diffusion_steps: int = 30
     finetune_batch_size: int = 12
     finetune_lr: float = 2e-4
+    inital_lam: float = 0.01
     eta_lam: float = 0.001
-    gradient_accumulate_every: int = 4
+    gradient_accumulate_every: int = 1
     update_lambda_every: int = 5
     reward_scaling_factor: float = 100000
     
@@ -48,12 +50,14 @@ class OnlineFinetuner():
     def __init__(self, config: FinetuningConfig):
         self.config = config
         self.config.AMConfig.finetune_steps = self.config.finetune_steps
+        self.config.AMConfig.num_steps = self.config.diffusion_steps
         self.config.AMConfig.dataset_name =self.config.dataset_name
         self.config.AMConfig.specific_dataset = self.config.specific_dataset
         self.config.AMConfig.finetune_lr = self.config.finetune_lr
         self.env, d_s, d_a = get_env(self.config.dataset_name, self.config.specific_dataset)
         self.config.AMConfig.d_s = d_s
         self.config.AMConfig.d_a = d_a
+        self.config.AMConfig.lam = self.config.inital_lam
         self.config.AMConfig.eta_lam = self.config.eta_lam
         self.config.AMConfig.update_ema_every = self.config.update_lambda_every
         self.config.AMConfig.reward_scaling_factor = self.config.reward_scaling_factor
@@ -104,8 +108,10 @@ class OnlineFinetuner():
             print(f"finetune_lr: {self.config.finetune_lr}")
             print(f"reward_scaling_factor: {self.config.AMConfig.reward_scaling_factor}")
             print(f"finetune_steps: {self.config.finetune_steps}")
+            print(f"diffusion_steps: {self.config.diffusion_steps}")
             print(f"gradient accumulate every: {self.config.gradient_accumulate_every}")
             print(f"sampling steps: {self.config.AMConfig.num_steps}")
+            print(f"Initial lambda: {self.config.inital_lam}")
             print(f"eta_lam: {self.config.eta_lam}")
             print(f"update_lambda_every: {self.config.update_lambda_every}")
             print('Device Details: ---------------------------------------------------------------------------')

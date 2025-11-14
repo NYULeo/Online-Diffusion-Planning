@@ -246,6 +246,3 @@ rewards = np.array(rewards)
 
 """
 
-
-t_asc = torch.linspace(1000, 0.0, 100).long()[:-1]
-print(t_asc[10])
