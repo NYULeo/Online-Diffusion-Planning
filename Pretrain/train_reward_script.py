@@ -12,7 +12,7 @@ if __name__ == '__main__':
     dataset_name = 'pointmaze',
     batch_size = 256, 
     num_steps = 100000, 
-    save_freq = 1000,  
+    save_freq = 10000,  
     lr = 1e-3,
     sigma = 3,
     target_reward = 1.0,
