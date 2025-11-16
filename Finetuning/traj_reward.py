@@ -132,7 +132,7 @@ class TotalReward(nn.Module):
             s_next_norm_kernel = self.kernel_processor(s_next).unsqueeze(0).requires_grad_(True).to(self.config.device)
  
            
-            r, _ = self.reward_net.predict(s_norm_reward, a)
+            r = self.reward_net.predict(s_norm_reward, a)
             c = self.sigmoid(s_norm_kernel, a, s_next_norm_kernel)
            
             grads = torch.autograd.grad(
@@ -175,7 +175,7 @@ class TotalReward(nn.Module):
         s_norm_reward = self.reward_processor(s).unsqueeze(0).requires_grad_(True)
         a = x[H-1][self.config.d_s:].unsqueeze(0).requires_grad_(True)
         
-        r, _ = self.reward_net.predict(s_norm_reward, a)
+        r = self.reward_net.predict(s_norm_reward, a)
         
 
         grads = torch.autograd.grad(
