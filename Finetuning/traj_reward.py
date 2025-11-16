@@ -8,7 +8,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 import torch
 import torch.nn as nn
-from Pretrain.Rewards.nets import Reward, MLPNetwork
+from Pretrain.Rewards.nets import Reward, MLPNetwork, ScalarReward
 from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 from Pretrain.Transition_Kernel.Kernel_Backbone import get_pretrained_kernel, get_pretrained_kernel_stats
@@ -39,7 +39,7 @@ class TotalReward(nn.Module):
         reward_state_dict, obs_dim, act_dim, reward_name = get_pretrained_reward(dataset_name, reward_checkpoint, specific_dataset)
         self.config.device = device
         #self.reward_net = MLPNetwork(input_dim = obs_dim + act_dim, out_dim = 1, hidden_dims = [200, 200, 200, 200], act_fn = 'swish', out_act_fn = 'identity').to(self.config.device)
-        self.reward_net = Reward(obs_dim, act_dim).to(self.config.device)
+        self.reward_net = ScalarReward(obs_dim, act_dim).to(self.config.device)
         self.reward_net.load_state_dict(reward_state_dict)
         self.reward_net.eval()
         self.kernels = []
@@ -132,7 +132,7 @@ class TotalReward(nn.Module):
             s_next_norm_kernel = self.kernel_processor(s_next).unsqueeze(0).requires_grad_(True).to(self.config.device)
  
            
-            r = self.reward_net(s_norm_reward, a)
+            r, _ = self.reward_net.predict(s_norm_reward, a)
             c = self.sigmoid(s_norm_kernel, a, s_next_norm_kernel)
            
             grads = torch.autograd.grad(
@@ -175,7 +175,7 @@ class TotalReward(nn.Module):
         s_norm_reward = self.reward_processor(s).unsqueeze(0).requires_grad_(True)
         a = x[H-1][self.config.d_s:].unsqueeze(0).requires_grad_(True)
         
-        r = self.reward_net(s_norm_reward, a)
+        r, _ = self.reward_net.predict(s_norm_reward, a)
         
 
         grads = torch.autograd.grad(
