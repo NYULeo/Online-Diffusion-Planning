@@ -530,9 +530,9 @@ class Acc_AdjointMatchingFineTuner:
         #total_var_reward = 0.0
 
        
-        conds = next(dataloader)
+        #conds = next(dataloader)
         while step < self.config.finetune_steps:
-             #conds = next(dataloader)
+             conds = next(dataloader)
              with self.accelerator.accumulate(self.new_score_net):
                 loss, avg_reward, avg_C = self.step(conds, reward_model)
                 self.optimizer.step()

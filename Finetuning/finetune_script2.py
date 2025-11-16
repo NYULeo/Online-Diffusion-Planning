@@ -46,7 +46,7 @@ if __name__ == "__main__":
         reward_model_checkpoint = 44000,
         kernel_model_checkpoint = 34000,
         finetune_steps = 1000000,
-        diffusion_steps = 50,
+        diffusion_steps = 30,
         finetune_batch_size = 12,
         finetune_lr = 5e-6,
         inital_lam = 0.01,
