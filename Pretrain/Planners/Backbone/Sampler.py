@@ -16,30 +16,6 @@ def clip_actions(x: torch.Tensor, d_s: int) -> torch.Tensor:
     x[..., d_s:] = actions
     return x
 
-def cosine_beta(t: torch.Tensor, s: float = 0.008) -> torch.Tensor:
-    """
-    Continuous-time VP drift g(t)^2 = beta(t) for the cosine schedule.
-    Using beta(t) = -2 d/dt log alpha(t) = (pi/(1+s)) * tan(a).
-    """
-    t = t.clamp(0.0, 1.0 - 1e-3)
-    a = (math.pi / 2.0) * ((t + s) / (1.0 + s))
-    return (math.pi / (1.0 + s)) * torch.tan(a)
-
-def cosine_alpha_sigma(t: torch.Tensor, s: float = 0.008) -> Tuple[torch.Tensor, torch.Tensor]:
-    """Continuous cosine schedule for α(t) and σ(t).
-
-    Reuse of the same function from ``diffusion_transformer.py``.  See
-    that module for details.
-    """
-    t = t.clamp(0.0, 1.0 - 1e-3)
-    factor = (t + s) / (1.0 + s)
-    f_t = torch.cos(    factor * (math.pi / 2)     )** 2
-    f0 = torch.cos( torch.tensor((s / (1.0 + s)) * (math.pi / 2))  ) ** 2
-    alpha_bar = (f_t / f0).clamp(0.0, 1.0 - 1e-3)
-    alpha = torch.sqrt(alpha_bar)
-    sigma = torch.sqrt(1.0 - alpha_bar)
-    return alpha, sigma
-
 @torch.no_grad()
 def sample_reverse_sde(
     s0: np.ndarray,
@@ -202,114 +178,7 @@ def sample_euler_karras(
     return x.squeeze(0).cpu().numpy()
 
 
-@torch.no_grad()
-def sample_ddim(
-    s0: np.ndarray,
-    noise_model,       # rename: model that predicts εθ(x_t, t)
-    d_s: int,
-    d_a: int,
-    horizon: int,
-    steps_S: int,      # number of DDIM steps you'd like
-    device: Optional[str] = None,
-) -> np.ndarray:
-    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Prepare initial condition
-    s0_t = torch.tensor(s0, device=device, dtype=torch.float32)
-    if s0_t.shape[0] != d_s:
-        raise ValueError(f"s0 should have shape ({d_s},), but got {s0_t.shape}")
-    dim = d_s + d_a
-
-    # Define discrete time‐steps sequence for DDIM: e.g.
-    t_seq = torch.linspace(1.0, 0.0, steps_S + 1, device=device)  # from 1 → 0
-    # Might exclude endpoint; you can also choose non‐uniform spacing.
-
-    # Precompute schedule arrays: alpha_bar(t), sqrt(alpha_bar), sqrt(1 - alpha_bar)
-    # use your cosine_alpha_sigma to get alpha(t), sigma(t), but we need cumulative alpha_bar so we might compute:
-    alpha_list = []
-    sigma_list = []
-    for t in t_seq:
-        alpha_t, sigma_t = cosine_alpha_sigma(t, s=0.008)
-        alpha_list.append(alpha_t)
-        sigma_list.append(sigma_t)
-    alpha = torch.stack(alpha_list)   # shape [steps_S +1]
-    sigma = torch.stack(sigma_list)   # shape [steps_S +1]
-    alpha_bar = alpha**2               # because α = sqrt(α_bar) in your function
-    sqrt_alpha_bar = torch.sqrt(alpha_bar)
-    sqrt_one_minus_alpha_bar = sigma   # since sigma = sqrt(1 - alpha_bar)
-
-    # Initialize x_T ~ Normal(0, I)
-    x = torch.randn((1, horizon, dim), dtype=torch.float32, device=device)
-    # apply conditioning mask and set condition part:
-    mask = torch.zeros((1, horizon, dim), dtype=torch.float32, device=device)
-    mask[:, 0, :d_s] = 1.0
-    y = torch.zeros((1, horizon, dim), dtype=torch.float32, device=device)
-    y[:, 0, :d_s] = s0_t.unsqueeze(0)
-    x = mask * y + (1 - mask) * x
-
-    # Sampling loop (deterministic DDIM: η = 0)
-    for i in range(steps_S, 0, -1):   # iterate backwards: index i from last to 1
-        t_i = t_seq[i]
-        t_prev = t_seq[i-1]
-        # predict εθ(x_ti, t_i)
-        eps = noise_model(x, t_i.unsqueeze(0))
-
-        # compute x0 estimate:
-        x0_hat = (x - sqrt_one_minus_alpha_bar[i] * eps) / sqrt_alpha_bar[i]
-
-        # compute jump to x_{t_prev}
-        x = sqrt_alpha_bar[i-1] * x0_hat + \
-            sqrt_one_minus_alpha_bar[i-1] * eps
-
-        # re-apply conditioning
-        x = mask * y + (1 - mask) * x
-
-        # clip action part as before
-        #x = clip_actions(x, d_s)
-
-    return x.squeeze(0).detach().cpu().numpy()
-
-
-
-
-
-# ================================
-# 3. KARRAS + COSINE INTERPOLATED (with beta)
-# ================================
-def karras_cosine_interpolated_beta(
-    num_steps: int = 50,
-    s: float = 0.008,
-    device: str = "cpu"
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    """
-    Returns: t, beta, alpha, sigma
-    - Karras timesteps
-    - Interpolated cosine marginals (memoryless)
-    - beta(t) from dσ²/dt
-    """
-    # High-res cosine grid
-    t_cosine = torch.linspace(1.0, 0.0, 1000 + 1, device=device)
-    _, sigma_cosine = cosine_alpha_sigma(t_cosine, s=s)
-
-    # Karras timesteps
-    t_karras = torch.linspace(1.0, 0.0, num_steps + 1, device=device)
-
-    # Interpolate sigma
-    sigma = torch.interpolate(t_karras, t_cosine.flip(0), sigma_cosine.flip(0))
-    alpha = torch.sqrt(1.0 - sigma**2)
-
-    # Compute beta from dσ²/dt = beta * (1 - σ²)
-    sigma_sq = sigma**2
-    d_sigma_sq = torch.diff(sigma_sq, dim=0)
-    dt = torch.diff(t_karras, dim=0)
-    beta = d_sigma_sq / (1.0 - sigma_sq[:-1]) / dt
-    beta = torch.cat([beta, beta[-1].unsqueeze(0)])  # pad
-
-    return t_karras, beta, alpha, sigma
-
-# ================================
-# 4. EULER SAMPLING (50 steps)
-# ================================
 
 
 

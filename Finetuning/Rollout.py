@@ -11,7 +11,7 @@ from Pretrain.Planners.Backbone.Dit import DiT1d
 #from Pretrain.Planners.Backbone.utils import get_pretrained_planner
 from utils import get_pretrained_planner
 from Pretrain.Dataset import Planner_Processor
-from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde
+from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde, sample_euler_karras
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
 import pickle
 import random
@@ -38,7 +38,7 @@ def save_trajs(trajs, env_name, specific_env):
          pickle.dump(trajs, f)
     print(f"trajectories saved")
 
-def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, checkpoint_steps, render = False):
+def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, Checpoint_steps; {checkpoint_steps}")
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
@@ -78,7 +78,8 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, check
      for i in range(episode_length):
            current_state_norm = planner_processor.preprocess(current_state)
            
-           x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
+           #x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
+           x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
            action = x[0, d_s:(d_s+d_a)].copy()
            obs, reward, terminated, truncated, info = env.step(action)
            if(render):
@@ -105,18 +106,13 @@ def rollout(env_name, specific_env, horizon, steps_T, eta, episode_length, check
      """
      
 
-def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 500, eta = 0.8, episode_length = 4000, critic = False, checkpoint_steps = 1000000, num_envs=8):
-     """
-     Run rollout on multiple environments in parallel and save the best trajectory
+def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, critic = False, checkpoint_steps = 1000000, num_envs=8):
      
-     Args:
-         num_envs: Number of parallel environments (default: 4)
-     """
-     print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
-     print(f"Running {num_envs} environments in parallel")
+     #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
+     #print(f"Running {num_envs} environments in parallel")
      
      device = "cuda" if torch.cuda.is_available() else "cpu"
-     print(f"Using device {device}")
+     #print(f"Using device {device}")
      
      
      # Create environment factory function
@@ -166,8 +162,8 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 500, eta = 
              current_state = current_states[env_idx]
              current_state_norm = planner_processor.preprocess(current_state)
              
-             
-             x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta, device=device)
+             x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+             #x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta, device)
              action = x[0, d_s:(d_s+d_a)].copy()
              
              actions[env_idx] = action
@@ -189,18 +185,14 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 500, eta = 
              
              if terminated_vec[env_idx] or truncated_vec[env_idx]:
                  done_envs[env_idx] = True
-                 print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
+                 #print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
          
         
          # Check if all environments are done
          if all(done_envs):
-             print("All environments completed!")
+             #print("All environments completed!")
              break
          
-         if i % 50 == 0:
-             active_count = sum(not d for d in done_envs)
-             if active_count > 0:
-                 print(f"Step {i}: Active envs: {active_count}")
      
      vec_env.close()
      
@@ -212,23 +204,13 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 500, eta = 
              'actions': np.asarray(acts[env_idx].copy()),
              'rewards': np.asarray(rewards[env_idx].copy())
          }
-     best_idx = np.argmax(all_rewards)
-     best_reward = all_rewards[best_idx]
-     best_trajectory = trajs[best_idx]
-     
-     print(f"\n{'='*60}")
-     print(f"Results from {num_envs} parallel rollouts:")
-     print(f"{'='*60}")
-     for env_idx in range(num_envs):
-         print(f"  Env {env_idx}: Total reward = {all_rewards[env_idx]:.4f}, Steps = {len(trajs[env_idx])}")
-     print(f"{'='*60}")
-     print(f"Best trajectory: Env {best_idx} with reward = {best_reward:.4f}")
-     print(f"Average reward: {np.mean(all_rewards):.4f} ± {np.std(all_rewards):.4f}")
-     print(f"{'='*60}\n")
-     
+     #best_idx = np.argmax(all_rewards)
+     #best_reward = all_rewards[best_idx]
+     #best_trajectory = trajs[best_idx]
+
      # Save the best trajectory in the same format as single rollout
      trajs_info = {
-         'best_traj': best_trajectory,
+         'trajs': trajs,
          'env_name': env_name,
          'specific_env': specific_env,
          'all_rewards': all_rewards
@@ -241,7 +223,7 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 500, eta = 
 
 
 
-
+"""
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
     set_seed(1)
@@ -250,4 +232,4 @@ if __name__ == "__main__":
     specific_train_dataset = 'medium'
     rollout(env_name, specific_train_dataset, horizon, steps_T = 500, eta = 0.8, episode_length  = 3000, checkpoint_steps = 500, render = True)
     #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 200, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1500, num_envs = 50)
-  
+"""

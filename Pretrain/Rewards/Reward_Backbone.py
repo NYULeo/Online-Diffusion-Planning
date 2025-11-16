@@ -257,9 +257,9 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
              a = a.to(device)
              r = r.to(device)
              #pred = reward_net(torch.cat([s, a], dim = 1))
-             pred, _ = reward_net.predict(s, a)
-             #loss = F.mse_loss(pred, r)
-             loss = reward_net.loss(s, a, r)
+             pred = reward_net.predict(s, a)
+             loss = F.mse_loss(pred, r)
+             #loss = reward_net.loss(s, a, r)
              total_mean_loss += loss.item()
              total_reward += pred.mean().item()
              
