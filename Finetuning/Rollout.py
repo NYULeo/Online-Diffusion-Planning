@@ -11,7 +11,7 @@ from Pretrain.Planners.Backbone.Dit import DiT1d
 #from Pretrain.Planners.Backbone.utils import get_pretrained_planner
 from utils import get_pretrained_planner
 from Pretrain.Dataset import Planner_Processor
-from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde, sample_euler_karras
+from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde, sample_euler_karras, sample_euler_karras2
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
 import pickle
 import random
@@ -230,6 +230,6 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 10, eta = 0.8, episode_length  = 5000, checkpoint_steps = 500, render = True)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 5, eta = 0.8, episode_length  = 3000, checkpoint_steps = 200, render = True)
     #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 200, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1500, num_envs = 50)
 

@@ -13,6 +13,7 @@ os.chdir(project_root)
 #from Planners.Backbone.Sampler import sample_dpm_cosine
 from Planners.Backbone.Sampler import sample_reverse_sde
 from Planners.Backbone.Sampler import sample_euler_karras, karras_beta_schedule
+from Planners.Backbone.Sampler import sample_euler_karras2
 #from Planners.Backbone.Sampler import sample_ddim
 import pickle
 from typing import Optional
@@ -126,7 +127,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
                    
                    #x =  sample_reverse_ddim(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
                    
-                   x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                   x = sample_euler_karras2(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                    action = x[0, d_s:(d_s+d_a)].copy()
                    #action = torch.tanh(action)
                    #action = planner_processor.postprocess(action)
@@ -169,7 +170,6 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
                 pickle.dump(traj_info, f)
      """
     
-
 def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 100, eta = 0.8, episode_length = 4000, critic = False, checkpoint_steps = 1000000, num_envs=8):
      
      print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
@@ -314,7 +314,7 @@ if __name__ == "__main__":
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
     #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 30, eta = 0.8, episode_length  = 2000, critic = False, checkpoint_steps = 990000, render = True)
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 200, num_karras = 0, eta = 0.8, episode_length  = 3000, critic = False, checkpoint_steps = 1000000, render = True)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 10, eta = 0.8, episode_length  = 3000, critic = False, checkpoint_steps = 1000000, render = True)
 
     #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 200, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1000000, num_envs = 50)
   

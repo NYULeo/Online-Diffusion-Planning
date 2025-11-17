@@ -178,6 +178,154 @@ def sample_euler_karras(
     return x.squeeze(0).cpu().numpy()
 
 
+import math
+import torch
+import numpy as np
+from typing import Optional
+
+# ------------------------------------------------------------------ #
+# 1. Hybrid schedule (Karras speed + cosine smoothness)
+# ------------------------------------------------------------------ #
+@torch.no_grad()
+def hybrid_karras_cosine_schedule(
+    num_steps: int = 50,
+    sigma_min: float = 0.01,
+    sigma_max: float = 30.0,
+    cosine_s: float = 0.008,
+    device: str = "cpu",
+):
+    """
+    Returns
+    -------
+    t_grid      : Tensor[N+1]   in [1,0]
+    beta_grid   : Tensor[N+1]   β(t)  (physics-consistent)
+    sigma_grid  : Tensor[N+1]   σ(t) = √β(t)
+    eta_grid    : Tensor[N+1]   η(t) = β(t)/2   ← memory-less
+    """
+    t = torch.linspace(1.0, 0.0, num_steps + 1, device=device)
+
+    # ---- Karras log-linear σ_k(t) (fast decay) ----
+    rho = torch.log(torch.tensor(sigma_max / sigma_min, device=device))
+    sigma_k = sigma_min * torch.exp(rho * t)                 # σ_k(t)
+
+    # ---- Target cosine α_bar(t) (smooth) ----
+    f = torch.cos((t + cosine_s) / (1.0 + cosine_s) * torch.pi / 2) ** 2
+    alpha_bar_target = f / f[0]                               # [0,1]
+
+    # ---- VP marginals forced to the target ----
+    sigma_sq = 1.0 - alpha_bar_target
+    sigma = torch.sqrt(sigma_sq)
+
+    # ---- Physics-consistent β(t) from variance ODE ----
+    d_sigma_sq = torch.gradient(sigma_sq, spacing=t)[0]       # central diff
+    beta = d_sigma_sq / alpha_bar_target
+    beta = torch.clamp(beta, min=1e-6)                        # numerical safety
+
+    eta = beta / 2.0                                          # memory-less
+
+    return t, beta, sigma, eta
+
+
+# ------------------------------------------------------------------ #
+# 2. Pure Karras schedule (for the first `num_karras` steps)
+# ------------------------------------------------------------------ #
+@torch.no_grad()
+def karras_beta_schedule(
+    num_steps: int = 50,
+    sigma_min: float = 0.01,
+    sigma_max: float = 30.0,
+    device: str = "cpu",
+):
+    t = torch.linspace(1.0, 0.0, num_steps + 1, device=device)
+    rho = torch.log(torch.tensor(sigma_max / sigma_min, device=device))
+    sigma_k = sigma_min * torch.exp(rho * t)
+
+    alpha = 1.0 / torch.sqrt(1.0 + sigma_k ** 2)
+    sigma = sigma_k * alpha
+
+    # analytic β(t) = 2ρ σ_k/(1+σ_k²)
+    beta = 2.0 * rho * sigma_k / (1.0 + sigma_k ** 2)
+    beta = torch.clamp(beta, min=1e-6)
+
+    return t, beta, sigma
+
+
+# ------------------------------------------------------------------ #
+# 3. Adapted sampler (exact copy of your API)
+# ------------------------------------------------------------------ #
+@torch.no_grad()
+def sample_euler_karras2(
+    s0: np.ndarray,
+    score_model: torch.nn.Module,
+    d_s: int,
+    d_a: int,
+    horizon: int,
+    num_steps: int = 50,
+    num_karras: int = 5,
+    eta: float = 1.0,
+    device: Optional[str] = None,
+) -> np.ndarray:
+    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    s0_t = torch.tensor(s0, device=device, dtype=torch.float32)
+    if s0_t.shape[0] != d_s:
+        raise ValueError(f"s0 should have shape ({d_s},), got {s0_t.shape}")
+
+    dim = d_s + d_a
+
+    # ---------- 1. Schedules ----------
+    # pure Karras for the first `num_karras` steps
+    t_grid_k, beta_k, _ = karras_beta_schedule(num_steps, device=device)
+
+    # hybrid (Karras speed + cosine smoothness) for the rest
+    t_grid_h, beta_h, sigma_h, eta_h = hybrid_karras_cosine_schedule(
+        num_steps, device=device
+    )
+
+    # align grids (both have the same t_grid)
+    t_grid = t_grid_k
+
+    # ---------- 2. Initial noise ----------
+    x = torch.randn(1, horizon, dim, device=device) * sigma_h[0]
+
+    # ---------- 3. Conditioning ----------
+    mask = torch.zeros(1, horizon, dim, device=device)
+    mask[:, 0, :d_s] = 1.0
+    y = torch.zeros_like(x)
+    y[:, 0, :d_s] = s0_t.unsqueeze(0)
+    x = mask * y + (1.0 - mask) * x
+
+    # ---------- 4. Euler integration ----------
+    for i in range(num_steps):
+        t_now = t_grid[i]
+        t_next = t_grid[i + 1] if i < num_steps - 1 else 0.0
+        dt = (t_next - t_now).item()
+
+        # ----- β(t) switch -----
+        if i < num_karras:
+            beta_now = beta_k[i].item()
+        else:
+            beta_now = beta_h[i].item()
+
+        # ----- drift & score -----
+        drift = -0.5 * beta_now * x
+        score = score_model(x, t_now.unsqueeze(0))
+
+        # ----- Euler step (with optional stochasticity) -----
+        if eta > 0.0:
+            noise = torch.randn_like(x)
+            noise_scale = eta * math.sqrt(beta_now * (-dt))
+            x = x + (drift - beta_now * score) * dt + noise_scale * noise
+        else:
+            x = x + (drift - beta_now * score) * dt
+
+        # ----- conditioning & action clipping -----
+        x = mask * y + (1.0 - mask) * x
+        x = clip_actions(x, d_s)
+
+    return x.squeeze(0).cpu().numpy()
+
+
+
 
 
 
