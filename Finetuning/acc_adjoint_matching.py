@@ -447,10 +447,11 @@ class Acc_AdjointMatchingFineTuner:
         all_final_Cs = self.accelerator.gather_for_metrics(local_Cs_det, use_gather_object=False)
         all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=False)
         all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object = False)
+        reward_std = float(all_rewards.std().item())
         if self.accelerator.is_main_process:
             total_avgC = float(all_final_Cs.mean().item())
             mean_reward = float(all_rewards.mean().item())
-            reward_std = float(all_rewards.std().item())
+            #reward_std = float(all_rewards.std().item())
         
        
         self.accelerator.wait_for_everyone()
