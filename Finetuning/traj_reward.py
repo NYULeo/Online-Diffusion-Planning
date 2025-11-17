@@ -116,7 +116,33 @@ class TotalReward(nn.Module):
         C = C / (H-1)
         C = C - self.config.delta
         return C
-   
+
+    def predict(self, x: torch.Tensor, lam: float):
+        H, D = x.shape
+        total_reward = torch.tensor(0.0, device = self.config.device, requires_grad = False)
+        for i in range(H-1):
+            s = x[i][:self.config.d_s]
+            s_norm_reward = self.reward_processor(s).unsqueeze(0).requires_grad_(False).to(self.config.device)
+            a = x[i][self.config.d_s:].unsqueeze(0).requires_grad_(False).to(self.config.device)
+            
+           
+            s_next = x[i+1][:self.config.d_s]
+            s_norm_kernel = self.kernel_processor(s).unsqueeze(0).requires_grad_(False).to(self.config.device)
+            s_next_norm_kernel = self.kernel_processor(s_next).unsqueeze(0).requires_grad_(False).to(self.config.device)
+ 
+           
+            r = self.reward_net(s_norm_reward, a)
+            c = self.sigmoid(s_norm_kernel, a, s_next_norm_kernel)
+            total_reward += (1/H)*(r.squeeze(0)) - lam  * ( (1/(H-1)) * c.squeeze(0))
+        
+        s = x[H-1][:self.config.d_s]
+        s_norm_reward = self.reward_processor(s).unsqueeze(0).requires_grad_(False)
+        a = x[H-1][self.config.d_s:].unsqueeze(0).requires_grad_(False)
+        r = self.reward_net(s_norm_reward, a)
+        total_reward +=  (1/H) * (r.squeeze(0))
+        total_reward = total_reward + (lam  * self.config.delta)
+        return total_reward
+
     def forward(self, x: torch.Tensor, lam: float):
         H, D = x.shape
         total_reward = torch.tensor(0.0, device=self.config.device, requires_grad = False)
@@ -174,7 +200,6 @@ class TotalReward(nn.Module):
         s = x[H-1][:self.config.d_s]
         s_norm_reward = self.reward_processor(s).unsqueeze(0).requires_grad_(True)
         a = x[H-1][self.config.d_s:].unsqueeze(0).requires_grad_(True)
-        
         r = self.reward_net(s_norm_reward, a)
         
 
@@ -192,8 +217,7 @@ class TotalReward(nn.Module):
        
        
         gradient += (1/H) * ((r_s_grad + r_a_grad)) 
-       
-        #total_reward +=  (1/H) * (r.squeeze(0))
+        total_reward +=  (1/H) * (r.squeeze(0))
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward, gradient
 

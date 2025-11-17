@@ -260,6 +260,8 @@ for batch in dataloader:
      exit()
 
 """
-
-
+import torch
+a = [torch.tensor(4.0), torch.tensor(5.0)]
+a = torch.stack(a)
+print(a)
 
