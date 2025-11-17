@@ -580,7 +580,9 @@ class Acc_AdjointMatchingFineTuner:
                          print(f"step: {step}, constraint {total_C / self.config.log_freq}")
                     total_loss = 0.0
                     total_reward = 0.0
+                    pure_reward = 0.0
                     total_C = 0.0
+
                     
              
                 if ((step % self.config.save_freq == 0) and (step!=0)):
