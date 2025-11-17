@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import Callable, List, Tuple
 import sys
 import os
+
+from sympy.core.evalf import pure_complex
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -59,8 +61,8 @@ class Acc_AdjointMatchingConfig:
     update_lambda_every = 5
 
     save_freq = 100
-    save_model_freq = 300
-    log_freq = 1
+    save_model_freq = 500
+    log_freq = 10
 
 
 
@@ -425,7 +427,8 @@ class Acc_AdjointMatchingFineTuner:
             local_final_Cs = []
             for s0 in local_s0:
                 s0 = s0.to(self.device)
-                traj = self.sample_Traj_karras(s0)  
+                #traj = self.sample_Traj_karras(s0)  
+                traj = self.sample_Traj(s0)  
                 local_trajs.append(traj)
                 final_x = traj[-1].squeeze(0).to(self.device)
                 C_val = base_reward_model.get_c(final_x)
@@ -525,14 +528,15 @@ class Acc_AdjointMatchingFineTuner:
         step = 0
         total_loss = 0.0
         total_reward = 0.0
+        pure_reward = 0.0
         total_C = 0.0
         Lambda_C = 0.0
         #total_var_reward = 0.0
 
        
-        #conds = next(dataloader)
+        conds = next(dataloader)
         while step < self.config.finetune_steps:
-             conds = next(dataloader)
+             #conds = next(dataloader)
              with self.accelerator.accumulate(self.new_score_net):
                 loss, avg_reward, avg_C = self.step(conds, reward_model)
                 self.optimizer.step()
@@ -548,9 +552,11 @@ class Acc_AdjointMatchingFineTuner:
                 total_C += avg_C
                 Lambda_C += avg_C
 
-                #current_lr = self.optimizer.param_groups[0]['lr']
+
                 Reward = avg_reward + (self.Lam.get_lam() * avg_C)
                 self.reward_tracker.log_reward(step, Reward, avg_C)
+                pure_reward += Reward
+            
                 
                 if step % self.config.update_lambda_every == 0:
                      self.Lam.update(Lambda_C / self.config.update_lambda_every) 
@@ -564,11 +570,13 @@ class Acc_AdjointMatchingFineTuner:
                     print('---------------------------------------------------------')
                     if(step == 0):
                          print(f"step: {step}, loss {total_loss}")
-                         print(f"step: {step}, reward {total_reward }")
+                         print(f"step: {step}, total reward {total_reward}")
+                         print(f"step: {step}, reward {pure_reward }")
                          print(f"step: {step}, constraint {total_C}")
                     else:
                          print(f"step: {step}, loss {total_loss / self.config.log_freq}")
-                         print(f"step: {step}, reward {total_reward / self.config.log_freq}")
+                         print(f"step: {step}, total reward {total_reward / self.config.log_freq}")
+                         print(f"step: {step}, reward {pure_reward / self.config.log_freq}")
                          print(f"step: {step}, constraint {total_C / self.config.log_freq}")
                     total_loss = 0.0
                     total_reward = 0.0

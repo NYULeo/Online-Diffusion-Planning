@@ -314,7 +314,7 @@ if __name__ == "__main__":
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
     #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 30, eta = 0.8, episode_length  = 2000, critic = False, checkpoint_steps = 990000, render = True)
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 10, eta = 0.8, episode_length  = 3000, critic = False, checkpoint_steps = 1000000, render = True)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 200, num_karras = 0, eta = 0.8, episode_length  = 3000, critic = False, checkpoint_steps = 1000000, render = True)
 
     #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 200, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1000000, num_envs = 50)
   
