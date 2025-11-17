@@ -260,8 +260,8 @@ for batch in dataloader:
      exit()
 
 """
-import torch
-a = [torch.tensor(4.0), torch.tensor(5.0)]
-a = torch.stack(a)
-print(a)
+import minari
+dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download = True)
+print(dataset.ref_min_score)
+
 
