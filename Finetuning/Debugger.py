@@ -141,7 +141,13 @@ print("Done! Heatmap saved with walls + start + goal.")
 
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: matplotlib not available ({e}). Plotting will be skipped.")
+    MATPLOTLIB_AVAILABLE = False
+    plt = None
 import minari
 from Pretrain.Rewards.nets import Reward
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
@@ -210,32 +216,41 @@ with torch.no_grad():
 reward_map = reward_map.reshape(RESOLUTION, RESOLUTION)
 
 # ================== Plot Heatmap ==================
-print("Creating heatmap...")
-fig, ax = plt.subplots(figsize=(10, 10))
+if MATPLOTLIB_AVAILABLE:
+    print("Creating heatmap...")
+    fig, ax = plt.subplots(figsize=(10, 10))
 
-# Plot heatmap
-im = ax.imshow(reward_map, extent=[-1, 11, -1, 11], origin='lower', 
-               cmap='RdYlBu_r', interpolation='bilinear')
-plt.colorbar(im, ax=ax, label='Reward')
+    # Plot heatmap
+    im = ax.imshow(reward_map, extent=[-1, 11, -1, 11], origin='lower', 
+                   cmap='RdYlBu_r', interpolation='bilinear')
+    plt.colorbar(im, ax=ax, label='Reward')
 
-# Draw walls
-for wall in env.maze.walls:
-    (x0, y0), (x1, y1) = wall
-    ax.plot([x0, x1], [y0, y1], 'k-', linewidth=3)
+    # Draw walls
+    for wall in env.maze.walls:
+        (x0, y0), (x1, y1) = wall
+        ax.plot([x0, x1], [y0, y1], 'k-', linewidth=3)
 
-# Mark start position
-ax.plot(1.0, 1.0, 'go', markersize=15, label='Start', markeredgecolor='black', markeredgewidth=2)
+    # Mark start position
+    ax.plot(1.0, 1.0, 'go', markersize=15, label='Start', markeredgecolor='black', markeredgewidth=2)
 
-# Mark goal position
-ax.plot(GOAL[0], GOAL[1], 'y*', markersize=20, label='Goal', markeredgecolor='black', markeredgewidth=1)
+    # Mark goal position
+    ax.plot(GOAL[0], GOAL[1], 'y*', markersize=20, label='Goal', markeredgecolor='black', markeredgewidth=1)
 
-ax.set_xlabel('X position')
-ax.set_ylabel('Y position')
-ax.set_title(f'Reward Heatmap (Step {STEP})')
-ax.legend()
-ax.grid(True, alpha=0.3)
+    ax.set_xlabel('X position')
+    ax.set_ylabel('Y position')
+    ax.set_title(f'Reward Heatmap (Step {STEP})')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
 
-plt.tight_layout()
-plt.savefig(OUTPUT_FILE, dpi=150, bbox_inches='tight')
-print(f"Heatmap saved to {OUTPUT_FILE}")
-plt.show()
+    plt.tight_layout()
+    plt.savefig(OUTPUT_FILE, dpi=150, bbox_inches='tight')
+    print(f"Heatmap saved to {OUTPUT_FILE}")
+    plt.show()
+else:
+    print("Skipping plotting due to matplotlib import error.")
+    print(f"Reward map statistics:")
+    print(f"  Min: {reward_map.min():.4f}, Max: {reward_map.max():.4f}, Mean: {reward_map.mean():.4f}")
+    print(f"  Shape: {reward_map.shape}")
+    # Save raw data as numpy array instead
+    np.save(OUTPUT_FILE.replace('.png', '.npy'), reward_map)
+    print(f"Reward map saved as numpy array to {OUTPUT_FILE.replace('.png', '.npy')}")
