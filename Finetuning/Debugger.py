@@ -159,6 +159,7 @@ from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrain
 STEP = 44000                    # Checkpoint step to load
 RESOLUTION = 256                # Grid resolution (256x256 is fast and looks good)
 BATCH_SIZE = 16384              # Batch size for efficient processing
+MAX_GOALS_TO_PLOT = 4           # Plot only the first few unique goals
 OUTPUT_FILE = f"reward_heatmap_step{STEP}_all_goals.png"
 
 # ================== Load Environment ==================
@@ -190,11 +191,16 @@ for episode in dataset:
     if episode_count >= max_episodes:
         break
 
-# Convert to numpy array
+# Convert to numpy array (limit to a few goals for clarity)
 if len(all_goals) == 0:
     raise ValueError("No goals found in dataset! Check dataset structure.")
-    
-GOALS = np.array(list(all_goals))
+
+goal_list = sorted(all_goals)
+if len(goal_list) > MAX_GOALS_TO_PLOT:
+    print(f"Found {len(goal_list)} unique goals, limiting to first {MAX_GOALS_TO_PLOT}.")
+    goal_list = goal_list[:MAX_GOALS_TO_PLOT]
+
+GOALS = np.array(goal_list)
 print(f"Found {len(GOALS)} unique goals:")
 for i, goal in enumerate(GOALS):
     print(f"  Goal {i+1}: [{goal[0]:.2f}, {goal[1]:.2f}]")
