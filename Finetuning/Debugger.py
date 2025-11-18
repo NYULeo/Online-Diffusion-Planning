@@ -1,4 +1,8 @@
-
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(project_root)
 
 """
     @torch.no_grad()
@@ -259,9 +263,210 @@ for batch in dataloader:
         #print(f"Collected rewards: mean={all_rewards.mean().item():.4f}, shape={all_rewards.shape}")
      exit()
 
-"""
+
+
+
 import minari
-dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download = True)
-print(dataset.ref_min_score)
+import numpy as np
+import torch
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 
+from Pretrain.Rewards.nets import Reward
+from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 
+# ================== Load dataset & env ==================
+dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
+env = dataset.recover_environment()
+env = env.unwrapped  # PointMaze2DEnv
+
+# ================== Load your pretrained reward model ==================
+reward_model_state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', 44000, 'medium')
+reward_model = Reward(obs_dim, act_dim)
+reward_model.load_state_dict(reward_model_state_dict)
+reward_model.eval()
+
+stats = get_pretrained_reward_stats(name)  # contains .norm_obs() method
+
+# ================== Grid setup ==================
+resolution = 200
+x_min, x_max = -1, 11
+y_min, y_max = -1, 11
+
+x = np.linspace(x_min, x_max, resolution)
+y = np.linspace(y_min, y_max, resolution)
+X, Y = np.meshgrid(x, y)
+
+fixed_goal = np.array([9.0, 9.0])   # standard goal for medium-v2
+
+obs_grid = np.column_stack([
+    X.ravel(),
+    Y.ravel(),
+    np.full_like(X.ravel(), fixed_goal[0]),
+    np.full_like(X.ravel(), fixed_goal[1])
+]).astype(np.float32)   # (N, 4)
+
+obs_grid = torch.from_numpy(obs_grid)
+
+# ================== Max-action search ==================
+n_act = 21  # slightly denser = smoother heatmap
+acts = np.linspace(-1.0, 1.0, n_act)
+AX, AY = np.meshgrid(acts, acts)
+candidate_acts = np.column_stack([AX.ravel(), AY.ravel()]).astype(np.float32)
+candidate_acts = torch.from_numpy(candidate_acts).float()
+
+N, A = len(obs_grid), len(candidate_acts)
+
+with torch.no_grad():
+    # Repeat observations and actions
+    obs_rep = obs_grid.unsqueeze(1).repeat(1, A, 1).reshape(N * A, 4)   # (N*A, 4)
+    act_rep = candidate_acts.unsqueeze(0).repeat(N, 1, 1).reshape(N * A, 2)  # (N*A, 2)
+
+    obs_rep = torch.from_numpy(obs_rep) if not torch.is_tensor(obs_rep) else obs_rep
+    act_rep = torch.from_numpy(act_rep) if not torch.is_tensor(act_rep) else act_rep
+
+    # === CRITICAL: apply your exact normalization ===
+    obs_rep = stats.norm_obs(obs_rep)   # <-- this is what your model expects!
+    act_rep = act_rep.float()
+    obs_rep = obs_rep.float()
+
+    rewards_flat = reward_model(obs_rep, act_rep)           # (N*A,)
+    rewards_grid = rewards_flat.reshape(N, A)
+    best_rewards = rewards_grid.max(dim=1)[0].cpu().numpy()
+
+reward_map = best_rewards.reshape(resolution, resolution)
+
+# ================== Plotting ==================
+plt.figure(figsize=(12, 11))
+cmap = LinearSegmentedColormap.from_list('reward', ['navy', 'royalblue', 'white', 'orange', 'red'], N=256)
+im = plt.imshow(reward_map, extent=[x_min, x_max, y_min, y_max],
+                cmap=cmap, origin='lower', interpolation='bilinear')
+
+# === FIXED: correct attribute for walls in current d4rl-pointmaze2d ===
+for wall in env.maze.walls:        # <-- this is the correct one (not layout_walls)
+    (x0, y0), (x1, y1) = wall
+    plt.plot([x0, x1], [y0, y1], color='black', linewidth=4, solid_capstyle='butt')
+
+# Start & goal
+plt.scatter(1.0, 1.0, c='lime', s=400, marker='o', edgecolor='black', linewidth=2, zorder=5, label='Start')
+plt.scatter(fixed_goal[0], fixed_goal[1], c='yellow', s=500, marker='*', edgecolor='black', linewidth=3, zorder=5, label='Goal')
+
+plt.colorbar(im, label='Reward (max over actions)', shrink=0.82)
+plt.title(f'Reward Model Heatmap — pointmaze/medium-v2\nIteration 44000 | Goal @ (9,9)', fontsize=16)
+plt.xlabel('X')
+plt.ylabel('Y')
+plt.legend(loc='upper left')
+plt.axis('equal')
+plt.xlim(x_min, x_max)
+plt.ylim(y_min, y_max)
+plt.tight_layout()
+plt.show()
+
+"""
+
+# save_reward_heatmap.py
+import minari
+import numpy as np
+import torch
+import matplotlib
+matplotlib.use('Agg')                # ← crucial: no display needed
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+from Pretrain.Rewards.nets import Reward
+from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
+
+# ================== Config ==================
+DATASET_NAME = 'D4RL/pointmaze/medium-v2'
+CHECKPOINT_STEP = 44000
+GOAL = np.array([9.0, 9.0])                     # change if you want another goal
+RESOLUTION = 400                                # 400×400 = publication quality
+OUTPUT_PATH = f"reward_heatmap_medium_step{CHECKPOINT_STEP}_goal{GOAL[0]}_{GOAL[1]}.png"
+BATCH_SIZE = 8192                               # ← prevents OOM on low-memory machines
+
+print(f"Loading dataset {DATASET_NAME}...")
+dataset = minari.load_dataset(DATASET_NAME, download=True)
+env = dataset.recover_environment().unwrapped
+
+print("Loading reward model...")
+reward_model_state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', CHECKPOINT_STEP, 'medium')
+reward_model = Reward(obs_dim, act_dim)
+reward_model.load_state_dict(reward_model_state_dict)
+reward_model.eval()
+stats = get_pretrained_reward_stats(name)
+
+# ================== Grid ==================
+x_min, x_max = -1, 11
+y_min, y_max = -1, 11
+x = np.linspace(x_min, x_max, RESOLUTION)
+y = np.linspace(y_min, y_max, RESOLUTION)
+X, Y = np.meshgrid(x, y)
+
+obs_base = np.column_stack([
+    X.ravel(),
+    Y.ravel(),
+    np.full(RESOLUTION*RESOLUTION, GOAL[0]),
+    np.full(RESOLUTION*RESOLUTION, GOAL[1])
+]).astype(np.float32)
+
+# ================== Dense action grid (for max-action reward) ==================
+n_act = 25
+acts = np.linspace(-1.0, 1.0, n_act)
+AX, AY = np.meshgrid(acts, acts)
+candidate_acts = np.column_stack([AX.ravel(), AY.ravel()]).astype(np.float32)
+acts_tensor = torch.from_numpy(candidate_acts)
+
+print("Evaluating reward model (this may take 10-30 seconds)...")
+best_rewards = np.full(RESOLUTION*RESOLUTION, -1e10)
+
+with torch.no_grad():
+    for i in range(0, len(obs_base), BATCH_SIZE):
+        batch_obs = torch.from_numpy(obs_base[i:i+BATCH_SIZE])
+        batch_size = len(batch_obs)
+
+        # Repeat actions for this batch
+        obs_rep = batch_obs.unsqueeze(1).repeat(1, len(acts_tensor), 1).reshape(-1, 4)
+        act_rep = acts_tensor.unsqueeze(0).repeat(batch_size, 1, 1).reshape(-1, 2)
+
+        obs_rep = stats.norm_obs(obs_rep)
+        obs_rep = obs_rep.float()
+        act_rep = act_rep.float()
+        rewards = reward_model(obs_rep, act_rep).cpu().numpy()
+        rewards = rewards.reshape(batch_size, len(acts_tensor))
+
+        best_in_batch = rewards.max(axis=1)
+        best_rewards[i:i+batch_size] = np.maximum(best_rewards[i:i+batch_size], best_in_batch)
+
+        if (i // BATCH_SIZE) % 10 == 0:
+            print(f"   → processed {i}/{len(obs_base)} positions")
+
+reward_map = best_rewards.reshape(RESOLUTION, RESOLUTION)
+print("Evaluation done. Plotting...")
+
+# ================== Plot & Save ==================
+plt.figure(figsize=(12, 11), dpi=300)
+cmap = LinearSegmentedColormap.from_list('reward', ['navy', 'blue', 'white', 'orange', 'red'], N=256)
+im = plt.imshow(reward_map, extent=[x_min, x_max, y_min, y_max],
+                cmap=cmap, origin='lower', interpolation='bilinear')
+
+# Walls
+for wall in env.maze.walls:
+    (x0, y0), (x1, y1) = wall
+    plt.plot([x0, x1], [y0, y1], color='black', linewidth=3, solid_capstyle='butt')
+
+# Markers
+plt.scatter(1.0, 1.0, c='lime', s=500, marker='o', edgecolor='black', linewidth=3, zorder=5)
+plt.scatter(GOAL[0], GOAL[1], c='yellow', s=700, marker='*', edgecolor='black', linewidth=3, zorder=5)
+
+plt.colorbar(im, shrink=0.8, label='Max-action reward')
+plt.title(f'Reward Model Heatmap\npointmaze/medium-v2 | step {CHECKPOINT_STEP} | goal @ ({GOAL[0]}, {GOAL[1]})', fontsize=16)
+plt.xlabel('X')
+plt.ylabel('Y')
+plt.axis('equal')
+plt.xlim(x_min, x_max)
+plt.ylim(y_min, y_max)
+plt.tight_layout()
+
+print(f"Saving to {OUTPUT_PATH} ...")
+plt.savefig(OUTPUT_PATH, dpi=300, bbox_inches='tight')
+plt.close()
+print("Done! Heatmap saved.")
