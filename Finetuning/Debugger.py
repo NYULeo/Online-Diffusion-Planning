@@ -142,6 +142,8 @@ print("Done! Heatmap saved with walls + start + goal.")
 import numpy as np
 import torch
 try:
+    import matplotlib
+    matplotlib.use('Agg')  # Non-interactive backend for headless servers
     import matplotlib.pyplot as plt
     MATPLOTLIB_AVAILABLE = True
 except ImportError as e:
@@ -161,7 +163,7 @@ OUTPUT_FILE = f"reward_heatmap_step{STEP}.png"
 # ================== Load Environment ==================
 print("Loading environment...")
 dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
-env = dataset.recover_environment()
+env = dataset.recover_environment().unwrapped  # Unwrap to access maze attribute
 
 # ================== Load Reward Model ==================
 print(f"Loading reward model (step {STEP})...")
@@ -243,14 +245,21 @@ if MATPLOTLIB_AVAILABLE:
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig(OUTPUT_FILE, dpi=150, bbox_inches='tight')
-    print(f"Heatmap saved to {OUTPUT_FILE}")
-    plt.show()
+    
+    # Ensure we save to the project root directory
+    save_path = os.path.join(project_root, OUTPUT_FILE) if not os.path.isabs(OUTPUT_FILE) else OUTPUT_FILE
+    plt.savefig(save_path, dpi=150, bbox_inches='tight')
+    print(f"Heatmap saved to {save_path}")
+    
+    # Close figure to free memory (good practice, especially on servers)
+    plt.close()
+    # Note: plt.show() is not called - script runs headless and only saves to file
 else:
     print("Skipping plotting due to matplotlib import error.")
     print(f"Reward map statistics:")
     print(f"  Min: {reward_map.min():.4f}, Max: {reward_map.max():.4f}, Mean: {reward_map.mean():.4f}")
     print(f"  Shape: {reward_map.shape}")
     # Save raw data as numpy array instead
-    np.save(OUTPUT_FILE.replace('.png', '.npy'), reward_map)
-    print(f"Reward map saved as numpy array to {OUTPUT_FILE.replace('.png', '.npy')}")
+    npy_path = os.path.join(project_root, OUTPUT_FILE.replace('.png', '.npy'))
+    np.save(npy_path, reward_map)
+    print(f"Reward map saved as numpy array to {npy_path}")
