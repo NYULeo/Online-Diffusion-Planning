@@ -154,7 +154,7 @@ import minari
 from Pretrain.Rewards.nets import Reward
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 
-
+"""
 # ================== Configuration ==================
 STEP = 44000                    # Checkpoint step to load
 GOAL = np.array([9.0, 9.0])     # Goal position [x, y]
@@ -302,32 +302,69 @@ else:
     np.save(npy_path, reward_map)
     print(f"Reward map saved as numpy array to {npy_path}")
 
-"""
-# Debug: Inspect maze object attributes
-dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
-env = dataset.recover_environment().unwrapped
-
-print("Maze object type:", type(env.maze))
-print("\nAll maze attributes:")
-for attr in dir(env.maze):
-    if not attr.startswith('__'):
-        try:
-            value = getattr(env.maze, attr)
-            if not callable(value):
-                print(f"  {attr}: {type(value)} = {value}")
-            else:
-                print(f"  {attr}: method")
-        except:
-            print(f"  {attr}: (could not access)")
-
-# Try to find walls-related attributes
-print("\nSearching for walls-related attributes:")
-for attr in dir(env.maze):
-    if 'wall' in attr.lower() or 'layout' in attr.lower() or 'structure' in attr.lower():
-        try:
-            value = getattr(env.maze, attr)
-            print(f"  Found: {attr} = {value}")
-        except:
-            print(f"  Found: {attr} (could not access)")
 
 """
+
+@torch.no_grad()
+def plot_multi_goal_reward_heatmap(reward_model, stats, resolution=350):
+    # Four corner goals in PointMaze-Medium
+    all_goals = np.array([
+        [9.0, 9.0],   # top-right
+        [9.0, 1.0],   # bottom-right
+        [1.0, 9.0],   # top-left
+        [1.0, 1.0],   # bottom-left
+    ])
+    
+    x = np.linspace(-1, 11, resolution)
+    y = np.linspace(-1, 11, resolution)
+    X, Y = np.meshgrid(x, y)
+    
+    fig, axes = plt.subplots(2, 2, figsize=(16, 16))
+    axes = axes.ravel()
+    
+    for idx, goal in enumerate(all_goals):
+        # Build observation grid with this goal
+        obs_grid = np.stack([
+            X.ravel(),
+            Y.ravel(),
+            np.full(resolution**2, goal[0]),
+            np.full(resolution**2, goal[1])
+        ], axis=1).astype(np.float32)
+        
+        obs_tensor = torch.from_numpy(obs_grid)
+        obs_norm = stats.norm_obs(obs_tensor)
+        
+        # Max over actions (same as your original code)
+        actions = np.linspace(-1.0, 1.0, 9)
+        action_grid = np.array([[ax, ay] for ax in actions for ay in actions])
+        act_tensor = torch.from_numpy(action_grid).float()
+        
+        rewards = []
+        batch_size = 8192
+        for i in range(0, len(obs_norm), batch_size):
+            obs_b = obs_norm[i:i+batch_size]
+            obs_rep = obs_b.unsqueeze(1).repeat(1, len(action_grid), 1)
+            act_rep = act_tensor.unsqueeze(0).repeat(obs_b.shape[0], 1, 1)
+            r = reward_model(obs_rep.flatten(0,1), act_rep.flatten(0,1))
+            rewards.append(r.view(obs_b.shape[0], -1).max(dim=1)[0])
+        
+        reward_map = torch.cat(rewards).cpu().numpy().reshape(resolution, resolution)
+        
+        im = axes[idx].imshow(reward_map, extent=[-1,11,-1,11], origin='lower', cmap='viridis')
+        axes[idx].set_title(f'Goal at {goal}', fontsize=14)
+        plt.colorbar(im, ax=axes[idx], shrink=0.8)
+    
+    plt.tight_layout()
+    plt.savefig("reward_heatmap_all_4_goals.png", dpi=150)
+    plt.show()
+
+
+
+# ================== Load Reward Model ==================
+print(f"Loading reward model (step {44000})...")
+state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', 44000, 'medium')
+model = Reward(obs_dim, act_dim)
+model.load_state_dict(state_dict)
+model.eval()
+stats = get_pretrained_reward_stats(name)
+plot_multi_goal_reward_heatmap(model, stats)
