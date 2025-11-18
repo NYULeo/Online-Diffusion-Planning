@@ -156,10 +156,12 @@ from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrain
 
 
 # ================== Configuration ==================
+# ================== Configuration ==================
 STEP = 44000                    # Checkpoint step to load
 RESOLUTION = 256                # Grid resolution (256x256 is fast and looks good)
 BATCH_SIZE = 16384              # Batch size for efficient processing
-MAX_GOALS_TO_PLOT = 4           # Plot only the first few unique goals
+MAX_GOALS_TO_PLOT = 10           # Plot only the first few unique goals
+GRID_MARGIN = 0.5               # Extra padding around observed positions for plotting
 OUTPUT_FILE = f"reward_heatmap_step{STEP}_all_goals.png"
 
 # ================== Load Environment ==================
@@ -168,16 +170,25 @@ dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
 env = dataset.recover_environment().unwrapped  # Unwrap to access maze attribute
 
 # ================== Extract All Unique Goals from Dataset ==================
-print("Extracting all unique goals from dataset...")
+print("Extracting all unique goals and position bounds from dataset...")
 all_goals = set()
 episode_count = 0
 max_episodes = 200  # Check first 200 episodes to find all goals
+pos_min = np.array([np.inf, np.inf], dtype=np.float32)
+pos_max = np.array([-np.inf, -np.inf], dtype=np.float32)
+first_start = None
 
 for episode in dataset:
     # Get goal from observations (goals are in obs[2:4] for pointmaze)
     # Observations are stored in a dictionary with key 'observation'
     obs = episode.observations['observation']
     if len(obs) > 0:
+        positions = obs[:, :2]
+        pos_min = np.minimum(pos_min, positions.min(axis=0))
+        pos_max = np.maximum(pos_max, positions.max(axis=0))
+        if first_start is None:
+            first_start = positions[0]
+
         # Goals are typically in the observation space [x, y, goal_x, goal_y]
         goals = obs[:, 2:4]  # Extract goal positions
         unique_goals_episode = np.unique(goals, axis=0)
@@ -205,6 +216,23 @@ print(f"Found {len(GOALS)} unique goals:")
 for i, goal in enumerate(GOALS):
     print(f"  Goal {i+1}: [{goal[0]:.2f}, {goal[1]:.2f}]")
 
+# Determine plotting bounds based on observed positions
+if np.isinf(pos_min).any() or np.isinf(pos_max).any():
+    raise ValueError("Could not determine position bounds from dataset.")
+
+grid_min = pos_min - GRID_MARGIN
+grid_max = pos_max + GRID_MARGIN
+print(f"Using grid bounds X[{grid_min[0]:.2f}, {grid_max[0]:.2f}] "
+      f"Y[{grid_min[1]:.2f}, {grid_max[1]:.2f}]")
+
+# Determine start position
+if hasattr(env.maze, 'start_pos'):
+    start_pos = np.array(env.maze.start_pos[:2], dtype=np.float32)
+elif first_start is not None:
+    start_pos = np.array(first_start, dtype=np.float32)
+else:
+    start_pos = np.array([1.0, 1.0], dtype=np.float32)
+
 # ================== Load Reward Model ==================
 print(f"Loading reward model (step {STEP})...")
 state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', STEP, 'medium')
@@ -214,9 +242,9 @@ model.eval()
 stats = get_pretrained_reward_stats(name)
 
 # ================== Create Grid ==================
-print(f"Creating {RESOLUTION}x{RESOLUTION} grid...")
-x = np.linspace(-1, 11, RESOLUTION)
-y = np.linspace(-1, 11, RESOLUTION)
+print(f"Creating {RESOLUTION}x{RESOLUTION} grid within observed bounds...")
+x = np.linspace(grid_min[0], grid_max[0], RESOLUTION)
+y = np.linspace(grid_min[1], grid_max[1], RESOLUTION)
 X, Y = np.meshgrid(x, y, indexing='xy')
 
 # ================== Evaluate Rewards for All Goals ==================
@@ -282,7 +310,10 @@ if MATPLOTLIB_AVAILABLE:
     fig, ax = plt.subplots(figsize=(12, 12))
 
     # Plot heatmap
-    im = ax.imshow(reward_map, extent=[-1, 11, -1, 11], origin='lower', 
+    im = ax.imshow(
+        reward_map,
+        extent=[grid_min[0], grid_max[0], grid_min[1], grid_max[1]],
+        origin='lower',
                    cmap='RdYlBu_r', interpolation='bilinear')
     plt.colorbar(im, ax=ax, label='Reward')
 
@@ -325,8 +356,15 @@ if MATPLOTLIB_AVAILABLE:
                     ax.plot(corners[:, 0], corners[:, 1], 'k-', linewidth=2, zorder=10)
 
     # Mark start position
-    ax.plot(1.0, 1.0, 'go', markersize=15, label='Start', markeredgecolor='black', 
-            markeredgewidth=2, zorder=20)
+    ax.plot(
+        start_pos[0],
+        start_pos[1],
+        'go',
+        markersize=15,
+        label='Start',
+        markeredgecolor='black',
+        markeredgewidth=2,
+        zorder=20)
 
     # Mark all goal positions
     print(f"Plotting {len(GOALS)} goals...")
@@ -344,6 +382,8 @@ if MATPLOTLIB_AVAILABLE:
     ax.legend(loc='upper right', fontsize=10)
     ax.grid(True, alpha=0.3)
     ax.set_aspect('equal')
+    ax.set_xlim(grid_min[0], grid_max[0])
+    ax.set_ylim(grid_min[1], grid_max[1])
 
     plt.tight_layout()
     
