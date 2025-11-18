@@ -309,6 +309,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 
+
 @torch.no_grad()
 def plot_pointmaze_with_reward_heatmap(
     reward_model, 
@@ -333,24 +334,32 @@ def plot_pointmaze_with_reward_heatmap(
 
     obs_tensor = torch.from_numpy(obs_grid).to(device)
     obs_norm = stats.norm_obs(obs_tensor)
-   
 
     # Evaluate max reward over 25 actions (same as your original)
     actions = np.linspace(-1.0, 1.0, 5)
     action_grid = np.array([[ax, ay] for ax in actions for ay in actions], dtype=np.float32)
-    act_tensor = torch.from_numpy(action_grid).to(device)
+    act_tensor = torch.from_numpy(action_grid).to(device)  # (25, 2)
 
+    # Batching to avoid memory issues
+    batch_size = 8192
     rewards = []
-    batch = 8192
-    obs_norm = obs_norm.float()
-    act_tensor = act_tensor.float()
-    for i in range(0, len(obs_norm), batch):
-        o = obs_norm[i:i+batch]
-        o_rep = o.unsqueeze(1).repeat(1, len(action_grid), 1).reshape(-1, o.shape[-1])
-        a_rep = act_tensor.unsqueeze(0).repeat(o.shape[0], 1).reshape(-1, 2)
-        r = reward_model(o_rep, a_rep)
+    for i in range(0, len(obs_norm), batch_size):
+        o = obs_norm[i:i+batch_size]  # (batch, 4)
+        num_actions = len(action_grid)
+        
+        # Fixed repeat: repeat in BOTH batch and action dimensions
+        o_rep = o.unsqueeze(1).repeat(1, num_actions, 1).reshape(-1, o.shape[-1])  # (batch*25, 4)
+        a_rep = act_tensor.unsqueeze(0).repeat(o.shape[0], num_actions, 1).reshape(-1, 2)  # (batch*25, 2) — fixed!
+        
+        # Model call
+        o_rep = o_rep.float()
+        a_rep = a_rep.float()
+        r = reward_model(o_rep, a_rep)  # (batch*25,)
+        
+        # Max over actions per position
         r = r.view(o.shape[0], -1).max(dim=1)[0]
         rewards.append(r.cpu())
+    
     reward_map = torch.cat(rewards).numpy().reshape(resolution, resolution)
 
     # === Plot ===
