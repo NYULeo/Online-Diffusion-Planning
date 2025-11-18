@@ -174,7 +174,8 @@ max_episodes = 200  # Check first 200 episodes to find all goals
 
 for episode in dataset:
     # Get goal from observations (goals are in obs[2:4] for pointmaze)
-    obs = episode.observations
+    # Observations are stored in a dictionary with key 'observation'
+    obs = episode.observations['observation']
     if len(obs) > 0:
         # Goals are typically in the observation space [x, y, goal_x, goal_y]
         goals = obs[:, 2:4]  # Extract goal positions
