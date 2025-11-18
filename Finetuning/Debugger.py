@@ -237,17 +237,28 @@ if MATPLOTLIB_AVAILABLE:
     
     # Convert maze_map to wall segments
     # Each cell in maze_map represents a wall cell if value is 1
+    # Try to use the method, fallback to manual calculation
     for row in range(map_height):
         for col in range(map_width):
             if maze_map[row][col] == 1:  # This is a wall cell
-                # Convert cell coordinates to world coordinates
-                # Get the center of the cell
-                cell_center = env.maze.cell_rowcol_to_xy(row, col)
-                # Handle both numpy array and tuple/list returns
-                x_center, y_center = cell_center[0], cell_center[1]
+                # Try to convert cell coordinates to world coordinates
+                try:
+                    # Try using the method if it exists
+                    if hasattr(env.maze, 'cell_rowcol_to_xy'):
+                        cell_center = env.maze.cell_rowcol_to_xy(row, col)
+                        x_center, y_center = float(cell_center[0]), float(cell_center[1])
+                    else:
+                        raise AttributeError("Method not available")
+                except:
+                    # Fallback: manual calculation based on maze structure
+                    # For pointmaze medium, the world coordinates range approximately from -2.5 to 2.5
+                    # Map is 8x8 cells, so each cell is about 0.625 units
+                    # But cell_size is 1, so we'll use a simpler approach
+                    # Center the map at origin, with cells starting from negative values
+                    x_center = (col - map_width / 2.0 + 0.5) * cell_size
+                    y_center = (map_height / 2.0 - row - 0.5) * cell_size
                 
                 # Draw a square representing the wall cell
-                # Cell size is typically 1.0 in world coordinates
                 half_cell = cell_size / 2.0
                 corners = [
                     [x_center - half_cell, y_center - half_cell],
