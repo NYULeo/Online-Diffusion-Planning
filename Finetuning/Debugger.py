@@ -161,7 +161,7 @@ OUTPUT_FILE = f"reward_heatmap_step{STEP}.png"
 # ================== Load Environment ==================
 print("Loading environment...")
 dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
-env = dataset.recover_environment().unwrapped
+env = dataset.recover_environment()
 
 # ================== Load Reward Model ==================
 print(f"Loading reward model (step {STEP})...")
