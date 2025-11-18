@@ -349,7 +349,7 @@ def plot_pointmaze_with_reward_heatmap(
         
         # Fixed repeat: repeat in BOTH batch and action dimensions
         o_rep = o.unsqueeze(1).repeat(1, num_actions, 1).reshape(-1, o.shape[-1])  # (batch*25, 4)
-        a_rep = act_tensor.unsqueeze(0).repeat(o.shape[0], num_actions, 1).reshape(-1, 2)  # (batch*25, 2) — fixed!
+        a_rep = act_tensor.unsqueeze(0).repeat(o.shape[0], 1, 1).reshape(-1, 2)  # (batch*25, 2) — fixed!
         
         # Model call
         o_rep = o_rep.float()
