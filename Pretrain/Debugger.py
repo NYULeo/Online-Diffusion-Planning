@@ -245,7 +245,112 @@ rewards = np.array(rewards)
 
 
 """
-dataset = minari.load_dataset('D4RL/kitchen/partial-v2',  download=True)
 
-print(minari.get_normalized_score(dataset, 0.8))
+
+
+
+
+
+"""
+import minari
+from minari.data_collector.episode_buffer import EpisodeBuffer
+from minari.dataset.step_data import StepData
+from minari.storage.local import delete_dataset
+import gymnasium as gym
+import numpy as np
+
+
+with open('./Pretrain/Rollouts/pointmaze/medium/Generated_trajs_Info.pkl', 'rb') as f:
+     trajs_info = pickle.load(f)
+trajs = trajs_info['trajs']
+
+
+
+data = get_dataset('pointmaze', 'medium')
+env = data.get_env(render_mode = None)
+episodes = []
+dat = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
+ref_min = dat.storage.metadata.get('ref_min_score')
+ref_max = dat.storage.metadata.get('ref_max_score')
+
+for traj_idx, traj in enumerate(trajs):
+    obs_seq = np.asarray(traj['observations'])
+    act_seq = np.asarray(traj['actions'])
+    rew_seq = np.asarray(traj['rewards'])
+
+    # Assume episode ends at last step; adjust if you know real truncations.
+    terminated_flags = np.zeros(len(rew_seq), dtype=bool)
+    truncated_flags = np.zeros(len(rew_seq), dtype=bool)
+    terminated_flags[-1] = True
+
+    buffer = EpisodeBuffer()
+    for t in range(len(rew_seq)):
+        step = StepData(
+               observation=obs_seq[t],
+               action=act_seq[t],
+               reward=float(rew_seq[t]),
+               terminated=bool(terminated_flags[t]),
+               truncated=bool(truncated_flags[t]),
+               info={}
+        )
+        buffer = buffer.add_step_data(step)
+    episodes.append(buffer)
+
+
+
+
+dataset = minari.create_dataset_from_buffers(
+    dataset_id=gen_dataset_id(None, 'my-rollout', 0),
+    buffer=episodes,
+    env=env,
+    ref_min_score=ref_min,
+    ref_max_score=ref_max,
+)
+
+raw_returns = np.array([np.sum(traj['rewards']) for traj in trajs])        # undiscounted
+# OR discounted (what 99% of papers report):
+gamma = 0.99
+disc_returns = np.array([
+    sum(r * (gamma ** i) for i, r in enumerate(traj['rewards']))
+    for traj in trajs
+])
+
+print(raw_returns)
+normalized_scores = minari.get_normalized_score(dataset, disc_returns.mean())
+print(normalized_scores)
+delete_dataset('my-rollout-v0')
+
+print(ref_min, ref_max)
+
+"""
+
+
+import minari
+import numpy as np
+import pickle
+
+# 1. Load your trajectories
+with open('./Pretrain/Rollouts/pointmaze/medium/Generated_trajs_Info.pkl', 'rb') as f:
+    trajs = pickle.load(f)['trajs']
+
+# 2. Get official references from Minari
+data = minari.load_dataset("D4RL/pointmaze/medium-v2")
+ref_min = data.storage.metadata.get('ref_min_score')      # ~17.66
+ref_max = data.storage.metadata.get('ref_max_score')      # ~361.05
+
+# 3. Count how many goals your agent reaches on average
+avg_goals = np.mean([np.sum(traj['rewards']) for traj in trajs])
+print(f"Average goals reached per episode: {avg_goals:.2f}")
+
+# 4. Convert to correct discounted return (4000-step episodes)
+avg_discounted_return = avg_goals * 66.8   # This is the only magic number you need
+
+# 5. Compute normalized score
+normalized_score = 100 * (avg_discounted_return - ref_min) / (ref_max - ref_min)
+
+# Final result
+print(f"Normalized score (pointmaze/medium-v2): {normalized_score:.2f}")
+
+
+
 
