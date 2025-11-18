@@ -345,6 +345,8 @@ def plot_multi_goal_reward_heatmap(reward_model, stats, resolution=350):
             obs_b = obs_norm[i:i+batch_size]
             obs_rep = obs_b.unsqueeze(1).repeat(1, len(action_grid), 1)
             act_rep = act_tensor.unsqueeze(0).repeat(obs_b.shape[0], 1, 1)
+            obs_rep = obs_rep.float()
+            act_rep = act_rep.float()
             r = reward_model(obs_rep.flatten(0,1), act_rep.flatten(0,1))
             rewards.append(r.view(obs_b.shape[0], -1).max(dim=1)[0])
         
