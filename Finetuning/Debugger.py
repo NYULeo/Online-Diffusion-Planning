@@ -372,9 +372,7 @@ with torch.no_grad():
             B = len(batch)
             obs_rep = batch.unsqueeze(1).repeat(1, len(acts_t), 1).reshape(-1, 4)
             act_rep = acts_t.unsqueeze(0).repeat(B, 1, 1).reshape(-1, 2)
-            obs_rep = obs_rep.float()
-            act_rep = act_rep.float()
-            r = model(stats.norm_obs(obs_rep), act_rep).cpu().numpy().reshape(B, -1)
+            r = model(stats.norm_obs(obs_rep).float(), act_rep.float()).cpu().numpy().reshape(B, -1)
             best[i:i+B] = r.max(axis=1)
         final_map = np.maximum(final_map, best.reshape(RESOLUTION, RESOLUTION))
 
