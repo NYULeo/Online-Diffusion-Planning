@@ -305,68 +305,93 @@ else:
 
 """
 
+import torch
+import matplotlib.pyplot as plt
+import numpy as np
+
 @torch.no_grad()
-def plot_multi_goal_reward_heatmap(reward_model, stats, resolution=350):
-    # Four corner goals in PointMaze-Medium
-    all_goals = np.array([
-        [9.0, 9.0],   # top-right
-        [9.0, 1.0],   # bottom-right
-        [1.0, 9.0],   # top-left
-        [1.0, 1.0],   # bottom-left
-    ])
-    
+def plot_pointmaze_with_reward_heatmap(
+    reward_model, 
+    stats, 
+    goal=np.array([9.0, 9.0]),   # change to see other goals
+    resolution=400
+):
+    device = next(reward_model.parameters()).device
+    reward_model.eval()
+
+    # Grid
     x = np.linspace(-1, 11, resolution)
     y = np.linspace(-1, 11, resolution)
     X, Y = np.meshgrid(x, y)
-    
-    fig, axes = plt.subplots(2, 2, figsize=(16, 16))
-    axes = axes.ravel()
-    
-    for idx, goal in enumerate(all_goals):
-        # Build observation grid with this goal
-        obs_grid = np.stack([
-            X.ravel(),
-            Y.ravel(),
-            np.full(resolution**2, goal[0]),
-            np.full(resolution**2, goal[1])
-        ], axis=1).astype(np.float32)
-        
-        obs_tensor = torch.from_numpy(obs_grid)
-        obs_norm = stats.norm_obs(obs_tensor)
-        
-        # Max over actions (same as your original code)
-        actions = np.linspace(-1.0, 1.0, 9)
-        action_grid = np.array([[ax, ay] for ax in actions for ay in actions])
-        act_tensor = torch.from_numpy(action_grid).float()
-        
-        rewards = []
-        batch_size = 8192
-        for i in range(0, len(obs_norm), batch_size):
-            obs_b = obs_norm[i:i+batch_size]
-            obs_rep = obs_b.unsqueeze(1).repeat(1, len(action_grid), 1)
-            act_rep = act_tensor.unsqueeze(0).repeat(obs_b.shape[0], 1, 1)
-            obs_rep = obs_rep.float()
-            act_rep = act_rep.float()
-            r = reward_model(obs_rep.flatten(0,1), act_rep.flatten(0,1))
-            rewards.append(r.view(obs_b.shape[0], -1).max(dim=1)[0])
-        
-        reward_map = torch.cat(rewards).cpu().numpy().reshape(resolution, resolution)
-        
-        im = axes[idx].imshow(reward_map, extent=[-1,11,-1,11], origin='lower', cmap='viridis')
-        axes[idx].set_title(f'Goal at {goal}', fontsize=14)
-        plt.colorbar(im, ax=axes[idx], shrink=0.8)
-    
+
+    # Build goal-conditioned observation grid
+    obs_grid = np.stack([
+        X.ravel(), Y.ravel(),
+        np.full(resolution**2, goal[0]),
+        np.full(resolution**2, goal[1])
+    ], axis=1).astype(np.float32)
+
+    obs_tensor = torch.from_numpy(obs_grid).to(device)
+    obs_norm = stats.norm_obs(obs_tensor)
+    obs_norm = obs_norm.float()
+    act_tensor = act_tensor.float()
+
+    # Evaluate max reward over 25 actions (same as your original)
+    actions = np.linspace(-1.0, 1.0, 5)
+    action_grid = np.array([[ax, ay] for ax in actions for ay in actions], dtype=np.float32)
+    act_tensor = torch.from_numpy(action_grid).to(device)
+
+    rewards = []
+    batch = 8192
+    for i in range(0, len(obs_norm), batch):
+        o = obs_norm[i:i+batch]
+        o_rep = o.unsqueeze(1).repeat(1, len(action_grid), 1).reshape(-1, o.shape[-1])
+        a_rep = act_tensor.unsqueeze(0).repeat(o.shape[0], 1).reshape(-1, 2)
+        r = reward_model(o_rep, a_rep)
+        r = r.view(o.shape[0], -1).max(dim=1)[0]
+        rewards.append(r.cpu())
+    reward_map = torch.cat(rewards).numpy().reshape(resolution, resolution)
+
+    # === Plot ===
+    plt.figure(figsize=(12, 11))
+    plt.imshow(reward_map, extent=[-1, 11, -1, 11], origin='lower', cmap='viridis', alpha=0.9)
+    plt.colorbar(label='Max Reward (over actions)', shrink=0.8)
+
+    # === Draw exact PointMaze-Medium walls (hard-coded from D4RL) ===
+    walls = [
+        # Horizontal walls
+        [(-1, 5), (5, 5)],     # top horizontal
+        [(5, 5), (5, 11)],     # right vertical from top
+        [(5, -1), (5, 5)],     # right vertical from bottom
+        [(-1, -1), (5, -1)],   # bottom horizontal
+        # Vertical walls
+        [(5, 5), (11, 5)],     # top-right horizontal
+        [(5, -1), (11, -1)],   # bottom-right horizontal
+    ]
+    for (x1, y1), (x2, y2) in walls:
+        plt.plot([x1, x2], [y1, y2], 'k-', linewidth=6)
+
+    # Start & Goal
+    plt.plot(1.0, 1.0, 'go', markersize=18, markeredgecolor='black', markeredgewidth=3, label='Start')
+    plt.plot(goal[0], goal[1], 'y*', markersize=25, markeredgecolor='black', markeredgewidth=2, label='Goal')
+
+    plt.xlim(-1, 11)
+    plt.ylim(-1, 11)
+    plt.xlabel('X position')
+    plt.ylabel('Y position')
+    plt.title(f'PointMaze-Medium Reward Heatmap\nGoal = {goal}', fontsize=16)
+    plt.legend()
+    plt.grid(False)
     plt.tight_layout()
-    plt.savefig("reward_heatmap_all_4_goals.png", dpi=150)
+    plt.savefig(f"pointmaze_medium_reward_heatmap_goal.png", dpi=150)
     plt.show()
 
-
-
-# ================== Load Reward Model ==================
 print(f"Loading reward model (step {44000})...")
 state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', 44000, 'medium')
 model = Reward(obs_dim, act_dim)
 model.load_state_dict(state_dict)
 model.eval()
 stats = get_pretrained_reward_stats(name)
-plot_multi_goal_reward_heatmap(model, stats)
+for gx, gy in [(9.0,9.0), (9.0,1.0), (1.0,9.0), (1.0,1.0)]:
+    plot_pointmaze_with_reward_heatmap(model, stats, goal=np.array([gx, gy]))
+
