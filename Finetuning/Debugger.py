@@ -220,13 +220,10 @@ for i, goal in enumerate(GOALS):
 if np.isinf(pos_min).any() or np.isinf(pos_max).any():
     raise ValueError("Could not determine position bounds from dataset.")
 
-goal_array = np.array(goal_list) if len(goal_list) > 0 else np.zeros((1, 2))
-combined_min = np.minimum(pos_min, goal_array.min(axis=0))
-combined_max = np.maximum(pos_max, goal_array.max(axis=0))
-grid_min = combined_min - GRID_MARGIN
-grid_max = combined_max + GRID_MARGIN
-print(f"Using grid bounds X[{grid_min[0]:.2f}, {grid_max[0]:.2f}] "
-      f"Y[{grid_min[1]:.2f}, {grid_max[1]:.2f}]")
+
+# Expand bounds a bit so the heatmap includes some context outside trajectories
+grid_min = (pos_min - GRID_MARGIN).astype(np.float32)
+grid_max = (pos_max + GRID_MARGIN).astype(np.float32)
 
 # Determine start position
 if hasattr(env.maze, 'start_pos'):
