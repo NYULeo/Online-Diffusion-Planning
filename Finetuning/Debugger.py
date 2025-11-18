@@ -333,8 +333,7 @@ def plot_pointmaze_with_reward_heatmap(
 
     obs_tensor = torch.from_numpy(obs_grid).to(device)
     obs_norm = stats.norm_obs(obs_tensor)
-    obs_norm = obs_norm.float()
-    act_tensor = act_tensor.float()
+   
 
     # Evaluate max reward over 25 actions (same as your original)
     actions = np.linspace(-1.0, 1.0, 5)
@@ -343,6 +342,8 @@ def plot_pointmaze_with_reward_heatmap(
 
     rewards = []
     batch = 8192
+    obs_norm = obs_norm.float()
+    act_tensor = act_tensor.float()
     for i in range(0, len(obs_norm), batch):
         o = obs_norm[i:i+batch]
         o_rep = o.unsqueeze(1).repeat(1, len(action_grid), 1).reshape(-1, o.shape[-1])
