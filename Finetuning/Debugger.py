@@ -292,6 +292,8 @@ else:
 
 # reward_heatmap_all_goals_CORRECT_WALLS.py
 # Works with current Minari/D4RL pointmaze2d (no .walls attribute)
+
+"""
 import os
 import numpy as np
 import torch
@@ -372,7 +374,10 @@ with torch.no_grad():
             B = len(batch)
             obs_rep = batch.unsqueeze(1).repeat(1, len(acts_t), 1).reshape(-1, 4)
             act_rep = acts_t.unsqueeze(0).repeat(B, 1, 1).reshape(-1, 2)
-            r = model(stats.norm_obs(obs_rep).float(), act_rep.float()).cpu().numpy().reshape(B, -1)
+            obs_norm = stats.norm_obs(obs_rep)
+            act = act_rep.float()
+            obs_norm = obs_norm.float()
+            r = model(obs_norm, act).cpu().numpy().reshape(B, -1)
             best[i:i+B] = r.max(axis=1)
         final_map = np.maximum(final_map, best.reshape(RESOLUTION, RESOLUTION))
 
@@ -424,3 +429,105 @@ else:
 
 print("Done!")
 
+"""
+# reward_heatmap_FAST.py   ← 15–20 seconds total
+import numpy as np, torch, minari, os
+try:
+    import matplotlib, matplotlib.pyplot as plt
+    matplotlib.use('Agg')
+    PLT = True
+except:
+    PLT = False
+
+from Pretrain.Rewards.nets import Reward
+from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
+
+# ================== FAST SETTINGS ==================
+STEP = 44000
+RES = 300                    # 300×300 = fast + still pretty
+ACTIONS = 15                 # 15×15 = 225 actions → plenty smooth
+BATCH = 32768
+OUT = f"heatmap_step{STEP}_fast.png"
+
+print("Loading env & model...")
+dataset = minari.load_dataset('D4RL/pointmaze/medium-v2')
+env = dataset.recover_environment().unwrapped
+
+# Load model
+sd, o_dim, a_dim, name = get_pretrained_reward('pointmaze', STEP, 'medium')
+model = Reward(o_dim, a_dim).eval()
+model.load_state_dict(sd)
+stats = get_pretrained_reward_stats(name)
+
+# Quick goal extraction (only first 10 unique)
+goals = set()
+for ep in dataset:
+    g = tuple(ep.observations['observation'][0, 2:4].round(5))
+    goals.add(g)
+    if len(goals) >= 10: break
+GOALS = np.array(list(goals))
+print(f"Using {len(GOALS)} goals: {GOALS[:,0]} , {GOALS[:,1]}")
+
+# Grid
+x = np.linspace(-1, 11, RES)
+y = np.linspace(-1, 11, RES)
+X, Y = np.meshgrid(x, y)
+
+# Action candidates
+acts = np.linspace(-1, 1, ACTIONS)
+ax, ay = np.meshgrid(acts, acts)
+act_grid = np.float32(np.stack([ax.ravel(), ay.ravel()], 1))
+act_t = torch.from_numpy(act_grid)
+
+# Final map
+final = np.full((RES, RES), -1e9)
+
+print("Evaluating (very fast)...")
+with torch.no_grad():
+    for goal in GOALS:
+        obs = np.stack([X.ravel(), Y.ravel(),
+                        np.full(RES*RES, goal[0]),
+                        np.full(RES*RES, goal[1])], 1).astype(np.float32)
+
+        best = np.full(RES*RES, -1e9)
+        for i in range(0, len(obs), BATCH):
+            batch = torch.from_numpy(obs[i:i+BATCH])
+            B = len(batch)
+            o = stats.norm_obs(batch.unsqueeze(1).repeat(1,ACTIONS*ACTIONS,1).reshape(-1,4))
+            a = act_t.unsqueeze(0).repeat(B,1,1).reshape(-1,2)
+            o = o.float()
+            a = a.float()
+            r = model(o, a).cpu().numpy().reshape(B, -1).max(1)
+            best[i:i+B] = np.maximum(best[i:i+B], r)
+        final = np.maximum(final, best.reshape(RES, RES))
+
+# Plot (super fast wall drawing)
+if PLT:
+    plt.figure(figsize=(10,10))
+    plt.imshow(final, extent=[-1,11,-1,11], origin='lower', cmap='RdYlBu_r')
+    
+    # Fast wall drawing using maze_map
+    for r in range(len(env.maze.maze_map)):
+        for c in range(len(env.maze.maze_map[0])):
+            if env.maze.maze_map[r][c] == 1:
+                xy = env.maze.cell_rowcol_to_xy(r, c)
+                s = env.maze.maze_size_scaling
+                plt.gca().add_patch(plt.Rectangle((xy[0]-s/2, xy[1]-s/2), s, s, color='black'))
+
+    plt.plot(1,1,'go',markersize=15,markeredgecolor='k',label='Start')
+    for i,g in enumerate(GOALS):
+        plt.plot(g[0],g[1],'y*',markersize=25,markeredgecolor='k')
+        plt.text(g[0]+0.3,g[1]+0.3,f'G{i+1}',fontweight='bold')
+    plt.colorbar(shrink=0.8).set_label('Reward')
+    plt.title(f"Reward Heatmap – Step {STEP} – {len(GOALS)} Goals")
+    plt.axis('equal')
+    plt.xlim(-1,11); plt.ylim(-1,11)
+    plt.tight_layout()
+    plt.savefig(OUT, dpi=200, bbox_inches='tight')
+    plt.close()
+    print(f"Saved {OUT} in ~15 seconds!")
+else:
+    np.save(OUT.replace(".png",".npy"), final)
+    print("Saved .npy")
+
+print("Done!")

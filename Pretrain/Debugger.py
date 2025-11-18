@@ -245,4 +245,9 @@ rewards = np.array(rewards)
 
 
 """
-
+X_MIN, X_MAX = -1.0, 11.0
+Y_MIN, Y_MAX = -1.0, 11.0
+RESOLUTION = 500
+x = np.linspace(X_MIN, X_MAX, RESOLUTION)
+y = np.linspace(Y_MIN, Y_MAX, RESOLUTION)
+X, Y = np.meshgrid(x, y)
