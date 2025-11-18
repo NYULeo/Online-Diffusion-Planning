@@ -6,7 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(project_root)
 from typing import Optional
-from Dataset import KitchenDataset, PointMazeDataset, get_dataset, get_env
+#from Dataset import KitchenDataset, PointMazeDataset, get_dataset, get_env
 import random
 from torch.utils.data import Dataset, DataLoader
 import torch
@@ -42,6 +42,7 @@ def load_model(reward_name, num_steps):
     return state_dict
 
 def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None):
+    from Dataset import KitchenDataset, PointMazeDataset
     if(dataset_name == 'kitchen'):
          data_1 = KitchenDataset('complete')
          data_2 = KitchenDataset('partial')
