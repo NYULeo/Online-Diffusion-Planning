@@ -154,6 +154,7 @@ import minari
 from Pretrain.Rewards.nets import Reward
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 
+
 # ================== Configuration ==================
 STEP = 44000                    # Checkpoint step to load
 GOAL = np.array([9.0, 9.0])     # Goal position [x, y]
@@ -227,10 +228,36 @@ if MATPLOTLIB_AVAILABLE:
                    cmap='RdYlBu_r', interpolation='bilinear')
     plt.colorbar(im, ax=ax, label='Reward')
 
-    # Draw walls
-    for wall in env.maze.walls:
-        (x0, y0), (x1, y1) = wall
-        ax.plot([x0, x1], [y0, y1], 'k-', linewidth=3)
+    # Draw walls from maze_map
+    # maze_map is a 2D grid where 1 = wall, 0 = open space
+    maze_map = env.maze.maze_map
+    map_height = env.maze.map_length
+    map_width = env.maze.map_width
+    cell_size = env.maze.maze_size_scaling
+    
+    # Convert maze_map to wall segments
+    # Each cell in maze_map represents a wall cell if value is 1
+    for row in range(map_height):
+        for col in range(map_width):
+            if maze_map[row][col] == 1:  # This is a wall cell
+                # Convert cell coordinates to world coordinates
+                # Get the center of the cell
+                cell_center = env.maze.cell_rowcol_to_xy(row, col)
+                # Handle both numpy array and tuple/list returns
+                x_center, y_center = cell_center[0], cell_center[1]
+                
+                # Draw a square representing the wall cell
+                # Cell size is typically 1.0 in world coordinates
+                half_cell = cell_size / 2.0
+                corners = [
+                    [x_center - half_cell, y_center - half_cell],
+                    [x_center + half_cell, y_center - half_cell],
+                    [x_center + half_cell, y_center + half_cell],
+                    [x_center - half_cell, y_center + half_cell],
+                    [x_center - half_cell, y_center - half_cell]  # Close the square
+                ]
+                corners = np.array(corners)
+                ax.plot(corners[:, 0], corners[:, 1], 'k-', linewidth=2)
 
     # Mark start position
     ax.plot(1.0, 1.0, 'go', markersize=15, label='Start', markeredgecolor='black', markeredgewidth=2)
@@ -263,3 +290,33 @@ else:
     npy_path = os.path.join(project_root, OUTPUT_FILE.replace('.png', '.npy'))
     np.save(npy_path, reward_map)
     print(f"Reward map saved as numpy array to {npy_path}")
+
+"""
+# Debug: Inspect maze object attributes
+dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
+env = dataset.recover_environment().unwrapped
+
+print("Maze object type:", type(env.maze))
+print("\nAll maze attributes:")
+for attr in dir(env.maze):
+    if not attr.startswith('__'):
+        try:
+            value = getattr(env.maze, attr)
+            if not callable(value):
+                print(f"  {attr}: {type(value)} = {value}")
+            else:
+                print(f"  {attr}: method")
+        except:
+            print(f"  {attr}: (could not access)")
+
+# Try to find walls-related attributes
+print("\nSearching for walls-related attributes:")
+for attr in dir(env.maze):
+    if 'wall' in attr.lower() or 'layout' in attr.lower() or 'structure' in attr.lower():
+        try:
+            value = getattr(env.maze, attr)
+            print(f"  Found: {attr} = {value}")
+        except:
+            print(f"  Found: {attr} (could not access)")
+
+"""
