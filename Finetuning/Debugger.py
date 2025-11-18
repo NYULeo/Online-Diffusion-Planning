@@ -18,6 +18,7 @@ import minari
 from Pretrain.Rewards.nets import Reward
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 
+"""
 # ================== Config ==================
 DATASET_NAME = 'D4RL/pointmaze/medium-v2'
 STEP = 44000
@@ -135,3 +136,106 @@ print(f"Saving {OUTPUT_PNG} ...")
 imageio.imwrite(OUTPUT_PNG, img)
 print("Done! Heatmap saved with walls + start + goal.")
 
+"""
+
+
+import numpy as np
+import torch
+import matplotlib.pyplot as plt
+import minari
+from Pretrain.Rewards.nets import Reward
+from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
+
+# ================== Configuration ==================
+STEP = 44000                    # Checkpoint step to load
+GOAL = np.array([9.0, 9.0])     # Goal position [x, y]
+RESOLUTION = 256                # Grid resolution (256x256 is fast and looks good)
+OUTPUT_FILE = f"reward_heatmap_step{STEP}.png"
+
+# ================== Load Environment ==================
+print("Loading environment...")
+dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
+env = dataset.recover_environment().unwrapped
+
+# ================== Load Reward Model ==================
+print(f"Loading reward model (step {STEP})...")
+state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', STEP, 'medium')
+model = Reward(obs_dim, act_dim)
+model.load_state_dict(state_dict)
+model.eval()
+stats = get_pretrained_reward_stats(name)
+
+# ================== Create Grid ==================
+print(f"Creating {RESOLUTION}x{RESOLUTION} grid...")
+x = np.linspace(-1, 11, RESOLUTION)
+y = np.linspace(-1, 11, RESOLUTION)
+X, Y = np.meshgrid(x, y)
+
+# Create observations: [x, y, goal_x, goal_y]
+obs_grid = np.stack([
+    X.ravel(),
+    Y.ravel(),
+    np.full(RESOLUTION**2, GOAL[0]),
+    np.full(RESOLUTION**2, GOAL[1])
+], axis=1).astype(np.float32)
+
+# ================== Evaluate Rewards ==================
+print("Evaluating rewards...")
+# Use a simple action (zero action) or max over a few actions
+n_actions = 5  # Sample 5x5 = 25 actions
+actions = np.linspace(-1.0, 1.0, n_actions)
+action_grid = np.array([[ax, ay] for ax in actions for ay in actions]).astype(np.float32)
+
+reward_map = np.zeros(RESOLUTION**2)
+
+with torch.no_grad():
+    obs_tensor = torch.from_numpy(obs_grid).float()
+    
+    # For each position, try all actions and take max reward
+    for i in range(len(obs_grid)):
+        obs = obs_tensor[i:i+1]  # [1, 4]
+        obs_repeated = obs.repeat(len(action_grid), 1)  # [25, 4]
+        act_tensor = torch.from_numpy(action_grid).float()  # [25, 2]
+        
+        # Normalize
+        obs_norm = stats.norm_obs(obs_repeated)
+        obs_norm = obs_norm.float()
+        act_tensor = act_tensor.float()
+        rewards = model(obs_norm, act_tensor).cpu().numpy()
+        reward_map[i] = rewards.max()
+        
+        if (i + 1) % 10000 == 0:
+            print(f"  Processed {i+1}/{len(obs_grid)} positions")
+
+reward_map = reward_map.reshape(RESOLUTION, RESOLUTION)
+
+# ================== Plot Heatmap ==================
+print("Creating heatmap...")
+fig, ax = plt.subplots(figsize=(10, 10))
+
+# Plot heatmap
+im = ax.imshow(reward_map, extent=[-1, 11, -1, 11], origin='lower', 
+               cmap='RdYlBu_r', interpolation='bilinear')
+plt.colorbar(im, ax=ax, label='Reward')
+
+# Draw walls
+for wall in env.maze.walls:
+    (x0, y0), (x1, y1) = wall
+    ax.plot([x0, x1], [y0, y1], 'k-', linewidth=3)
+
+# Mark start position
+ax.plot(1.0, 1.0, 'go', markersize=15, label='Start', markeredgecolor='black', markeredgewidth=2)
+
+# Mark goal position
+ax.plot(GOAL[0], GOAL[1], 'y*', markersize=20, label='Goal', markeredgecolor='black', markeredgewidth=1)
+
+ax.set_xlabel('X position')
+ax.set_ylabel('Y position')
+ax.set_title(f'Reward Heatmap (Step {STEP})')
+ax.legend()
+ax.grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig(OUTPUT_FILE, dpi=150, bbox_inches='tight')
+print(f"Heatmap saved to {OUTPUT_FILE}")
+plt.show()
