@@ -154,17 +154,49 @@ import minari
 from Pretrain.Rewards.nets import Reward
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 
-"""
+
 # ================== Configuration ==================
 STEP = 44000                    # Checkpoint step to load
-GOAL = np.array([9.0, 9.0])     # Goal position [x, y]
 RESOLUTION = 256                # Grid resolution (256x256 is fast and looks good)
-OUTPUT_FILE = f"reward_heatmap_step{STEP}.png"
+BATCH_SIZE = 16384              # Batch size for efficient processing
+OUTPUT_FILE = f"reward_heatmap_step{STEP}_all_goals.png"
 
 # ================== Load Environment ==================
 print("Loading environment...")
 dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
 env = dataset.recover_environment().unwrapped  # Unwrap to access maze attribute
+
+# ================== Extract All Unique Goals from Dataset ==================
+print("Extracting all unique goals from dataset...")
+all_goals = set()
+episode_count = 0
+max_episodes = 200  # Check first 200 episodes to find all goals
+
+for episode in dataset:
+    # Get goal from observations (goals are in obs[2:4] for pointmaze)
+    obs = episode.observations
+    if len(obs) > 0:
+        # Goals are typically in the observation space [x, y, goal_x, goal_y]
+        goals = obs[:, 2:4]  # Extract goal positions
+        unique_goals_episode = np.unique(goals, axis=0)
+        for goal in unique_goals_episode:
+            # Round to 2 decimal places to avoid floating point precision issues
+            goal_rounded = (round(goal[0], 2), round(goal[1], 2))
+            all_goals.add(goal_rounded)
+    
+    episode_count += 1
+    # Limit to first max_episodes for speed (should capture all goals)
+    if episode_count >= max_episodes:
+        break
+
+# Convert to numpy array
+if len(all_goals) == 0:
+    raise ValueError("No goals found in dataset! Check dataset structure.")
+    
+GOALS = np.array(list(all_goals))
+print(f"Found {len(GOALS)} unique goals:")
+for i, goal in enumerate(GOALS):
+    print(f"  Goal {i+1}: [{goal[0]:.2f}, {goal[1]:.2f}]")
 
 # ================== Load Reward Model ==================
 print(f"Loading reward model (step {STEP})...")
@@ -178,109 +210,133 @@ stats = get_pretrained_reward_stats(name)
 print(f"Creating {RESOLUTION}x{RESOLUTION} grid...")
 x = np.linspace(-1, 11, RESOLUTION)
 y = np.linspace(-1, 11, RESOLUTION)
-X, Y = np.meshgrid(x, y)
+X, Y = np.meshgrid(x, y, indexing='xy')
 
-# Create observations: [x, y, goal_x, goal_y]
-obs_grid = np.stack([
-    X.ravel(),
-    Y.ravel(),
-    np.full(RESOLUTION**2, GOAL[0]),
-    np.full(RESOLUTION**2, GOAL[1])
-], axis=1).astype(np.float32)
-
-# ================== Evaluate Rewards ==================
-print("Evaluating rewards...")
-# Use a simple action (zero action) or max over a few actions
+# ================== Evaluate Rewards for All Goals ==================
+print("Evaluating rewards for all goals...")
+# Use action candidates
 n_actions = 5  # Sample 5x5 = 25 actions
 actions = np.linspace(-1.0, 1.0, n_actions)
 action_grid = np.array([[ax, ay] for ax in actions for ay in actions]).astype(np.float32)
+acts_t = torch.from_numpy(action_grid)
 
-reward_map = np.zeros(RESOLUTION**2)
+# Store reward maps for each goal
+reward_maps_per_goal = []
 
-with torch.no_grad():
-    obs_tensor = torch.from_numpy(obs_grid).float()
+for goal_idx, goal in enumerate(GOALS):
+    print(f"\nProcessing goal {goal_idx+1}/{len(GOALS)}: [{goal[0]:.2f}, {goal[1]:.2f}]")
     
-    # For each position, try all actions and take max reward
-    for i in range(len(obs_grid)):
-        obs = obs_tensor[i:i+1]  # [1, 4]
-        obs_repeated = obs.repeat(len(action_grid), 1)  # [25, 4]
-        act_tensor = torch.from_numpy(action_grid).float()  # [25, 2]
-        
-        # Normalize
-        obs_norm = stats.norm_obs(obs_repeated)
-        obs_norm = obs_norm.float()
-        act_tensor = act_tensor.float()
-        rewards = model(obs_norm, act_tensor).cpu().numpy()
-        reward_map[i] = rewards.max()
-        
-        if (i + 1) % 10000 == 0:
-            print(f"  Processed {i+1}/{len(obs_grid)} positions")
+    # Create observations: [x, y, goal_x, goal_y]
+    obs_base = np.stack([
+        X.ravel(),
+        Y.ravel(),
+        np.full(RESOLUTION**2, goal[0]),
+        np.full(RESOLUTION**2, goal[1])
+    ], axis=1).astype(np.float32)
+    
+    reward_map_goal = np.full(RESOLUTION**2, -1e10, dtype=np.float32)
+    
+    with torch.no_grad():
+        for start in range(0, len(obs_base), BATCH_SIZE):
+            end = min(start + BATCH_SIZE, len(obs_base))
+            batch_obs = torch.from_numpy(obs_base[start:end])
+            
+            # Repeat actions for each position
+            obs_rep = batch_obs.unsqueeze(1).repeat(1, len(acts_t), 1).reshape(-1, 4)
+            act_rep = acts_t.unsqueeze(0).repeat(end-start, 1, 1).reshape(-1, 2)
+            
+            # Normalize
+            obs_norm = stats.norm_obs(obs_rep)
+            obs_norm = obs_norm.float()
+            act_rep = act_rep.float()
+            
+            # Compute rewards
+            r = model(obs_norm, act_rep).cpu().numpy().reshape(end-start, -1)
+            reward_map_goal[start:end] = r.max(axis=1)
+            
+            if start % (BATCH_SIZE*10) == 0:
+                print(f"  → {start}/{len(obs_base)}")
+    
+    reward_maps_per_goal.append(reward_map_goal.reshape(RESOLUTION, RESOLUTION))
 
-reward_map = reward_map.reshape(RESOLUTION, RESOLUTION)
+
+
+
+
+
+
+# Aggregate reward maps (take maximum across all goals for each position)
+print("\nAggregating reward maps across all goals...")
+reward_map = np.stack(reward_maps_per_goal, axis=0).max(axis=0)
 
 # ================== Plot Heatmap ==================
 if MATPLOTLIB_AVAILABLE:
     print("Creating heatmap...")
-    fig, ax = plt.subplots(figsize=(10, 10))
+    fig, ax = plt.subplots(figsize=(12, 12))
 
     # Plot heatmap
     im = ax.imshow(reward_map, extent=[-1, 11, -1, 11], origin='lower', 
                    cmap='RdYlBu_r', interpolation='bilinear')
     plt.colorbar(im, ax=ax, label='Reward')
 
-    # Draw walls from maze_map
-    # maze_map is a 2D grid where 1 = wall, 0 = open space
-    maze_map = env.maze.maze_map
-    map_height = env.maze.map_length
-    map_width = env.maze.map_width
-    cell_size = env.maze.maze_size_scaling
-    
-    # Convert maze_map to wall segments
-    # Each cell in maze_map represents a wall cell if value is 1
-    # Try to use the method, fallback to manual calculation
-    for row in range(map_height):
-        for col in range(map_width):
-            if maze_map[row][col] == 1:  # This is a wall cell
-                # Try to convert cell coordinates to world coordinates
-                try:
-                    # Try using the method if it exists
-                    if hasattr(env.maze, 'cell_rowcol_to_xy'):
-                        cell_center = env.maze.cell_rowcol_to_xy(row, col)
-                        x_center, y_center = float(cell_center[0]), float(cell_center[1])
-                    else:
-                        raise AttributeError("Method not available")
-                except:
-                    # Fallback: manual calculation based on maze structure
-                    # For pointmaze medium, the world coordinates range approximately from -2.5 to 2.5
-                    # Map is 8x8 cells, so each cell is about 0.625 units
-                    # But cell_size is 1, so we'll use a simpler approach
-                    # Center the map at origin, with cells starting from negative values
-                    x_center = (col - map_width / 2.0 + 0.5) * cell_size
-                    y_center = (map_height / 2.0 - row - 0.5) * cell_size
-                
-                # Draw a square representing the wall cell
-                half_cell = cell_size / 2.0
-                corners = [
-                    [x_center - half_cell, y_center - half_cell],
-                    [x_center + half_cell, y_center - half_cell],
-                    [x_center + half_cell, y_center + half_cell],
-                    [x_center - half_cell, y_center + half_cell],
-                    [x_center - half_cell, y_center - half_cell]  # Close the square
-                ]
-                corners = np.array(corners)
-                ax.plot(corners[:, 0], corners[:, 1], 'k-', linewidth=2)
+    # Draw walls using env.maze.walls (more accurate than maze_map)
+    print("Drawing maze walls...")
+    if hasattr(env.maze, 'walls'):
+        for wall in env.maze.walls:
+            (x0, y0), (x1, y1) = wall
+            ax.plot([x0, x1], [y0, y1], 'k-', linewidth=3, zorder=10)
+    else:
+        # Fallback: use maze_map if walls attribute doesn't exist
+        print("  Using maze_map fallback...")
+        maze_map = env.maze.maze_map
+        map_height = env.maze.map_length
+        map_width = env.maze.map_width
+        cell_size = env.maze.maze_size_scaling
+        
+        for row in range(map_height):
+            for col in range(map_width):
+                if maze_map[row][col] == 1:  # This is a wall cell
+                    try:
+                        if hasattr(env.maze, 'cell_rowcol_to_xy'):
+                            cell_center = env.maze.cell_rowcol_to_xy(row, col)
+                            x_center, y_center = float(cell_center[0]), float(cell_center[1])
+                        else:
+                            raise AttributeError("Method not available")
+                    except:
+                        x_center = (col - map_width / 2.0 + 0.5) * cell_size
+                        y_center = (map_height / 2.0 - row - 0.5) * cell_size
+                    
+                    half_cell = cell_size / 2.0
+                    corners = [
+                        [x_center - half_cell, y_center - half_cell],
+                        [x_center + half_cell, y_center - half_cell],
+                        [x_center + half_cell, y_center + half_cell],
+                        [x_center - half_cell, y_center + half_cell],
+                        [x_center - half_cell, y_center - half_cell]
+                    ]
+                    corners = np.array(corners)
+                    ax.plot(corners[:, 0], corners[:, 1], 'k-', linewidth=2, zorder=10)
 
     # Mark start position
-    ax.plot(1.0, 1.0, 'go', markersize=15, label='Start', markeredgecolor='black', markeredgewidth=2)
+    ax.plot(1.0, 1.0, 'go', markersize=15, label='Start', markeredgecolor='black', 
+            markeredgewidth=2, zorder=20)
 
-    # Mark goal position
-    ax.plot(GOAL[0], GOAL[1], 'y*', markersize=20, label='Goal', markeredgecolor='black', markeredgewidth=1)
+    # Mark all goal positions
+    print(f"Plotting {len(GOALS)} goals...")
+    for i, goal in enumerate(GOALS):
+        ax.plot(goal[0], goal[1], 'y*', markersize=20, 
+                markeredgecolor='black', markeredgewidth=1, zorder=20)
+        # Add goal number label
+        ax.text(goal[0] + 0.3, goal[1] + 0.3, f'G{i+1}', 
+                fontsize=10, color='black', weight='bold', zorder=21,
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7))
 
-    ax.set_xlabel('X position')
-    ax.set_ylabel('Y position')
-    ax.set_title(f'Reward Heatmap (Step {STEP})')
-    ax.legend()
+    ax.set_xlabel('X position', fontsize=12)
+    ax.set_ylabel('Y position', fontsize=12)
+    ax.set_title(f'Reward Heatmap (Step {STEP}) - All {len(GOALS)} Goals', fontsize=14, fontweight='bold')
+    ax.legend(loc='upper right', fontsize=10)
     ax.grid(True, alpha=0.3)
+    ax.set_aspect('equal')
 
     plt.tight_layout()
     
@@ -303,105 +359,4 @@ else:
     print(f"Reward map saved as numpy array to {npy_path}")
 
 
-"""
-
-import torch
-import matplotlib.pyplot as plt
-import numpy as np
-
-
-@torch.no_grad()
-def plot_pointmaze_with_reward_heatmap(
-    reward_model, 
-    stats, 
-    goal=np.array([9.0, 9.0]),   # change to see other goals
-    resolution=400
-):
-    device = next(reward_model.parameters()).device
-    reward_model.eval()
-
-    # Grid
-    x = np.linspace(-1, 11, resolution)
-    y = np.linspace(-1, 11, resolution)
-    X, Y = np.meshgrid(x, y)
-
-    # Build goal-conditioned observation grid
-    obs_grid = np.stack([
-        X.ravel(), Y.ravel(),
-        np.full(resolution**2, goal[0]),
-        np.full(resolution**2, goal[1])
-    ], axis=1).astype(np.float32)
-
-    obs_tensor = torch.from_numpy(obs_grid).to(device)
-    obs_norm = stats.norm_obs(obs_tensor)
-
-    # Evaluate max reward over 25 actions (same as your original)
-    actions = np.linspace(-1.0, 1.0, 5)
-    action_grid = np.array([[ax, ay] for ax in actions for ay in actions], dtype=np.float32)
-    act_tensor = torch.from_numpy(action_grid).to(device)  # (25, 2)
-
-    # Batching to avoid memory issues
-    batch_size = 8192
-    rewards = []
-    for i in range(0, len(obs_norm), batch_size):
-        o = obs_norm[i:i+batch_size]  # (batch, 4)
-        num_actions = len(action_grid)
-        
-        # Fixed repeat: repeat in BOTH batch and action dimensions
-        o_rep = o.unsqueeze(1).repeat(1, num_actions, 1).reshape(-1, o.shape[-1])  # (batch*25, 4)
-        a_rep = act_tensor.unsqueeze(0).repeat(o.shape[0], 1, 1).reshape(-1, 2)  # (batch*25, 2) — fixed!
-        
-        # Model call
-        o_rep = o_rep.float()
-        a_rep = a_rep.float()
-        r = reward_model(o_rep, a_rep)  # (batch*25,)
-        
-        # Max over actions per position
-        r = r.view(o.shape[0], -1).max(dim=1)[0]
-        rewards.append(r.cpu())
-    
-    reward_map = torch.cat(rewards).numpy().reshape(resolution, resolution)
-
-    # === Plot ===
-    plt.figure(figsize=(12, 11))
-    plt.imshow(reward_map, extent=[-1, 11, -1, 11], origin='lower', cmap='viridis', alpha=0.9)
-    plt.colorbar(label='Max Reward (over actions)', shrink=0.8)
-
-    # === Draw exact PointMaze-Medium walls (hard-coded from D4RL) ===
-    walls = [
-        # Horizontal walls
-        [(-1, 5), (5, 5)],     # top horizontal
-        [(5, 5), (5, 11)],     # right vertical from top
-        [(5, -1), (5, 5)],     # right vertical from bottom
-        [(-1, -1), (5, -1)],   # bottom horizontal
-        # Vertical walls
-        [(5, 5), (11, 5)],     # top-right horizontal
-        [(5, -1), (11, -1)],   # bottom-right horizontal
-    ]
-    for (x1, y1), (x2, y2) in walls:
-        plt.plot([x1, x2], [y1, y2], 'k-', linewidth=6)
-
-    # Start & Goal
-    plt.plot(1.0, 1.0, 'go', markersize=18, markeredgecolor='black', markeredgewidth=3, label='Start')
-    plt.plot(goal[0], goal[1], 'y*', markersize=25, markeredgecolor='black', markeredgewidth=2, label='Goal')
-
-    plt.xlim(-1, 11)
-    plt.ylim(-1, 11)
-    plt.xlabel('X position')
-    plt.ylabel('Y position')
-    plt.title(f'PointMaze-Medium Reward Heatmap\nGoal = {goal}', fontsize=16)
-    plt.legend()
-    plt.grid(False)
-    plt.tight_layout()
-    plt.savefig(f"pointmaze_medium_reward_heatmap_goal.png", dpi=150)
-    plt.show()
-
-print(f"Loading reward model (step {44000})...")
-state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', 44000, 'medium')
-model = Reward(obs_dim, act_dim)
-model.load_state_dict(state_dict)
-model.eval()
-stats = get_pretrained_reward_stats(name)
-for gx, gy in [(9.0,9.0), (9.0,1.0), (1.0,9.0), (1.0,1.0)]:
-    plot_pointmaze_with_reward_heatmap(model, stats, goal=np.array([gx, gy]))
 
