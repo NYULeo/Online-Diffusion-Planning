@@ -36,7 +36,6 @@ from Pretrain.Rewards.nets import Reward
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 
 
-"""
 
 # ================== Configuration ==================
 # ================== Configuration ==================
@@ -288,145 +287,9 @@ else:
     np.save(npy_path, reward_map)
     print(f"Reward map saved as numpy array to {npy_path}")
 
-"""
 
 # reward_heatmap_all_goals_CORRECT_WALLS.py
 # Works with current Minari/D4RL pointmaze2d (no .walls attribute)
 
-
-import os
-import numpy as np
-import torch
-import minari
-
-try:
-    import matplotlib
-    matplotlib.use('Agg')
-    import matplotlib.pyplot as plt
-    PLT = True
-except:
-    PLT = False
-
-from Pretrain.Rewards.nets import Reward
-from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
-
-# ================== CONFIG ==================
-STEP = 44000
-RESOLUTION = 500
-BATCH_SIZE = 16384
-ACTIONS_SIDE = 27
-OUTPUT = f"reward_heatmap_step{STEP}_all_goals_CORRECT.png"
-
-print("Loading dataset...")
-dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
-env = dataset.recover_environment().unwrapped
-
-# ================== Extract real unique goals ==================
-print("Extracting unique goals...")
-goals_set = set()
-for ep in dataset:
-    goals = ep.observations['observation'][:, 2:4]
-    for g in np.unique(goals, axis=0):
-        goals_set.add(tuple(np.round(g, 6)))
-GOALS = np.array(list(goals_set))[:10]  # up to 10 goals
-print(f"Found {len(GOALS)} unique goals: {GOALS.tolist()}")
-
-# Fixed bounds
-X_MIN, X_MAX = -1.0, 11.0
-Y_MIN, Y_MAX = -1.0, 11.0
-start_pos = np.array([1.0, 1.0])
-
-# ================== Load model ==================
-print(f"Loading reward model step {STEP}...")
-sd, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', STEP, 'medium')
-model = Reward(obs_dim, act_dim)
-model.load_state_dict(sd)
-model.eval()
-stats = get_pretrained_reward_stats(name)
-
-# Action grid
-acts = np.linspace(-1.0, 1.0, ACTIONS_SIDE)
-ax, ay = np.meshgrid(acts, acts)
-acts_grid = np.stack([ax.ravel(), ay.ravel()], axis=1).astype(np.float32)
-acts_t = torch.from_numpy(acts_grid)
-
-# Grid
-x = np.linspace(X_MIN, X_MAX, RESOLUTION)
-y = np.linspace(Y_MIN, Y_MAX, RESOLUTION)
-X, Y = np.meshgrid(x, y)
-
-final_map = np.full((RESOLUTION, RESOLUTION), -1e10, dtype=np.float32)
-
-print("Evaluating reward model over grid...")
-with torch.no_grad():
-    for idx, goal in enumerate(GOALS):
-        print(f"  Goal {idx+1}/{len(GOALS)}: ({goal[0]:.2f}, {goal[1]:.2f})")
-        
-        obs_base = np.stack([
-            X.ravel(), Y.ravel(),
-            np.full(RESOLUTION**2, goal[0]),
-            np.full(RESOLUTION**2, goal[1])
-        ], axis=1).astype(np.float32)
-
-        best = np.full(RESOLUTION**2, -1e10, dtype=np.float32)
-        for i in range(0, len(obs_base), BATCH_SIZE):
-            batch = torch.from_numpy(obs_base[i:i+BATCH_SIZE])
-            B = len(batch)
-            obs_rep = batch.unsqueeze(1).repeat(1, len(acts_t), 1).reshape(-1, 4)
-            act_rep = acts_t.unsqueeze(0).repeat(B, 1, 1).reshape(-1, 2)
-            obs_norm = stats.norm_obs(obs_rep)
-            act = act_rep.float()
-            obs_norm = obs_norm.float()
-            r = model(obs_norm, act).cpu().numpy().reshape(B, -1)
-            best[i:i+B] = r.max(axis=1)
-        final_map = np.maximum(final_map, best.reshape(RESOLUTION, RESOLUTION))
-
-# ================== Plot with CORRECT walls ==================
-if PLT:
-    plt.figure(figsize=(14, 13), dpi=300)
-
-    im = plt.imshow(final_map, extent=[X_MIN, X_MAX, Y_MIN, Y_MAX],
-                    origin='lower', cmap='RdYlBu_r', interpolation='bilinear')
-
-    # === CORRECT WAY TO DRAW WALLS (no .walls attribute) ===
-    maze_map = env.maze.maze_map
-    for row in range(len(maze_map)):
-        for col in range(len(maze_map[0])):
-            if maze_map[row][col] == 1:  # wall cell
-                center = env.maze.cell_rowcol_to_xy(row, col)
-                x, y = center[0], center[1]
-                size = env.maze.maze_size_scaling
-                half = size / 2
-                rect = plt.Rectangle((x - half, y - half), size, size,
-                                     facecolor='black', edgecolor='black', zorder=10)
-                plt.gca().add_patch(rect)
-
-    # Start & goals
-    plt.plot(start_pos[0], start_pos[1], 'o', c='lime', markersize=20,
-             markeredgecolor='black', markeredgewidth=3, label='Start', zorder=20)
-    for i, g in enumerate(GOALS):
-        plt.plot(g[0], g[1], '*', c='yellow', markersize=30,
-                 markeredgecolor='black', markeredgewidth=3, zorder=20)
-        plt.text(g[0]+0.3, g[1]+0.3, f'G{i+1}', fontsize=12, fontweight='bold',
-                 bbox=dict(facecolor='yellow', alpha=0.8, pad=2))
-
-    plt.colorbar(im, shrink=0.8, label='Max-action Reward')
-    plt.title(f'Reward Model Heatmap (Step {STEP})\nAggregated over {len(GOALS)} Goals', fontsize=18, pad=20)
-    plt.xlabel('X position')
-    plt.ylabel('Y position')
-    plt.legend()
-    plt.axis('equal')
-    plt.xlim(X_MIN, X_MAX)
-    plt.ylim(Y_MIN, Y_MAX)
-    plt.tight_layout()
-
-    plt.savefig(OUTPUT, dpi=300, bbox_inches='tight')
-    print(f"Saved: {os.path.abspath(OUTPUT)}")
-    plt.close()
-else:
-    np.save(OUTPUT.replace('.png', '.npy'), final_map)
-    print("Matplotlib failed → saved .npy only")
-
-print("Done!")
 
 

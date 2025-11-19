@@ -347,6 +347,7 @@ avg_discounted_return = avg_goals * 66.8   # This is the only magic number you n
 
 # 5. Compute normalized score
 normalized_score = 100 * (avg_discounted_return - ref_min) / (ref_max - ref_min)
+print(ref_min, ref_max)
 
 # Final result
 print(f"Normalized score (pointmaze/medium-v2): {normalized_score:.2f}")
