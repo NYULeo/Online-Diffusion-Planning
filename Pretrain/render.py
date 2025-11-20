@@ -87,7 +87,7 @@ if __name__ == "__main__":
          if all(np.linalg.norm(goal - kept) >= MIN_DIST for kept in filtered):
              filtered.append(goal)
      Goals = np.array(filtered)
-     print(len(Goals))
+     print(Goals[:50])
      #render('pointmaze', 'medium', trajs[0])
      """
      env_name = info['env_name']

@@ -16,7 +16,8 @@ import torch
 import imageio.v3 as imageio
 import minari
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
-
+from Pretrain.Dataset import get_dataset
+from typing import List
 
 
 import numpy as np
@@ -47,6 +48,7 @@ def heatmap(STEP):
 
    # ================== Load Environment ==================
    #print("Loading environment...")
+   print(f'Ploting the heatmap for checkpoint: {STEP}')
    dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
    env = dataset.recover_environment().unwrapped  # Unwrap to access maze attribute
 
@@ -63,7 +65,7 @@ def heatmap(STEP):
    # Lines 89-94 - Fixed version
    t = 0
    while(t < 20):
-    obs, info = env.reset()
+    obs, info = env.reset(seed = t)
     goal = env.generate_target_goal()
     
     # Convert to tuple and round to avoid floating point precision issues
@@ -77,7 +79,7 @@ def heatmap(STEP):
     all_goals.add(goal_rounded)
     
     # Also update position bounds from observation
-    obs_dict, info = env.reset()
+    obs_dict, info = env.reset(seed = t)
     obs = obs_dict['observation']  # extract the numpy array
     if len(obs) >= 2:
         positions = obs[:2]  # Current position
@@ -321,9 +323,8 @@ if __name__ == '__main__':
    np.random.seed(0)
    random.seed(0)
    torch.manual_seed(0) 
-   heatmap(44000)
-
-
+   heatmap(50000)
+  
 
 # Example Usage (requires a functioning PointMaze environment with a get_goal() method)
 # You may need to adapt the code based on the specific implementation of your environment.
