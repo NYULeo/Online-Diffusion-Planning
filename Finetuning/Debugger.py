@@ -306,7 +306,7 @@ def heatmap(STEP):
 
 
 if __name__ == '__main__':
-   step = 70000
+   step = 10000
    while(step <= 100000):
        np.random.seed(0)
        random.seed(0)
