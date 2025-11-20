@@ -33,11 +33,11 @@ except ImportError as e:
 import minari
 from Pretrain.Rewards.nets import SimpleReward
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
-
+import random
 
 def heatmap(STEP):
-# ================== Configuration ==================
-# ================== Configuration ==================
+   # ================== Configuration ==================
+   # ================== Configuration ==================
    #STEP = 100000                   # Checkpoint step to load
    RESOLUTION = 256                # Grid resolution (256x256 is fast and looks good)
    BATCH_SIZE = 16384              # Batch size for efficient processing
@@ -45,13 +45,13 @@ def heatmap(STEP):
    GRID_MARGIN = 0.5               # Extra padding around observed positions for plotting
    OUTPUT_FILE = f"{STEP}_heatmap.png"
 
-# ================== Load Environment ==================
-   print("Loading environment...")
+   # ================== Load Environment ==================
+   #print("Loading environment...")
    dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
    env = dataset.recover_environment().unwrapped  # Unwrap to access maze attribute
 
-# ================== Extract All Unique Goals from Dataset ==================
-   print("Extracting all unique goals and position bounds from dataset...")
+   # ================== Extract All Unique Goals from Dataset ==================
+   #print("Extracting all unique goals and position bounds from dataset...")
    all_goals = set()
    episode_count = 0
    max_episodes = 200  # Check first 200 episodes to find all goals
@@ -60,10 +60,10 @@ def heatmap(STEP):
    first_start = None
 
 
-# Lines 89-94 - Fixed version
+   # Lines 89-94 - Fixed version
    t = 0
    while(t < 20):
-    obs, info = env.reset()
+    obs, info = env.reset(seed=0)
     goal = env.generate_target_goal()
     
     # Convert to tuple and round to avoid floating point precision issues
@@ -87,7 +87,7 @@ def heatmap(STEP):
             first_start = positions
     
     t += 1
-# Convert to numpy array (limit to a few goals for clarity)
+   # Convert to numpy array (limit to a few goals for clarity)
    if len(all_goals) == 0:
         raise ValueError("No goals found in dataset! Check dataset structure.")
 
@@ -97,16 +97,16 @@ def heatmap(STEP):
        goal_list = goal_list[:MAX_GOALS_TO_PLOT]
 
    GOALS = np.array(goal_list)
-   print(f"Found {len(GOALS)} unique goals:")
-   for i, goal in enumerate(GOALS):
-       print(f"  Goal {i+1}: [{goal[0]:.2f}, {goal[1]:.2f}]")
+   #print(f"Found {len(GOALS)} unique goals:")
+   #for i, goal in enumerate(GOALS):
+       #print(f"  Goal {i+1}: [{goal[0]:.2f}, {goal[1]:.2f}]")
 
-# Determine plotting bounds based on observed positions
+   # Determine plotting bounds based on observed positions
    if np.isinf(pos_min).any() or np.isinf(pos_max).any():
        raise ValueError("Could not determine position bounds from dataset.")
 
 
-# Determine plotting bounds based on observed positions
+   # Determine plotting bounds based on observed positions
    if np.isinf(pos_min).any() or np.isinf(pos_max).any():
       if hasattr(env, 'maze') and hasattr(env.maze, 'maze_map'):
           map_height = env.maze.map_length
@@ -122,11 +122,11 @@ def heatmap(STEP):
 
 
 
-# Expand bounds a bit so the heatmap includes some context outside trajectories
+   # Expand bounds a bit so the heatmap includes some context outside trajectories
    grid_min = (pos_min - GRID_MARGIN).astype(np.float32)
    grid_max = (pos_max + GRID_MARGIN).astype(np.float32)
 
-# Determine start position
+   # Determine start position
    if hasattr(env.maze, 'start_pos'):
        start_pos = np.array(env.maze.start_pos[:2], dtype=np.float32)
    elif first_start is not None:
@@ -134,23 +134,23 @@ def heatmap(STEP):
    else:
        start_pos = np.array([1.0, 1.0], dtype=np.float32)
 
-# ================== Load Reward Model ==================
-   print(f"Loading reward model (step {STEP})...")
+   # ================== Load Reward Model ==================
+   #print(f"Loading reward model (step {STEP})...")
    state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', STEP, 'medium')
    model = SimpleReward(obs_dim, act_dim)
    model.load_state_dict(state_dict)
    model.eval()
    stats = get_pretrained_reward_stats(name)
 
-# ================== Create Grid ==================
-   print(f"Creating {RESOLUTION}x{RESOLUTION} grid within observed bounds...")
+   # ================== Create Grid ==================
+   #print(f"Creating {RESOLUTION}x{RESOLUTION} grid within observed bounds...")
    x = np.linspace(grid_min[0], grid_max[0], RESOLUTION)
    y = np.linspace(grid_min[1], grid_max[1], RESOLUTION)
    X, Y = np.meshgrid(x, y, indexing='xy')
 
-# ================== Evaluate Rewards for All Goals ==================
-   print("Evaluating rewards for all goals...")
-# Use action candidates
+   # ================== Evaluate Rewards for All Goals ==================
+   #print("Evaluating rewards for all goals...")
+   # Use action candidates
    n_actions = 5  # Sample 5x5 = 25 actions
    actions = np.linspace(-1.0, 1.0, n_actions)
    action_grid = np.array([[ax, ay] for ax in actions for ay in actions]).astype(np.float32)
@@ -160,7 +160,7 @@ def heatmap(STEP):
    reward_maps_per_goal = []
 
    for goal_idx, goal in enumerate(GOALS):
-      print(f"\nProcessing goal {goal_idx+1}/{len(GOALS)}: [{goal[0]:.2f}, {goal[1]:.2f}]")
+      #print(f"\nProcessing goal {goal_idx+1}/{len(GOALS)}: [{goal[0]:.2f}, {goal[1]:.2f}]")
     
      # Create observations: [x, y, goal_x, goal_y]
       obs_base = np.stack([
@@ -197,12 +197,12 @@ def heatmap(STEP):
 
 
    # Aggregate reward maps (take maximum across all goals for each position)
-   print("\nAggregating reward maps across all goals...")
+   #print("\nAggregating reward maps across all goals...")
    reward_map = np.stack(reward_maps_per_goal, axis=0).max(axis=0)
 
    # ================== Plot Heatmap ==================
    if MATPLOTLIB_AVAILABLE:
-    print("Creating heatmap...")
+    #print("Creating heatmap...")
     fig, ax = plt.subplots(figsize=(12, 12))
 
     # Plot heatmap
@@ -214,14 +214,14 @@ def heatmap(STEP):
     plt.colorbar(im, ax=ax, label='Reward')
 
     # Draw walls using env.maze.walls (more accurate than maze_map)
-    print("Drawing maze walls...")
+    #print("Drawing maze walls...")
     if hasattr(env.maze, 'walls'):
         for wall in env.maze.walls:
             (x0, y0), (x1, y1) = wall
             ax.plot([x0, x1], [y0, y1], 'k-', linewidth=3, zorder=10)
     else:
         # Fallback: use maze_map if walls attribute doesn't exist
-        print("  Using maze_map fallback...")
+        #print("  Using maze_map fallback...")
         maze_map = env.maze.maze_map
         map_height = env.maze.map_length
         map_width = env.maze.map_width
@@ -288,7 +288,7 @@ def heatmap(STEP):
     os.makedirs(reward_dir, exist_ok=True)
     save_path = os.path.join(reward_dir, OUTPUT_FILE) if not os.path.isabs(OUTPUT_FILE) else OUTPUT_FILE
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
-    print(f"Heatmap saved to {save_path}")
+    #print(f"Heatmap saved to {save_path}")
     
     # Close figure to free memory (good practice, especially on servers)
     plt.close()
@@ -304,12 +304,17 @@ def heatmap(STEP):
       print(f"Reward map saved as numpy array to {npy_path}")
 
 
-# reward_heatmap_all_goals_CORRECT_WALLS.py
-# Works with current Minari/D4RL pointmaze2d (no .walls attribute)
 
-
-heatmap(100000)
-
+if __name__ == '__main__':
+   step = 30000
+   np.random.seed(0)
+   random.seed(0)
+   torch.manual_seed(0) 
+   while(step <= 100000):
+       print(f"Ploting the heatmap for checkpoint {step}")
+       heatmap(step)
+       step += 5000
+   print('Done')
 
 
 # Example Usage (requires a functioning PointMaze environment with a get_goal() method)
