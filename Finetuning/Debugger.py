@@ -323,7 +323,7 @@ if __name__ == '__main__':
    np.random.seed(0)
    random.seed(0)
    torch.manual_seed(0) 
-   heatmap(50000)
+   heatmap(44000)
   
 
 # Example Usage (requires a functioning PointMaze environment with a get_goal() method)
