@@ -63,7 +63,7 @@ def heatmap(STEP):
    # Lines 89-94 - Fixed version
    t = 0
    while(t < 20):
-    obs, info = env.reset(seed=0)
+    obs, info = env.reset()
     goal = env.generate_target_goal()
     
     # Convert to tuple and round to avoid floating point precision issues
@@ -307,10 +307,10 @@ def heatmap(STEP):
 
 if __name__ == '__main__':
    step = 30000
-   np.random.seed(0)
-   random.seed(0)
-   torch.manual_seed(0) 
    while(step <= 100000):
+       np.random.seed(0)
+       random.seed(0)
+       torch.manual_seed(0) 
        print(f"Ploting the heatmap for checkpoint {step}")
        heatmap(step)
        step += 5000
