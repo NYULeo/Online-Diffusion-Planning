@@ -485,3 +485,22 @@ class EnsembleModel(nn.Module):
             self.ensemble_models[i].load_state_dict(state_dicts[i])
 
 """
+
+
+
+class SimpleReward(nn.Module):
+    def __init__(self, obs_dim, act_dim, hidden=512):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(obs_dim + act_dim, hidden), nn.LayerNorm(hidden), nn.SiLU(),
+            nn.Linear(hidden, hidden), nn.LayerNorm(hidden), nn.SiLU(),
+            nn.Linear(hidden, hidden), nn.LayerNorm(hidden), nn.SiLU(),
+            nn.Linear(hidden, hidden), nn.LayerNorm(hidden), nn.SiLU(),
+            nn.Linear(hidden, 1),
+            nn.Tanh()                               # ← this alone fixes 90 %
+        )
+        self.scale = nn.Parameter(torch.tensor(5.0))
+
+    def forward(self, obs, act):
+        x = torch.cat([obs, act], dim=-1)
+        return self.net(x).squeeze(-1) * self.scale
