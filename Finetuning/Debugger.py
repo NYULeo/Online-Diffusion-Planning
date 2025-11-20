@@ -190,8 +190,8 @@ def heatmap(STEP):
              r = model(obs_norm, act_rep).cpu().numpy().reshape(end-start, -1)
              reward_map_goal[start:end] = r.max(axis=1)
             
-             if start % (BATCH_SIZE*10) == 0:
-                print(f"  → {start}/{len(obs_base)}")
+             #if start % (BATCH_SIZE*10) == 0:
+                #print(f"  → {start}/{len(obs_base)}")
     
       reward_maps_per_goal.append(reward_map_goal.reshape(RESOLUTION, RESOLUTION))
 
@@ -306,7 +306,7 @@ def heatmap(STEP):
 
 
 if __name__ == '__main__':
-   step = 30000
+   step = 70000
    while(step <= 100000):
        np.random.seed(0)
        random.seed(0)
