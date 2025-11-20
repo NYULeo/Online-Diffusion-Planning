@@ -38,7 +38,7 @@ from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrain
 
 # ================== Configuration ==================
 # ================== Configuration ==================
-STEP = 55000                   # Checkpoint step to load
+STEP = 20000                   # Checkpoint step to load
 RESOLUTION = 256                # Grid resolution (256x256 is fast and looks good)
 BATCH_SIZE = 16384              # Batch size for efficient processing
 MAX_GOALS_TO_PLOT = 10           # Plot only the first few unique goals
