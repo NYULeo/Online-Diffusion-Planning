@@ -131,6 +131,22 @@ if np.isinf(pos_min).any() or np.isinf(pos_max).any():
     raise ValueError("Could not determine position bounds from dataset.")
 
 
+# Determine plotting bounds based on observed positions
+if np.isinf(pos_min).any() or np.isinf(pos_max).any():
+    if hasattr(env, 'maze') and hasattr(env.maze, 'maze_map'):
+        map_height = env.maze.map_length
+        map_width = env.maze.map_width
+        cell = env.maze.maze_size_scaling
+        pos_min = np.array([-map_width / 2.0 * cell, -map_height / 2.0 * cell], dtype=np.float32)
+        pos_max = np.array([ map_width / 2.0 * cell,  map_height / 2.0 * cell], dtype=np.float32)
+    else:
+        raise ValueError("Could not determine position bounds from dataset or maze.")
+
+grid_min = (pos_min - GRID_MARGIN).astype(np.float32)
+grid_max = (pos_max + GRID_MARGIN).astype(np.float32)
+
+
+
 # Expand bounds a bit so the heatmap includes some context outside trajectories
 grid_min = (pos_min - GRID_MARGIN).astype(np.float32)
 grid_max = (pos_max + GRID_MARGIN).astype(np.float32)
