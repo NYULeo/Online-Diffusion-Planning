@@ -143,8 +143,8 @@ def heatmap(STEP):
    # ================== Load Reward Model ==================
    #print(f"Loading reward model (step {STEP})...")
    state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', STEP, 'medium')
-   #model = SimpleReward(obs_dim, act_dim)
-   model = Reward(obs_dim, act_dim)
+   model = SimpleReward(obs_dim, act_dim)
+   #model = Reward(obs_dim, act_dim)
    model.load_state_dict(state_dict)
    model.eval()
    stats = get_pretrained_reward_stats(name)
@@ -313,7 +313,7 @@ def heatmap(STEP):
 
 
 if __name__ == '__main__':
-   """
+   
    step = 10000
    while(step <= 100000):
        np.random.seed(0)
@@ -321,13 +321,10 @@ if __name__ == '__main__':
        torch.manual_seed(0) 
        print(f"Ploting the heatmap for checkpoint {step}")
        heatmap(step)
-       step += 5000
+       step += 10000
    print('Done')
-   """
-   np.random.seed(0)
-   random.seed(0)
-   torch.manual_seed(0) 
-   heatmap(100000)
+   
+  
   
 
 # Example Usage (requires a functioning PointMaze environment with a get_goal() method)
