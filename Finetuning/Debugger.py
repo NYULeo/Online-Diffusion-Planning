@@ -102,6 +102,8 @@ while(t < 10):
     all_goals.add(goal_rounded)
     
     # Also update position bounds from observation
+    obs_dict, info = env.reset()
+    obs = obs_dict['observation']  # extract the numpy array
     if len(obs) >= 2:
         positions = obs[:2]  # Current position
         pos_min = np.minimum(pos_min, positions)
