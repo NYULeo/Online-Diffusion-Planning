@@ -131,7 +131,8 @@ for i, goal in enumerate(GOALS):
             obs_rep = batch_obs.unsqueeze(1).repeat(1, len(acts_t), 1).reshape(-1, obs_base.shape[1])
             act_rep = acts_t.unsqueeze(0).repeat(end - start, 1, 1).reshape(-1, act_dim)
 
-            obs_norm = stats.norm_obs(obs_rep.float())
+            obs_norm = stats.norm_obs(obs_rep)
+            obs_norm = obs_norm.float()
             act_norm = act_rep.float()
 
             r = model(obs_norm, act_norm).cpu().numpy().reshape(end - start, -1)
