@@ -127,14 +127,18 @@ def heatmap(STEP):
    # Expand bounds a bit so the heatmap includes some context outside trajectories
    grid_min = (pos_min - GRID_MARGIN).astype(np.float32)
    grid_max = (pos_max + GRID_MARGIN).astype(np.float32)
-
+    
    # Determine start position
+   """
    if hasattr(env.maze, 'start_pos'):
        start_pos = np.array(env.maze.start_pos[:2], dtype=np.float32)
    elif first_start is not None:
        start_pos = np.array(first_start, dtype=np.float32)
    else:
        start_pos = np.array([1.0, 1.0], dtype=np.float32)
+   """
+   default_start = np.array([-1.5, -0.5], dtype=np.float32)  # choose your constant
+   start_pos = default_start
 
    # ================== Load Reward Model ==================
    #print(f"Loading reward model (step {STEP})...")
