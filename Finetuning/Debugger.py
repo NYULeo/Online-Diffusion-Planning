@@ -41,7 +41,7 @@ from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrain
 STEP = 20000                   # Checkpoint step to load
 RESOLUTION = 256                # Grid resolution (256x256 is fast and looks good)
 BATCH_SIZE = 16384              # Batch size for efficient processing
-MAX_GOALS_TO_PLOT = 10           # Plot only the first few unique goals
+MAX_GOALS_TO_PLOT = 20           # Plot only the first few unique goals
 GRID_MARGIN = 0.5               # Extra padding around observed positions for plotting
 OUTPUT_FILE = f"reward_heatmap_step{STEP}_all_goals.png"
 
@@ -87,7 +87,7 @@ for episode in dataset:
 """
 # Lines 89-94 - Fixed version
 t = 0
-while(t < 10):
+while(t < 20):
     obs, info = env.reset()
     goal = env.generate_target_goal()
     
