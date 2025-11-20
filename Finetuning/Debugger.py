@@ -31,7 +31,7 @@ except ImportError as e:
     MATPLOTLIB_AVAILABLE = False
     plt = None
 import minari
-from Pretrain.Rewards.nets import SimpleReward
+from Pretrain.Rewards.nets import SimpleReward, Reward
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 import random
 
@@ -137,7 +137,8 @@ def heatmap(STEP):
    # ================== Load Reward Model ==================
    #print(f"Loading reward model (step {STEP})...")
    state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', STEP, 'medium')
-   model = SimpleReward(obs_dim, act_dim)
+   #model = SimpleReward(obs_dim, act_dim)
+   model = Reward(obs_dim, act_dim)
    model.load_state_dict(state_dict)
    model.eval()
    stats = get_pretrained_reward_stats(name)
@@ -306,6 +307,7 @@ def heatmap(STEP):
 
 
 if __name__ == '__main__':
+   """
    step = 10000
    while(step <= 100000):
        np.random.seed(0)
@@ -315,6 +317,12 @@ if __name__ == '__main__':
        heatmap(step)
        step += 5000
    print('Done')
+   """
+   np.random.seed(0)
+   random.seed(0)
+   torch.manual_seed(0) 
+   heatmap(44000)
+
 
 
 # Example Usage (requires a functioning PointMaze environment with a get_goal() method)

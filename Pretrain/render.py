@@ -70,7 +70,24 @@ if __name__ == "__main__":
      """
      data = get_dataset('pointmaze', 'medium')
      trajs = data.get_trajectories()
-     print(len(trajs))
+     Goals = []
+     seen = set()
+     for traj in trajs:
+        rewards = traj['rewards']
+        for obs, rew in zip(traj['observations'], rewards):
+           if rew == 1:
+               goal = tuple(np.round(obs[:2], 3))   # round to avoid float jitter
+               if goal not in seen:
+                   seen.add(goal)
+                   Goals.append(goal)
+     Goals = np.array(Goals)
+     MIN_DIST = 0.1  # tweak threshold
+     filtered = []
+     for goal in Goals:
+         if all(np.linalg.norm(goal - kept) >= MIN_DIST for kept in filtered):
+             filtered.append(goal)
+     Goals = np.array(filtered)
+     print(len(Goals))
      #render('pointmaze', 'medium', trajs[0])
      """
      env_name = info['env_name']
