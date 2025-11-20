@@ -70,7 +70,8 @@ if __name__ == "__main__":
      """
      data = get_dataset('pointmaze', 'medium')
      trajs = data.get_trajectories()
-     render('pointmaze', 'medium', trajs[0])
+     print(len(trajs))
+     #render('pointmaze', 'medium', trajs[0])
      """
      env_name = info['env_name']
      specific_env = info['specific_env']

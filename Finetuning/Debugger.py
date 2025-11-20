@@ -35,59 +35,34 @@ from Pretrain.Rewards.nets import SimpleReward
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 
 
-
+def heatmap(STEP):
 # ================== Configuration ==================
 # ================== Configuration ==================
-STEP = 100000                   # Checkpoint step to load
-RESOLUTION = 256                # Grid resolution (256x256 is fast and looks good)
-BATCH_SIZE = 16384              # Batch size for efficient processing
-MAX_GOALS_TO_PLOT = 20           # Plot only the first few unique goals
-GRID_MARGIN = 0.5               # Extra padding around observed positions for plotting
-OUTPUT_FILE = f"reward_heatmap_step{STEP}_all_goals.png"
+   #STEP = 100000                   # Checkpoint step to load
+   RESOLUTION = 256                # Grid resolution (256x256 is fast and looks good)
+   BATCH_SIZE = 16384              # Batch size for efficient processing
+   MAX_GOALS_TO_PLOT = 20           # Plot only the first few unique goals
+   GRID_MARGIN = 0.5               # Extra padding around observed positions for plotting
+   OUTPUT_FILE = f"{STEP}_heatmap.png"
 
 # ================== Load Environment ==================
-print("Loading environment...")
-dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
-env = dataset.recover_environment().unwrapped  # Unwrap to access maze attribute
+   print("Loading environment...")
+   dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
+   env = dataset.recover_environment().unwrapped  # Unwrap to access maze attribute
 
 # ================== Extract All Unique Goals from Dataset ==================
-print("Extracting all unique goals and position bounds from dataset...")
-all_goals = set()
-episode_count = 0
-max_episodes = 200  # Check first 200 episodes to find all goals
-pos_min = np.array([np.inf, np.inf], dtype=np.float32)
-pos_max = np.array([-np.inf, -np.inf], dtype=np.float32)
-first_start = None
+   print("Extracting all unique goals and position bounds from dataset...")
+   all_goals = set()
+   episode_count = 0
+   max_episodes = 200  # Check first 200 episodes to find all goals
+   pos_min = np.array([np.inf, np.inf], dtype=np.float32)
+   pos_max = np.array([-np.inf, -np.inf], dtype=np.float32)
+   first_start = None
 
 
-"""
-for episode in dataset:
-    # Get goal from observations (goals are in obs[2:4] for pointmaze)
-    # Observations are stored in a dictionary with key 'observation'
-    obs = episode.observations['observation']
-    if len(obs) > 0:
-        positions = obs[:, :2]
-        pos_min = np.minimum(pos_min, positions.min(axis=0))
-        pos_max = np.maximum(pos_max, positions.max(axis=0))
-        if first_start is None:
-            first_start = positions[0]
-
-        # Goals are typically in the observation space [x, y, goal_x, goal_y]
-        goals = obs[:, 2:4]  # Extract goal positions
-        unique_goals_episode = np.unique(goals, axis=0)
-        for goal in unique_goals_episode:
-            # Round to 2 decimal places to avoid floating point precision issues
-            goal_rounded = (round(goal[0], 2), round(goal[1], 2))
-            all_goals.add(goal_rounded)
-    
-    episode_count += 1
-    # Limit to first max_episodes for speed (should capture all goals)
-    if episode_count >= max_episodes:
-        break
-"""
 # Lines 89-94 - Fixed version
-t = 0
-while(t < 20):
+   t = 0
+   while(t < 20):
     obs, info = env.reset()
     goal = env.generate_target_goal()
     
@@ -113,125 +88,120 @@ while(t < 20):
     
     t += 1
 # Convert to numpy array (limit to a few goals for clarity)
-if len(all_goals) == 0:
-    raise ValueError("No goals found in dataset! Check dataset structure.")
+   if len(all_goals) == 0:
+        raise ValueError("No goals found in dataset! Check dataset structure.")
 
-goal_list = sorted(all_goals)
-if len(goal_list) > MAX_GOALS_TO_PLOT:
-    print(f"Found {len(goal_list)} unique goals, limiting to first {MAX_GOALS_TO_PLOT}.")
-    goal_list = goal_list[:MAX_GOALS_TO_PLOT]
+   goal_list = sorted(all_goals)
+   if len(goal_list) > MAX_GOALS_TO_PLOT:
+       print(f"Found {len(goal_list)} unique goals, limiting to first {MAX_GOALS_TO_PLOT}.")
+       goal_list = goal_list[:MAX_GOALS_TO_PLOT]
 
-GOALS = np.array(goal_list)
-print(f"Found {len(GOALS)} unique goals:")
-for i, goal in enumerate(GOALS):
-    print(f"  Goal {i+1}: [{goal[0]:.2f}, {goal[1]:.2f}]")
-
-# Determine plotting bounds based on observed positions
-if np.isinf(pos_min).any() or np.isinf(pos_max).any():
-    raise ValueError("Could not determine position bounds from dataset.")
-
+   GOALS = np.array(goal_list)
+   print(f"Found {len(GOALS)} unique goals:")
+   for i, goal in enumerate(GOALS):
+       print(f"  Goal {i+1}: [{goal[0]:.2f}, {goal[1]:.2f}]")
 
 # Determine plotting bounds based on observed positions
-if np.isinf(pos_min).any() or np.isinf(pos_max).any():
-    if hasattr(env, 'maze') and hasattr(env.maze, 'maze_map'):
-        map_height = env.maze.map_length
-        map_width = env.maze.map_width
-        cell = env.maze.maze_size_scaling
-        pos_min = np.array([-map_width / 2.0 * cell, -map_height / 2.0 * cell], dtype=np.float32)
-        pos_max = np.array([ map_width / 2.0 * cell,  map_height / 2.0 * cell], dtype=np.float32)
-    else:
-        raise ValueError("Could not determine position bounds from dataset or maze.")
+   if np.isinf(pos_min).any() or np.isinf(pos_max).any():
+       raise ValueError("Could not determine position bounds from dataset.")
 
-grid_min = (pos_min - GRID_MARGIN).astype(np.float32)
-grid_max = (pos_max + GRID_MARGIN).astype(np.float32)
+
+# Determine plotting bounds based on observed positions
+   if np.isinf(pos_min).any() or np.isinf(pos_max).any():
+      if hasattr(env, 'maze') and hasattr(env.maze, 'maze_map'):
+          map_height = env.maze.map_length
+          map_width = env.maze.map_width
+          cell = env.maze.maze_size_scaling
+          pos_min = np.array([-map_width / 2.0 * cell, -map_height / 2.0 * cell], dtype=np.float32)
+          pos_max = np.array([ map_width / 2.0 * cell,  map_height / 2.0 * cell], dtype=np.float32)
+      else:
+          raise ValueError("Could not determine position bounds from dataset or maze.")
+
+   grid_min = (pos_min - GRID_MARGIN).astype(np.float32)
+   grid_max = (pos_max + GRID_MARGIN).astype(np.float32)
 
 
 
 # Expand bounds a bit so the heatmap includes some context outside trajectories
-grid_min = (pos_min - GRID_MARGIN).astype(np.float32)
-grid_max = (pos_max + GRID_MARGIN).astype(np.float32)
+   grid_min = (pos_min - GRID_MARGIN).astype(np.float32)
+   grid_max = (pos_max + GRID_MARGIN).astype(np.float32)
 
 # Determine start position
-if hasattr(env.maze, 'start_pos'):
-    start_pos = np.array(env.maze.start_pos[:2], dtype=np.float32)
-elif first_start is not None:
-    start_pos = np.array(first_start, dtype=np.float32)
-else:
-    start_pos = np.array([1.0, 1.0], dtype=np.float32)
+   if hasattr(env.maze, 'start_pos'):
+       start_pos = np.array(env.maze.start_pos[:2], dtype=np.float32)
+   elif first_start is not None:
+       start_pos = np.array(first_start, dtype=np.float32)
+   else:
+       start_pos = np.array([1.0, 1.0], dtype=np.float32)
 
 # ================== Load Reward Model ==================
-print(f"Loading reward model (step {STEP})...")
-state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', STEP, 'medium')
-model = SimpleReward(obs_dim, act_dim)
-model.load_state_dict(state_dict)
-model.eval()
-stats = get_pretrained_reward_stats(name)
+   print(f"Loading reward model (step {STEP})...")
+   state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', STEP, 'medium')
+   model = SimpleReward(obs_dim, act_dim)
+   model.load_state_dict(state_dict)
+   model.eval()
+   stats = get_pretrained_reward_stats(name)
 
 # ================== Create Grid ==================
-print(f"Creating {RESOLUTION}x{RESOLUTION} grid within observed bounds...")
-x = np.linspace(grid_min[0], grid_max[0], RESOLUTION)
-y = np.linspace(grid_min[1], grid_max[1], RESOLUTION)
-X, Y = np.meshgrid(x, y, indexing='xy')
+   print(f"Creating {RESOLUTION}x{RESOLUTION} grid within observed bounds...")
+   x = np.linspace(grid_min[0], grid_max[0], RESOLUTION)
+   y = np.linspace(grid_min[1], grid_max[1], RESOLUTION)
+   X, Y = np.meshgrid(x, y, indexing='xy')
 
 # ================== Evaluate Rewards for All Goals ==================
-print("Evaluating rewards for all goals...")
+   print("Evaluating rewards for all goals...")
 # Use action candidates
-n_actions = 5  # Sample 5x5 = 25 actions
-actions = np.linspace(-1.0, 1.0, n_actions)
-action_grid = np.array([[ax, ay] for ax in actions for ay in actions]).astype(np.float32)
-acts_t = torch.from_numpy(action_grid)
+   n_actions = 5  # Sample 5x5 = 25 actions
+   actions = np.linspace(-1.0, 1.0, n_actions)
+   action_grid = np.array([[ax, ay] for ax in actions for ay in actions]).astype(np.float32)
+   acts_t = torch.from_numpy(action_grid)
 
-# Store reward maps for each goal
-reward_maps_per_goal = []
+   #  Store reward maps for each goal
+   reward_maps_per_goal = []
 
-for goal_idx, goal in enumerate(GOALS):
-    print(f"\nProcessing goal {goal_idx+1}/{len(GOALS)}: [{goal[0]:.2f}, {goal[1]:.2f}]")
+   for goal_idx, goal in enumerate(GOALS):
+      print(f"\nProcessing goal {goal_idx+1}/{len(GOALS)}: [{goal[0]:.2f}, {goal[1]:.2f}]")
     
-    # Create observations: [x, y, goal_x, goal_y]
-    obs_base = np.stack([
-        X.ravel(),
-        Y.ravel(),
-        np.full(RESOLUTION**2, goal[0]),
-        np.full(RESOLUTION**2, goal[1])
-    ], axis=1).astype(np.float32)
+     # Create observations: [x, y, goal_x, goal_y]
+      obs_base = np.stack([
+         X.ravel(),
+         Y.ravel(),
+         np.full(RESOLUTION**2, goal[0]),
+         np.full(RESOLUTION**2, goal[1])
+      ], axis=1).astype(np.float32)
     
-    reward_map_goal = np.full(RESOLUTION**2, -1e10, dtype=np.float32)
+      reward_map_goal = np.full(RESOLUTION**2, -1e10, dtype=np.float32)
     
-    with torch.no_grad():
-        for start in range(0, len(obs_base), BATCH_SIZE):
-            end = min(start + BATCH_SIZE, len(obs_base))
-            batch_obs = torch.from_numpy(obs_base[start:end])
+      with torch.no_grad():
+         for start in range(0, len(obs_base), BATCH_SIZE):
+             end = min(start + BATCH_SIZE, len(obs_base))
+             batch_obs = torch.from_numpy(obs_base[start:end])
             
             # Repeat actions for each position
-            obs_rep = batch_obs.unsqueeze(1).repeat(1, len(acts_t), 1).reshape(-1, 4)
-            act_rep = acts_t.unsqueeze(0).repeat(end-start, 1, 1).reshape(-1, 2)
+             obs_rep = batch_obs.unsqueeze(1).repeat(1, len(acts_t), 1).reshape(-1, 4)
+             act_rep = acts_t.unsqueeze(0).repeat(end-start, 1, 1).reshape(-1, 2)
             
             # Normalize
-            obs_norm = stats.norm_obs(obs_rep)
-            obs_norm = obs_norm.float()
-            act_rep = act_rep.float()
+             obs_norm = stats.norm_obs(obs_rep)
+             obs_norm = obs_norm.float()
+             act_rep = act_rep.float()
             
             # Compute rewards
-            r = model(obs_norm, act_rep).cpu().numpy().reshape(end-start, -1)
-            reward_map_goal[start:end] = r.max(axis=1)
+             r = model(obs_norm, act_rep).cpu().numpy().reshape(end-start, -1)
+             reward_map_goal[start:end] = r.max(axis=1)
             
-            if start % (BATCH_SIZE*10) == 0:
+             if start % (BATCH_SIZE*10) == 0:
                 print(f"  → {start}/{len(obs_base)}")
     
-    reward_maps_per_goal.append(reward_map_goal.reshape(RESOLUTION, RESOLUTION))
+      reward_maps_per_goal.append(reward_map_goal.reshape(RESOLUTION, RESOLUTION))
 
 
+   # Aggregate reward maps (take maximum across all goals for each position)
+   print("\nAggregating reward maps across all goals...")
+   reward_map = np.stack(reward_maps_per_goal, axis=0).max(axis=0)
 
-
-
-
-
-# Aggregate reward maps (take maximum across all goals for each position)
-print("\nAggregating reward maps across all goals...")
-reward_map = np.stack(reward_maps_per_goal, axis=0).max(axis=0)
-
-# ================== Plot Heatmap ==================
-if MATPLOTLIB_AVAILABLE:
+   # ================== Plot Heatmap ==================
+   if MATPLOTLIB_AVAILABLE:
     print("Creating heatmap...")
     fig, ax = plt.subplots(figsize=(12, 12))
 
@@ -314,29 +284,31 @@ if MATPLOTLIB_AVAILABLE:
     plt.tight_layout()
     
     # Ensure we save to the project root directory
-    save_path = os.path.join(project_root, OUTPUT_FILE) if not os.path.isabs(OUTPUT_FILE) else OUTPUT_FILE
+    reward_dir = os.path.join(project_root, "reward_map")
+    os.makedirs(reward_dir, exist_ok=True)
+    save_path = os.path.join(reward_dir, OUTPUT_FILE) if not os.path.isabs(OUTPUT_FILE) else OUTPUT_FILE
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
     print(f"Heatmap saved to {save_path}")
     
     # Close figure to free memory (good practice, especially on servers)
     plt.close()
     # Note: plt.show() is not called - script runs headless and only saves to file
-else:
-    print("Skipping plotting due to matplotlib import error.")
-    print(f"Reward map statistics:")
-    print(f"  Min: {reward_map.min():.4f}, Max: {reward_map.max():.4f}, Mean: {reward_map.mean():.4f}")
-    print(f"  Shape: {reward_map.shape}")
+   else:
+      print("Skipping plotting due to matplotlib import error.")
+      print(f"Reward map statistics:")
+      print(f"  Min: {reward_map.min():.4f}, Max: {reward_map.max():.4f}, Mean: {reward_map.mean():.4f}")
+      print(f"  Shape: {reward_map.shape}")
     # Save raw data as numpy array instead
-    npy_path = os.path.join(project_root, OUTPUT_FILE.replace('.png', '.npy'))
-    np.save(npy_path, reward_map)
-    print(f"Reward map saved as numpy array to {npy_path}")
+      npy_path = os.path.join(project_root, OUTPUT_FILE.replace('.png', '.npy'))
+      np.save(npy_path, reward_map)
+      print(f"Reward map saved as numpy array to {npy_path}")
 
 
 # reward_heatmap_all_goals_CORRECT_WALLS.py
 # Works with current Minari/D4RL pointmaze2d (no .walls attribute)
 
 
-
+heatmap(100000)
 
 
 
