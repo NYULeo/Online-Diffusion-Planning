@@ -84,17 +84,57 @@ for episode in dataset:
     if episode_count >= max_episodes:
         break
 
-# Convert to numpy array (limit to a few goals for clarity)
+# Convert to numpy array and filter goals to be within observed position bounds
 if len(all_goals) == 0:
     raise ValueError("No goals found in dataset! Check dataset structure.")
 
-goal_list = sorted(all_goals)
-if len(goal_list) > MAX_GOALS_TO_PLOT:
-    print(f"Found {len(goal_list)} unique goals, limiting to first {MAX_GOALS_TO_PLOT}.")
-    goal_list = goal_list[:MAX_GOALS_TO_PLOT]
+goal_list = np.array(list(all_goals))
 
-GOALS = np.array(goal_list)
-print(f"Found {len(GOALS)} unique goals:")
+# Filter goals to only include those within reasonable bounds (same as position bounds)
+# This ensures goals are within the actual maze area
+goal_mask = np.all((goal_list >= pos_min - GRID_MARGIN) & (goal_list <= pos_max + GRID_MARGIN), axis=1)
+filtered_goals = goal_list[goal_mask]
+
+if len(filtered_goals) == 0:
+    print(f"Warning: No goals found within position bounds. Using all goals.")
+    filtered_goals = goal_list
+
+print(f"Found {len(goal_list)} total unique goals, {len(filtered_goals)} within position bounds.")
+
+# Select MAX_GOALS_TO_PLOT distinct goals using distance-based selection
+# This ensures goals are spread out across the space, not just sorted by x-coordinate
+def select_distinct_goals(goals, n_select):
+    """Select n_select goals that are maximally spread out using greedy farthest point selection."""
+    if len(goals) <= n_select:
+        return goals
+    
+    goals = np.array(goals)
+    selected = []
+    # Start with the goal closest to the center of the goal distribution
+    center = goals.mean(axis=0)
+    distances_to_center = np.linalg.norm(goals - center, axis=1)
+    first_idx = np.argmin(distances_to_center)
+    selected.append(first_idx)
+    
+    # Greedily add goals that are farthest from already selected goals
+    for _ in range(n_select - 1):
+        max_min_dist = -1
+        best_idx = -1
+        for i in range(len(goals)):
+            if i in selected:
+                continue
+            # Find minimum distance to any already selected goal
+            min_dist = min(np.linalg.norm(goals[i] - goals[j]) for j in selected)
+            if min_dist > max_min_dist:
+                max_min_dist = min_dist
+                best_idx = i
+        if best_idx >= 0:
+            selected.append(best_idx)
+    
+    return goals[selected]
+
+GOALS = select_distinct_goals(filtered_goals, MAX_GOALS_TO_PLOT)
+print(f"Selected {len(GOALS)} distinct goals:")
 for i, goal in enumerate(GOALS):
     print(f"  Goal {i+1}: [{goal[0]:.2f}, {goal[1]:.2f}]")
 
