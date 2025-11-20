@@ -68,9 +68,9 @@ if __name__ == "__main__":
      trajs = info['trajs']
      best_traj = info['best_traj']
      """
-     data = get_dataset('kitchen', 'partial')
+     data = get_dataset('pointmaze', 'medium')
      trajs = data.get_trajectories()
-     render('kitchen', 'partial', trajs[0])
+     render('pointmaze', 'medium', trajs[0])
      """
      env_name = info['env_name']
      specific_env = info['specific_env']
