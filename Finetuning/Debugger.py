@@ -15,7 +15,6 @@ import numpy as np
 import torch
 import imageio.v3 as imageio
 import minari
-from Pretrain.Rewards.nets import Reward
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 
 
@@ -32,7 +31,7 @@ except ImportError as e:
     MATPLOTLIB_AVAILABLE = False
     plt = None
 import minari
-from Pretrain.Rewards.nets import Reward
+from Pretrain.Rewards.nets import SimpleReward
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 
 
@@ -145,7 +144,7 @@ else:
 # ================== Load Reward Model ==================
 print(f"Loading reward model (step {STEP})...")
 state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', STEP, 'medium')
-model = Reward(obs_dim, act_dim)
+model = SimpleReward(obs_dim, act_dim)
 model.load_state_dict(state_dict)
 model.eval()
 stats = get_pretrained_reward_stats(name)
