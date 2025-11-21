@@ -486,6 +486,7 @@ class Acc_AdjointMatchingFineTuner:
              print(f"loss_global.requires_grad = {loss_global.requires_grad}")
         """
         # 5. Backward and optimizer step only on main process or all processes?
+        self.optimizer.zero_grad()
         self.accelerator.backward(loss_global)
                 
         total_grad_norm = 0.0
@@ -498,9 +499,9 @@ class Acc_AdjointMatchingFineTuner:
                print(f"Gradient norm before clipping: {total_grad_norm}")
         """
         self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
-        #self.optimizer.step()
-        #self.scheduler.step()
-        #self.optimizer.zero_grad()
+        self.optimizer.step()
+        self.scheduler.step()
+        
 
          # 6. Logging: gather detached metrics
         local_loss_det = local_loss.detach()
@@ -546,8 +547,8 @@ class Acc_AdjointMatchingFineTuner:
         conds = next(dataloader)
         while step < self.config.finetune_steps:
              #conds = next(dataloader)
-             with self.accelerator.accumulate(self.new_score_net):
-                  loss, avg_reward, avg_C = self.step(conds, reward_model)
+             #with self.accelerator.accumulate(self.new_score_net):
+             loss, avg_reward, avg_C = self.step(conds, reward_model)
              
              self.accelerator.wait_for_everyone()
              

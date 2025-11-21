@@ -66,7 +66,7 @@ class OnlineFinetuner():
         self.config.AMConfig.update_lambda_every = self.config.update_lambda_every
        
 
-        self.accelerator = Accelerator(mixed_precision='no', gradient_accumulation_steps = self.config.gradient_accumulate_every)
+        self.accelerator = Accelerator(mixed_precision='no')
         self.device = self.accelerator.device
 
         
