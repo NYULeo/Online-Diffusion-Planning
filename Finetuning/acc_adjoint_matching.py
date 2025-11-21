@@ -500,6 +500,7 @@ class Acc_AdjointMatchingFineTuner:
         self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
         #self.optimizer.step()
         #self.scheduler.step()
+        #self.optimizer.zero_grad()
 
          # 6. Logging: gather detached metrics
         local_loss_det = local_loss.detach()
@@ -542,15 +543,11 @@ class Acc_AdjointMatchingFineTuner:
         #total_var_reward = 0.0
 
        
-        #conds = next(dataloader)
+        conds = next(dataloader)
         while step < self.config.finetune_steps:
-             conds = next(dataloader)
+             #conds = next(dataloader)
              with self.accelerator.accumulate(self.new_score_net):
-                loss, avg_reward, avg_C = self.step(conds, reward_model)
-                #self.optimizer.step()
-                #self.scheduler.step()
-                #self.optimizer.zero_grad()
-            
+                  loss, avg_reward, avg_C = self.step(conds, reward_model)
              
              self.accelerator.wait_for_everyone()
              

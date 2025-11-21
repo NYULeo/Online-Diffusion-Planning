@@ -16,6 +16,7 @@ from typing import List
 from utils import TrajectoryDict
 from Pretrain.Dataset import get_env
 from torch.utils.data import DataLoader, DistributedSampler
+from Pretrain.Planners.Backbone.utils import get_pretrained_planner
 import torch
 import copy
 import os
@@ -65,7 +66,7 @@ class OnlineFinetuner():
         self.config.AMConfig.update_lambda_every = self.config.update_lambda_every
        
 
-        self.accelerator = Accelerator(mixed_precision='no', gradient_accumulation_steps=self.config.gradient_accumulate_every)
+        self.accelerator = Accelerator(mixed_precision='no', gradient_accumulation_steps = self.config.gradient_accumulate_every)
         self.device = self.accelerator.device
 
         
@@ -79,6 +80,7 @@ class OnlineFinetuner():
         self.Initialize_Buffer()
 
         self.PlannerDataset = PlannerDataset(self.Buffer, self.config.AMConfig.horizon, self.config.dataset_name, self.config.specific_dataset)
+        #self.initialize_score_net()
         #self.logdir =  f"./Results/{self.config.dataset_name}/{self.config.specific_dataset}/{'Models'}/"
         #self.reward_tracker = RewardTracker(save_dir="./logs/")
     
@@ -88,6 +90,20 @@ class OnlineFinetuner():
         trajs = dataset.get_trajectories()
         self.Buffer.extend(trajs)
     
+    def initialize_score_net(self):
+        state_dict = get_pretrained_planner(self.config.dataset_name, self.config.specific_dataset, self.config.planner_checkpoint)
+        if( self.config.dataset_name == 'kitchen'):
+              self.model = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
+        elif (self.config.dataset_name == 'pointmaze'):
+              self.model = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
+        else:
+              raise ValueError(f"Invalid Environment: {self.config.dataset_name}")
+        self.model.load_state_dict(state_dict)
+        for p in self.model.parameters():
+              p.requires_grad_(False)
+        self.model.eval()
+
+
     def Initialize_reward_model(self, device):
         self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
  
@@ -131,6 +147,11 @@ class OnlineFinetuner():
         
         #mp.spawn(self.AMFineTuner.finetune_planner, args=(dataloader, self.reward_model), nprocs = 2)
         self.AMFineTuner.finetune_planner(dataloader, self.reward_model)
+        """
+        if self.accelerator.is_main_process:
+             self.model.load_state_dict(new_score_net_state_dict)
+             self.model.eval()
+        """
             
 
 
