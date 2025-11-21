@@ -456,7 +456,7 @@ class Acc_AdjointMatchingFineTuner:
         
         #reward_std = broadcast(reward_std, from_process=0)
         stats = torch.tensor([total_avgC, reward_std], device=self.device)
-        stats = broadcast(stats, src=0)
+        stats = broadcast(stats, from_process=0)
         total_avgC, reward_std = stats.tolist()
         self.accelerator.wait_for_everyone()
         
@@ -612,4 +612,11 @@ class Acc_AdjointMatchingFineTuner:
              
              step = step+1
              self.accelerator.wait_for_everyone()
+        """
+        self.new_score_net.eval()
+        if self.accelerator.is_main_process:
+            return self.new_score_net.state_dict()
+        else:
+            return None
+        """
         
