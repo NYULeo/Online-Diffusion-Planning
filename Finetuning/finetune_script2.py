@@ -48,16 +48,16 @@ if __name__ == "__main__":
         finetune_steps = 3000,
         diffusion_steps = 50,
         finetune_batch_size = 12,
-        #finetune_lr = 1e-05,
         finetune_lr = 2e-05,
         inital_lam = 0.01,
         eta_lam = 0.005,
         gradient_accumulate_every = 1,
         update_lambda_every = 2,
-        reward_scaling_factor = 100000
+        reward_scaling_factor = 10
         )
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
 
 
+#finetune_lr = 1e-05,
