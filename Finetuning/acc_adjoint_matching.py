@@ -381,8 +381,8 @@ class Acc_AdjointMatchingFineTuner:
         t_asc_reversed = torch.flip(self.t_asc, dims = [0]).to(self.device)
         k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
         #a0 = (-1 * self.config.reward_scaling_factor * gradient).detach().unsqueeze(0).to(self.device)
-        #a0 = ( (self.config.reward_scaling_factor/reward_std) * gradient).detach().unsqueeze(0).to(self.device)
-        a0 = ( (self.config.reward_scaling_factor) * gradient).detach().unsqueeze(0).to(self.device)
+        a0 = ( (self.config.reward_scaling_factor/reward_std) * gradient).detach().unsqueeze(0).to(self.device)
+        #a0 = ( (self.config.reward_scaling_factor) * gradient).detach().unsqueeze(0).to(self.device)
         #print(f"reward_std: {reward_std}")
         #print(f"a0 Norm: {a0.norm().item()}")
         a.append(a0)
@@ -390,8 +390,8 @@ class Acc_AdjointMatchingFineTuner:
         for i in range(steps_T - 1):
             #t_now, t_next = self.t_asc[i], self.t_asc[i + 1]
             t_now, t_next = t_asc_reversed[i], t_asc_reversed[i+1]
-            dt = (t_now - t_next)
-            #dt = (t_next - t_now)
+            #dt = (t_now - t_next)
+            dt = (t_next - t_now)
             T = X_reversed[i].to(self.device)
             T.requires_grad_(True)
             current_a = a[i].to(self.device) 
