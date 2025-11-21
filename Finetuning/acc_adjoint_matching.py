@@ -57,7 +57,7 @@ class Acc_AdjointMatchingConfig:
     finetune_steps: int = 500
     lam: float = 0.01
     eta_lam: float = 0.001
-    reward_scaling_factor: float = 10000
+    reward_scaling_factor: float = 100000
     update_lambda_every = 5
 
     save_freq = 100
@@ -382,6 +382,7 @@ class Acc_AdjointMatchingFineTuner:
         k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
         #a0 = (-1 * self.config.reward_scaling_factor * gradient).detach().unsqueeze(0).to(self.device)
         a0 = ( (self.config.reward_scaling_factor/reward_std) * gradient).detach().unsqueeze(0).to(self.device)
+        print(f"reward_std: {reward_std}")
         #print(f"a0 Norm: {a0.norm().item()}")
         a.append(a0)
         #a.append(torch.zeros_like(gradient).unsqueeze(0).to(self.device))
@@ -444,7 +445,7 @@ class Acc_AdjointMatchingFineTuner:
         
         local_Cs_det = local_final_Cs.detach()
         # 2. Gather C values and update lambda on main process
-        all_final_Cs = self.accelerator.gather_for_metrics(local_Cs_det, use_gather_object=False)
+        all_final_Cs = self.accelerator.gather_for_metrics(local_Cs_det, use_gather_object = False)
         #all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=False)
         all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object = False)
         if self.accelerator.is_main_process:
@@ -604,7 +605,6 @@ class Acc_AdjointMatchingFineTuner:
                 if ( (step % self.config.save_model_freq == 0) and (step!=0)):
                     self.save(step)
              
-            
              if(step % self.config.update_lambda_every == 0):
                  self.sync_lambda()
              
