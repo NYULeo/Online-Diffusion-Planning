@@ -438,6 +438,8 @@ class Acc_AdjointMatchingFineTuner:
                 local_rewards.append(reward)
             local_trajs = torch.stack(local_trajs).to(self.device)
             local_final_Cs = torch.stack(local_final_Cs).mean()
+            print(f"Local final Cs: {local_final_Cs}")
+            exit()
             local_rewards = torch.stack(local_rewards)
         
         self.accelerator.wait_for_everyone()
@@ -450,7 +452,7 @@ class Acc_AdjointMatchingFineTuner:
         reward_std = float(all_rewards.std().item())
         if self.accelerator.is_main_process:
             total_avgC = float(all_final_Cs.mean().item())
-            mean_reward = float(all_rewards.mean().item())
+            #mean_reward = float(all_rewards.mean().item())
             #reward_std = float(all_rewards.std().item())
         
        
@@ -547,9 +549,9 @@ class Acc_AdjointMatchingFineTuner:
              conds = next(dataloader)
              with self.accelerator.accumulate(self.new_score_net):
                 loss, avg_reward, avg_C = self.step(conds, reward_model)
-                self.optimizer.step()
-                self.scheduler.step()
-                self.optimizer.zero_grad()
+                #self.optimizer.step()
+                #self.scheduler.step()
+                #self.optimizer.zero_grad()
             
              
              self.accelerator.wait_for_everyone()

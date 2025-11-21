@@ -8,6 +8,7 @@ from utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, E
 from traj_reward import RewardConfig, TotalReward
 from adjoint_matching import AdjointMatchingFineTuner, AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
+from Finetuning.Rollout import rollout
 from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Dataset import get_PlannerName
 from Pretrain.Dataset import get_dataset
