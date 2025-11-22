@@ -50,7 +50,7 @@ if __name__ == "__main__":
         finetune_batch_size = 12,
         finetune_lr = 2e-05,
         inital_lam = 0.0,
-        eta_lam = 0.005,
+        eta_lam = 0.0,
         gradient_accumulate_every = 1,
         update_lambda_every = 2,
         reward_scaling_factor = 100000)
