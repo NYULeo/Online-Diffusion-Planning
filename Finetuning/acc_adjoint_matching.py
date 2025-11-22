@@ -60,8 +60,8 @@ class Acc_AdjointMatchingConfig:
     reward_scaling_factor: float = 100000
     update_lambda_every = 5
 
-    save_freq = 100
-    save_model_freq = 100
+    save_freq = 50
+    save_model_freq = 50
     log_freq = 1
 
 
@@ -99,9 +99,9 @@ class Acc_AdjointMatchingFineTuner:
         self.ema = EMA(self.config.ema_decay)
         self.t_asc = torch.linspace(1.0, 0.0, self.config.num_steps + 1, device = self.device)
         self.k = self.kt(self.t_asc) 
-        #self.config.num_karras = math.floor( (self.config.num_steps) * 0.2)
-        #self.t_grid, self.beta_1, self.sigma_grid = karras_beta_schedule(self.config.num_steps, self.config.sigma_min, self.config.sigma_max, self.device)
-        #self.beta_2 = cosine_beta(self.t_grid, s=self.config.s)
+        self.config.num_karras = math.floor( (self.config.num_steps) * 0.2)
+        self.t_grid, self.beta_1, self.sigma_grid = karras_beta_schedule(self.config.num_steps, self.config.sigma_min, self.config.sigma_max, self.device)
+        self.beta_2 = cosine_beta(self.t_grid, s=self.config.s)
         
         self.set_old_score_net(planner_checkpoint)
         self.set_new_score_net()
@@ -433,8 +433,8 @@ class Acc_AdjointMatchingFineTuner:
             local_rewards = []
             for s0 in local_s0:
                 s0 = s0.to(self.device)
-                #traj, reward = self.sample_Traj_karras(s0, base_reward_model)  
-                traj, reward = self.sample_Traj(s0, base_reward_model)  
+                traj, reward = self.sample_Traj_karras(s0, base_reward_model)  
+                #traj, reward = self.sample_Traj(s0, base_reward_model)  
                 local_trajs.append(traj)
                 final_x = traj[-1].squeeze(0).to(self.device)
                 C_val = base_reward_model.get_c(final_x)

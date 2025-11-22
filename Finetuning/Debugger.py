@@ -328,21 +328,42 @@ if __name__ == '__main__':
 """
 
 
-t = torch.linspace(1.0, 0.0, 10, device='cpu')
-_, beta1, sigma_grid = karras_beta_schedule(10, 0.01, 30.0, device = 'cpu')
-beta2 = cosine_beta(t)
-print(beta1)
-print(beta2)
-  
+
+from torch.utils.data import DistributedSampler, DataLoader
+from utils import PlannerDataset
+from utils import cycle
+def Initialize_Buffer():
+        Buffer = []
+        dataset = get_dataset('pointmaze', 'medium')
+        trajs = dataset.get_trajectories()
+        Buffer.extend(trajs)
+        return Buffer
+ 
+
+Buffer = Initialize_Buffer()
+PlannerDataset = PlannerDataset(Buffer, 32, 'pointmaze', 'medium')
+#sampler = DistributedSampler(PlannerDataset, shuffle=True, drop_last=True)
+dataloader = DataLoader(PlannerDataset, 12,  shuffle = True,  drop_last = True)
+dataloader = cycle(dataloader)
+t = 0
+coordinates = []
+while (t<50):
+   conds = next(dataloader)
+   for cond in conds:
+       coordinates.append(cond[:2].numpy())
+   t += 1
+
+x_min = np.min(coordinates[:, 0])
+y_min = np.min()
+coordinates = np.array(coordinates)
+print(coordinates)
+
+
+
+
+
 
 # Example Usage (requires a functioning PointMaze environment with a get_goal() method)
 # You may need to adapt the code based on the specific implementation of your environment.
 # env = gym.make("PointMaze_Medium-v3") # Example environment name
 # visualize_reward_heatmap(env) 
-"""
-data = get_dataset('pointmaze', 'medium')
-env = data.get_env(render_mode = None)
-env = env.unwrapped
-env.reset()
-print(env.generate_target_goal())
-"""
