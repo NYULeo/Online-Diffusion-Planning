@@ -60,9 +60,9 @@ class Acc_AdjointMatchingConfig:
     reward_scaling_factor: float = 100000
     update_lambda_every = 5
 
-    save_freq = 50
-    save_model_freq = 50
-    log_freq = 1
+    save_freq = 100
+    save_model_freq = 100
+    log_freq = 10
 
 
 
