@@ -1,3 +1,4 @@
+from math import cos
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -18,7 +19,8 @@ import minari
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 from Pretrain.Dataset import get_dataset
 from typing import List
-
+from utils import karras_beta_schedule
+from Pretrain.Planners.Backbone.utils import cosine_beta
 
 import numpy as np
 import torch
@@ -311,7 +313,7 @@ def heatmap(STEP):
       print(f"Reward map saved as numpy array to {npy_path}")
 
 
-
+"""
 if __name__ == '__main__':
    
    step = 10000
@@ -323,8 +325,14 @@ if __name__ == '__main__':
        heatmap(step)
        step += 10000
    print('Done')
-   
-  
+"""
+
+
+t = torch.linspace(1.0, 0.0, 10, device='cpu')
+_, beta1, sigma_grid = karras_beta_schedule(10, 0.01, 30.0, device = 'cpu')
+beta2 = cosine_beta(t)
+print(beta1)
+print(beta2)
   
 
 # Example Usage (requires a functioning PointMaze environment with a get_goal() method)
