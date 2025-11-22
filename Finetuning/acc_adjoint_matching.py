@@ -58,7 +58,7 @@ class Acc_AdjointMatchingConfig:
     lam: float = 0.01
     eta_lam: float = 0.001
     reward_scaling_factor: float = 100000
-    update_lambda_every = 5
+    update_lambda_every = 3
 
     save_freq = 100
     save_model_freq = 100
