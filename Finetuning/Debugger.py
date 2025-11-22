@@ -332,6 +332,9 @@ if __name__ == '__main__':
 from torch.utils.data import DistributedSampler, DataLoader
 from utils import PlannerDataset
 from utils import cycle
+import matplotlib
+matplotlib.use('TkAgg')  # or 'Qt5Agg' depending on your system
+import matplotlib.pyplot as plt
 def Initialize_Buffer():
         Buffer = []
         dataset = get_dataset('pointmaze', 'medium')
@@ -347,23 +350,71 @@ dataloader = DataLoader(PlannerDataset, 12,  shuffle = True,  drop_last = True)
 dataloader = cycle(dataloader)
 t = 0
 coordinates = []
-while (t<50):
+while (t<100):
    conds = next(dataloader)
    for cond in conds:
        coordinates.append(cond[:2].numpy())
    t += 1
 
-x_min = np.min(coordinates[:, 0])
-y_min = np.min()
+
 coordinates = np.array(coordinates)
-print(coordinates)
 
 
+Y = coordinates[:, 1]
+# Histogram with density curve
+"""
+plt.figure(figsize=(8, 6))
+plt.hist(X, bins=50, density=True, alpha=0.7, label='Histogram')
+data_sorted = np.sort(X)
+plt.plot(data_sorted, np.linspace(0, 1, len(data_sorted)), label='CDF')
+plt.xlabel('Value')
+plt.ylabel('Density')
+plt.title('Distribution with CDF')
+plt.legend()
+plt.show()
+"""
 
 
+"""
+# Continuous density plot using KDE
+plt.figure(figsize=(8, 6))
+# Option 1: Using seaborn (smooth and easy)
+import seaborn as sns
+sns.kdeplot(Y, fill=True, alpha=0.7, label='Density')
+plt.xlabel('Y-coordinate')
+plt.ylabel('Density')
+plt.title('Distribution of Y-coordinates')
+plt.legend()
+plt.show()
+"""
+
+"""
+# 2D density heatmap using seaborn
+plt.figure(figsize=(10, 8))
+import seaborn as sns
+
+# Option 1: Use cbar=True parameter (simplest)
+ax = sns.kdeplot(x=coordinates[:, 0], y=coordinates[:, 1], fill=True, cmap='viridis', levels=20, cbar=True)
+ax.set_xlabel('X-coordinate')
+ax.set_ylabel('Y-coordinate')
+ax.set_title('2D Density Heatmap of Coordinates')
+plt.show()
+"""
 
 
-# Example Usage (requires a functioning PointMaze environment with a get_goal() method)
-# You may need to adapt the code based on the specific implementation of your environment.
-# env = gym.make("PointMaze_Medium-v3") # Example environment name
-# visualize_reward_heatmap(env) 
+plt.figure(figsize=(10, 8))
+plt.hexbin(coordinates[:, 0], coordinates[:, 1], gridsize=50, cmap='viridis', mincnt=1)
+plt.colorbar(label='Count')
+plt.xlabel('X-coordinate')
+plt.ylabel('Y-coordinate')
+plt.title('Hexbin Heatmap of Coordinates')
+plt.show()
+# OR using histogram2d for a binned heatmap
+# H, xedges, yedges = np.histogram2d(coordinates[:, 0], coordinates[:, 1], bins=50)
+# extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
+# plt.imshow(H.T, origin='lower', extent=extent, cmap='hot', interpolation='bilinear')
+# plt.colorbar(label='Count')
+# plt.xlabel('X-coordinate')
+# plt.ylabel('Y-coordinate')
+# plt.title('2D Histogram Heatmap of Coordinates')
+# plt.show()
