@@ -46,15 +46,14 @@ if __name__ == "__main__":
         reward_model_checkpoint = 100000,
         kernel_model_checkpoint = 34000,
         finetune_steps = 3000,
-        diffusion_steps = 50,
+        diffusion_steps = 200,
         finetune_batch_size = 12,
         finetune_lr = 2e-05,
         inital_lam = 0.01,
         eta_lam = 0.005,
         gradient_accumulate_every = 1,
         update_lambda_every = 2,
-        reward_scaling_factor = 10
-        )
+        reward_scaling_factor = 10)
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
