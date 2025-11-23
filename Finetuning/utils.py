@@ -31,7 +31,7 @@ class Lambda:
     
     def update(self, C):
         self.lam = np.maximum(self.base_lam, self.lam + (self.eta_lam * C))
-        #self.lam = np.clip(self.lam, 0.0, 0.1)
+        self.lam = np.clip(self.lam, 0.0, 5.0)
     
     def set_lam(self, lam: float):
         self.lam = lam

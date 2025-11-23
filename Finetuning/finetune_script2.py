@@ -49,11 +49,11 @@ if __name__ == "__main__":
         diffusion_steps = 50,
         finetune_batch_size = 12,
         finetune_lr = 2e-05,
-        inital_lam = 0.001,
-        eta_lam = 0.3,
+        inital_lam = 0.05,
+        eta_lam = 0.1,
         gradient_accumulate_every = 1,
-        update_lambda_every = 3,
-        reward_scaling_factor = 10000)
+        update_lambda_every = 2,
+        reward_scaling_factor = 1000)
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
