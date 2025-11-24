@@ -30,7 +30,7 @@ try:
 except ImportError:
     raise ImportError("accelerate is required but not installed. Run: pip install accelerate")
 from accelerate.utils import broadcast
-
+import pickle
 
 
 @dataclass
@@ -109,6 +109,7 @@ class Acc_AdjointMatchingFineTuner:
         self.set_optimizer_and_scheduler()
         self.set_lambda()
         self.set_reward_tracker()
+        self.Initial_Conds = []
     
 
     def Accelerate_Prepare(self, dataloader: DataLoader, reward_model: TotalReward):
@@ -198,8 +199,7 @@ class Acc_AdjointMatchingFineTuner:
             return
         self.ema.update_model_average(self.ema_model, base_new_score_net)
         
-        
-    def save(self, step):
+    def save(self, step: int):
         self.ema_model.eval()
         data = {
             'dataset_name': self.config.dataset_name,
@@ -215,6 +215,14 @@ class Acc_AdjointMatchingFineTuner:
         torch.save(data, savepath)
         print(f"saved model to {savepath}")
     
+    def save_initial_conds(self, step: int):
+        filename = 'Initial_Conds_' + str(step) + '.pkl'
+        save_dir =  f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/"
+        save_path = os.path.join(save_dir, filename)
+        with open(save_path, 'wb') as f:
+            pickle.dump(self.Initial_Conds, f)
+        print(f"Initial Conditions saved to {save_path}")
+
     def vector_field(self, x: torch.Tensor, t: torch.Tensor, score_model: DiT1d) -> torch.Tensor:
         # Compute beta(t) from cosine schedule
         k = self.kt(t).detach().to(self.device)
@@ -548,11 +556,13 @@ class Acc_AdjointMatchingFineTuner:
         #total_var_reward = 0.0
 
        
-        conds = next(dataloader)
+        #conds = next(dataloader)
         while step < self.config.finetune_steps:
-             #conds = next(dataloader)
+             conds = next(dataloader)
              #with self.accelerator.accumulate(self.new_score_net):
              loss, avg_reward, avg_C = self.step(conds, reward_model)
+             for cond in conds:
+                 self.Initial_Conds.append(cond[:2].detach().cpu().numpy().copy())
              
              self.accelerator.wait_for_everyone()
              
@@ -602,11 +612,12 @@ class Acc_AdjointMatchingFineTuner:
                     save_path=f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/logs/{model_name}_finetune_reward_curve.png",
                     title=f"{model_name} Finetuning Avg Reward",
                     show_constraint=True,
-                    smooth_window=5,
+                    smooth_window=50,
                   ) 
 
                 if ( (step % self.config.save_model_freq == 0) and (step!=0)):
                     self.save(step)
+                    self.save_initial_conds(step)
              
              if(step % self.config.update_lambda_every == 0):
                  self.sync_lambda()

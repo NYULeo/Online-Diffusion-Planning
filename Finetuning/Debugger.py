@@ -22,6 +22,9 @@ from typing import List
 from utils import karras_beta_schedule
 from Pretrain.Planners.Backbone.utils import cosine_beta
 
+
+
+
 import numpy as np
 import torch
 try:
@@ -37,6 +40,16 @@ import minari
 from Pretrain.Rewards.nets import SimpleReward, Reward
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 import random
+from torch.utils.data import DistributedSampler, DataLoader
+from utils import PlannerDataset
+from utils import cycle
+import matplotlib
+matplotlib.use('TkAgg')  # or 'Qt5Agg' depending on your system
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pickle
+
+
 
 def heatmap(STEP):
    # ================== Configuration ==================
@@ -131,14 +144,7 @@ def heatmap(STEP):
    grid_max = (pos_max + GRID_MARGIN).astype(np.float32)
     
    # Determine start position
-   """
-   if hasattr(env.maze, 'start_pos'):
-       start_pos = np.array(env.maze.start_pos[:2], dtype=np.float32)
-   elif first_start is not None:
-       start_pos = np.array(first_start, dtype=np.float32)
-   else:
-       start_pos = np.array([1.0, 1.0], dtype=np.float32)
-   """
+ 
    default_start = np.array([-1.5, -0.5], dtype=np.float32)  # choose your constant
    start_pos = default_start
 
@@ -328,13 +334,6 @@ if __name__ == '__main__':
 """
 
 
-
-from torch.utils.data import DistributedSampler, DataLoader
-from utils import PlannerDataset
-from utils import cycle
-import matplotlib
-matplotlib.use('TkAgg')  # or 'Qt5Agg' depending on your system
-import matplotlib.pyplot as plt
 def Initialize_Buffer():
         Buffer = []
         dataset = get_dataset('pointmaze', 'medium')
@@ -350,7 +349,7 @@ dataloader = DataLoader(PlannerDataset, 12,  shuffle = True,  drop_last = True)
 dataloader = cycle(dataloader)
 t = 0
 coordinates = []
-while (t<100):
+while (t<500):
    conds = next(dataloader)
    for cond in conds:
        coordinates.append(cond[:2].numpy())
@@ -358,50 +357,6 @@ while (t<100):
 
 
 coordinates = np.array(coordinates)
-
-
-Y = coordinates[:, 1]
-# Histogram with density curve
-"""
-plt.figure(figsize=(8, 6))
-plt.hist(X, bins=50, density=True, alpha=0.7, label='Histogram')
-data_sorted = np.sort(X)
-plt.plot(data_sorted, np.linspace(0, 1, len(data_sorted)), label='CDF')
-plt.xlabel('Value')
-plt.ylabel('Density')
-plt.title('Distribution with CDF')
-plt.legend()
-plt.show()
-"""
-
-
-"""
-# Continuous density plot using KDE
-plt.figure(figsize=(8, 6))
-# Option 1: Using seaborn (smooth and easy)
-import seaborn as sns
-sns.kdeplot(Y, fill=True, alpha=0.7, label='Density')
-plt.xlabel('Y-coordinate')
-plt.ylabel('Density')
-plt.title('Distribution of Y-coordinates')
-plt.legend()
-plt.show()
-"""
-
-"""
-# 2D density heatmap using seaborn
-plt.figure(figsize=(10, 8))
-import seaborn as sns
-
-# Option 1: Use cbar=True parameter (simplest)
-ax = sns.kdeplot(x=coordinates[:, 0], y=coordinates[:, 1], fill=True, cmap='viridis', levels=20, cbar=True)
-ax.set_xlabel('X-coordinate')
-ax.set_ylabel('Y-coordinate')
-ax.set_title('2D Density Heatmap of Coordinates')
-plt.show()
-"""
-
-
 plt.figure(figsize=(10, 8))
 plt.hexbin(coordinates[:, 0], coordinates[:, 1], gridsize=50, cmap='viridis', mincnt=1)
 plt.colorbar(label='Count')
@@ -409,12 +364,82 @@ plt.xlabel('X-coordinate')
 plt.ylabel('Y-coordinate')
 plt.title('Hexbin Heatmap of Coordinates')
 plt.show()
-# OR using histogram2d for a binned heatmap
-# H, xedges, yedges = np.histogram2d(coordinates[:, 0], coordinates[:, 1], bins=50)
-# extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
-# plt.imshow(H.T, origin='lower', extent=extent, cmap='hot', interpolation='bilinear')
-# plt.colorbar(label='Count')
-# plt.xlabel('X-coordinate')
-# plt.ylabel('Y-coordinate')
-# plt.title('2D Histogram Heatmap of Coordinates')
-# plt.show()
+
+
+
+
+
+"""
+def plot_reward_curve(steps: List, rewards: List, constraints: List,
+                      title: str = "Finetuning Reward Curve"):
+        if not rewards:
+            print("No reward data to plot!")
+            return
+
+        sns.set_style("whitegrid", {'axes.grid': True, 'axes.edgecolor':'black'})
+        plt.rcParams.update({'font.size': 14})
+
+        okabe_ito = ["#D55E00","#000000", "#E69F00", "#56B4E9", "#009E73",
+                       "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#FF0000"]
+        raw_color    = okabe_ito[3]   
+        smooth_color = okabe_ito[4] 
+        constraint_color     = okabe_ito[9]  
+
+        fig, ax1 = plt.subplots(figsize=(12, 8))
+        steps = np.array(steps)
+        rewards = np.array(rewards)
+
+        smooth_window_reward = 40
+        smoothed = _smooth_curve(rewards, smooth_window_reward)
+        valid_idx = ~np.isnan(smoothed)
+        ax1.plot(steps[valid_idx], smoothed[valid_idx],
+                     color=smooth_color, linewidth=3.0,
+                     label=f'Smoothed Reward (window={smooth_window_reward})')
+        ax1.plot(steps, rewards, alpha=0.3, color=raw_color, linewidth=1.0, label='Raw Reward')
+        ax1.set_title(title, fontsize=16, fontweight='bold')
+        ax1.set_xlabel('Steps', fontsize=12)
+        ax1.set_ylabel('Reward', fontsize=12, color=raw_color)
+        ax1.tick_params(axis='y', labelcolor=raw_color)
+        ax1.grid(True, alpha=0.3)
+        ax1.legend(frameon=True, fancybox=True, fontsize=12)
+        sns.despine()
+
+        
+        ax2 = ax1.twinx()
+        C_vals = np.array(constraints)
+        smooth_window_constraint = 50
+        smoothed = _smooth_curve(constraints, smooth_window_constraint)
+        valid_idx = ~np.isnan(smoothed)
+        ax2.plot(steps[valid_idx], smoothed[valid_idx],
+                     color=constraint_color, linewidth=2.0,
+                     label=f'Smoothed Constraint (window={smooth_window_constraint})')
+        #ax2.plot(steps[:len(C_vals)], C_vals, color=constraint_color, alpha=0.7, linewidth=1.5, label='Constraint')
+        ax2.set_ylabel('Constraint', fontsize=12, color=constraint_color)
+        ax2.tick_params(axis='y', labelcolor=constraint_color)
+        ax2.legend(loc='upper right')
+        sns.despine()
+        
+
+
+        plt.tight_layout()
+        plt.show()
+        return fig
+
+def _smooth_curve(data: np.ndarray, window: int) -> np.ndarray:
+        if window <= 1:
+            return data
+        smoothed = np.convolve(data, np.ones(window)/window, mode='valid')
+        padded = np.full_like(data, np.nan)
+        padded[window-1:] = smoothed
+        return padded
+
+save_path = f'./Finetuning/PointMaze_Medium_Planner_finetune_reward_logs.pkl'
+with open(save_path, 'rb') as f:
+    data = pickle.load(f)
+
+steps = data['steps'][:1956]
+rewards = data['rewards'][:1956]
+constraints = data['constraints'][:1956]
+
+plot_reward_curve(steps, rewards, constraints)
+"""
