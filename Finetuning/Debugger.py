@@ -334,6 +334,7 @@ if __name__ == '__main__':
 """
 
 
+"""
 def Initialize_Buffer():
         Buffer = []
         dataset = get_dataset('pointmaze', 'medium')
@@ -354,7 +355,18 @@ while (t<500):
    for cond in conds:
        coordinates.append(cond[:2].numpy())
    t += 1
+"""
 
+
+
+
+
+
+
+"""
+save_path = f'./Finetuning/Initial_Conds_500.pkl'
+with open(save_path, 'rb') as f:
+    coordinates = pickle.load(f)
 
 coordinates = np.array(coordinates)
 plt.figure(figsize=(10, 8))
@@ -364,12 +376,12 @@ plt.xlabel('X-coordinate')
 plt.ylabel('Y-coordinate')
 plt.title('Hexbin Heatmap of Coordinates')
 plt.show()
-
-
-
-
-
 """
+
+
+
+
+
 def plot_reward_curve(steps: List, rewards: List, constraints: List,
                       title: str = "Finetuning Reward Curve"):
         if not rewards:
@@ -389,7 +401,7 @@ def plot_reward_curve(steps: List, rewards: List, constraints: List,
         steps = np.array(steps)
         rewards = np.array(rewards)
 
-        smooth_window_reward = 40
+        smooth_window_reward = 60
         smoothed = _smooth_curve(rewards, smooth_window_reward)
         valid_idx = ~np.isnan(smoothed)
         ax1.plot(steps[valid_idx], smoothed[valid_idx],
@@ -404,7 +416,7 @@ def plot_reward_curve(steps: List, rewards: List, constraints: List,
         ax1.legend(frameon=True, fancybox=True, fontsize=12)
         sns.despine()
 
-        
+        """
         ax2 = ax1.twinx()
         C_vals = np.array(constraints)
         smooth_window_constraint = 50
@@ -418,6 +430,7 @@ def plot_reward_curve(steps: List, rewards: List, constraints: List,
         ax2.tick_params(axis='y', labelcolor=constraint_color)
         ax2.legend(loc='upper right')
         sns.despine()
+        """
         
 
 
@@ -437,9 +450,8 @@ save_path = f'./Finetuning/PointMaze_Medium_Planner_finetune_reward_logs.pkl'
 with open(save_path, 'rb') as f:
     data = pickle.load(f)
 
-steps = data['steps'][:1956]
-rewards = data['rewards'][:1956]
-constraints = data['constraints'][:1956]
+steps = data['steps'][:3500]
+rewards = data['rewards'][:3500]
+constraints = data['constraints'][:3500]
 
 plot_reward_curve(steps, rewards, constraints)
-"""

@@ -99,7 +99,7 @@ class Acc_AdjointMatchingFineTuner:
         self.ema = EMA(self.config.ema_decay)
         self.t_asc = torch.linspace(1.0, 0.0, self.config.num_steps + 1, device = self.device)
         self.k = self.kt(self.t_asc) 
-        self.config.num_karras = math.floor( (self.config.num_steps) * 0.2)
+        self.config.num_karras = math.floor( (self.config.num_steps) * 0.1)
         self.t_grid, self.beta_1, self.sigma_grid = karras_beta_schedule(self.config.num_steps, self.config.sigma_min, self.config.sigma_max, self.device)
         self.beta_2 = cosine_beta(self.t_grid, s=self.config.s)
         

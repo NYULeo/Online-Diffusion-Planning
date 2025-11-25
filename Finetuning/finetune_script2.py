@@ -43,7 +43,7 @@ if __name__ == "__main__":
         dataset_name = env_name,
         specific_dataset = specific_env,
         planner_checkpoint = 1000000,
-        reward_model_checkpoint = 100000,
+        reward_model_checkpoint = 10000,
         kernel_model_checkpoint = 34000,
         finetune_steps = 5000,
         diffusion_steps = 50,
