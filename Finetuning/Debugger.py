@@ -363,8 +363,8 @@ while (t<500):
 
 
 
-"""
-save_path = f'./Finetuning/Initial_Conds_500.pkl'
+
+save_path = f'./Finetuning/Initial_Conds_700.pkl'
 with open(save_path, 'rb') as f:
     coordinates = pickle.load(f)
 
@@ -376,12 +376,12 @@ plt.xlabel('X-coordinate')
 plt.ylabel('Y-coordinate')
 plt.title('Hexbin Heatmap of Coordinates')
 plt.show()
+
+
+
+
+
 """
-
-
-
-
-
 def plot_reward_curve(steps: List, rewards: List, constraints: List,
                       title: str = "Finetuning Reward Curve"):
         if not rewards:
@@ -416,7 +416,7 @@ def plot_reward_curve(steps: List, rewards: List, constraints: List,
         ax1.legend(frameon=True, fancybox=True, fontsize=12)
         sns.despine()
 
-        """
+        
         ax2 = ax1.twinx()
         C_vals = np.array(constraints)
         smooth_window_constraint = 50
@@ -430,7 +430,7 @@ def plot_reward_curve(steps: List, rewards: List, constraints: List,
         ax2.tick_params(axis='y', labelcolor=constraint_color)
         ax2.legend(loc='upper right')
         sns.despine()
-        """
+        
         
 
 
@@ -455,3 +455,4 @@ rewards = data['rewards'][:3500]
 constraints = data['constraints'][:3500]
 
 plot_reward_curve(steps, rewards, constraints)
+"""
