@@ -328,29 +328,31 @@ print(ref_min, ref_max)
 import minari
 import numpy as np
 import pickle
+from Dataset import get_dataset
 
 # 1. Load your trajectories
 with open('./Pretrain/Rollouts/pointmaze/medium/Generated_trajs_Info.pkl', 'rb') as f:
     trajs = pickle.load(f)['trajs']
 
-# 2. Get official references from Minari
-data = minari.load_dataset("D4RL/pointmaze/medium-v2")
-ref_min = data.storage.metadata.get('ref_min_score')      # ~17.66
-ref_max = data.storage.metadata.get('ref_max_score')      # ~361.05
 
-# 3. Count how many goals your agent reaches on average
-avg_goals = np.mean([np.sum(traj['rewards']) for traj in trajs])
-print(f"Average goals reached per episode: {avg_goals:.2f}")
+def get_normalized_score(trajs, env_name, specific_env):
+    # 2. Get official references from Minari
+    data = get_dataset(env_name, specific_env)
+    ref_min = data.get_ref_min_score()
+    ref_max = data.get_ref_max_score()
+   
+    # 3. Count how many goals your agent reaches on average
+    avg_goals = np.mean([np.sum(traj['rewards']) for traj in trajs])
+    print(f"Average goals reached per episode: {avg_goals:.2f}")
 
-# 4. Convert to correct discounted return (4000-step episodes)
-avg_discounted_return = avg_goals * 66.8   # This is the only magic number you need
+    # 4. Convert to correct discounted return (4000-step episodes)
+    avg_discounted_return = avg_goals * 66.8   # This is the only magic number you need
 
-# 5. Compute normalized score
-normalized_score = 100 * (avg_discounted_return - ref_min) / (ref_max - ref_min)
-print(ref_min, ref_max)
+    # 5. Compute normalized score
+    normalized_score = 100 * (avg_discounted_return - ref_min) / (ref_max - ref_min) 
 
-# Final result
-print(f"Normalized score (pointmaze/medium-v2): {normalized_score:.2f}")
+    # Final result
+    print(f"Normalized score (pointmaze/medium-v2): {normalized_score:.2f}")
 
 
 

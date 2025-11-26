@@ -22,6 +22,7 @@ import copy
 import os
 from accelerate import Accelerator
 import torch.multiprocessing as mp
+import math
 
 
 @dataclass
@@ -36,6 +37,7 @@ class FinetuningConfig():
     
     finetune_steps: int = 1000000
     diffusion_steps: int = 30
+    karras_percent: float = 0.05
     finetune_batch_size: int = 12
     finetune_lr: float = 2e-4
     inital_lam: float = 0.01
@@ -52,8 +54,9 @@ class OnlineFinetuner():
     def __init__(self, config: FinetuningConfig):
         self.config = config
         self.config.AMConfig.finetune_steps = self.config.finetune_steps
-        self.config.AMConfig.num_steps = self.config.diffusion_steps
-        self.config.AMConfig.dataset_name =self.config.dataset_name
+        self.config.AMConfig.diffusion_steps = self.config.diffusion_steps
+        self.config.AMConfig.num_karras = math.floor(self.config.diffusion_steps * self.config.karras_percent)
+        self.config.AMConfig.dataset_name = self.config.dataset_name
         self.config.AMConfig.specific_dataset = self.config.specific_dataset
         self.config.AMConfig.finetune_lr = self.config.finetune_lr
         self.env, d_s, d_a = get_env(self.config.dataset_name, self.config.specific_dataset)
@@ -125,9 +128,10 @@ class OnlineFinetuner():
             print(f"finetune_lr: {self.config.AMConfig.finetune_lr}")
             print(f"reward_scaling_factor: {self.config.AMConfig.reward_scaling_factor}")
             print(f"finetune_steps: {self.config.AMConfig.finetune_steps}")
-            print(f"diffusion_steps: { self.config.AMConfig.num_steps}")
+            print(f"diffusion_steps: { self.config.AMConfig.diffusion_steps}")
             print(f"gradient accumulate every: {self.config.gradient_accumulate_every}")
-            print(f"sampling steps: {self.config.AMConfig.num_steps}")
+            print(f"sampling steps: {self.config.AMConfig.diffusion_steps}")
+            print(f"karras steps: {self.config.AMConfig.num_karras}")
             print(f"Initial lambda: {self.config.AMConfig.lam}")
             print(f"eta_lam: {self.config.AMConfig.eta_lam}")
             print(f"update_lambda_every: {self.config.AMConfig.update_lambda_every}")

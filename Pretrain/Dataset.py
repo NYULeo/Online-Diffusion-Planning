@@ -141,7 +141,13 @@ class KitchenDataset():
           #env_spec = self.dataset.spec.env_spec
           #return gym.make(env_spec, render_mode='rgb_array')
           #return gym.make(env_spec, render_mode = None)
+     
+     def get_ref_max_score(self):
+          return self.dataset.storage.metadata.get('ref_max_score')
 
+     def get_ref_min_score(self):
+          return self.dataset.storage.metadata.get('ref_min_score')
+     
      def get_total_steps(self):
           return self.dataset.total_steps
      
@@ -216,6 +222,12 @@ class PointMazeDataset():
           #env_spec = self.dataset.spec.env_spec
           #return gym.make(env_spec, render_mode='rgb_array')
           #return gym.make(env_spec, render_mode = None)
+     
+     def get_ref_max_score(self):
+          return self.dataset.storage.metadata.get('ref_max_score')
+
+     def get_ref_min_score(self):
+          return self.dataset.storage.metadata.get('ref_min_score')
 
      def get_total_steps(self):
           return self.dataset.total_steps
@@ -287,6 +299,12 @@ class AntMazeDataset():
           #env_spec = self.dataset.spec.env_spec
           #return gym.make(env_spec, render_mode='rgb_array')
           #return gym.make(env_spec, render_mode = None)
+          
+     def get_ref_max_score(self):
+          return self.dataset.storage.metadata.get('ref_max_score')
+
+     def get_ref_min_score(self):
+          return self.dataset.storage.metadata.get('ref_min_score')
 
      def get_total_steps(self):
           return self.dataset.total_steps

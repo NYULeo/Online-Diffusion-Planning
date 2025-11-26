@@ -43,7 +43,7 @@ class Acc_AdjointMatchingConfig:
     specific_dataset: Optional[str] = None
     backbone_name: str = 'transformer'
     eta: float = 0.8
-    num_steps: int = 30
+    diffusion_steps: int = 30
     num_karras: int = 2
     s: float = 0.008  # cosine schedule offset used in base drift
     sigma_min: float = 0.01
@@ -60,8 +60,8 @@ class Acc_AdjointMatchingConfig:
     reward_scaling_factor: float = 100000
     update_lambda_every = 3
 
-    save_freq = 100
-    save_model_freq = 100
+    save_freq = 50
+    save_model_freq = 50
     log_freq = 10
 
 
@@ -97,10 +97,9 @@ class Acc_AdjointMatchingFineTuner:
         #torch.cuda.manual_seed_all(42)
         
         self.ema = EMA(self.config.ema_decay)
-        self.t_asc = torch.linspace(1.0, 0.0, self.config.num_steps + 1, device = self.device)
+        self.t_asc = torch.linspace(1.0, 0.0, self.config.diffusion_steps + 1, device = self.device)
         self.k = self.kt(self.t_asc) 
-        self.config.num_karras = math.floor( (self.config.num_steps) * 0.1)
-        self.t_grid, self.beta_1, self.sigma_grid = karras_beta_schedule(self.config.num_steps, self.config.sigma_min, self.config.sigma_max, self.device)
+        self.t_grid, self.beta_1, self.sigma_grid = karras_beta_schedule(self.config.diffusion_steps, self.config.sigma_min, self.config.sigma_max, self.device)
         self.beta_2 = cosine_beta(self.t_grid, s=self.config.s)
         
         self.set_old_score_net(planner_checkpoint)
@@ -332,10 +331,6 @@ class Acc_AdjointMatchingFineTuner:
 
         s0_t = s0.to(self.device)
         dim = self.config.d_s + self.config.d_a
-        # Karras β(t) + σ(t)
-        #t_grid, beta_1, sigma_grid = karras_beta_schedule(self.config.num_steps, self.device)
-        #t_grid, beta_1, _, sigma_grid =  karras_cosine_interpolated_beta(num_steps, device=device)
-        #beta_2 = cosine_beta(t_grid, s=0.008)
 
         # Initialize x_T
         x = torch.randn(1, self.config.horizon, dim, dtype=torch.float32, device=self.device) * self.sigma_grid[0]
@@ -347,9 +342,9 @@ class Acc_AdjointMatchingFineTuner:
 
         X = []
         X.append(x.detach().clone())
-        for i in range(self.config.num_steps):
+        for i in range(self.config.diffusion_steps):
              t_now = self.t_grid[i]
-             t_next = self.t_grid[i + 1] if i < self.config.num_steps - 1 else 0.0
+             t_next = self.t_grid[i + 1] if i < self.config.diffusion_steps - 1 else 0.0
              dt = (t_next - t_now).item()
              if( i < self.config.num_karras ):
                   beta_now = self.beta_1[i].item()
@@ -391,7 +386,7 @@ class Acc_AdjointMatchingFineTuner:
         t_asc_reversed = torch.flip(self.t_asc, dims = [0]).to(self.device)
         k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
         #a0 = (-1 * self.config.reward_scaling_factor * gradient).detach().unsqueeze(0).to(self.device)
-        a0 = ( -1 * (self.config.reward_scaling_factor/reward_std) * gradient).detach().unsqueeze(0).to(self.device)
+        a0 = ( (self.config.reward_scaling_factor/reward_std) * gradient).detach().unsqueeze(0).to(self.device)
         #a0 = ( (self.config.reward_scaling_factor) * gradient).detach().unsqueeze(0).to(self.device)
         #print(f"reward_std: {reward_std}")
         #print(f"a0 Norm: {a0.norm().item()}")
@@ -538,8 +533,6 @@ class Acc_AdjointMatchingFineTuner:
         self.set_ema_model()
         self.set_lambda(reward_model.get_beta())
         self.set_reward_tracker()
-        
-
         
         print(f"Starting Preparing")
         dataloader, reward_model = self.Accelerate_Prepare(dataloader, reward_model)
