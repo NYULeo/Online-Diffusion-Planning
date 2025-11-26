@@ -313,10 +313,10 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 100, eta = 
 if __name__ == "__main__":
     set_seed(1)
     horizon = 32
-    env_name = 'pointmaze'
-    specific_train_dataset = 'medium'
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 990000, render = True)
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 2, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 1000000, render = True)
+    env_name = 'kitchen'
+    specific_train_dataset = 'partial'
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 990000, render = True)
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 1000000, render = True)
 
     #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 200, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1000000, num_envs = 50)
   
