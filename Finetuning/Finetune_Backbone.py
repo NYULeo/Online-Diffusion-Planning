@@ -55,7 +55,7 @@ class OnlineFinetuner():
         self.config = config
         self.config.AMConfig.finetune_steps = self.config.finetune_steps
         self.config.AMConfig.diffusion_steps = self.config.diffusion_steps
-        self.config.AMConfig.num_karras = math.floor(self.config.diffusion_steps * self.config.karras_percent)
+        self.config.AMConfig.num_karras = math.ceil(self.config.diffusion_steps * self.config.karras_percent)
         self.config.AMConfig.dataset_name = self.config.dataset_name
         self.config.AMConfig.specific_dataset = self.config.specific_dataset
         self.config.AMConfig.finetune_lr = self.config.finetune_lr

@@ -355,5 +355,5 @@ def get_normalized_score(trajs, env_name, specific_env):
     print(f"Normalized score (pointmaze/medium-v2): {normalized_score:.2f}")
 
 
-
+print(math.ceil(2.3))
 
