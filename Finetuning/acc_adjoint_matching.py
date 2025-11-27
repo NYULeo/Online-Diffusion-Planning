@@ -357,8 +357,8 @@ class Acc_AdjointMatchingFineTuner:
             # Euler step
              if self.config.eta > 0:
                  noise = torch.randn_like(x)
-                 print(beta_now)
-                 print(dt)
+                 #print(beta_now)
+                 #print(dt)
                  noise_scale = self.config.eta * math.sqrt(beta_now * (-dt))
                  x = x + ((drift - beta_now * score) * dt + noise_scale * noise)
              else:
