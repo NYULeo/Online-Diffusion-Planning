@@ -25,6 +25,7 @@ from Pretrain.Planners.Backbone.UNet import TemporalUnet
 from Pretrain.Dataset import get_env
 from torch.autograd.functional import jvp 
 import copy
+from torch.cuda.amp import GradScaler
 try:
     from accelerate import Accelerator
 except ImportError:
@@ -94,8 +95,6 @@ class Acc_AdjointMatchingFineTuner:
         torch.backends.cudnn.benchmark=False
         torch.manual_seed(42 + rank)
         torch.cuda.manual_seed_all(42 + rank)
-        #torch.manual_seed(42)
-        #torch.cuda.manual_seed_all(42)
         
         self.ema = EMA(self.config.ema_decay)
         self.t_asc = torch.linspace(1.0, 0.0, self.config.diffusion_steps + 1, device = self.device)
@@ -424,13 +423,12 @@ class Acc_AdjointMatchingFineTuner:
             v_new = self.vector_field(traj_x_i, self.t_asc[i].detach().to(self.device), self.new_score_net).squeeze(0).flatten().to(self.device)
             v_old = self.vector_field(traj_x_i, self.t_asc[i].detach().to(self.device), self.old_score_net).squeeze(0).flatten().detach().to(self.device)
             sigma = self.sigma_t(self.k[i]).detach().to(self.device)
-            """
             if(i <= self.config.num_Loss_Clip_steps):
                 Loss = Loss + torch.min(((v_new - v_old)*(2/sigma) + (sigma * adjoint_i)).pow(2).mean(), torch.tensor((self.config.reward_scaling_factor**2)*1.6).to(self.device))
             else:
                 Loss = Loss + ((v_new - v_old)*(2/sigma) + (sigma * adjoint_i)).pow(2).mean()
-            """
-            Loss = Loss + ((v_new - v_old)*(2/sigma) + (sigma * adjoint_i)).pow(2).mean()
+            
+            #Loss = Loss + ((v_new - v_old)*(2/sigma) + (sigma * adjoint_i)).pow(2).mean()
         Loss = Loss / len(traj_x)
         return Loss
     

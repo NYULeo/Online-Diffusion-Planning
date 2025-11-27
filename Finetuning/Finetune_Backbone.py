@@ -71,7 +71,7 @@ class OnlineFinetuner():
         self.config.AMConfig.update_lambda_every = self.config.update_lambda_every
        
 
-        self.accelerator = Accelerator(mixed_precision='fp16')
+        self.accelerator = Accelerator(mixed_precision='bf16')
         self.device = self.accelerator.device
 
         
