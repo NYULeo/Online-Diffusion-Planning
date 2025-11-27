@@ -357,8 +357,6 @@ class Acc_AdjointMatchingFineTuner:
             # Euler step
              if self.config.eta > 0:
                  noise = torch.randn_like(x)
-                 #print(beta_now)
-                 #print(dt)
                  noise_scale = self.config.eta * math.sqrt(beta_now * (-dt))
                  x = x + ((drift - beta_now * score) * dt + noise_scale * noise)
              else:
@@ -429,8 +427,6 @@ class Acc_AdjointMatchingFineTuner:
                 Loss = Loss + torch.min(((v_new - v_old)*(2/sigma) + (sigma * adjoint_i)).pow(2).mean(), torch.tensor((self.config.reward_scaling_factor**2)*1.6).to(self.device))
             else:
                 Loss = Loss + ((v_new - v_old)*(2/sigma) + (sigma * adjoint_i)).pow(2).mean()
-            
-            #Loss = Loss + ((v_new - v_old)*(2/sigma) + (sigma * adjoint_i)).pow(2).mean()
         Loss = Loss / len(traj_x)
         return Loss
     
@@ -444,7 +440,7 @@ class Acc_AdjointMatchingFineTuner:
             for s0 in local_s0:
                 s0 = s0.to(self.device)
                 with self.accelerator.autocast():
-                   traj, reward = self.sample_Traj_karras(s0, base_reward_model)  
+                     traj, reward = self.sample_Traj_karras(s0, base_reward_model)  
                 #traj, reward = self.sample_Traj(s0, base_reward_model)  
                 local_trajs.append(traj)
                 final_x = traj[-1].squeeze(0).to(self.device)
@@ -481,8 +477,8 @@ class Acc_AdjointMatchingFineTuner:
         for traj in local_trajs:
             traj = [traj[i] for i in range(traj.shape[0])]
             with self.accelerator.autocast():
-                adjoint, reward = self.make_a(traj, reward_model, reward_std)
-                loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
+                  adjoint, reward = self.make_a(traj, reward_model, reward_std)
+                  loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
             local_loss_tensors.append(loss_tensor)
             local_rewards.append(reward)
         local_loss = torch.stack(local_loss_tensors).mean()
