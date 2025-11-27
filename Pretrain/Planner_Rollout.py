@@ -78,7 +78,7 @@ class ActionSelector:
 
 def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, critic, checkpoint_steps, render = False):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, critic: {critic}, Checpoint_steps; {checkpoint_steps}")
+     print(f"Horizon: {horizon}, Diffusion_steps: {steps_T}, num_karras: {num_karras}, eta: {eta}, critic: {critic}, Checpoint_steps; {checkpoint_steps}, Episode_length: {episode_length}")
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      device = "cuda" if torch.cuda.is_available() else "cpu"
      print(f"Using device {device}")
@@ -311,12 +311,12 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 100, eta = 
 
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
-    set_seed(1)
+    set_seed(5)
     horizon = 32
-    env_name = 'kitchen'
-    specific_train_dataset = 'partial'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 990000, render = True)
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 1000000, render = True)
+    env_name = 'pointmaze'
+    specific_train_dataset = 'medium'
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 990000, render = True)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 1000000, render = True)
 
     #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 200, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1000000, num_envs = 50)
   

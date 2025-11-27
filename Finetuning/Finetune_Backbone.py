@@ -38,6 +38,7 @@ class FinetuningConfig():
     finetune_steps: int = 1000000
     diffusion_steps: int = 30
     karras_percent: float = 0.05
+    Loss_Clip_percent: float = 0.75
     finetune_batch_size: int = 12
     finetune_lr: float = 2e-4
     inital_lam: float = 0.01
@@ -56,6 +57,7 @@ class OnlineFinetuner():
         self.config.AMConfig.finetune_steps = self.config.finetune_steps
         self.config.AMConfig.diffusion_steps = self.config.diffusion_steps
         self.config.AMConfig.num_karras = math.ceil(self.config.diffusion_steps * self.config.karras_percent)
+        self.config.AMConfig.num_Loss_Clip_steps = math.ceil(self.config.diffusion_steps * self.config.Loss_Clip_percent)
         self.config.AMConfig.dataset_name = self.config.dataset_name
         self.config.AMConfig.specific_dataset = self.config.specific_dataset
         self.config.AMConfig.finetune_lr = self.config.finetune_lr
@@ -69,7 +71,7 @@ class OnlineFinetuner():
         self.config.AMConfig.update_lambda_every = self.config.update_lambda_every
        
 
-        self.accelerator = Accelerator(mixed_precision='no')
+        self.accelerator = Accelerator(mixed_precision='fp16')
         self.device = self.accelerator.device
 
         
@@ -130,6 +132,7 @@ class OnlineFinetuner():
             print(f"finetune_steps: {self.config.AMConfig.finetune_steps}")
             print(f"diffusion_steps: { self.config.AMConfig.diffusion_steps}")
             print(f"karras steps: {self.config.AMConfig.num_karras}")
+            print(f"Loss clip steps: {self.config.AMConfig.num_Loss_Clip_steps}")
             print(f"gradient accumulate every: {self.config.gradient_accumulate_every}")
             print(f"Initial lambda: {self.config.AMConfig.lam}")
             print(f"eta_lam: {self.config.AMConfig.eta_lam}")

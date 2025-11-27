@@ -70,6 +70,7 @@ if __name__ == "__main__":
      """
      
      #render('pointmaze', 'medium', trajs[0])
+     
      """
      env_name = info['env_name']
      specific_env = info['specific_env']

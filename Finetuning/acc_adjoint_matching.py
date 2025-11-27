@@ -45,6 +45,7 @@ class Acc_AdjointMatchingConfig:
     eta: float = 0.8
     diffusion_steps: int = 30
     num_karras: int = 2
+    num_Loss_Clip_steps: int = 35
     s: float = 0.008  # cosine schedule offset used in base drift
     sigma_min: float = 0.01
     sigma_max: float = 30.0
@@ -141,7 +142,7 @@ class Acc_AdjointMatchingFineTuner:
          steps = new_steps if new_steps is not None else self.config.finetune_steps
     
           # Create new optimizer
-         self.optimizer = torch.optim.AdamW(
+         self.optimizer = torch.optim.Adam(
              self.new_score_net.parameters(), lr=lr, weight_decay = 1e-2)
          self.optimizer.zero_grad()
          # Create new scheduler
@@ -423,7 +424,10 @@ class Acc_AdjointMatchingFineTuner:
             v_new = self.vector_field(traj_x_i, self.t_asc[i].detach().to(self.device), self.new_score_net).squeeze(0).flatten().to(self.device)
             v_old = self.vector_field(traj_x_i, self.t_asc[i].detach().to(self.device), self.old_score_net).squeeze(0).flatten().detach().to(self.device)
             sigma = self.sigma_t(self.k[i]).detach().to(self.device)
-            Loss = Loss + ((v_new -  v_old)*(2/sigma) + (sigma * adjoint_i)).pow(2).mean()
+            if(i <= self.config.num_Loss_Clip_steps):
+                Loss = Loss + torch.min(((v_new -  v_old)*(2/sigma) + (sigma * adjoint_i)).pow(2).mean(), torch.tensor((self.config.reward_scaling_factor**2)*1.6).to(self.device))
+            else:
+                Loss = Loss + ((v_new -  v_old)*(2/sigma) + (sigma * adjoint_i)).pow(2).mean()
         Loss = Loss / len(traj_x)
         return Loss
     
@@ -436,7 +440,8 @@ class Acc_AdjointMatchingFineTuner:
             local_rewards = []
             for s0 in local_s0:
                 s0 = s0.to(self.device)
-                traj, reward = self.sample_Traj_karras(s0, base_reward_model)  
+                with self.accelerator.autocast():
+                   traj, reward = self.sample_Traj_karras(s0, base_reward_model)  
                 #traj, reward = self.sample_Traj(s0, base_reward_model)  
                 local_trajs.append(traj)
                 final_x = traj[-1].squeeze(0).to(self.device)
@@ -461,7 +466,6 @@ class Acc_AdjointMatchingFineTuner:
             total_avgC = 0.0
             reward_std = 0.0
         
-        #reward_std = broadcast(reward_std, from_process=0)
         stats = torch.tensor([total_avgC, reward_std], device=self.device)
         stats = broadcast(stats, from_process=0)
         total_avgC, reward_std = stats.tolist()
@@ -469,13 +473,13 @@ class Acc_AdjointMatchingFineTuner:
         
         
         # 3. Compute adjoints, rewards & loss tensors for each trajectory
-       # with self.accelerator.split_between_processes(all_trajs) as local_trajs2:
         local_loss_tensors = []
         local_rewards = []
         for traj in local_trajs:
             traj = [traj[i] for i in range(traj.shape[0])]
-            adjoint, reward = self.make_a(traj, reward_model, reward_std)
-            loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
+            with self.accelerator.autocast():
+                adjoint, reward = self.make_a(traj, reward_model, reward_std)
+                loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
             local_loss_tensors.append(loss_tensor)
             local_rewards.append(reward)
         local_loss = torch.stack(local_loss_tensors).mean()
@@ -552,7 +556,6 @@ class Acc_AdjointMatchingFineTuner:
         #conds = next(dataloader)
         while step < self.config.finetune_steps:
              conds = next(dataloader)
-             #with self.accelerator.accumulate(self.new_score_net):
              loss, avg_reward, avg_C = self.step(conds, reward_model)
              for cond in conds:
                  self.Initial_Conds.append(cond[:2].detach().cpu().numpy().copy())
