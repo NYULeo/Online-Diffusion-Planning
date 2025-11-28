@@ -29,7 +29,7 @@ import numpy as np
 import torch
 try:
     import matplotlib
-    matplotlib.use('Agg')  # Non-interactive backend for headless servers
+    #matplotlib.use('Agg')  # Non-interactive backend for headless servers
     import matplotlib.pyplot as plt
     MATPLOTLIB_AVAILABLE = True
 except ImportError as e:
@@ -44,7 +44,7 @@ from torch.utils.data import DistributedSampler, DataLoader
 from utils import PlannerDataset
 from utils import cycle
 import matplotlib
-#matplotlib.use('TkAgg')  # or 'Qt5Agg' depending on your system
+matplotlib.use('TkAgg')  # or 'Qt5Agg' depending on your system
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
@@ -323,13 +323,13 @@ def heatmap(STEP):
 if __name__ == '__main__':
    
    step = 10000
-   while(step <= 100000):
+   while(step <= 200000):
        np.random.seed(0)
        random.seed(0)
        torch.manual_seed(0) 
        #print(f"Ploting the heatmap for checkpoint {step}")
        heatmap(step)
-       step += 10000
+       step += 20000
    print('Done')
 
 
@@ -362,9 +362,9 @@ while (t<500):
 
 
 
-"""
 
-save_path = f'./Finetuning/Initial_Conds_700.pkl'
+"""
+save_path = f'./Finetuning/Initial_Conds_3000.pkl'
 with open(save_path, 'rb') as f:
     coordinates = pickle.load(f)
 
