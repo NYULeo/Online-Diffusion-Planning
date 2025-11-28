@@ -44,7 +44,7 @@ from torch.utils.data import DistributedSampler, DataLoader
 from utils import PlannerDataset
 from utils import cycle
 import matplotlib
-matplotlib.use('TkAgg')  # or 'Qt5Agg' depending on your system
+#matplotlib.use('TkAgg')  # or 'Qt5Agg' depending on your system
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
