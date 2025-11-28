@@ -43,7 +43,7 @@ if __name__ == "__main__":
         dataset_name = env_name,
         specific_dataset = specific_env,
         planner_checkpoint = 1000000,
-        reward_model_checkpoint = 50000,
+        reward_model_checkpoint = 180000,
         kernel_model_checkpoint = 34000,
         finetune_steps = 5000,
         diffusion_steps = 50,
@@ -55,7 +55,7 @@ if __name__ == "__main__":
         eta_lam = 0.1,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
-        reward_scaling_factor = 100)
+        reward_scaling_factor = 10)
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
