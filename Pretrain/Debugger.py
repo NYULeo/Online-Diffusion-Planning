@@ -357,4 +357,4 @@ def get_normalized_score(trajs, env_name, specific_env):
 
 print(math.ceil(2.3))
 """
-print(torch.min(torch.tensor(10), torch.tensor(5)))
+
