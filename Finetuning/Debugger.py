@@ -319,7 +319,7 @@ def heatmap(STEP):
       print(f"Reward map saved as numpy array to {npy_path}")
 
 
-"""
+
 if __name__ == '__main__':
    
    step = 10000
@@ -327,11 +327,11 @@ if __name__ == '__main__':
        np.random.seed(0)
        random.seed(0)
        torch.manual_seed(0) 
-       print(f"Ploting the heatmap for checkpoint {step}")
+       #print(f"Ploting the heatmap for checkpoint {step}")
        heatmap(step)
        step += 10000
    print('Done')
-"""
+
 
 
 """
@@ -381,7 +381,7 @@ plt.show()
 
 
 
-
+"""
 
 def plot_reward_curve(steps: List, rewards: List, constraints: List,
                       title: str = "Finetuning Reward Curve"):
@@ -417,7 +417,7 @@ def plot_reward_curve(steps: List, rewards: List, constraints: List,
         ax1.legend(frameon=True, fancybox=True, fontsize=12)
         sns.despine()
 
-        """
+        
         ax2 = ax1.twinx()
         C_vals = np.array(constraints)
         smooth_window_constraint = 50
@@ -431,7 +431,7 @@ def plot_reward_curve(steps: List, rewards: List, constraints: List,
         ax2.tick_params(axis='y', labelcolor=constraint_color)
         ax2.legend(loc='upper right')
         sns.despine()
-        """
+        
         
 
 
@@ -456,3 +456,4 @@ rewards = data['rewards'][:450]
 constraints = data['constraints'][:450]
 
 plot_reward_curve(steps, rewards, constraints)
+"""
