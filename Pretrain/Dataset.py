@@ -92,6 +92,7 @@ class KitchenDataset():
                       'actions': actions,
                       'rewards': new_rewards
                     }
+                 """
                  if(len(trajectories) != 0):
                       Temp = merger(trajectories[len(trajectories)-1], trajectory)
                       if(Temp is not None):
@@ -101,6 +102,8 @@ class KitchenDataset():
                             trajectories.append(trajectory)
                  else:
                       trajectories.append(trajectory)
+                 """
+                 trajectories.append(trajectory)
 
           return trajectories  
      
@@ -128,7 +131,7 @@ class KitchenDataset():
              else:
                   new_rewards[i] = 0
          return np.array(new_rewards, dtype = np.float64) 
-
+     
      def get_state_dim(self):
           return self.dataset._observation_space['observation'].shape[0]
     
@@ -180,15 +183,16 @@ class PointMazeDataset():
               truncated = episode.truncations
               done_seq = np.logical_or(terminated, truncated)
               
-              
+
+              """
               for i in range(len(actions)):
                    if(done_seq[i]):
                         observations = observations[:i+2]
                         actions = actions[:i+1]
                         rewards = rewards[:i+1]
                         break
+              """ 
               
-
               if(len(actions) < 10):
                   continue
               else: 
@@ -197,6 +201,7 @@ class PointMazeDataset():
                         'actions': actions,
                         'rewards': rewards
                       }
+                    """
                     if(len(trajectories) != 0):
                         Temp = merger(trajectories[len(trajectories)-1], trajectory)
                         if(Temp is not None):
@@ -205,7 +210,9 @@ class PointMazeDataset():
                         else:
                             trajectories.append(trajectory)
                     else:
-                      trajectories.append(trajectory)
+                         trajectories.append(trajectory)
+                    """
+                    trajectories.append(trajectory)
           return trajectories
           
      
@@ -545,6 +552,12 @@ class PlannerDataset_Rollout(Dataset):
     def __getitem__(self, idx):
         return self.windows[idx], self.conditions[idx]
 
-
-
-
+"""
+data = get_dataset('pointmaze', 'medium')
+env = data.get_env(render_mode = None).unwrapped
+obs, info = env.reset(seed = 0)
+Goals = []
+for i in range(20):
+    Goals.append(env.generate_target_goal())
+print(np.array(Goals))
+"""

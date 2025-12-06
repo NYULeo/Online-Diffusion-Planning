@@ -2,18 +2,20 @@
 
 import sys
 import os
+
+from torch._dynamo.pgo import ReservedWorkflowIdUserError
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(project_root)
 from typing import Optional
-#from Dataset import KitchenDataset, PointMazeDataset, get_dataset, get_env
+from Dataset import KitchenDataset, PointMazeDataset, get_dataset, get_env
 import random
 from torch.utils.data import Dataset, DataLoader
 import torch
 import torch.optim as optim
 import numpy as np
 from Pretrain.utils import set_seed, SAStats
-#from Critic.train_critic import get_CriticName
+from Critic.train_critic import get_CriticName
 import torch.nn as nn
 import pickle
 from Pretrain.Rewards.nets import Reward, MLPNetwork, ScalarReward, SimpleReward
@@ -23,8 +25,19 @@ from Pretrain.utils import cycle
 import copy
 from sympy import Predicate, factorint
 import torch.nn.functional as F
+import numpy as np
 
 
+def reward_filter(obs, rews):
+    target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
+    for i in range(len(obs)):
+        goal_coord = np.floor(obs[i][:2]) + 0.5
+        #goal_coord = np.round(goal_coord, 1)  
+        if np.any(np.all(np.equal(goal_coord, target_goals), axis=1)):
+            rews[i-1] = 1
+        else:
+            rews[i-1] = 0
+    return rews
 
 def save_model(reward_net, reward_name, num_steps):
     reward_net.eval()
@@ -80,14 +93,12 @@ class RewardDataset(Dataset):
             
         # ----- gather raw obs/actions to fit stats -----
         obs_list, act_list = [], []
-        
         for traj in trajs:
             obs, acts = traj['observations'], traj['actions']
             L = min(len(obs), len(acts))
             obs_list.append(obs[:L])
             act_list.append(acts[:L])
         obs_all = np.concatenate(obs_list, axis=0)  # [N, d_s]
-        #act_all = np.concatenate(act_list, axis=0)  # [N, d_a]
         
         allowed_values = [0,1]
         #get stats
@@ -97,9 +108,10 @@ class RewardDataset(Dataset):
         
         transitions = []
         for traj in trajs:
-            obs = np.asarray(traj['observations'])      
+            obs = np.asarray(traj['observations'])
             acts = np.asarray(traj['actions'])
             rews = np.asarray(traj['rewards'])
+            rews = reward_filter(obs, rews)
             if(not np.all(np.isin(rews, allowed_values))):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
             if(target_reward is not None):
@@ -198,9 +210,10 @@ class test_dataset(Dataset):
         transitions = []
         allowed_values = [0,1]
         for traj in trajs:
-            obs = np.asarray(traj['observations'])      
+            obs = np.asarray(traj['observations'])        
             acts = np.asarray(traj['actions'])
             rews = np.asarray(traj['rewards'])
+            rews = reward_filter(obs, rews)
             if(not np.all(np.isin(rews, allowed_values))):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
             if(target_reward is not None):
@@ -347,6 +360,8 @@ def grad_norm(s, a, reward_net):
      
      return pred, grad_norm_avg
 '''
+
+
 
 
 

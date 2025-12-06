@@ -29,7 +29,7 @@ import numpy as np
 import torch
 try:
     import matplotlib
-    matplotlib.use('Agg')  # Non-interactive backend for headless servers
+    #matplotlib.use('Agg')  # Non-interactive backend for headless servers
     import matplotlib.pyplot as plt
     MATPLOTLIB_AVAILABLE = True
 except ImportError as e:
@@ -318,7 +318,7 @@ def heatmap(STEP):
       np.save(npy_path, reward_map)
       print(f"Reward map saved as numpy array to {npy_path}")
 
-
+"""
 
 if __name__ == '__main__':
    
@@ -332,7 +332,7 @@ if __name__ == '__main__':
        step += 20000
    print('Done')
 
-
+"""
 
 """
 def Initialize_Buffer():
@@ -364,7 +364,7 @@ while (t<500):
 
 
 """
-save_path = f'./Finetuning/Initial_Conds_3000.pkl'
+save_path = f'./Finetuning/Initial_Conds_950.pkl'
 with open(save_path, 'rb') as f:
     coordinates = pickle.load(f)
 
@@ -377,6 +377,11 @@ plt.ylabel('Y-coordinate')
 plt.title('Hexbin Heatmap of Coordinates')
 plt.show()
 """
+
+
+
+
+
 
 
 
@@ -457,3 +462,4 @@ constraints = data['constraints'][:450]
 
 plot_reward_curve(steps, rewards, constraints)
 """
+

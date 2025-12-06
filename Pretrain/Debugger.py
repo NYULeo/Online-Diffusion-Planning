@@ -50,6 +50,7 @@ from Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward
 from Dataset import get_dataset
 from Rewards.nets import Reward
 from Finetuning.traj_reward import TotalReward
+from Rewards.Reward_Backbone import Train_Dataset, RewardDataset
 
 
 
