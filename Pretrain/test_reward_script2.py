@@ -26,8 +26,8 @@ if __name__ == '__main__':
     trajs = trajs,
     sigma = 10, 
     target_reward = 1.0,
-    save_freq = 20000, 
-    num_steps = 200000)
+    save_freq = 2000, 
+    num_steps = 20000)
 
 
 
