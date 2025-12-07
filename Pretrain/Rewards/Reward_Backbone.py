@@ -30,7 +30,7 @@ import numpy as np
 
 def reward_filter(obs, rews):
     #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
-    target_goals = np.array([[-2.5, 2.5]])
+    target_goals = np.array([[-1.5, 0.5]])
     for i in range(len(obs)):
         goal_coord = np.floor(obs[i][:2]) + 0.5
         #goal_coord = np.round(goal_coord, 1)  
