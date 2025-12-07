@@ -15,7 +15,7 @@ if __name__ == '__main__':
     save_freq = 2000,  
     lr = 1e-4,
     sigma = 10,
-    target_reward = 5.0,
+    target_reward = 50.0,
     specific_dataset='medium')
 
 

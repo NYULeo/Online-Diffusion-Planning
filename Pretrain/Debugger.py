@@ -1,18 +1,12 @@
 #from pstats import StatsProfile
 import sys
 import os
-
-from minari.storage.local import gen_dataset_id
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import logging
 import numpy as np
-from pandas._libs.algos import take_2d_axis0_float32_float32
 import torch
-import gymnasium as gym# Conditional import to avoid GLFW3 errors on headless servers
-
 from loguru import logger as log
 import minari
-from scipy.ndimage import gaussian_filter1d, convolve
+from scipy.ndimage import gaussian_filter1d,  gaussian_filter
 
 from typing import Tuple
 from torch.utils.data import Dataset
@@ -358,4 +352,3 @@ def get_normalized_score(trajs, env_name, specific_env):
 
 print(math.ceil(2.3))
 """
-

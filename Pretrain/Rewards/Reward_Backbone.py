@@ -2,6 +2,8 @@
 
 import sys
 import os
+
+from sympy.printing.rcode import reserved_words
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(project_root)
@@ -116,6 +118,8 @@ class RewardDataset(Dataset):
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
             rews = gaussian_filter1d(rews, sigma, mode="nearest")
+            print(rews)
+            exit()
             for t in range(len(acts)):
                 obs_t = self.stats.norm_obs(obs[t])
                 a_t   = acts[t]
@@ -359,8 +363,6 @@ def grad_norm(s, a, reward_net):
      
      return pred, grad_norm_avg
 '''
-
-
 
 
 

@@ -25,7 +25,7 @@ if __name__ == '__main__':
     specific_dataset = 'medium', 
     trajs = trajs,
     sigma = 10, 
-    target_reward = 5.0,
+    target_reward = 50.0,
     save_freq = 2000, 
     num_steps = 20000)
 
