@@ -318,7 +318,7 @@ def heatmap(STEP):
       np.save(npy_path, reward_map)
       print(f"Reward map saved as numpy array to {npy_path}")
 
-"""
+
 
 if __name__ == '__main__':
    
@@ -332,7 +332,7 @@ if __name__ == '__main__':
        step += 20000
    print('Done')
 
-"""
+
 
 """
 def Initialize_Buffer():
