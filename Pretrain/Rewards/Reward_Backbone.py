@@ -13,7 +13,7 @@ import torch
 import torch.optim as optim
 import numpy as np
 from Pretrain.utils import set_seed, SAStats
-from Critic.train_critic import get_CriticName
+#from Critic.train_critic import get_CriticName
 import torch.nn as nn
 import pickle
 from Pretrain.Rewards.nets import Reward, MLPNetwork, ScalarReward, SimpleReward
