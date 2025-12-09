@@ -386,7 +386,6 @@ class Acc_AdjointMatchingFineTuner:
             score = self.old_score_net(T, torch.tensor(0.0).unsqueeze(0).to(self.device))
             EntGrad = -1 * score
             EntGrad = EntGrad.detach().to(self.device)
-            print(EntGrad.shape)
         else:
             EntGrad = torch.zeros_like(gradient).detach().unsqueeze(0).to(self.device)
 
