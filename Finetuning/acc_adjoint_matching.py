@@ -384,7 +384,7 @@ class Acc_AdjointMatchingFineTuner:
         reward, gradient = reward_model(T_squeezed, self.Lam.get_lam())
         if(self.config.MaxEnt):
             score = self.old_score_net(T, torch.tensor(0.0).unsqueeze(0).to(self.device))
-            score.requires_grad_(false)
+            score.requires_grad(False)
             EntGrad = -1 * score
             EntGrad = EntGrad.detach().unsqueeze(0).to(self.device)
         else:

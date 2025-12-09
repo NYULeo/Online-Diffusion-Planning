@@ -354,4 +354,3 @@ print(math.ceil(2.3))
 """
 
 #trajs, reward_name, obs_dim, act_dim = Train_Dataset('pointmaze', 'medium')
-    
