@@ -6,6 +6,7 @@ import sys
 import os
 
 from sympy.core.evalf import pure_complex
+from sympy.functions.elementary.piecewise import false
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -61,6 +62,7 @@ class Acc_AdjointMatchingConfig:
     eta_lam: float = 0.001
     reward_scaling_factor: float = 100000
     update_lambda_every = 3
+    MaxEnt: bool = False
 
     save_freq = 50
     save_model_freq = 50
@@ -380,13 +382,19 @@ class Acc_AdjointMatchingFineTuner:
         T = X_reversed[0]
         T_squeezed = T.squeeze(0).to(self.device)
         reward, gradient = reward_model(T_squeezed, self.Lam.get_lam())
-        #print(f"gradient norm: {gradient.norm().item()}")
-        
-        #print(f"gradient norm: {gradient.norm()}")
+        if(self.config.MaxEnt):
+            score = self.old_score_net(T_squeezed, torch.tensor(0.0).unsqueeze(0).to(self.device))
+            score.requires_grad_(false)
+            EntGrad = -1 * score
+            EntGrad = EntGrad.detach().unsqueeze(0).to(self.device)
+        else:
+            EntGrad = torch.zeros_like(gradient).detach().unsqueeze(0).to(self.device)
+
+
         t_asc_reversed = torch.flip(self.t_asc, dims = [0]).to(self.device)
         k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
         #a0 = (-1 * self.config.reward_scaling_factor * gradient).detach().unsqueeze(0).to(self.device)
-        a0 = ( (self.config.reward_scaling_factor/reward_std) * gradient).detach().unsqueeze(0).to(self.device)
+        a0 = ( (self.config.reward_scaling_factor/reward_std) * gradient).detach().unsqueeze(0).to(self.device) + EntGrad
         #a0 = ( (self.config.reward_scaling_factor) * gradient).detach().unsqueeze(0).to(self.device)
         #print(f"reward_std: {reward_std}")
         #print(f"a0 Norm: {a0.norm().item()}")

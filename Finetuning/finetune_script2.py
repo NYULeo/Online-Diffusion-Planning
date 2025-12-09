@@ -1,5 +1,7 @@
 import sys
 import os
+
+from sympy import true
 # Change to project root directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -55,10 +57,10 @@ if __name__ == "__main__":
         eta_lam = 0.1,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
-        reward_scaling_factor = 50)
+        reward_scaling_factor = 50,
+        MaxEnt = true)
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-
 
 #finetune_lr = 1e-05,

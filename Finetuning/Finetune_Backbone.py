@@ -46,6 +46,7 @@ class FinetuningConfig():
     gradient_accumulate_every: int = 1
     update_lambda_every: int = 5
     reward_scaling_factor: float = 100000
+    MaxEnt: bool = False
     
 
 
@@ -69,6 +70,7 @@ class OnlineFinetuner():
         self.config.AMConfig.update_ema_every = self.config.update_lambda_every
         self.config.AMConfig.reward_scaling_factor = self.config.reward_scaling_factor
         self.config.AMConfig.update_lambda_every = self.config.update_lambda_every
+        self.config.AMConfig.MaxEnt = self.config.MaxEnt
        
 
         self.accelerator = Accelerator(mixed_precision='bf16')

@@ -108,6 +108,7 @@ class RewardDataset(Dataset):
         self.stats.obs_std = obs_all.std(axis=0)+ 1e-8
         
         transitions = []
+        #L = 0
         for traj in trajs:
             obs = np.asarray(traj['observations'])
             acts = np.asarray(traj['actions'])
@@ -119,7 +120,9 @@ class RewardDataset(Dataset):
                 rews = self.boost_signal(target_reward, rews)
             rews = gaussian_filter1d(rews, sigma, mode="nearest")
             #print(rews)
+            #print(rews.dtype)
             #exit()
+            #L += len(rews)
             for t in range(len(acts)):
                 obs_t = self.stats.norm_obs(obs[t])
                 a_t   = acts[t]
@@ -128,6 +131,7 @@ class RewardDataset(Dataset):
 
         self.transitions = transitions
         self.save_stats(reward_name)
+        #print(L/len(trajs))
     
     def save_stats(self, reward_name):
         stats_name =  str(reward_name) + '_stats.pkl'
@@ -250,6 +254,9 @@ class test_dataset(Dataset):
 def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: float = 3, target_reward: Optional[float] = None, save_freq: int = 50, num_steps: int = 500):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device {device}")
+    print(f"Testing the reward model for {dataset_name} Dataset")
+    print(f"Target reward: {target_reward}, Sigma: {sigma}")
+
     if(trajs is None): 
         train_Trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
         dataset = RewardDataset(train_Trajs, sigma, reward_name, target_reward)
@@ -363,9 +370,4 @@ def grad_norm(s, a, reward_net):
      
      return pred, grad_norm_avg
 '''
-
-
-#trajs, reward_name, obs_dim, act_dim = Train_Dataset('pointmaze', 'medium')
-    
-#dataset = RewardDataset(trajs, 50, reward_name, 50)
 
