@@ -386,6 +386,7 @@ class Acc_AdjointMatchingFineTuner:
             score = self.old_score_net(T, torch.tensor(0.0).unsqueeze(0).to(self.device))
             EntGrad = -1 * score
             EntGrad = EntGrad.detach().unsqueeze(0).to(self.device)
+            print(EntGrad.shape)
         else:
             EntGrad = torch.zeros_like(gradient).detach().unsqueeze(0).to(self.device)
 
@@ -393,8 +394,10 @@ class Acc_AdjointMatchingFineTuner:
         t_asc_reversed = torch.flip(self.t_asc, dims = [0]).to(self.device)
         k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
         #a0 = (-1 * self.config.reward_scaling_factor * gradient).detach().unsqueeze(0).to(self.device)
-        a0 = ( (self.config.reward_scaling_factor/reward_std) * gradient).detach().unsqueeze(0).to(self.device) + EntGrad
-        #a0 = ( (self.config.reward_scaling_factor) * gradient).detach().unsqueeze(0).to(self.device)
+        #a0 = ( (self.config.reward_scaling_factor/reward_std) * gradient).detach().unsqueeze(0).to(self.device) + EntGrad
+        a0 = ( (self.config.reward_scaling_factor) * gradient).detach().unsqueeze(0).to(self.device)
+        print(a0.shape)
+        exit()
         #print(f"reward_std: {reward_std}")
         #print(f"a0 Norm: {a0.norm().item()}")
         a.append(a0)
