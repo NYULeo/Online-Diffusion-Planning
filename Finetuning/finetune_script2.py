@@ -58,7 +58,7 @@ if __name__ == "__main__":
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
         reward_scaling_factor = 50,
-        MaxEnt = True)
+        MaxEnt = False)
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
