@@ -47,6 +47,7 @@ class FinetuningConfig():
     update_lambda_every: int = 5
     reward_scaling_factor: float = 100000
     MaxEnt: bool = False
+    Entropy_Scaling_Factor: float = 0.5
     
 
 
@@ -71,6 +72,7 @@ class OnlineFinetuner():
         self.config.AMConfig.reward_scaling_factor = self.config.reward_scaling_factor
         self.config.AMConfig.update_lambda_every = self.config.update_lambda_every
         self.config.AMConfig.MaxEnt = self.config.MaxEnt
+        self.config.AMConfig.Entropy_Scaling_Factor = self.config.Entropy_Scaling_Factor
        
 
         self.accelerator = Accelerator(mixed_precision='bf16')
@@ -140,6 +142,7 @@ class OnlineFinetuner():
             print(f"eta_lam: {self.config.AMConfig.eta_lam}")
             print(f"update_lambda_every: {self.config.AMConfig.update_lambda_every}")
             print(f"Differential Entropy Maximization:: {self.config.AMConfig.MaxEnt}")
+            print(f"Entropy Scaling Factor: {self.config.AMConfig.Entropy_Scaling_Factor}")
             print('Device Details: ---------------------------------------------------------------------------')
             print(f"The device is: {self.device}")
             print(f"The number of GPUs is: {torch.cuda.device_count()}")

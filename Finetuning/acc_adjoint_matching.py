@@ -63,6 +63,7 @@ class Acc_AdjointMatchingConfig:
     reward_scaling_factor: float = 100000
     update_lambda_every = 3
     MaxEnt: bool = False
+    Entropy_Scaling_Factor: float = 0.5
 
     save_freq = 50
     save_model_freq = 50
@@ -393,7 +394,7 @@ class Acc_AdjointMatchingFineTuner:
         t_asc_reversed = torch.flip(self.t_asc, dims = [0]).to(self.device)
         k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
         #a0 = (-1 * self.config.reward_scaling_factor * gradient).detach().unsqueeze(0).to(self.device)
-        a0 = ( (self.config.reward_scaling_factor/reward_std) * gradient).detach().unsqueeze(0).to(self.device) + EntGrad
+        a0 = ( (self.config.reward_scaling_factor/reward_std) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * EntGrad)
         #a0 = ( (self.config.reward_scaling_factor) * gradient).detach().unsqueeze(0).to(self.device)
         
         #print(f"reward_std: {reward_std}")
