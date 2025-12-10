@@ -139,6 +139,7 @@ class OnlineFinetuner():
             print(f"Initial lambda: {self.config.AMConfig.lam}")
             print(f"eta_lam: {self.config.AMConfig.eta_lam}")
             print(f"update_lambda_every: {self.config.AMConfig.update_lambda_every}")
+            print(f"Differential Entropy Maximization:: {self.config.AMConfig.MaxEnt}")
             print('Device Details: ---------------------------------------------------------------------------')
             print(f"The device is: {self.device}")
             print(f"The number of GPUs is: {torch.cuda.device_count()}")
