@@ -450,7 +450,7 @@ class Acc_AdjointMatchingFineTuner:
                 s0 = s0.to(self.device)
                 with self.accelerator.autocast():
                      traj, reward = self.sample_Traj_karras(s0, base_reward_model) 
-                     print(f"reward: {reward}") 
+                     #print(f"reward: {reward}") 
                 #traj, reward = self.sample_Traj(s0, base_reward_model)  
                 local_trajs.append(traj)
                 final_x = traj[-1].squeeze(0).to(self.device)
