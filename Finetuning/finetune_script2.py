@@ -53,13 +53,13 @@ if __name__ == "__main__":
         Loss_Clip_percent = 0.75,
         finetune_batch_size = 12,
         finetune_lr = 2e-05,
-        inital_lam = 2.0,
+        inital_lam = 2.5,
         eta_lam = 0.5,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
         reward_scaling_factor = 50,
         MaxEnt = True,
-        Entropy_Scaling_Factor = 0.05)
+        Entropy_Scaling_Factor = 1.0)
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
