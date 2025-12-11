@@ -61,7 +61,7 @@ if __name__ == "__main__":
         update_lambda_every = 1,
         reward_scaling_factor = 50,
         MaxEnt = True,
-        Entropy_Scaling_Factor = 0.1)
+        Entropy_Scaling_Factor = 0)
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
