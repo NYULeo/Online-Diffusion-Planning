@@ -118,7 +118,7 @@ class RewardDataset(Dataset):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
-            rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate = 4/sigma)
+            rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate = 10/sigma)
             #print(rews)
             #print(rews.dtype)
             #exit()
@@ -177,8 +177,8 @@ def train_reward(dataset_name: str, batch_size, num_steps, save_freq, lr, sigma,
         num_layers=5).to(device)
     """
     #reward_net = LargeScalarReward(obs_dim, act_dim, output_scale = target_reward).to(device)
-    #reward_net = SimpleReward(obs_dim, act_dim).to(device)
-    reward_net = DeepScaledReward(obs_dim, act_dim).to(device)
+    reward_net = SimpleReward(obs_dim, act_dim).to(device)
+    #reward_net = DeepScaledReward(obs_dim, act_dim).to(device)
     #reward_net = Reward(obs_dim, act_dim).to(device)
     #reward_net = MLPNetwork(input_dim = obs_dim + act_dim, out_dim = 1, hidden_dims = [200, 200, 200, 200], act_fn = 'swish', out_act_fn = 'identity').to(device)
     optimizer = optim.AdamW(reward_net.parameters(), lr = lr, weight_decay = 1e-4)
@@ -226,7 +226,7 @@ class test_dataset(Dataset):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
-            rews = gaussian_filter1d(rews, sigma, mode = 'nearest', truncate = 4/sigma)
+            rews = gaussian_filter1d(rews, sigma, mode = 'nearest', truncate = 10/sigma)
             for t in range(len(acts)):
                 obs_t = self.stats.norm_obs(obs[t])
                 a_t   = acts[t]
@@ -271,8 +271,8 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
     num = save_freq
     while num <= num_steps:
          state_dict = load_model(reward_name, num)
-         #reward_net = SimpleReward(obs_dim, act_dim).to(device)
-         reward_net = DeepScaledReward(obs_dim, act_dim).to(device)
+         reward_net = SimpleReward(obs_dim, act_dim).to(device)
+         #reward_net = DeepScaledReward(obs_dim, act_dim).to(device)
          #reward_net = Reward(obs_dim, act_dim).to(device)
          #reward_net = MLPNetwork(input_dim = obs_dim + act_dim, out_dim = 1, hidden_dims = [200, 200, 200, 200], act_fn = 'swish', out_act_fn = 'identity').to(device)
          reward_net.load_state_dict(state_dict)

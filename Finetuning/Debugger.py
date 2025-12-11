@@ -151,9 +151,9 @@ def heatmap(STEP):
    # ================== Load Reward Model ==================
    #print(f"Loading reward model (step {STEP})...")
    state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', STEP, 'medium')
-   #model = SimpleReward(obs_dim, act_dim)
+   model = SimpleReward(obs_dim, act_dim)
    #model = Reward(obs_dim, act_dim)
-   model = DeepScaledReward(obs_dim, act_dim)
+   #model = DeepScaledReward(obs_dim, act_dim)
    model.load_state_dict(state_dict)
    model.eval()
    stats = get_pretrained_reward_stats(name)

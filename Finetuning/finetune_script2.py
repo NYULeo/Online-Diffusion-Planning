@@ -46,7 +46,7 @@ if __name__ == "__main__":
         dataset_name = env_name,
         specific_dataset = specific_env,
         planner_checkpoint = 1000000,
-        reward_model_checkpoint = 200000,
+        reward_model_checkpoint = 50000,
         kernel_model_checkpoint = 34000,
         finetune_steps = 5000,
         diffusion_steps = 50,
@@ -55,13 +55,13 @@ if __name__ == "__main__":
         finetune_batch_size = 12,
         finetune_lr = 2e-05,
         #inital_lam = 2.5,
-        inital_lam = 0,
+        inital_lam = 0.0,
         eta_lam = 0.5,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
         reward_scaling_factor = 50,
         MaxEnt = True,
-        Entropy_Scaling_Factor = 0.1)
+        Entropy_Scaling_Factor = 0.0)
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
