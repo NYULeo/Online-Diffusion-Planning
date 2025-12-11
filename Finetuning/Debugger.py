@@ -323,7 +323,7 @@ def heatmap(STEP):
 if __name__ == '__main__':
    
    step = 50000
-   while(step <= 200000):
+   while(step <= 500000):
        np.random.seed(0)
        random.seed(0)
        torch.manual_seed(0) 
