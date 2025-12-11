@@ -504,3 +504,88 @@ class SimpleReward(nn.Module):
     def forward(self, obs, act):
         x = torch.cat([obs, act], dim=-1)
         return self.net(x).squeeze(-1) * self.scale
+
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class DeepScaledReward(nn.Module):
+    def __init__(self, obs_dim, act_dim, hidden=512, num_layers=64, dropout_p=0.1):
+        super().__init__()
+        input_dim = obs_dim + act_dim
+        self.input_proj = nn.Linear(input_dim, hidden)
+        
+        # Deep residual stack (paper's core: residuals + LayerNorm + Swish/SiLU)
+        self.layers = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(hidden, hidden),
+                nn.LayerNorm(hidden),
+                nn.SiLU(),  # Swish: Smooth, non-dying activation (paper Fig. 16)
+                nn.Dropout(dropout_p),
+                nn.Linear(hidden, hidden),  # Paired for double-layer block
+                nn.LayerNorm(hidden),
+                nn.SiLU(),
+                nn.Dropout(dropout_p)
+            ) for _ in range(num_layers // 2)  # e.g., 32 blocks for 64 layers
+        ])
+        
+        self.output = nn.Linear(hidden, 1)
+        self.scale = nn.Parameter(torch.tensor(5.0))
+        self.residual_proj = nn.Linear(input_dim, hidden)  # Initial skip
+
+    def forward(self, obs, act):
+        x = torch.cat([obs, act], dim=-1)
+        residual = self.residual_proj(x)
+        x = self.input_proj(x) + residual  # Initial residual
+        
+        for layer in self.layers:
+            skip = x
+            x = layer(x)
+            x = x + skip  # Residual connection—key for deep scaling (paper Sec. A.7)
+        
+        out = F.softplus(self.output(x)).squeeze(-1) * self.scale  # Positive, smooth for sparse
+        return out
+
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class DeepResidualReward(nn.Module):
+    def __init__(self, obs_dim, act_dim, hidden_dim=512, num_blocks=32, dropout_p=0.05):
+        super().__init__()
+        input_dim = obs_dim + act_dim
+        self.input_proj = nn.Linear(input_dim, hidden_dim)
+        
+        # Deep residual blocks: Each block = 2 layers (total 64 layers for num_blocks=32)
+        self.blocks = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.LayerNorm(hidden_dim),
+                nn.SiLU(),  # Swish: Smooth gradients for sparse propagation
+                nn.Dropout(dropout_p),
+                
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.LayerNorm(hidden_dim),
+                nn.SiLU(),
+                nn.Dropout(dropout_p)
+            ) for _ in range(num_blocks)
+        ])
+        
+        self.output = nn.Linear(hidden_dim, 1)
+        self.scale = nn.Parameter(torch.tensor(5.0))  # Your learnable scale
+        self.residual_proj = nn.Linear(input_dim, hidden_dim)  # Initial skip
+
+    def forward(self, obs, act):
+        x = torch.cat([obs, act], dim=-1)
+        residual = self.residual_proj(x)
+        x = self.input_proj(x) + residual  # Initial residual connection
+        
+        for block in self.blocks:
+            skip = x
+            x = block(x)
+            x = x + skip  # Residual after each block—prevents vanishing in zeros
+        
+        out = F.softplus(self.output(x)).squeeze(-1) * self.scale  # ≥0, bounded for sparsity
+        return out
