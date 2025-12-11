@@ -59,7 +59,7 @@ if __name__ == "__main__":
         eta_lam = 0.5,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
-        reward_scaling_factor = 1,
+        reward_scaling_factor = 50,
         MaxEnt = True,
         Entropy_Scaling_Factor = 0.1)
     set_seed(1)
