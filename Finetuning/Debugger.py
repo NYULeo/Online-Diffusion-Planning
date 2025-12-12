@@ -172,6 +172,26 @@ def heatmap(STEP):
    action_grid = np.array([[ax, ay] for ax in actions for ay in actions]).astype(np.float32)
    acts_t = torch.from_numpy(action_grid)
 
+
+
+   #New Added Code
+   # Find the index of the zero action [0.0, 0.0] for using original reward values
+   zero_action_idx = None
+   for i, act in enumerate(action_grid):
+       if np.allclose(act, [0.0, 0.0], atol=1e-6):
+           zero_action_idx = i
+           break
+   
+   if zero_action_idx is None:
+       # Fallback: use middle action if zero doesn't exist
+       zero_action_idx = len(action_grid) // 2
+       print(f"Warning: Zero action not found, using action index {zero_action_idx}: {action_grid[zero_action_idx]}")
+
+
+
+
+
+
    #  Store reward maps for each goal
    reward_maps_per_goal = []
 
@@ -204,7 +224,8 @@ def heatmap(STEP):
             
             # Compute rewards
              r = model(obs_norm, act_rep).cpu().numpy().reshape(end-start, -1)
-             reward_map_goal[start:end] = r.max(axis=1)
+             #reward_map_goal[start:end] = r.max(axis=1)
+             reward_map_goal[start:end] = r[:, zero_action_idx]
             
              #if start % (BATCH_SIZE*10) == 0:
                 #print(f"  → {start}/{len(obs_base)}")
@@ -318,6 +339,9 @@ def heatmap(STEP):
       npy_path = os.path.join(project_root, OUTPUT_FILE.replace('.png', '.npy'))
       np.save(npy_path, reward_map)
       print(f"Reward map saved as numpy array to {npy_path}")
+   print(f"Final reward_map stats: min={reward_map.min():.4f}, max={reward_map.max():.4f}, mean={reward_map.mean():.4f}")
+   print(f"Negative positions: {(reward_map < 0).sum()} / {reward_map.size} ({100 * (reward_map < 0).sum() / reward_map.size:.1f}%)")
+   np.save(f"{STEP}_reward_map_debug.npy", reward_map)  # Save for later inspection
 
 
 
@@ -357,8 +381,6 @@ while (t<500):
        coordinates.append(cond[:2].numpy())
    t += 1
 """
-
-
 
 
 
