@@ -661,7 +661,7 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
 
 
 
-
+"""
 if __name__ == '__main__':
    
    step = 5000
@@ -674,7 +674,12 @@ if __name__ == '__main__':
        step += 5000
    print('Done')
 
+"""
 
+v = torch.tensor([10,10], dtype = torch.float32)
+max_norm = 5.0
+v = v * torch.clamp(max_norm / torch.norm(v), max=1.0)
+print(v)
 
 """
 def Initialize_Buffer():
