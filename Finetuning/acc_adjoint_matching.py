@@ -469,7 +469,7 @@ class Acc_AdjointMatchingFineTuner:
         if self.accelerator.is_main_process:
             total_avgC = float(all_final_Cs.mean().item())
             #reward_std = float(all_rewards.std().item())
-            reward_std = float(torch.max(all_rewards).item() - torch.min(all_rewards.item()))
+            reward_std = float(torch.max(all_rewards).item() - torch.min(all_rewards).item())
 
         else:
             total_avgC = 0.0
