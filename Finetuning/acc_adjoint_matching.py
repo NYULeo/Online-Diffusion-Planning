@@ -396,6 +396,7 @@ class Acc_AdjointMatchingFineTuner:
         k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
        
         a0 = ( (self.config.reward_scaling_factor/reward_std) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * EntGrad)
+        print(f"a0: {a0.norm().item()}")
         
         a.append(a0)
         #a.append(torch.zeros_like(gradient).unsqueeze(0).to(self.device))
@@ -468,6 +469,8 @@ class Acc_AdjointMatchingFineTuner:
         if self.accelerator.is_main_process:
             total_avgC = float(all_final_Cs.mean().item())
             reward_std = float(all_rewards.std().item())
+            #reward_std = float(torch.max(all_rewards).item() - torch.min(all_rewards.item()))
+
         else:
             total_avgC = 0.0
             reward_std = 0.0
