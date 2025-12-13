@@ -383,6 +383,7 @@ class Acc_AdjointMatchingFineTuner:
         T = X_reversed[0]
         T_squeezed = T.squeeze(0).to(self.device)
         reward, gradient = reward_model(T_squeezed, self.Lam.get_lam())
+        print(f"Reward Gradeint Norm: {gradient.norm().item()}")
         if(self.config.MaxEnt):
             score = self.old_score_net(T, torch.tensor(0.0).unsqueeze(0).to(self.device))
             EntGrad = -1 * score
@@ -447,7 +448,7 @@ class Acc_AdjointMatchingFineTuner:
                 s0 = s0.to(self.device)
                 with self.accelerator.autocast():
                      traj, reward = self.sample_Traj_karras(s0, base_reward_model)  
-                     print(f"Reward: {reward}")
+                     #print(f"Reward: {reward}")
                 local_trajs.append(traj)
                 final_x = traj[-1].squeeze(0).to(self.device)
                 C_val = base_reward_model.get_c(final_x)
