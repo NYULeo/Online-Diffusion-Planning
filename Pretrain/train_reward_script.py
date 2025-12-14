@@ -14,8 +14,8 @@ if __name__ == '__main__':
     num_steps = 1000, 
     save_freq = 200,  
     lr = 3e-4,
-    sigma = 5.0,
-    target_reward = 10.0,
+    sigma = 100.0,
+    target_reward = 50.0,
     specific_dataset='medium')
 
 
