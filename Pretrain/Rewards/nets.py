@@ -506,10 +506,11 @@ class SimpleReward(nn.Module):
 """
 
 class SimpleReward(nn.Module):
-    def __init__(self, obs_dim, act_dim, hidden=64):
+    def __init__(self, obs_dim, act_dim, hidden=32):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(obs_dim + act_dim, hidden),
+            nn.SiLU(),
             nn.Linear(hidden, hidden), 
             nn.SiLU(),
             nn.Linear(hidden, 1),
