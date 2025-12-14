@@ -18,7 +18,7 @@ from Pretrain.utils import set_seed, SAStats
 #from Critic.train_critic import get_CriticName
 import torch.nn as nn
 import pickle
-from Pretrain.Rewards.nets import Reward, MLPNetwork, ScalarReward, SimpleReward, DeepScaledReward
+from Pretrain.Rewards.nets import Reward, MLPNetwork, ScalarReward, SimpleReward
 import os
 from scipy.ndimage import gaussian_filter1d, convolve
 from Pretrain.utils import cycle
