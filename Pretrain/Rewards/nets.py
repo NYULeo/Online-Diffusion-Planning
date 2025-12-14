@@ -493,11 +493,7 @@ class SimpleReward(nn.Module):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(obs_dim + act_dim, hidden), 
-            nn.LayerNorm(hidden), 
-            nn.SiLU(),
             nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden), 
-            nn.SiLU(),
             nn.Linear(hidden, 1),
             nn.ReLU()                              
         )
