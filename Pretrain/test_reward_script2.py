@@ -24,10 +24,10 @@ if __name__ == '__main__':
     dataset_name = 'pointmaze', 
     specific_dataset = 'medium', 
     trajs = trajs,
-    sigma = 3.0, 
-    target_reward = 5.0,
-    save_freq = 20000, 
-    num_steps = 100000)
+    sigma = 5.0, 
+    target_reward = 10.0,
+    save_freq = 200, 
+    num_steps = 1000)
 
 
 

@@ -118,7 +118,7 @@ class RewardDataset(Dataset):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
-            rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate = 100/sigma)
+            rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate = 150/sigma)
             #print(rews)
             #print(rews.dtype)
             #exit()
@@ -226,7 +226,7 @@ class test_dataset(Dataset):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
-            rews = gaussian_filter1d(rews, sigma, mode = 'nearest', truncate = 100/sigma)
+            rews = gaussian_filter1d(rews, sigma, mode = 'nearest', truncate = 150/sigma)
             for t in range(len(acts)):
                 obs_t = self.stats.norm_obs(obs[t])
                 a_t   = acts[t]
