@@ -13,9 +13,9 @@ if __name__ == '__main__':
     batch_size = 256, 
     num_steps = 1000, 
     save_freq = 200,  
-    lr = 3e-4,
-    sigma = 3.0,
-    target_reward = 5.0,
+    lr = 1e-4,
+    sigma = 5.0,
+    target_reward = 10.0,
     specific_dataset='medium')
 
 
