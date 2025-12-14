@@ -37,7 +37,7 @@ except ImportError as e:
     MATPLOTLIB_AVAILABLE = False
     plt = None
 import minari
-from Pretrain.Rewards.nets import SimpleReward, Reward, DeepScaledReward
+from Pretrain.Rewards.nets import SimpleReward, Reward
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 import random
 from torch.utils.data import DistributedSampler, DataLoader
