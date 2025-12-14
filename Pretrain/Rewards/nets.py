@@ -487,7 +487,7 @@ class EnsembleModel(nn.Module):
 """
 
 
-
+"""
 class SimpleReward(nn.Module):
     def __init__(self, obs_dim, act_dim, hidden=512):
         super().__init__()
@@ -503,8 +503,27 @@ class SimpleReward(nn.Module):
         x = torch.cat([obs, act], dim=-1)
         #return self.net(x).squeeze(-1) * self.scale
         return self.net(x).squeeze(-1)
+"""
+
+class SimpleReward(nn.Module):
+    def __init__(self, obs_dim, act_dim, hidden=512):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(obs_dim + act_dim, hidden), nn.SiLU(),
+            nn.Linear(hidden, hidden), nn.SiLU(),
+            nn.Linear(hidden, 1),
+            nn.ReLU()                              
+        )
+        #self.scale = nn.Parameter(torch.tensor(5.0))
+
+    def forward(self, obs, act):
+        x = torch.cat([obs, act], dim=-1)
+        #return self.net(x).squeeze(-1) * self.scale
+        return self.net(x).squeeze(-1)
 
 
+
+"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -545,5 +564,5 @@ class DeepScaledReward(nn.Module):
         
         out = F.softplus(self.output(x)).squeeze(-1) * self.scale  # Positive, smooth for sparse
         return out
-
+"""
 
