@@ -449,14 +449,25 @@ class Acc_AdjointMatchingFineTuner:
             local_rewards = []
             for s0 in local_s0:
                 s0 = s0.to(self.device)
-                with self.accelerator.autocast():
-                     traj, reward = self.sample_Traj_karras(s0, base_reward_model)  
+                #Mutiple Ones
+                for i in range(5):
+                     with self.accelerator.autocast():
+                          traj, reward = self.sample_Traj_karras(s0, base_reward_model)  
+                     if(reward.item() < 0.5):
+                          continue
                      #print(f"Reward: {reward}")
-                local_trajs.append(traj)
-                final_x = traj[-1].squeeze(0).to(self.device)
-                C_val = base_reward_model.get_c(final_x)
-                local_final_Cs.append(C_val)
-                local_rewards.append(reward)
+                     local_trajs.append(traj)
+                     final_x = traj[-1].squeeze(0).to(self.device)
+                     C_val = base_reward_model.get_c(final_x)
+                     local_final_Cs.append(C_val)
+                     local_rewards.append(reward)
+            # Handle case where no trajectories pass the filter
+            if len(local_trajs) == 0:
+                # Return zero loss/reward if no valid trajectories
+                if self.accelerator.is_main_process:
+                    return 0.0, 0.0, 0.0
+                return 0.0, 0.0, 0.0
+
             local_trajs = torch.stack(local_trajs).to(self.device)
             local_final_Cs = torch.stack(local_final_Cs)
             local_rewards = torch.stack(local_rewards)
@@ -493,6 +504,7 @@ class Acc_AdjointMatchingFineTuner:
                   loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
             local_loss_tensors.append(loss_tensor)
             local_rewards.append(reward)
+
         local_loss = torch.stack(local_loss_tensors).mean()
         local_rewards = torch.stack(local_rewards).mean()
             
