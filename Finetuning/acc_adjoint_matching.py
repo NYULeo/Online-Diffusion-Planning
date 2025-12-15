@@ -450,17 +450,17 @@ class Acc_AdjointMatchingFineTuner:
             for s0 in local_s0:
                 s0 = s0.to(self.device)
                 #Mutiple Ones
-                for i in range(1):
-                     with self.accelerator.autocast():
-                          traj, reward = self.sample_Traj_karras(s0, base_reward_model)  
-                     if(reward.item() < 0.5):
-                          continue
+                #for i in range(1):
+                with self.accelerator.autocast():
+                    traj, reward = self.sample_Traj_karras(s0, base_reward_model)  
+                if(reward.item() < 0.5):
+                    continue
                      #print(f"Reward: {reward}")
-                     local_trajs.append(traj)
-                     final_x = traj[-1].squeeze(0).to(self.device)
-                     C_val = base_reward_model.get_c(final_x)
-                     local_final_Cs.append(C_val)
-                     local_rewards.append(reward)
+                local_trajs.append(traj)
+                final_x = traj[-1].squeeze(0).to(self.device)
+                C_val = base_reward_model.get_c(final_x)
+                local_final_Cs.append(C_val)
+                local_rewards.append(reward)
             # Handle case where no trajectories pass the filter
             if len(local_trajs) == 0:
                 # Return zero loss/reward if no valid trajectories

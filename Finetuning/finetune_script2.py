@@ -52,7 +52,7 @@ if __name__ == "__main__":
         diffusion_steps = 50,
         karras_percent = 0.05,
         Loss_Clip_percent = 0.75,
-        finetune_batch_size = 6,
+        finetune_batch_size = 12,
         finetune_lr = 2e-05,
         #inital_lam = 2.5,
         inital_lam = 0.0,
@@ -60,8 +60,8 @@ if __name__ == "__main__":
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
         reward_scaling_factor = 50,
-        MaxEnt = True,
-        Entropy_Scaling_Factor = 0.0) 
+        MaxEnt = False,
+        Entropy_Scaling_Factor = 0.5) 
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
