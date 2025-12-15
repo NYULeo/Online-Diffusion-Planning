@@ -461,12 +461,6 @@ class Acc_AdjointMatchingFineTuner:
                 C_val = base_reward_model.get_c(final_x)
                 local_final_Cs.append(C_val)
                 local_rewards.append(reward)
-            # Handle case where no trajectories pass the filter
-            if len(local_trajs) == 0:
-                # Return zero loss/reward if no valid trajectories
-                if self.accelerator.is_main_process:
-                    return 0.0, 0.0, 0.0
-                return 0.0, 0.0, 0.0
 
             local_trajs = torch.stack(local_trajs).to(self.device)
             local_final_Cs = torch.stack(local_final_Cs)
