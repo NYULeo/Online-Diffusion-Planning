@@ -454,9 +454,9 @@ class Acc_AdjointMatchingFineTuner:
                 with self.accelerator.autocast():
                     traj, reward = self.sample_Traj_karras(s0, base_reward_model) 
                 print(f"Reward: {reward.item()}")
-                if(reward.item() == 0.0):
-                    continue
-                     #print(f"Reward: {reward}")
+                #if(reward.item() == 0.0):
+                    #continue
+                 
                 local_trajs.append(traj)
                 final_x = traj[-1].squeeze(0).to(self.device)
                 C_val = base_reward_model.get_c(final_x)
