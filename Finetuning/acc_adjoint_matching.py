@@ -452,7 +452,9 @@ class Acc_AdjointMatchingFineTuner:
                 #Mutiple Ones
                 #for i in range(1):
                 with self.accelerator.autocast():
-                    traj, reward = self.sample_Traj_karras(s0, base_reward_model)  
+                    traj, reward = self.sample_Traj_karras(s0, base_reward_model) 
+                print(f"Reward: {type(reward)}")
+                exit()
                 if(reward.item() < 0.5):
                     continue
                      #print(f"Reward: {reward}")
