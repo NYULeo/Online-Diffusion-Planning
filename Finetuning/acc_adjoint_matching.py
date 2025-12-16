@@ -450,22 +450,27 @@ class Acc_AdjointMatchingFineTuner:
             for s0 in local_s0:
                 s0 = s0.to(self.device)
                 #Mutiple Ones
-                #for i in range(1):
-                with self.accelerator.autocast():
-                    traj, reward = self.sample_Traj_karras(s0, base_reward_model) 
-                print(f"Reward: {reward.item()}")
-                #if(reward.item() == 0.0):
-                    #continue
+                for i in range(5):
+                   with self.accelerator.autocast():
+                       traj, reward = self.sample_Traj_karras(s0, base_reward_model) 
+                   #print(f"Reward: {reward.item()}")
+                   if(reward.item() == 0.0):
+                       continue
                  
-                local_trajs.append(traj)
-                final_x = traj[-1].squeeze(0).to(self.device)
-                C_val = base_reward_model.get_c(final_x)
-                local_final_Cs.append(C_val)
-                local_rewards.append(reward)
-
-            local_trajs = torch.stack(local_trajs).to(self.device)
-            local_final_Cs = torch.stack(local_final_Cs)
-            local_rewards = torch.stack(local_rewards)
+                   local_trajs.append(traj)
+                   final_x = traj[-1].squeeze(0).to(self.device)
+                   C_val = base_reward_model.get_c(final_x)
+                   local_final_Cs.append(C_val)
+                   local_rewards.append(reward)
+            if(len(local_trajs) != 0):
+               local_trajs = torch.stack(local_trajs).to(self.device)
+               local_final_Cs = torch.stack(local_final_Cs)
+               local_rewards = torch.stack(local_rewards)
+            else:
+                # Create empty tensors with appropriate shape/device
+                local_trajs = torch.empty(0, device=self.device)  # Empty tensor on device
+                local_final_Cs = torch.empty(0, device=self.device)
+                local_rewards = torch.empty(0, device=self.device)
         
         self.accelerator.wait_for_everyone()
         
@@ -499,9 +504,14 @@ class Acc_AdjointMatchingFineTuner:
                   loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
             local_loss_tensors.append(loss_tensor)
             local_rewards.append(reward)
-
-        local_loss = torch.stack(local_loss_tensors).mean()
-        local_rewards = torch.stack(local_rewards).mean()
+        
+        if len(local_loss_tensors) > 0:
+            local_loss = torch.stack(local_loss_tensors).mean()
+            local_rewards = torch.stack(local_rewards).mean()
+        else:
+            # Handle empty case - maybe return zero loss or skip this step
+            local_loss = torch.tensor(0.0, device=self.device, requires_grad=True)
+            local_rewards = torch.tensor(0.0, device=self.device)
             
             
         self.accelerator.wait_for_everyone()
