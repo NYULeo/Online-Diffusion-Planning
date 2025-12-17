@@ -108,6 +108,8 @@ class RewardDataset(Dataset):
         self.stats.obs_std = obs_all.std(axis=0)+ 1e-8
         
         transitions = []
+        Total = 0
+        Zero = 0
         #L = 0
         for traj in trajs:
             obs = np.asarray(traj['observations'])
@@ -128,9 +130,15 @@ class RewardDataset(Dataset):
                 a_t   = acts[t]
                 r_t   = rews[t]
                 transitions.append((obs_t, a_t, r_t))
+                total += 1
+                if(r_t == 0.0):
+                     Zero += 1
+            
 
         self.transitions = transitions
         self.save_stats(reward_name)
+        print(f"Total: {Total}, Zero: {Zero}, Percentage: {Zero/Total}")
+        exit()
         #print(L/len(trajs))
     
     def save_stats(self, reward_name):
@@ -167,14 +175,6 @@ def train_reward(dataset_name: str, batch_size, num_steps, save_freq, lr, sigma,
     print(f"Training reward approximator for {dataset_name} Dataset") 
     dataset = RewardDataset(trajs, sigma, reward_name, target_reward)
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
-    count = 0
-    for s, a, r in dataloader:
-        if(r.item() == 0.0):
-            count += 1
-    print(f"Length of dataloader: {len(dataloader)}")
-    print(f"Number of 0 rewards: {count}")
-    print(f"Percentage of 0 rewards: {count/len(dataloader)}")
-    exit()
     
     """
     reward_net = ScalarReward(
