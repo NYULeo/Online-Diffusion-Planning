@@ -130,7 +130,7 @@ class RewardDataset(Dataset):
                 a_t   = acts[t]
                 r_t   = rews[t]
                 transitions.append((obs_t, a_t, r_t))
-                total += 1
+                Total += 1
                 if(r_t == 0.0):
                      Zero += 1
             
