@@ -111,7 +111,6 @@ class RewardDataset(Dataset):
         transitions = []
         Total = 0
         Zero = 0
-        #L = 0
         for traj in trajs:
             obs = np.asarray(traj['observations'])
             acts = np.asarray(traj['actions'])
@@ -132,15 +131,9 @@ class RewardDataset(Dataset):
                 Total += 1
                 if(r_t == 0.0):
                     Zero += 1
-               
-                
-                    
-    
+            
         self.transitions = transitions
         self.save_stats(reward_name)
-        print(f"Total: {Total}, Zero: {Zero}, Percentage: {Zero/Total}")
-        exit()
-        #print(L/len(trajs))
     
     def save_stats(self, reward_name):
         stats_name =  str(reward_name) + '_stats.pkl'
