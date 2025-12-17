@@ -562,6 +562,31 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
     neg_count = (reward_map < 0).sum()
     neg_pct = 100 * neg_count / reward_map.size
     print(f"Final reward_map stats: min={reward_map.min():.4f}, max={reward_map.max():.4f}, mean={reward_map.mean():.4f}")
+    
+    # Reward stats over the entire grid (all positions after aggregation)
+    rm_finite = np.isfinite(reward_map)
+    rm_mean = reward_map[rm_finite].mean()
+    rm_var  = reward_map[rm_finite].var()      # population variance (ddof=0)
+    rm_std  = reward_map[rm_finite].std()
+
+    print(f"Final reward_map stats: min={reward_map[rm_finite].min():.4f}, "
+      f"max={reward_map[rm_finite].max():.4f}, mean={rm_mean:.4f}, "
+      f"var={rm_var:.6f}, std={rm_std:.6f}, N={rm_finite.sum()}")
+
+    # (Optional) grad-norm stats too
+    gn_finite = np.isfinite(gradnorm_map)
+    gn_mean = gradnorm_map[gn_finite].mean()
+    gn_var  = gradnorm_map[gn_finite].var()
+    gn_std  = gradnorm_map[gn_finite].std()
+    print(f"Final gradnorm_map stats: min={gradnorm_map[gn_finite].min():.6f}, "
+      f"max={gradnorm_map[gn_finite].max():.6f}, mean={gn_mean:.6f}, "
+      f"var={gn_var:.6f}, std={gn_std:.6f}, N={gn_finite.sum()}")
+
+
+
+
+
+
     print(f"Negative positions: {neg_count} / {reward_map.size} ({neg_pct:.1f}%)")
     if neg_pct < 1.0:
         print("Warning: Negatives are sparse (<1%). Try agg_method='mean' or 'min' to reveal more.")

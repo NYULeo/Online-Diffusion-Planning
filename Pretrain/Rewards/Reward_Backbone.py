@@ -28,6 +28,7 @@ import torch.nn.functional as F
 import numpy as np
 
 
+
 def reward_filter(obs, rews):
     #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
     target_goals = np.array([[-1.5, 0.5]])
@@ -121,21 +122,20 @@ class RewardDataset(Dataset):
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
             rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate = 200/sigma)
-            #print(rews)
-            #print(rews.dtype)
-            #exit()
-            #L += len(rews)
             for t in range(len(acts)):
                 obs_t = self.stats.norm_obs(obs[t])
-                print(obs_t)
                 a_t   = acts[t]
                 r_t   = rews[t]
+                if( (r_t == 0.0) and (random.random() < 0.10)):
+                    continue
                 transitions.append((obs_t, a_t, r_t))
                 Total += 1
                 if(r_t == 0.0):
-                     Zero += 1
-            
-
+                    Zero += 1
+               
+                
+                    
+    
         self.transitions = transitions
         self.save_stats(reward_name)
         print(f"Total: {Total}, Zero: {Zero}, Percentage: {Zero/Total}")
