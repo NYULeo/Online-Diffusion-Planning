@@ -774,14 +774,14 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
 
 if __name__ == '__main__':
    
-   step = 2000
-   while(step <= 10000):
+   step = 200
+   while(step <= 1000):
        np.random.seed(0)
        random.seed(0)
        torch.manual_seed(0) 
        #print(f"Ploting the heatmap for checkpoint {step}")
        heatmap(step)
-       step += 2000
+       step += 200
    print('Done')
 
 
