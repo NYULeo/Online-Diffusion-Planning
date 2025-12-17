@@ -126,7 +126,7 @@ class RewardDataset(Dataset):
                 obs_t = self.stats.norm_obs(obs[t])
                 a_t   = acts[t]
                 r_t   = rews[t]
-                if( (r_t == 0.0) and (random.random() < 0.10)):
+                if( (r_t == 0.0) and (random.random() < 0.20)):
                     continue
                 transitions.append((obs_t, a_t, r_t))
                 Total += 1
