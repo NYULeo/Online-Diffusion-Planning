@@ -71,6 +71,25 @@ def function(x, beta: float):
 
 
 
+from Rewards.Reward_Backbone import RewardDataset, Train_Dataset
+trajs, name, obs_dim, act_dim = Train_Dataset('pointmaze', 'medium')
+dataset = RewardDataset(trajs, 7.0, name, 1.0)
+cords = dataset.transitions
+coordinates = []
+for cord in cords:
+    coordinates.append(cord[0])
+coordinates = np.array(coordinates)
+coordinates = coordinates[:, :2]
+plt.figure(figsize=(10, 8))
+plt.hexbin(coordinates[:, 0], coordinates[:, 1], gridsize=50, cmap='viridis', mincnt=1)
+plt.colorbar(label='Count')
+plt.xlabel('X-coordinate')
+plt.ylabel('Y-coordinate')
+plt.title('Hexbin Heatmap of Coordinates')
+plt.show()
+
+
+
 """
 save_path = f'./Rollouts/{'pointmaze'}/{'medium'}/Generated_trajs_Info.pkl'
 with open(save_path, 'rb') as f:

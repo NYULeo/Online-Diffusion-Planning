@@ -120,13 +120,12 @@ class RewardDataset(Dataset):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
+            
             rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate = 200/sigma)
             for t in range(len(acts)):
                 obs_t = self.stats.norm_obs(obs[t])
                 a_t   = acts[t]
                 r_t   = rews[t]
-                if( (r_t == 0.0) and (random.random() < 0.20)):
-                    continue
                 transitions.append((obs_t, a_t, r_t))
                 Total += 1
                 if(r_t == 0.0):

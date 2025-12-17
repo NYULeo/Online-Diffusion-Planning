@@ -796,7 +796,7 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
 
 
 
-
+"""
 if __name__ == '__main__':
    
    step = 200
@@ -808,7 +808,7 @@ if __name__ == '__main__':
        heatmap(step)
        step += 200
    print('Done')
-
+"""
 
 
 
@@ -839,10 +839,14 @@ while (t<500):
 
 
 
-"""
-save_path = f'./Finetuning/Initial_Conds_950.pkl'
+
+save_path = f'./Finetuning/Initial_Conds_3750.pkl'
 with open(save_path, 'rb') as f:
     coordinates = pickle.load(f)
+
+
+
+
 
 coordinates = np.array(coordinates)
 plt.figure(figsize=(10, 8))
@@ -852,7 +856,6 @@ plt.xlabel('X-coordinate')
 plt.ylabel('Y-coordinate')
 plt.title('Hexbin Heatmap of Coordinates')
 plt.show()
-"""
 
 
 
