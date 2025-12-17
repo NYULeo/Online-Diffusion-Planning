@@ -460,6 +460,7 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
 
     # Store reward maps for each goal
     reward_maps_per_goal = []
+    gradnorm_maps_per_goal = []
 
     for goal_idx, goal in enumerate(GOALS):
         print(f"Processing goal {goal_idx+1}/{len(GOALS)}: [{goal[0]:.2f}, {goal[1]:.2f}]")
@@ -473,7 +474,9 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
         ], axis=1).astype(np.float32)
     
         reward_map_goal = np.full(RESOLUTION**2, -1e10, dtype=np.float32)
-    
+       
+        #Replace 
+        """
         with torch.no_grad():
             for start in range(0, len(obs_base), BATCH_SIZE):
                 end = min(start + BATCH_SIZE, len(obs_base))
@@ -491,8 +494,38 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
                 # Compute rewards
                 r = model(obs_norm, act_rep).cpu().numpy().reshape(end-start, -1)
                 reward_map_goal[start:end] = r[:, zero_action_idx]
-        
+        """
+        obs_mean_t = torch.as_tensor(stats.obs_mean, dtype=torch.float32)
+        obs_std_t = torch.as_tensor(np.maximum(stats.obs_std, getattr(stats, "std_floor", 1e-3)), dtype=torch.float32)
+
+        gradnorm_map_goal = np.full(RESOLUTION**2, np.nan, dtype=np.float32)
+
+        for start in range(0, len(obs_base), BATCH_SIZE):
+            end = min(start + BATCH_SIZE, len(obs_base))
+
+            batch_obs = torch.from_numpy(obs_base[start:end]).float()
+            batch_obs.requires_grad_(True)  # gradients w.r.t. [x,y,goal_x,goal_y]
+
+            act = torch.from_numpy(action_grid[zero_action_idx]).float()
+            act_rep = act.unsqueeze(0).repeat(end - start, 1)  # [B,2]
+
+            # differentiable normalization (DON’T use stats.norm_obs here)
+            obs_norm = (batch_obs - obs_mean_t) / obs_std_t
+
+            r = model(obs_norm, act_rep)  # [B]
+            reward_map_goal[start:end] = r.detach().cpu().numpy()
+
+            grads = torch.autograd.grad(r.sum(), batch_obs, create_graph=False)[0]  # [B,4]
+            gradnorm = torch.norm(grads[:, :2], dim=1)  # only ∇ w.r.t (x,y)
+            gradnorm_map_goal[start:end] = gradnorm.detach().cpu().numpy()
         reward_maps_per_goal.append(reward_map_goal.reshape(RESOLUTION, RESOLUTION))
+
+
+
+
+
+
+        gradnorm_maps_per_goal.append(gradnorm_map_goal.reshape(RESOLUTION, RESOLUTION))
 
     # Aggregate reward maps (customizable: 'max', 'min', or 'mean')
     print(f"Aggregating with method: {agg_method}")
@@ -504,6 +537,26 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
         reward_map = np.stack(reward_maps_per_goal, axis=0).mean(axis=0)
     else:
         raise ValueError("agg_method must be 'max', 'min', or 'mean'")
+
+
+
+    #Addition
+    if agg_method == 'max':
+         gradnorm_map = np.stack(gradnorm_maps_per_goal, axis=0).max(axis=0)
+    elif agg_method == 'min':
+         gradnorm_map = np.stack(gradnorm_maps_per_goal, axis=0).min(axis=0)
+    elif agg_method == 'mean':
+         gradnorm_map = np.stack(gradnorm_maps_per_goal, axis=0).mean(axis=0)
+
+
+
+
+
+
+
+
+
+
 
     # Debug print (enhanced)
     neg_count = (reward_map < 0).sum()
@@ -529,7 +582,8 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
     if MATPLOTLIB_AVAILABLE:
         print("Creating heatmap...")
         
-        # Single or dual subplot setup
+        #Replacement
+        """
         if highlight_negatives and neg_mask.any():
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
             axes = [ax1, ax2]
@@ -539,7 +593,26 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
             fig, ax = plt.subplots(figsize=(12, 12))
             axes = [ax]
             titles = [f'Reward Heatmap (Step {STEP}) - All {len(GOALS)} Goals ({agg_method} agg)']
+        """
+        if highlight_negatives and neg_mask.any():
+             fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(30, 10))
+             axes = [ax1, ax2, ax3]
+             titles = [
+                  f'Full Range (Step {STEP}) - Reward ({agg_method} agg)',
+                  f'Negative Zoom (Step {STEP}) - Reward',
+                  f'Grad-Norm (Step {STEP}) - ||∇_(x,y) r|| ({agg_method} agg)',
+             ]
+        else:
+             fig, (ax1, ax3) = plt.subplots(1, 2, figsize=(20, 10))
+             axes = [ax1, ax3]
+             titles = [
+                    f'Reward Heatmap (Step {STEP}) - Reward ({agg_method} agg)',
+                    f'Grad-Norm Heatmap (Step {STEP}) - ||∇_(x,y) r|| ({agg_method} agg)',
+             ]
 
+
+        #Replacement
+        """
         data_min, data_max = reward_map.min(), reward_map.max()
         
         for idx, ax in enumerate(axes):
@@ -565,13 +638,51 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
             # Overlay negative contours (if any)
             if neg_mask.any():
                 ax.contour(X, Y, reward_map, levels=[0.0], colors='red', linestyles='--', linewidths=2, alpha=0.7)
+            """
+        data_min, data_max = reward_map.min(), reward_map.max()
+        finite = np.isfinite(gradnorm_map)
+        grad_vmax = np.percentile(gradnorm_map[finite], 99) if finite.any() else 1.0
 
+        for idx, ax in enumerate(axes):
+            is_grad_panel = (idx == len(axes) - 1)  # last axis is gradnorm
+
+            if is_grad_panel:
+               data = gradnorm_map
+               vmin, vmax = 0.0, grad_vmax
+               cmap = "viridis"
+               cbar_label = r"||∇_{x,y} reward||"
+            else:
+               data = reward_map
+               cbar_label = "Reward"
+               if idx == 0:  # full reward
+                    vmin, vmax = data_min, data_max
+                    cmap = "coolwarm"
+               else:  # negative zoom reward
+                    zoom_min, zoom_max = -0.1, 0.2
+                    vmin = max(data_min, zoom_min)
+                    vmax = min(0.0, zoom_max) if data_max > 0 else data_max
+                    cmap = "Blues_r"
+
+            im = ax.imshow(
+              data,
+              extent=[grid_min[0], grid_max[0], grid_min[1], grid_max[1]],
+              origin="lower",
+              cmap=cmap,
+              vmin=vmin, vmax=vmax,
+              interpolation="bilinear",
+            )
+            plt.colorbar(im, ax=ax, label=cbar_label, shrink=0.8)
+
+            # Only overlay reward=0 contour on reward panels (not gradnorm)
+            if (not is_grad_panel) and neg_mask.any():
+               ax.contour(X, Y, reward_map, levels=[0.0], colors="red",
+                          linestyles="--", linewidths=2, alpha=0.7)
             # Draw walls using env.maze.walls (more accurate than maze_map)
             print("Drawing maze walls...")
             if hasattr(env.maze, 'walls'):
-                for wall in env.maze.walls:
-                    (x0, y0), (x1, y1) = wall
-                    ax.plot([x0, x1], [y0, y1], 'k-', linewidth=3, zorder=10)
+                 for wall in env.maze.walls:
+                     (x0, y0), (x1, y1) = wall
+                     ax.plot([x0, x1], [y0, y1], 'k-', linewidth=3, zorder=10)
             else:
                 # Fallback: use maze_map if walls attribute doesn't exist
                 print("  Using maze_map fallback...")
