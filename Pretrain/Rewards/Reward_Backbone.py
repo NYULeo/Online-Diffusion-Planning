@@ -127,6 +127,7 @@ class RewardDataset(Dataset):
             #L += len(rews)
             for t in range(len(acts)):
                 obs_t = self.stats.norm_obs(obs[t])
+                print(obs_t)
                 a_t   = acts[t]
                 r_t   = rews[t]
                 transitions.append((obs_t, a_t, r_t))
