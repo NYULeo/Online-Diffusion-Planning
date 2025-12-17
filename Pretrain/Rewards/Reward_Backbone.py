@@ -167,7 +167,14 @@ def train_reward(dataset_name: str, batch_size, num_steps, save_freq, lr, sigma,
     print(f"Training reward approximator for {dataset_name} Dataset") 
     dataset = RewardDataset(trajs, sigma, reward_name, target_reward)
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
-    
+    count = 0
+    for s, a, r in dataloader:
+        if(r == 0.0):
+            count += 1
+    print(f"Length of dataloader: {len(dataloader)}")
+    print(f"Number of 0 rewards: {count}")
+    print(f"Percentage of 0 rewards: {count/len(dataloader)}")
+    exit()
     
     """
     reward_net = ScalarReward(
