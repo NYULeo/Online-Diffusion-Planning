@@ -398,9 +398,12 @@ class Acc_AdjointMatchingFineTuner:
         a0 =  ((self.config.reward_scaling_factor/reward_std) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * EntGrad)
         #max_norm = 5.0
         #a0 =   a0 * torch.clamp(max_norm / torch.norm(a0), max=1.0)
-        print(f"a0: {a0.norm().item()}")
+        #print(f"a0: {a0.norm().item()}")
+        if(a0.norm().item() == 0.0):
+            print(f"a0 is 0")
         
         a.append(a0)
+    
         #a.append(torch.zeros_like(gradient).unsqueeze(0).to(self.device))
         for i in range(steps_T - 1):
             #t_now, t_next = self.t_asc[i], self.t_asc[i + 1]
@@ -453,7 +456,7 @@ class Acc_AdjointMatchingFineTuner:
                 for i in range(5):
                    with self.accelerator.autocast():
                        traj, reward = self.sample_Traj_karras(s0, base_reward_model) 
-                   print(f"Reward: {reward.item()}")
+                   #print(f"Reward: {reward.item()}")
                    #if(reward.item() == 0.0):
                        #continue
                  
