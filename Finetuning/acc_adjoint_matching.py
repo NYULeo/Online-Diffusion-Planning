@@ -470,6 +470,9 @@ class Acc_AdjointMatchingFineTuner:
                 local_trajs = torch.stack(local_trajs).to(self.device)
                 local_final_Cs = torch.stack(local_final_Cs)
                 local_rewards = torch.stack(local_rewards)
+                print(local_final_Cs)
+                print(local_rewards)
+                exit()
             else:
                # Create empty tensors with appropriate shape/device
                local_trajs = None
@@ -514,6 +517,7 @@ class Acc_AdjointMatchingFineTuner:
         
             local_loss = torch.stack(local_loss_tensors).mean()
             local_rewards = torch.stack(local_rewards).mean()
+            print()
         else:
             local_loss = torch.tensor(0.0, device = self.device, requires_grad = False)
             local_rewards = torch.tensor(0.0, device = self.device, requires_grad = False)
