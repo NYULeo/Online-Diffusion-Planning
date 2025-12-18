@@ -515,8 +515,8 @@ class Acc_AdjointMatchingFineTuner:
             local_loss = torch.stack(local_loss_tensors).mean()
             local_rewards = torch.stack(local_rewards).mean()
         else:
-            local_loss = torch.tensor(0.0, device = self.device)
-            local_rewards = torch.tensor(0.0, device = self.device)
+            local_loss = torch.tensor(0.0, device = self.device, requires_grad = False)
+            local_rewards = torch.tensor(0.0, device = self.device, requires_grad = False)
         
             
             
