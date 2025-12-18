@@ -796,7 +796,7 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
 
 
 
-
+"""
 if __name__ == '__main__':
    
    step = 200
@@ -808,8 +808,10 @@ if __name__ == '__main__':
        heatmap(step)
        step += 200
    print('Done')
+"""
 
-
+s = torch.empty(0)
+print(s)
 
 
 """

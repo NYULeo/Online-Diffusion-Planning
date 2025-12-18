@@ -456,21 +456,25 @@ class Acc_AdjointMatchingFineTuner:
                 for i in range(5):
                    with self.accelerator.autocast():
                        traj, reward = self.sample_Traj_karras(s0, base_reward_model) 
-                   #print(f"Reward: {reward.item()}")
-                   #if(reward.item() == 0.0):
-                       #continue
+                   print(f"Reward: {reward.item()}")
+                   if(reward.item() == 0.0):
+                       continue
                  
                    local_trajs.append(traj)
                    final_x = traj[-1].squeeze(0).to(self.device)
                    C_val = base_reward_model.get_c(final_x)
                    local_final_Cs.append(C_val)
                    local_rewards.append(reward)
-            #if(len(local_trajs) != 0):
-            local_trajs = torch.stack(local_trajs).to(self.device)
-            local_final_Cs = torch.stack(local_final_Cs)
-            local_rewards = torch.stack(local_rewards)
-            #else:
+            
+            if(len(local_trajs) != 0):
+                local_trajs = torch.stack(local_trajs).to(self.device)
+                local_final_Cs = torch.stack(local_final_Cs)
+                local_rewards = torch.stack(local_rewards)
+            else:
                # Create empty tensors with appropriate shape/device
+               local_trajs = None
+               local_final_Cs = torch.tensor([0.0])
+               local_rewards = torch.tensor([0.0])
                # local_trajs = torch.empty(0, device=self.device)  # Empty tensor on device
                # local_final_Cs = torch.empty(0, device=self.device)
                # local_rewards = torch.empty(0, device=self.device)
@@ -480,7 +484,6 @@ class Acc_AdjointMatchingFineTuner:
         local_Cs_det = local_final_Cs.detach()
         # 2. Gather C values and update lambda on main process
         all_final_Cs = self.accelerator.gather_for_metrics(local_Cs_det, use_gather_object = False)
-        #all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object=False)
         all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object = False)
         if self.accelerator.is_main_process:
             total_avgC = float(all_final_Cs.mean().item())
@@ -498,22 +501,23 @@ class Acc_AdjointMatchingFineTuner:
         
         
         # 3. Compute adjoints, rewards & loss tensors for each trajectory
-        local_loss_tensors = []
-        local_rewards = []
-        for traj in local_trajs:
-            traj = [traj[i] for i in range(traj.shape[0])]
-            with self.accelerator.autocast():
-                  adjoint, reward = self.make_a(traj, reward_model, reward_std)
-                  loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
-            local_loss_tensors.append(loss_tensor)
-            local_rewards.append(reward)
+        if(local_trajs is not None):
+            local_loss_tensors = []
+            local_rewards = []
+            for traj in local_trajs:
+                traj = [traj[i] for i in range(traj.shape[0])]
+                with self.accelerator.autocast():
+                     adjoint, reward = self.make_a(traj, reward_model, reward_std)
+                     loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
+                local_loss_tensors.append(loss_tensor)
+                local_rewards.append(reward)
         
-        #if len(local_loss_tensors) > 0:
-        local_loss = torch.stack(local_loss_tensors).mean()
-        local_rewards = torch.stack(local_rewards).mean()
-        #else:
-            #local_loss = torch.tensor(0.0, device=self.device, requires_grad=True)
-            #local_rewards = torch.tensor(0.0, device=self.device)
+            local_loss = torch.stack(local_loss_tensors).mean()
+            local_rewards = torch.stack(local_rewards).mean()
+        else:
+            local_loss = torch.tensor(0.0, device = self.device)
+            local_rewards = torch.tensor(0.0, device = self.device)
+        
             
             
         self.accelerator.wait_for_everyone()
@@ -532,8 +536,8 @@ class Acc_AdjointMatchingFineTuner:
                 
         total_grad_norm = 0.0
         for param in self.accelerator.unwrap_model(self.new_score_net).parameters():
-             if param.grad is not None:
-                    total_grad_norm += param.grad.data.norm(2).item() ** 2
+            if param.grad is not None:
+                total_grad_norm += param.grad.data.norm(2).item() ** 2
         total_grad_norm = total_grad_norm ** (1. / 2)
         """
         if self.accelerator.is_main_process:
