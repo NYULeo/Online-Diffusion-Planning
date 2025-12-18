@@ -809,9 +809,8 @@ if __name__ == '__main__':
        step += 200
    print('Done')
 """
-
-s = torch.empty(0)
-print(s)
+a = torch.tensor([1.0]*10)
+print(a)
 
 
 """

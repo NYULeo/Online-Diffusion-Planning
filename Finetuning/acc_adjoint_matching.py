@@ -470,14 +470,11 @@ class Acc_AdjointMatchingFineTuner:
                 local_trajs = torch.stack(local_trajs).to(self.device)
                 local_final_Cs = torch.stack(local_final_Cs)
                 local_rewards = torch.stack(local_rewards)
-                print(local_final_Cs)
-                print(local_rewards)
-                exit()
             else:
                # Create empty tensors with appropriate shape/device
                local_trajs = None
-               local_final_Cs = torch.tensor([0.0])
-               local_rewards = torch.tensor([0.0])
+               local_final_Cs = torch.tensor([0.0]*len(local_s0), device = self.device)
+               local_rewards = torch.tensor([0.0]*len(local_s0), device = self.device)
                # local_trajs = torch.empty(0, device=self.device)  # Empty tensor on device
                # local_final_Cs = torch.empty(0, device=self.device)
                # local_rewards = torch.empty(0, device=self.device)
@@ -514,39 +511,35 @@ class Acc_AdjointMatchingFineTuner:
                      loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
                 local_loss_tensors.append(loss_tensor)
                 local_rewards.append(reward)
-        
+            
+            local_count = len(local_loss_tensors)
             local_loss = torch.stack(local_loss_tensors).mean()
             local_rewards = torch.stack(local_rewards).mean()
-            print()
         else:
-            local_loss = torch.tensor(0.0, device = self.device, requires_grad = False)
+            local_count = 0
+            local_loss = 0.0 * sum(p.float().sum() for p in self.new_score_net.parameters())
             local_rewards = torch.tensor(0.0, device = self.device, requires_grad = False)
+            
         
             
-            
+    
         self.accelerator.wait_for_everyone()
-        # 4. Gather loss tensors & reward floats across processes
+        local_count_t = torch.tensor(float(local_count), device=self.device)
+        global_count_t = self.accelerator.reduce(local_count_t, reduction="sum")
+        global_count = float(global_count_t.item())
+       
         
-        loss_global = self.accelerator.reduce(local_loss, reduction="mean")
-         
-        # Check whether the loss_global still has gradient
-        """
-        if self.accelerator.is_main_process:
-             print(f"loss_global.requires_grad = {loss_global.requires_grad}")
-        """
         # 5. Backward and optimizer step only on main process or all processes?
+        loss_to_backprop = local_loss * (local_count / global_count)
         self.optimizer.zero_grad()
-        self.accelerator.backward(loss_global)
+        self.accelerator.backward(loss_to_backprop)
                 
         total_grad_norm = 0.0
         for param in self.accelerator.unwrap_model(self.new_score_net).parameters():
             if param.grad is not None:
                 total_grad_norm += param.grad.data.norm(2).item() ** 2
         total_grad_norm = total_grad_norm ** (1. / 2)
-        """
-        if self.accelerator.is_main_process:
-               print(f"Gradient norm before clipping: {total_grad_norm}")
-        """
+       
         self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
         self.optimizer.step()
         self.scheduler.step()
