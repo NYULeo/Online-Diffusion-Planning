@@ -445,105 +445,115 @@ class Acc_AdjointMatchingFineTuner:
     
 
     def step(self, s0_batch: torch.Tensor, reward_model: TotalReward) -> Tuple[float, float, float]:
+        # 1. Split batch across processes
         base_reward_model = self.accelerator.unwrap_model(reward_model)
-        world_size = self.accelerator.num_processes
-
         with self.accelerator.split_between_processes(s0_batch) as local_s0:
             local_trajs = []
             local_final_Cs = []
-            local_sampled_rewards = []
-
+            local_rewards = []
             for s0 in local_s0:
                 s0 = s0.to(self.device)
-                for _ in range(5):
-                    with self.accelerator.autocast():
-                        traj, reward = self.sample_Traj_karras(s0, base_reward_model)
-                    if reward.item() == 0.0:
-                        continue
-                    local_trajs.append(traj)
-                    final_x = traj[-1].squeeze(0).to(self.device)
-                    C_val = base_reward_model.get_c(final_x)
-                    local_final_Cs.append(C_val)
-                    local_sampled_rewards.append(reward)
-
-            # Prepare accepted data
-            num_local_accepted = len(local_trajs)
-            if num_local_accepted > 0:
+                #Mutiple Ones
+                for i in range(5):
+                   with self.accelerator.autocast():
+                       traj, reward = self.sample_Traj_karras(s0, base_reward_model) 
+                   print(f"Reward: {reward.item()}")
+                   #if(reward.item() == 0.0):
+                       #continue
+                 
+                   local_trajs.append(traj)
+                   final_x = traj[-1].squeeze(0).to(self.device)
+                   C_val = base_reward_model.get_c(final_x)
+                   local_final_Cs.append(C_val)
+                   local_rewards.append(reward)
+            
+            if(len(local_trajs) != 0):
                 local_trajs = torch.stack(local_trajs).to(self.device)
                 local_final_Cs = torch.stack(local_final_Cs)
-                local_sampled_rewards = torch.stack(local_sampled_rewards)
+                local_rewards = torch.stack(local_rewards)
             else:
-                local_trajs = None
-                local_final_Cs = torch.empty((0,), dtype=torch.float32, device=self.device)
-                local_sampled_rewards = torch.empty((0,), dtype=torch.float32, device=self.device)
-
+               # Create empty tensors with appropriate shape/device
+               local_trajs = None
+               local_final_Cs = torch.tensor([0.0]*len(local_s0), device = self.device)
+               local_rewards = torch.tensor([0.0]*len(local_s0), device = self.device)
+              
+        
         self.accelerator.wait_for_everyone()
-
-        # Gather for global statistics (only accepted trajectories contribute)
-        all_final_Cs = self.accelerator.gather_for_metrics(local_final_Cs.detach())
-        all_sampled_rewards = self.accelerator.gather_for_metrics(local_sampled_rewards.detach())
-
+        
+        local_Cs_det = local_final_Cs.detach()
+        # 2. Gather C values and update lambda on main process
+        all_final_Cs = self.accelerator.gather_for_metrics(local_Cs_det, use_gather_object = False)
+        all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object = False)
         if self.accelerator.is_main_process:
-            num_total_accepted = all_final_Cs.numel()
-            if num_total_accepted > 0:
-                total_avgC = float(all_final_Cs.mean().item())
-            else:
-                total_avgC = 0.0
+            total_avgC = float(all_final_Cs.mean().item())
+            #reward_std = float(all_rewards.std().item())
+            reward_std = float(torch.max(all_rewards).item() - torch.min(all_rewards).item())
 
-            if num_total_accepted > 1:
-                reward_std = float((all_sampled_rewards.max() - all_sampled_rewards.min()).item())
-                reward_std = max(reward_std, 1e-6)
-            else:
-                reward_std = 1.0
         else:
             total_avgC = 0.0
-            reward_std = 1.0
-
+            reward_std = 0.0
+        
         stats = torch.tensor([total_avgC, reward_std], device=self.device)
         stats = broadcast(stats, from_process=0)
         total_avgC, reward_std = stats.tolist()
         self.accelerator.wait_for_everyone()
-
-        # Compute unreduced sums for loss and adjoint reward (only on accepted trajectories)
-        local_sum_loss = torch.tensor(0.0, device=self.device, requires_grad=True)
-        local_sum_adjoint_reward = torch.tensor(0.0, device=self.device)
-        local_count_t = torch.tensor(num_local_accepted, device=self.device, dtype=torch.float32)
-
-        if num_local_accepted > 0:
-            for traj_tensor in local_trajs:
-                traj = [traj_tensor[i] for i in range(traj_tensor.shape[0])]
+        
+        
+        # 3. Compute adjoints, rewards & loss tensors for each trajectory
+        if(local_trajs is not None):
+            local_loss_tensors = []
+            local_rewards = []
+            for traj in local_trajs:
+                traj = [traj[i] for i in range(traj.shape[0])]
                 with self.accelerator.autocast():
-                    adjoint, adjoint_reward = self.make_a(traj, reward_model, reward_std)
-                    loss_tensor = self.adjoint_matching_loss(traj, adjoint)
-                local_sum_loss = local_sum_loss + loss_tensor
-                local_sum_adjoint_reward = local_sum_adjoint_reward + adjoint_reward
-
-        # Reduce sums and count
-        total_sum_loss = self.accelerator.reduce(local_sum_loss, reduction="sum")
-        total_sum_adjoint_reward = self.accelerator.reduce(local_sum_adjoint_reward, reduction="sum")
-        total_count_t = self.accelerator.reduce(local_count_t, reduction="sum")
-        total_count = int(total_count_t.item())
-
-        # Compute loss to backward (local scaling - safe for unbalanced acceptance)
-        loss_to_backward = torch.tensor(0.0, device = self.device, requires_grad = True)
-        if total_count > 0:
-             loss_to_backward = local_sum_loss * (world_size / total_count)
-
-        # Backward and optimizer step (always call backward for DDP consistency)
+                     adjoint, reward = self.make_a(traj, reward_model, reward_std)
+                     loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
+                local_loss_tensors.append(loss_tensor)
+                local_rewards.append(reward)
+            
+            local_loss = torch.stack(local_loss_tensors).mean()
+            local_rewards = torch.stack(local_rewards).mean()
+        else:
+            local_loss = torch.tensor(0.0, device = self.device, requires_grad = True)
+            local_rewards = torch.tensor(0.0, device = self.device, requires_grad = False)
+            
+        
+        self.accelerator.wait_for_everyone()
+        global_loss = self.accelerator.reduce(local_loss, reduction="mean")
+        
+       
+        
+        # 5. Backward and optimizer step only on main process or all processes
         self.optimizer.zero_grad()
-        self.new_score_net.zero_grad()  # or self.new_score_net if applicable
-        self.accelerator.backward(loss_to_backward)
+        self.new_score_net.zero_grad()
+        self.accelerator.backward(global_loss)
+        """
+        total_grad_norm = 0.0
+        for param in self.accelerator.unwrap_model(self.new_score_net).parameters():
+            if param.grad is not None:
+                total_grad_norm += param.grad.data.norm(2).item() ** 2
+        total_grad_norm = total_grad_norm ** (1. / 2)
+        """
         self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
         self.optimizer.step()
         self.scheduler.step()
+        
 
-        # Logging (only main process returns meaningful values)
+         # 6. Logging: gather detached metrics
+        local_loss_det = local_loss.detach()
+        local_rewards_det = local_rewards.detach()
+        all_losses = self.accelerator.gather_for_metrics(local_loss_det, use_gather_object=False)
+        all_rewards = self.accelerator.gather_for_metrics(local_rewards_det, use_gather_object=False)
+
+        #if self.accelerator.is_main_process:
         if self.accelerator.is_main_process:
-            avg_loss = (total_sum_loss.detach().item() / total_count) if total_count > 0 else 0.0
-            avg_reward = (total_sum_adjoint_reward.detach().item() / total_count) if total_count > 0 else 0.0
-            return avg_loss, avg_reward, total_avgC
+             #if isinstance(all_losses, torch.Tensor):
+            avg_loss = float(all_losses.mean().item())
+            avg_reward = float(all_rewards.mean().item())
+            return avg_loss, avg_reward, total_avgC    
+        return 0, 0, 0
 
-        return 0.0, 0.0, 0.0
+
 
     
     def finetune_planner(self, dataloader: DataLoader, reward_model: TotalReward, old_score_net: Optional[DiT1d] = None):
