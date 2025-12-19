@@ -796,7 +796,7 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
 
 
 
-"""
+
 if __name__ == '__main__':
    
    step = 200
@@ -808,7 +808,7 @@ if __name__ == '__main__':
        heatmap(step)
        step += 200
    print('Done')
-"""
+
 
 
 
@@ -943,6 +943,7 @@ constraints = data['constraints'][:450]
 plot_reward_curve(steps, rewards, constraints)
 """
 #Original
+"""
 def step(self, s0_batch: torch.Tensor, reward_model: TotalReward) -> Tuple[float, float, float]:
         # 1. Split batch across processes
         base_reward_model = self.accelerator.unwrap_model(reward_model)
@@ -1026,13 +1027,7 @@ def step(self, s0_batch: torch.Tensor, reward_model: TotalReward) -> Tuple[float
         self.optimizer.zero_grad()
         self.new_score_net.zero_grad()
         self.accelerator.backward(global_loss)
-        """
-        total_grad_norm = 0.0
-        for param in self.accelerator.unwrap_model(self.new_score_net).parameters():
-            if param.grad is not None:
-                total_grad_norm += param.grad.data.norm(2).item() ** 2
-        total_grad_norm = total_grad_norm ** (1. / 2)
-        """
+       
         self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
         self.optimizer.step()
         self.scheduler.step()
@@ -1051,8 +1046,7 @@ def step(self, s0_batch: torch.Tensor, reward_model: TotalReward) -> Tuple[float
             avg_reward = float(all_rewards.mean().item())
             return avg_loss, avg_reward, total_avgC    
         return 0, 0, 0
-
-
+"""
 
 
 
