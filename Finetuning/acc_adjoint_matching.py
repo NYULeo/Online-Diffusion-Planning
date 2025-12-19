@@ -452,7 +452,7 @@ class Acc_AdjointMatchingFineTuner:
             local_final_Cs = []
             local_rewards = []
             for s0 in local_s0:
-                s0 = s0.to(self.device)
+                s0 = s0.to (self.device)
                 #Mutiple Ones
                 for i in range(5):
                    with self.accelerator.autocast():
@@ -483,6 +483,7 @@ class Acc_AdjointMatchingFineTuner:
         local_Cs_det = local_final_Cs.detach()
         # 2. Gather C values and update lambda on main process
         all_final_Cs = self.accelerator.gather_for_metrics(local_Cs_det, use_gather_object = False)
+        all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object = False)
         all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object = False)
         if self.accelerator.is_main_process:
             total_avgC = float(all_final_Cs.mean().item())
@@ -500,7 +501,8 @@ class Acc_AdjointMatchingFineTuner:
         
         
         # 3. Compute adjoints, rewards & loss tensors for each trajectory
-        if(local_trajs is not None):
+        with self.accelerator.split_between_processes(all_trajs) as local_trajs:
+        #if(local_trajs is not None):
             local_loss_tensors = []
             local_rewards = []
             for traj in local_trajs:
@@ -513,9 +515,9 @@ class Acc_AdjointMatchingFineTuner:
             
             local_loss = torch.stack(local_loss_tensors).mean()
             local_rewards = torch.stack(local_rewards).mean()
-        else:
-            local_loss = torch.tensor(0.0, device = self.device, requires_grad = True)
-            local_rewards = torch.tensor(0.0, device = self.device, requires_grad = False)
+        #else:
+            #local_loss = torch.tensor(0.0, device = self.device, requires_grad = True)
+            #local_rewards = torch.tensor(0.0, device = self.device, requires_grad = False)
             
         
         self.accelerator.wait_for_everyone()
