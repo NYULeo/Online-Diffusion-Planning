@@ -395,6 +395,8 @@ class Acc_AdjointMatchingFineTuner:
         t_asc_reversed = torch.flip(self.t_asc, dims = [0]).to(self.device)
         k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
        
+        if(reward_std == 0.0):
+            reward_std = 1.0
         a0 =  (-1 * (self.config.reward_scaling_factor/reward_std) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * EntGrad)
         #max_norm = 5.0
         #a0 =   a0 * torch.clamp(max_norm / torch.norm(a0), max=1.0)
