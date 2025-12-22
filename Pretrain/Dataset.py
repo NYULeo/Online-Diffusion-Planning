@@ -4,7 +4,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 import minari
 from sympy.core import I
-import mediapy as media
+#import mediapy as media
 import warnings
 import gymnasium as gym
 warnings.filterwarnings("ignore", category=UserWarning)
