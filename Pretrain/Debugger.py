@@ -70,7 +70,7 @@ def function(x, beta: float):
     return (1/beta)* np.log(1 + np.exp(x*beta))
 
 
-
+"""
 from Rewards.Reward_Backbone import RewardDataset, Train_Dataset
 trajs, name, obs_dim, act_dim = Train_Dataset('pointmaze', 'medium')
 dataset = RewardDataset(trajs, 7.0, name, 1.0)
@@ -87,6 +87,12 @@ plt.xlabel('X-coordinate')
 plt.ylabel('Y-coordinate')
 plt.title('Hexbin Heatmap of Coordinates')
 plt.show()
+"""
+
+
+
+
+
 
 
 
@@ -314,11 +320,11 @@ for traj_idx, traj in enumerate(trajs):
 
 
 dataset = minari.create_dataset_from_buffers(
-    dataset_id=gen_dataset_id(None, 'my-rollout', 0),
-    buffer=episodes,
-    env=env,
-    ref_min_score=ref_min,
-    ref_max_score=ref_max,
+    dataset_id = gen_dataset_id(None, 'my-rollout', 0),
+    buffer = episodes,
+    env = env,
+    ref_min_score = ref_min,
+    ref_max_score = ref_max,
 )
 
 raw_returns = np.array([np.sum(traj['rewards']) for traj in trajs])        # undiscounted
@@ -335,9 +341,9 @@ print(normalized_scores)
 delete_dataset('my-rollout-v0')
 
 print(ref_min, ref_max)
+"""
 
-"""
-"""
+
 
 import minari
 import numpy as np
@@ -370,6 +376,5 @@ def get_normalized_score(trajs, env_name, specific_env):
 
 
 print(math.ceil(2.3))
-"""
 
 #trajs, reward_name, obs_dim, act_dim = Train_Dataset('pointmaze', 'medium')

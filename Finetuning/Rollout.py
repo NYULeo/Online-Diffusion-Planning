@@ -15,6 +15,8 @@ from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde, sample_euler_
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
 import pickle
 import random
+import gymnasium as gym
+import gymnasium_robotics
 
 def set_seed(seed=0):
     # Python random
@@ -45,15 +47,22 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      device = "cuda" if torch.cuda.is_available() else "cpu"
      print(f"Using device {device}")
      
-     #get environment
+    
+     _, d_s, d_a = get_env(env_name, specific_env)
+    
+    # Create environment factory function
+     def make_env():
+        gym.register_envs(gymnasium_robotics)
+        if render:
+             env = gym.make('PointMaze_Medium-v3', max_episode_steps = episode_length, render_mode='rgb_array', continuing_task=False)
+        else:
+             env = gym.make('PointMaze_Medium-v3', max_episode_steps = episode_length, render_mode=None, continuing_task=False)
+        return env
      
-     if(render):
-         env, d_s, d_a = get_env(env_name, specific_env, 'rgb_array')
-     else:
-         env, d_s, d_a = get_env(env_name, specific_env, None)
-     #env = gym.make('PointMaze_Medium-v3', render_mode = 'rgb_array')
-
-     #get Planner
+     env = make_env()
+     goal_cell  = np.array([6.5, 1.5], dtype=int) 
+     reset_cell = np.array([5.5, 4.5], dtype=int)
+     #reset_cell = None
      state_dict = get_pretrained_planner(env_name, specific_env, checkpoint_steps)
      if( env_name == 'kitchen'):
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
@@ -68,13 +77,8 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      planner_processor = Planner_Processor(env_name, specific_env)
 
      #reset
-     initial_pos = np.array([-0.5, -1.5])
-     unwrapped_env = env.unwrapped if hasattr(env, 'unwrapped') else env
-     if hasattr(unwrapped_env, 'set_initial_state'):
-        unwrapped_env.set_initial_state(initial_pos)
-     elif hasattr(unwrapped_env, 'reset_to_location'):
-        unwrapped_env.reset_to_location(initial_pos)
-     s0 = env.reset(seed=0)
+     
+     s0 = env.reset(seed = 0, options={"goal_cell": goal_cell, "reset_cell": reset_cell})
      s0 = s0[0]['observation']
      current_state = s0
      frames = []
@@ -90,6 +94,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
            obs, reward, terminated, truncated, info = env.step(action)
            if(render):
                 frames.append(env.render())
+                
            
            observations.append(obs['observation'].copy())
            actions.append(action.copy())
@@ -116,15 +121,14 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
      
      #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
      #print(f"Running {num_envs} environments in parallel")
-     
      device = "cuda" if torch.cuda.is_available() else "cpu"
      #print(f"Using device {device}")
      
-     
      # Create environment factory function
      def make_env():
-         env, _, _ = get_env(env_name, specific_env)
-         return env
+        gym.register_envs(gymnasium_robotics)
+        env = gym.make('PointMaze_Medium-v3', max_episode_steps = episode_length, render_mode=None, continuing_task=False)
+        return env
      
      # Create vectorized environment
      vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
@@ -145,7 +149,8 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
      
      # Get Processor
      planner_processor = Planner_Processor(env_name, specific_env)
-     
+     goal_cell  = np.array([6.5, 1.5], dtype=int) 
+     reset_cell = np.array([6.5, 4.5], dtype=int)
      # Reset all environments
      s0_vec = vec_env.reset(seed=1)
      current_states = s0_vec[0]['observation']  # Shape: (num_envs, d_s)
@@ -234,11 +239,11 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
 
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
-    set_seed(10)
+    set_seed(0)
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 7000, checkpoint_steps = 200, render = True)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_steps = 250, render = True)
     #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 200, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1500, num_envs = 50)
 
  

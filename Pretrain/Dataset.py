@@ -27,7 +27,7 @@ def get_env(env_name, specific_env, render_mode = None):
     d_s = data.get_state_dim()
     d_a = data.get_action_dim()
     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = 'rgb_array')
-    return   env, d_s, d_a
+    return  env, d_s, d_a
 
 def merger(traj_1, traj_2):
      states_1 = traj_1['observations']
