@@ -16,7 +16,7 @@ import os
 from typing import Optional, List, Dict, Any
 import torch.nn as nn
 from Dataset import get_dataset, get_dataset
-
+import gymnasium as gym
 import torch
 import math
 from utils import set_seed
@@ -349,11 +349,11 @@ import minari
 import numpy as np
 import pickle
 from Dataset import get_dataset
-
+"""
 # 1. Load your trajectories
 with open('./Pretrain/Rollouts/pointmaze/medium/Generated_trajs_Info.pkl', 'rb') as f:
     trajs = pickle.load(f)['trajs']
-
+"""
 
 def get_normalized_score(trajs, env_name, specific_env):
     # 2. Get official references from Minari
@@ -374,7 +374,18 @@ def get_normalized_score(trajs, env_name, specific_env):
     # Final result
     print(f"Normalized score (pointmaze/medium-v2): {normalized_score:.2f}")
 
+gym.register_envs(gymnasium_robotics)
+env = gym.make('PointMaze_Medium-v3', max_episode_steps = 1000, render_mode=None, continuing_task=False)
+maze = env.unwrapped.maze  # Access the internal Maze object
 
-print(math.ceil(2.3))
+maze_map = maze.maze_map
+rows, cols = len(maze_map), len(maze_map[0])
 
+# Find all free cells (not walls)
+free_cells = []
+for row in range(rows):
+    for col in range(cols):
+        if maze_map[row][col] != 1:  # 1 = wall; others are free/open
+            free_cells.append(np.array([row, col]))
+print(free_cells)
 #trajs, reward_name, obs_dim, act_dim = Train_Dataset('pointmaze', 'medium')

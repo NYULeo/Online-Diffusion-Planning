@@ -60,8 +60,8 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
         return env
      
      env = make_env()
-     goal_cell  = np.array([6.5, 1.5], dtype=int) 
-     reset_cell = np.array([5.5, 4.5], dtype=int)
+     goal_cell  = np.array([6, 1], dtype=int) 
+     reset_cell = np.array([3, 4], dtype=int)
      #reset_cell = None
      state_dict = get_pretrained_planner(env_name, specific_env, checkpoint_steps)
      if( env_name == 'kitchen'):
@@ -106,6 +106,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
                 break
      
      env.close()
+     print(np.array(rewards))
      traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(rewards)}
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      #print(rewards)
@@ -243,7 +244,7 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_steps = 250, render = True)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_steps = 50, render = True)
     #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 200, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1500, num_envs = 50)
 
  
