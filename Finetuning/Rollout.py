@@ -20,22 +20,21 @@ import gymnasium_robotics
 from Pretrain.Dataset import get_dataset
 
 
-def get_normalized_score(trajs, env_name, specific_env):
+def get_normalized_score(trajs):
     # 2. Get official references from Minari
-    data = get_dataset(env_name, specific_env)
-    ref_min = data.get_ref_min_score()
-    ref_max = data.get_ref_max_score()
-   
+    #data = get_dataset(env_name, specific_env)
+    
     # 3. Count how many goals your agent reaches on average
     avg_goals = np.mean([np.sum(traj['rewards']) for traj in trajs])
     avg_discounted_return = np.mean([np.sum(traj['rewards']) * (0.99**len(traj['rewards'])) for traj in trajs])
-    print(f"Average Success Rate: {avg_goals:.2f}")
+    #print(f"Average Success Rate: {avg_goals:.2f}")
 
     # 5. Compute normalized score
-    normalized_score = 100 * (avg_discounted_return - ref_min) / (ref_max - ref_min) 
+    normalized_score = 100 * avg_discounted_return 
+    return normalized_score
 
     # Final result
-    print(f"Normalized score (pointmaze/medium-v2): {normalized_score:.2f}")
+    #print(f"Normalized score (pointmaze/medium-v2): {normalized_score:.2f}")
 
 def set_seed(seed=0):
     # Python random
@@ -71,7 +70,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
     
     # Create environment factory function
      goal_cell  = np.array([6, 1], dtype=int) 
-     reset_cell = np.array([5, 4], dtype=int)
+     reset_cell = np.array([4, 6], dtype=int)
      #reset_cell = None
      state_dict = get_pretrained_planner(env_name, specific_env, checkpoint_steps)
      if( env_name == 'kitchen'):
@@ -174,27 +173,27 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
         else:
             start_cells.append(free_cells[i].copy())
      start_cells = np.array(start_cells)
-             
+     normalized_scores = []
+     for start_cell in start_cells:
+       # Reset all environments
+       seeds = list(range(num_envs)) 
+       s0_vec = vec_env.reset(seed = seeds, options={"goal_cell": goal_cell, "reset_cell": start_cell})
+       current_states = s0_vec[0]['observation']
      
-     # Reset all environments
-     seeds = list(range(num_envs)) 
-     s0_vec = vec_env.reset(seed = seeds, options={"goal_cell": goal_cell, "reset_cell": np.array([1, 6])})
-     current_states = s0_vec[0]['observation']
+       # Store trajectories for each environment
+       all_rewards = [0.0 for _ in range(num_envs)]
+       done_envs = [False for _ in range(num_envs)]
+       observations = [[] for _ in range(num_envs)]
+       acts = [[] for _ in range(num_envs)]
+       rewards = [[] for _ in range(num_envs)]
+       for env_idx in range(num_envs):
+          observations[env_idx].append(current_states[env_idx].copy())
      
-     # Store trajectories for each environment
-     all_rewards = [0.0 for _ in range(num_envs)]
-     done_envs = [False for _ in range(num_envs)]
-     observations = [[] for _ in range(num_envs)]
-     acts = [[] for _ in range(num_envs)]
-     rewards = [[] for _ in range(num_envs)]
-     for env_idx in range(num_envs):
-        observations[env_idx].append(current_states[env_idx].copy())
-     
-     for i in range(episode_length):
-         actions = np.zeros((num_envs, d_a))
+       for i in range(episode_length):
+          actions = np.zeros((num_envs, d_a))
          
-         # Generate actions for each environment
-         for env_idx in range(num_envs):
+          # Generate actions for each environment
+          for env_idx in range(num_envs):
              if done_envs[env_idx]:
                  continue
              current_state = current_states[env_idx]
@@ -203,11 +202,11 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
              action = x[0, d_s:(d_s+d_a)].copy()
              actions[env_idx] = action
          
-         # Step all environments at once
-         obs_vec, rewards_vec, terminated_vec, truncated_vec, info_vec = vec_env.step(actions)
+          # Step all environments at once
+          obs_vec, rewards_vec, terminated_vec, truncated_vec, info_vec = vec_env.step(actions)
          
-         # Update trajectories
-         for env_idx in range(num_envs):
+          # Update trajectories
+          for env_idx in range(num_envs):
              if done_envs[env_idx]:
                  continue
              
@@ -223,37 +222,37 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
                  #print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
          
         
-         # Check if all environments are done
-         if all(done_envs):
+          # Check if all environments are done
+          if all(done_envs):
              #print("All environments completed!")
              break
          
+       vec_env.close()
      
-     vec_env.close()
-     
-     # Find the trajectory with the maximum reward
-     trajs = [[] for _ in range(num_envs)]
-     for env_idx in range(num_envs):
-         trajs[env_idx] = {
-             'observations': np.asarray(observations[env_idx].copy()),
-             'actions': np.asarray(acts[env_idx].copy()),
-             'rewards': np.asarray(rewards[env_idx].copy())
-         }
-     #best_idx = np.argmax(all_rewards)
-     #best_reward = all_rewards[best_idx]
-     #best_trajectory = trajs[best_idx]
-     
-     # Save the best trajectory in the same format as single rollout
-     """
-     trajs_info = {
+       # Find the trajectory with the maximum reward
+       trajs = [[] for _ in range(num_envs)]
+       for env_idx in range(num_envs):
+          trajs[env_idx] = {
+              'observations': np.asarray(observations[env_idx].copy()),
+              'actions': np.asarray(acts[env_idx].copy()),
+              'rewards': np.asarray(rewards[env_idx].copy())
+          }
+          #best_idx = np.argmax(all_rewards)
+          #best_reward = all_rewards[best_idx]
+          #best_trajectory = trajs[best_idx]
+       normalized_scores.append(get_normalized_score(trajs))
+       
+         # Save the best trajectory in the same format as single rollout
+       """
+        trajs_info = {
          'trajs': trajs,
          'env_name': env_name,
          'specific_env': specific_env,
          'all_rewards': all_rewards
-     }
-     save_trajs(trajs_info, env_name, specific_env)
-     """
-     get_normalized_score(trajs, env_name, specific_env)
+          }
+          save_trajs(trajs_info, env_name, specific_env)
+       """
+     print(f"Average Normalized Score: {np.mean(normalized_scores):.2f}")
      
     
      
@@ -268,12 +267,14 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, checkpoint_steps = 100, render = True)
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True)
     #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 50, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1500, num_envs = 50)
-    checkpoint = 50
+    
+    checkpoint = 0
     while(checkpoint < 200):
        print(f"Rollout for checkpoint: {checkpoint}")
        rollout_parallel(env_name,  specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, critic = False, checkpoint_steps = checkpoint, num_envs=50)
        checkpoint += 50
+    
+    
 
- 
