@@ -7,6 +7,7 @@ from sympy.core import I
 #import mediapy as media
 import warnings
 import gymnasium as gym
+import gymnasium_robotics
 warnings.filterwarnings("ignore", category=UserWarning)
 from collections import namedtuple
 import torch
@@ -26,7 +27,6 @@ def get_env(env_name, specific_env, render_mode = None):
     env = data.get_env(render_mode)
     d_s = data.get_state_dim()
     d_a = data.get_action_dim()
-    #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = 'rgb_array')
     return  env, d_s, d_a
 
 def merger(traj_1, traj_2):
@@ -156,6 +156,7 @@ class KitchenDataset():
      
 class PointMazeDataset():
      def __init__(self, name: str):
+          self.name = name
           if name == 'open_dense':
                self.dataset = minari.load_dataset('D4RL/pointmaze/open-dense-v2', download = True)
           elif name == 'umaze':
@@ -224,11 +225,18 @@ class PointMazeDataset():
     
      def get_env(self, render_mode):
           # Use headless mode for servers without display capabilities
-          return self.dataset.recover_environment(render_mode = render_mode)
+          gym.register_envs(gymnasium_robotics)
+          if(self.name == 'medium'):
+              env = gym.make('PointMaze_Medium-v3', max_episode_steps = 1000, render_mode = render_mode, continuing_task=False)
+          elif(self.name == 'large'):
+              env = gym.make('PointMaze_Large-v3', max_episode_steps = 1000, render_mode = render_mode, continuing_task=False)
+          elif(self.name == 'umaze'):
+              env = gym.make('PointMaze_Umaze-v3', max_episode_steps = 1000, render_mode = render_mode, continuing_task=False)
+          else:
+              raise ValueError(f'Invalid dataset name')
+          return env
+          #return self.dataset.recover_environment(render_mode = render_mode)
           #return self.dataset.recover_environment(render_mode = 'rgb_array')
-          #env_spec = self.dataset.spec.env_spec
-          #return gym.make(env_spec, render_mode='rgb_array')
-          #return gym.make(env_spec, render_mode = None)
      
      def get_ref_max_score(self):
           return self.dataset.storage.metadata.get('ref_max_score')

@@ -189,7 +189,6 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 100, eta = 
      def make_env():
          env, _, _ = get_env(env_name, specific_env)
          return env
-     
      # Create vectorized environment
      vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
      
