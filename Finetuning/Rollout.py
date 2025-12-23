@@ -268,15 +268,15 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, checkpoint_steps = 250, render = True)
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, checkpoint_steps = 250, render = True)
     #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 50, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1500, num_envs = 50)
-    """
+    
     checkpoint = 0
     while(checkpoint < 450):
        print(f"Rollout for checkpoint: {checkpoint}")
        rollout_parallel(env_name,  specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, critic = False, checkpoint_steps = checkpoint, num_envs=50)
        checkpoint += 50
-    """
+
     
     
 
