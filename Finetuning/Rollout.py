@@ -70,7 +70,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
     
     # Create environment factory function
      goal_cell  = np.array([6, 1], dtype=int) 
-     reset_cell = np.array([4, 6], dtype=int)
+     reset_cell = np.array([5, 4], dtype=int)
      #reset_cell = None
      state_dict = get_pretrained_planner(env_name, specific_env, checkpoint_steps)
      if( env_name == 'kitchen'):
@@ -227,7 +227,7 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
              #print("All environments completed!")
              break
          
-       vec_env.close()
+       #vec_env.close()
      
        # Find the trajectory with the maximum reward
        trajs = [[] for _ in range(num_envs)]
@@ -252,6 +252,7 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
           }
           save_trajs(trajs_info, env_name, specific_env)
        """
+     vec_env.close()
      print(f"Average Normalized Score: {np.mean(normalized_scores):.2f}")
      
     
@@ -267,14 +268,15 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, checkpoint_steps = 250, render = True)
     #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 50, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1500, num_envs = 50)
-    
+    """
     checkpoint = 0
-    while(checkpoint < 200):
+    while(checkpoint < 450):
        print(f"Rollout for checkpoint: {checkpoint}")
        rollout_parallel(env_name,  specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, critic = False, checkpoint_steps = checkpoint, num_envs=50)
        checkpoint += 50
+    """
     
     
 
