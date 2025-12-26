@@ -70,7 +70,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
     
     # Create environment factory function
      goal_cell  = np.array([6, 1], dtype=int) 
-     reset_cell = np.array([5, 4], dtype=int)
+     reset_cell = np.array([6, 3], dtype=int)
      #reset_cell = None
      state_dict = get_pretrained_planner(env_name, specific_env, checkpoint_steps)
      if( env_name == 'kitchen'):
@@ -133,25 +133,30 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
      #print(f"Using device {device}")
      
      # Create environment factory function
-     env, d_s, d_a = get_env(env_name, specific_env)
+     _, d_s, d_a = get_env(env_name, specific_env)
      def make_env():
          env, _, _ = get_env(env_name, specific_env)
          return env
      
      # Create vectorized environment
      vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
+
+     # Find all free cells (not walls)
+     """
      maze = env.unwrapped.maze  # Access the internal Maze object
      maze_map = maze.maze_map
      rows, cols = len(maze_map), len(maze_map[0])
-    
-     # Find all free cells (not walls)
      free_cells = []
      for row in range(rows):
        for col in range(cols):
           if maze_map[row][col] != 1:  # 1 = wall; others are free/open
                free_cells.append(np.array([row, col]))
      free_cells = np.array(free_cells)
-    
+     """
+     free_cells = np.array([[6,6], [1,1], [1,6], [3,2], [5,4], [3,4], [4,1], [4,6]])
+
+
+
      # Get Planner
      state_dict = get_pretrained_planner(env_name, specific_env, checkpoint_steps)
      if env_name == 'kitchen':
@@ -264,19 +269,36 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
 
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
-    set_seed(0)
+    set_seed(3)
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, checkpoint_steps = 250, render = True)
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True)
     #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 50, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1500, num_envs = 50)
     
     checkpoint = 0
     while(checkpoint < 450):
        print(f"Rollout for checkpoint: {checkpoint}")
-       rollout_parallel(env_name,  specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, critic = False, checkpoint_steps = checkpoint, num_envs=50)
+       rollout_parallel(env_name,  specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, critic = False, checkpoint_steps = checkpoint, num_envs=8)
        checkpoint += 50
+    
 
+
+
+"""
+env, d_s, d_a = get_env('pointmaze', 'medium')
+
+maze = env.unwrapped.maze  # Access the internal Maze object
+maze_map = maze.maze_map
+rows, cols = len(maze_map), len(maze_map[0])
     
-    
+# Find all free cells (not walls)
+free_cells = []
+for row in range(rows):
+    for col in range(cols):
+        if maze_map[row][col] != 1:  # 1 = wall; others are free/open
+               free_cells.append(np.array([row, col]))
+free_cells = np.array(free_cells)
+print(free_cells)
+"""
 

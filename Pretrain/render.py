@@ -10,7 +10,7 @@ from Dataset import get_dataset
 
 def render(dataset_name, specific_dataset, traj):
      env, _, _ = get_env(dataset_name, specific_dataset, render_mode = 'rgb_array')
-     env.reset(seed=1)
+     env.reset()
      frames = []
      for i in range(len(traj['actions'])):
           action = traj['actions'][i]
@@ -62,6 +62,9 @@ def check_speration(trajs):
 
 if __name__ == "__main__":
      set_seed(1)
+     data = get_dataset('antmaze', 'medium_play')
+     trajs = data.get_trajectories()
+     render('antmaze', 'medium_play', trajs[2])
      """
      with open('Rollouts/pointmaze/medium/Generated_trajs_Info.pkl', 'rb') as f:
         info = pickle.load(f)

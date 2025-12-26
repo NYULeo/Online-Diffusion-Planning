@@ -225,6 +225,7 @@ class PointMazeDataset():
     
      def get_env(self, render_mode):
           # Use headless mode for servers without display capabilities
+          
           gym.register_envs(gymnasium_robotics)
           if(self.name == 'medium'):
               env = gym.make('PointMaze_Medium-v3', max_episode_steps = 1000, render_mode = render_mode, continuing_task=False)
@@ -235,6 +236,7 @@ class PointMazeDataset():
           else:
               raise ValueError(f'Invalid dataset name')
           return env
+          
           #return self.dataset.recover_environment(render_mode = render_mode)
           #return self.dataset.recover_environment(render_mode = 'rgb_array')
      

@@ -4,14 +4,15 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 from dataclasses import dataclass
+from gymnasium.vector import AsyncVectorEnv
 from utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker
 from traj_reward import RewardConfig, TotalReward
 from adjoint_matching import AdjointMatchingFineTuner, AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
 from Finetuning.Rollout import rollout
+from Finetuning.utils import karras_beta_schedule, karras_beta_schedule
 from Pretrain.Planners.Backbone.Dit import DiT1d
-from Pretrain.Dataset import get_PlannerName
-from Pretrain.Dataset import get_dataset
+from Pretrain.Dataset import get_PlannerName, get_dataset, Planner_Processor
 from typing import List
 from utils import TrajectoryDict
 from Pretrain.Dataset import get_env
@@ -23,6 +24,8 @@ import os
 from accelerate import Accelerator
 import torch.multiprocessing as mp
 import math
+import numpy as np
+
 
 
 @dataclass
@@ -49,8 +52,128 @@ class FinetuningConfig():
     MaxEnt: bool = False
     Entropy_Scaling_Factor: float = 0.5
     
-
-
+"""
+def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, critic = False, checkpoint_steps = 1000000, num_envs=8):
+     
+     #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
+     #print(f"Running {num_envs} environments in parallel")
+     device = "cuda" if torch.cuda.is_available() else "cpu"
+     #print(f"Using device {device}")
+     
+     # Create environment factory function
+     env, d_s, d_a = get_env(env_name, specific_env)
+     def make_env():
+         env, _, _ = get_env(env_name, specific_env)
+         return env
+     
+     # Create vectorized environment
+     vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
+     maze = env.unwrapped.maze  # Access the internal Maze object
+     maze_map = maze.maze_map
+     rows, cols = len(maze_map), len(maze_map[0])
+    
+     # Find all free cells (not walls)
+     free_cells = []
+     for row in range(rows):
+       for col in range(cols):
+          if maze_map[row][col] != 1:  # 1 = wall; others are free/open
+               free_cells.append(np.array([row, col]))
+     free_cells = np.array(free_cells)
+    
+     # Get Planner
+     state_dict = get_pretrained_planner(env_name, specific_env, checkpoint_steps)
+     if env_name == 'kitchen':
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+     elif env_name == 'pointmaze':
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+     else:
+         raise ValueError(f"Invalid Environment: {env_name}")
+     model.load_state_dict(state_dict)
+     model.eval()
+     
+     # Get Processor
+     planner_processor = Planner_Processor(env_name, specific_env)
+     goal_cell  = np.array([6, 1], dtype=int) 
+     start_cells = []
+     for i in range(len(free_cells)):
+        if(np.array_equal(free_cells[i], goal_cell)):
+            continue
+        else:
+            start_cells.append(free_cells[i].copy())
+     start_cells = np.array(start_cells)
+     normalized_scores = []
+     for start_cell in start_cells:
+       # Reset all environments
+       seeds = list(range(num_envs)) 
+       s0_vec = vec_env.reset(seed = seeds, options={"goal_cell": goal_cell, "reset_cell": start_cell})
+       current_states = s0_vec[0]['observation']
+     
+       # Store trajectories for each environment
+       all_rewards = [0.0 for _ in range(num_envs)]
+       done_envs = [False for _ in range(num_envs)]
+       observations = [[] for _ in range(num_envs)]
+       acts = [[] for _ in range(num_envs)]
+       rewards = [[] for _ in range(num_envs)]
+       for env_idx in range(num_envs):
+          observations[env_idx].append(current_states[env_idx].copy())
+     
+       for i in range(episode_length):
+          actions = np.zeros((num_envs, d_a))
+         
+          # Generate actions for each environment
+          for env_idx in range(num_envs):
+             if done_envs[env_idx]:
+                 continue
+             current_state = current_states[env_idx]
+             current_state_norm = planner_processor.preprocess(current_state)
+             x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+             action = x[0, d_s:(d_s+d_a)].copy()
+             actions[env_idx] = action
+         
+          # Step all environments at once
+          obs_vec, rewards_vec, terminated_vec, truncated_vec, info_vec = vec_env.step(actions)
+         
+          # Update trajectories
+          for env_idx in range(num_envs):
+             if done_envs[env_idx]:
+                 continue
+             
+             observations[env_idx].append(obs_vec['observation'][env_idx].copy())
+             acts[env_idx].append(actions[env_idx].copy())
+             rewards[env_idx].append(rewards_vec[env_idx])
+             all_rewards[env_idx] += rewards_vec[env_idx]
+             
+             current_states[env_idx] = obs_vec['observation'][env_idx].copy()
+             
+             if terminated_vec[env_idx] or truncated_vec[env_idx]:
+                 done_envs[env_idx] = True
+                 #print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
+         
+        
+          # Check if all environments are done
+          if all(done_envs):
+             #print("All environments completed!")
+             break
+         
+       #vec_env.close()
+     
+       # Find the trajectory with the maximum reward
+       trajs = [[] for _ in range(num_envs)]
+       for env_idx in range(num_envs):
+          trajs[env_idx] = {
+              'observations': np.asarray(observations[env_idx].copy()),
+              'actions': np.asarray(acts[env_idx].copy()),
+              'rewards': np.asarray(rewards[env_idx].copy())
+          }
+          #best_idx = np.argmax(all_rewards)
+          #best_reward = all_rewards[best_idx]
+          #best_trajectory = trajs[best_idx]
+       normalized_scores.append(get_normalized_score(trajs))
+       
+         # Save the best trajectory in the same format as single rollout
+       
+     vec_env.close()
+"""
 
 
 class OnlineFinetuner():
