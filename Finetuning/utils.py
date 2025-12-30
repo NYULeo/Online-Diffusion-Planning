@@ -212,7 +212,7 @@ class KernelDataset(Dataset):
     
     def save_stats(self, dataset_name, specific_dataset, step):
         name = getName(dataset_name, specific_dataset)
-        stats_name =  str(name) + f'_kernel_stats_{str(step)}.pkl'
+        stats_name =  str(name) + f'_Kernel_stats_{str(step)}.pkl'
         stats_dir = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Stats/'
         os.makedirs(stats_dir, exist_ok=True)
         savepath = os.path.join(stats_dir, stats_name)
@@ -275,7 +275,7 @@ class RewardDataset(Dataset):
     
     def save_stats(self, dataset_name, specific_dataset, step):
         name = getName(dataset_name, specific_dataset)
-        stats_name =  str(name) + f'_reward_stats_{str(step)}.pkl'
+        stats_name =  str(name) + f'_Reward_stats_{str(step)}.pkl'
         stats_dir = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/'
         os.makedirs(stats_dir, exist_ok=True)
         savepath = os.path.join(stats_dir, stats_name)
