@@ -53,6 +53,8 @@ class FinetuningConfig():
     planner_checkpoint: int
     reward_model_checkpoint: int
     kernel_model_checkpoint: int
+    train_reward_config: Train_Reward_Config  # Moved before fields with defaults
+    train_kernel_config: Train_Kernel_Config  # Moved before fields with defaults
     finetune_steps: int = 1000000
     finetune_rounds: int = 10
     diffusion_steps: int = 30
@@ -67,11 +69,9 @@ class FinetuningConfig():
     reward_scaling_factor: float = 100000
     MaxEnt: bool = False
     Entropy_Scaling_Factor: float = 0.5
-    
     rollout_length: int = 4000
     rollout_num_envs: int = 8
-    train_reward_config: Train_Reward_Config
-    train_kernel_config: Train_Kernel_Config
+   
     
 
 
