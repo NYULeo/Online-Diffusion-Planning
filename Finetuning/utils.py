@@ -13,14 +13,110 @@ from torch.utils.data import Dataset
 from Pretrain.utils import SAStats
 from scipy.ndimage import gaussian_filter1d
 from typing import TypedDict, List
-from Pretrain.Dataset import Planner_Processor
 from typing import Optional
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import seaborn as sns
 from Pretrain.Dataset import get_PlannerName
 from typing import Tuple
+#from Pretrain.Rewards.Reward_Backbone import Train_Dataset
+from Pretrain.Transition_Kernel.Kernel_Backbone import count_files_in_folder
+import copy
+from Pretrain.Rewards.nets import SimpleReward
+from torch.utils.data import DataLoader
+import torch.optim as optim
+from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel
+from Pretrain.Dataset import KitchenDataset, PointMazeDataset, get_env, Planner_Processor
+from gymnasium.vector import AsyncVectorEnv
+from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
+from Pretrain.Planners.Backbone.Dit import DiT1d
+from Rollout import get_normalized_score
 
+
+def reward_filter(obs, rews, goal):
+    #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
+    target_goals = goal
+    for i in range(1, len(obs)):
+        goal_coord = np.floor(obs[i][:2]) + 0.5
+        #goal_coord = np.round(goal_coord, 1)  
+        if np.any(np.all(np.equal(goal_coord, target_goals), axis=1)):
+            rews[i-1] = 1
+        else:
+            rews[i-1] = 0
+    return rews
+
+def save_reward_model(reward_net, dataset_name, specific_dataset, step):
+    reward_net.eval()
+    name = getName(dataset_name, specific_dataset)
+    net_dict = reward_net.state_dict()
+    os.makedirs(f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
+    save_path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{name}_reward_{str(step)}.pkl'
+    #print("Exists:", os.path.isfile(save_path), "Size:", os.path.getsize(save_path) if os.path.isfile(save_path) else None)
+    torch.save(net_dict, save_path)
+    print(f"reward model save to {name}_{str(step)}.pkl")
+
+def save_kernel_model(kernel_net, dataset_name, specific_dataset, step, ensemble_idx):
+    kernel_net.eval()
+    name = getName(dataset_name, specific_dataset)
+    net_dict =  kernel_net.state_dict()
+    os.makedirs(f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{step}', exist_ok=True)
+    save_path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{step}/{name}_kernel_{str(step)}_{str(ensemble_idx)}.pkl'
+    torch.save(net_dict, save_path)
+    print(f"Kernel model save to {name}_{str(step)}_{str(ensemble_idx)}.pkl")
+
+def get_reward_model(dataset_name, specific_dataset, step):
+    _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+    name = getName(dataset_name, specific_dataset)
+    path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{name}_reward_{str(step)}.pkl'
+    model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
+    return model_state_dict, obs_dim, act_dim
+
+def get_reward_stats(dataset_name, specific_dataset, step):
+    name = getName(dataset_name, specific_dataset)
+    path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/{name}_reward_stats_{str(step)}.pkl'
+    with open(path, 'rb') as f:
+        stats = pickle.load(f)
+    return stats  
+
+def get_kernel(dataset_name, specific_dataset, step):
+    _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+    name = getName(dataset_name, specific_dataset)
+    path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}'
+    file_count = count_files_in_folder(path)
+    kernel_state_dicts = []
+    for i in range(file_count):
+        dir = f"./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}/{name}_kernel_{str(step)}_{str(i)}.pkl"
+        kernel_state_dicts.append(torch.load(dir, weights_only=True, map_location='cpu'))
+    return kernel_state_dicts, obs_dim, act_dim
+
+def get_kernel_stats(dataset_name, specific_dataset, step):
+    name = getName(dataset_name, specific_dataset)
+    path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Stats/{name}_kernel_stats_{str(step)}.pkl'
+    with open(path, 'rb') as f:
+        stats = pickle.load(f)
+    return stats  
+
+def save_planner(model, dataset_name, specific_dataset, step: int):
+    model.eval()
+    data = {
+            'dataset_name': dataset_name,
+            'specific_dataset': specific_dataset,
+            'step': step,
+            'ema': model.state_dict()
+    }
+    name = getName(dataset_name, specific_dataset)
+    savepath = f"./Finetuning/Planners/{dataset_name}/{specific_dataset}/{name}_Planner_{str(step)}.pt"
+    torch.save(data, savepath)
+    print(f"saved model to {savepath}")
+
+def get_planner(dataset_name, specific_dataset, step):
+    name = getName(dataset_name, specific_dataset)
+    path = f"./Finetuning/Planners/{dataset_name}/{specific_dataset}/{name}_Planner_{str(step)}.pt"
+    if not os.path.exists(path):
+          raise FileNotFoundError(f"Checkpoint not found: {path}")
+    checkpoint = torch.load(path, weights_only = True,map_location='cpu')
+    #checkpoint = torch.load(checkpoint_path,  weights_only=True)
+    return checkpoint['ema']
 
 class Lambda:
     def __init__(self, lam: float, beta: float, eta_lam: float):
@@ -49,51 +145,45 @@ class TrajectoryDict(TypedDict):
 
 def getName(env_name, specific_env):
      if(env_name == 'kitchen'):
-          if(specific_env == 'complete'):
-               return 'kitchen_high'
-          elif(specific_env == 'partial'):
-               return 'kitchen_medium'
-          elif(specific_env == 'mixed'):
-               return 'kitchen_mixed'
-          else:
-               raise ValueError(f"Invalid specific environment: {specific_env}")
+        
+          return 'Kitchen'
      elif(env_name == 'pointmaze'):
           if specific_env == 'open_dense':
-               return '2DMaze_openDense'
+               return 'PointMaze_OpenDense'
           elif specific_env == 'umaze':
-               return '2DMaze_umaze'
+               return 'PointMaze_Umaze'
           elif specific_env == 'large_dense':
-               return '2DMaze_largeDense'
+               return 'PointMaze_LargeDense'
           elif specific_env== 'medium':
-               return '2DMaze_medium'
+               return 'PointMaze_Medium'
           elif specific_env == 'umaze_dense':
-               return '2DMaze_umazeDense'
+               return 'PointMaze_UmazeDense'
           elif specific_env == 'large':
-               return '2DMaze_large'
+               return 'PointMaze_Large'
           elif specific_env == 'open':
-               return '2DMaze_open'
+               return 'PointMaze_Open'
           else:
               raise ValueError(f"Invalid specific environment: {specific_env}")
      elif(env_name == 'antmaze'):
           if specific_env == 'medium_play':
-               return 'antMaze_mediumPlay'
+               return 'AntMaze_MediumPlay'
           elif specific_env == 'umaze_diverse':
-               return 'antMaze_umazeDiverse'
+               return 'AntMaze_UmazeDiverse'
           elif specific_env == 'large_diverse':
-               return 'antMaze_largeDiverse'
+               return 'AntMaze_LargeDiverse'
           elif specific_env == 'large_play':
-               return 'antMaze_largePlay'
+               return 'AntMaze_LargePlay'
           elif specific_env == 'medium_diverse':
-               return 'antMaze_mediumDiverse'
+               return 'AntMaze_MediumDiverse'
           elif specific_env == 'umaze':
-               return 'antMaze_umaze'
+               return 'AntMaze_Umaze'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
      else:
-         raise ValueError(f"Invalid environment name: '{env_name}")
+         raise ValueError(f"Invalid environment name: {env_name}")
 
 class KernelDataset(Dataset):
-    def __init__(self, trajectories: List[TrajectoryDict], dataset_name: str, specific_dataset: str):
+    def __init__(self, trajectories: List[TrajectoryDict], dataset_name: str, specific_dataset: str, step: int):
          obs_list, act_list = [], []
         
          for traj in trajectories:
@@ -118,12 +208,12 @@ class KernelDataset(Dataset):
                 s_tp1 = self.stats.norm_obs(obs[t+1])
                 data.append((s_t, a_t, s_tp1))
          self.data = data
-         self.save_stats(dataset_name, specific_dataset)
+         self.save_stats(dataset_name, specific_dataset, step)
     
-    def save_stats(self, dataset_name, specific_dataset):
+    def save_stats(self, dataset_name, specific_dataset, step):
         name = getName(dataset_name, specific_dataset)
-        stats_name =  str(name) + '_kernel_stats.pkl'
-        stats_dir = f'./Results/{dataset_name}/{specific_dataset}/Kernel_Stats/'
+        stats_name =  str(name) + f'_kernel_stats_{str(step)}.pkl'
+        stats_dir = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Stats/'
         os.makedirs(stats_dir, exist_ok=True)
         savepath = os.path.join(stats_dir, stats_name)
         with open(savepath, 'wb') as f:
@@ -142,7 +232,7 @@ class KernelDataset(Dataset):
         )
 
 class RewardDataset(Dataset):
-    def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str):
+    def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, step: int, goal: Optional[np.array] = None, target_reward: Optional[float] = None):
             
         # ----- gather raw obs/actions to fit stats -----
         obs_list, act_list = [], []
@@ -160,12 +250,19 @@ class RewardDataset(Dataset):
         self.stats = SAStats()
         self.stats.obs_mean = obs_all.mean(axis=0)
         self.stats.obs_std = obs_all.std(axis=0)+ 1e-8
-        
+        allowed_values = [0,1]
+
         transitions = []
         for traj in trajs:
             obs = traj['observations']      
             acts = traj['actions']
             rews = traj['rewards']
+            if( goal is not None):
+                rews = reward_filter(obs, rews, goal)
+            if(not np.all(np.isin(rews, allowed_values))):
+                raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
+            if(target_reward is not None):
+                rews = self.boost_signal(target_reward, rews)
             rews = gaussian_filter1d(rews, sigma)
             for t in range(len(acts)):
                 obs_t = self.stats.norm_obs(obs[t])
@@ -174,12 +271,12 @@ class RewardDataset(Dataset):
                 transitions.append((obs_t, a_t, r_t))
 
         self.transitions = transitions
-        self.save_stats(dataset_name, specific_dataset)
+        self.save_stats(dataset_name, specific_dataset, step)
     
-    def save_stats(self, dataset_name, specific_dataset):
+    def save_stats(self, dataset_name, specific_dataset, step):
         name = getName(dataset_name, specific_dataset)
-        stats_name =  str(name) + '_reward_stats.pkl'
-        stats_dir = f'./Results/{dataset_name}/{specific_dataset}/Reward_Stats/'
+        stats_name =  str(name) + f'_reward_stats_{str(step)}.pkl'
+        stats_dir = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/'
         os.makedirs(stats_dir, exist_ok=True)
         savepath = os.path.join(stats_dir, stats_name)
         with open(savepath, 'wb') as f:
@@ -196,6 +293,95 @@ class RewardDataset(Dataset):
             torch.tensor(a, dtype=torch.float32),
             torch.tensor(r, dtype=torch.float32),
         )
+    
+    def boost_signal(self, target_reward, rews):
+        for t in range(len(rews)):
+            if(rews[t] == 1):
+                 rews[t] = target_reward
+        return rews
+
+def train_reward(trajs: List[TrajectoryDict], dataset_name: str, batch_size, num_steps, lr, sigma, step, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+    print(f"Training reward approximator for {dataset_name}_{specific_dataset} Dataset") 
+    dataset = RewardDataset(trajs, sigma, dataset_name, specific_dataset, step, goal, target_reward)
+    dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
+    reward_net = SimpleReward(obs_dim, act_dim).to(device)
+    optimizer = optim.AdamW(reward_net.parameters(), lr = lr, weight_decay = 1e-4)
+    total_loss = 0
+    counter = 0
+    for i in range(num_steps):
+           s, a, r = next(dataloader)
+           s = s.to(device)
+           a = a.to(device)
+           r = r.to(device)
+        
+           # Predicted Reward
+           optimizer.zero_grad()
+           pred = reward_net(s, a)
+           loss = F.mse_loss(pred, r)
+           loss.backward()
+           optimizer.step()
+           total_loss += loss.item()
+           counter += 1
+    save_reward_model(reward_net, dataset_name, specific_dataset, step)
+           
+def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str,
+                 batch_size=256, lr=1e-3, num_steps=10000,
+                 ensemble_size=10, λ_reg=1e-3, step: int = 0):
+    # Prepare dataset / dataloader
+    print(f"Training kernel for {dataset_name}_{specific_dataset}")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("Using device:", device)
+    _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+    dataset = KernelDataset(trajs, dataset_name, specific_dataset, step)
+    loader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
+                              pin_memory=True, num_workers=8))
+    # Create ensemble of models
+    ensemble = [RobustTransitionKernel(obs_dim, act_dim).to(device) for _ in range(ensemble_size)]
+    optimizers = [optim.Adam(m.parameters(), lr, weight_decay=1e-5) for m in ensemble]
+    total_loss = 0.0
+    for k in range(1, num_steps + 1):
+        s, a, s_next = next(loader)
+        s = s.to(device)
+        a = a.to(device)
+        s_next = s_next.to(device)
+        # For each model in ensemble, compute loss
+        losses = []
+        mus = []
+        log_stds = []
+        for m in ensemble:
+            mu, log_std = m(s, a)
+            mus.append(mu)
+            log_stds.append(log_std)
+            loss = m.gaussian_nll(s_next, mu, log_std)
+            losses.append(loss)
+        # optional: variance‐disagreement inflation
+        # compute mean of mus
+        mus_stack = torch.stack(mus, dim=0)  # (K, B, obs_dim)
+        mu_mean = mus_stack.mean(dim=0)      # (B, obs_dim)
+        # disagreement = average squared deviation
+        disagreement = ((mus_stack - mu_mean.unsqueeze(0)) ** 2).mean(dim=0) 
+        disagreement_detached = disagreement.detach()
+        # inflate each model’s loss by penalizing small variance in high disagreement dims
+        for i, m in enumerate(ensemble):
+            penalty = (disagreement_detached / (torch.exp(2 * log_stds[i]) + m.noise_floor)).sum(dim=-1).mean()
+            losses[i] = losses[i] + λ_reg * penalty
+
+        # Backprop & optimize each model
+        for i, (m, opt) in enumerate(zip(ensemble, optimizers)):
+            opt.zero_grad()
+            losses[i].backward()
+            opt.step()
+
+        avg_loss = sum(losses).item() / ensemble_size
+        total_loss += avg_loss
+
+    for idx, m in enumerate(ensemble):
+         ckpt = copy.deepcopy(m).cpu()
+         save_kernel_model(ckpt, dataset_name, specific_dataset, step, idx)
+
+
 
 class PlannerDataset(Dataset):
     def __init__(self, trajs: List[TrajectoryDict], horizon: int, dataset_name: str, specific_dataset: str):
@@ -212,9 +398,10 @@ class PlannerDataset(Dataset):
     
     def __len__(self):
         return len(self.conditions)
-
+   
     def __getitem__(self, idx):
         return self.conditions[idx]
+ 
 
 def cycle(dl):
     while True:
@@ -339,15 +526,6 @@ class RewardTracker:
         padded[window-1:] = smoothed
         return padded
 
-def get_pretrained_planner(dataset_name, specific_dataset, steps):
-      planner_name = get_PlannerName(dataset_name, specific_dataset)
-      checkpoint_path = f"./Finetuning/Planners/{dataset_name}/{specific_dataset}/{planner_name}_{steps}.pt"
-      if not os.path.exists(checkpoint_path):
-          raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
-      checkpoint = torch.load(checkpoint_path, weights_only = True,map_location='cpu')
-      #checkpoint = torch.load(checkpoint_path,  weights_only=True)
-      return checkpoint['ema']
-
 def karras_beta_schedule(
     num_steps: int,
     sigma_min: float,
@@ -382,3 +560,129 @@ def clip_actions(x: torch.Tensor, d_s: int) -> torch.Tensor:
     return x
 
 
+
+
+
+def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs=8, goal_cell: Optional[np.ndarray] = None):
+     
+     #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
+     #print(f"Running {num_envs} environments in parallel")
+     device = "cuda" if torch.cuda.is_available() else "cpu"
+     trajs = []
+     #print(f"Using device {device}")
+     
+     # Create environment factory function
+     _, d_s, d_a = get_env(env_name, specific_env)
+     def make_env():
+         env, _, _ = get_env(env_name, specific_env)
+         return env
+     
+     # Create vectorized environment
+     vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
+     #maze = env.unwrapped.maze  # Access the internal Maze object
+     #maze_map = maze.maze_map
+     #rows, cols = len(maze_map), len(maze_map[0])
+    
+     # Get Planner
+     state_dict = get_planner(env_name, specific_env, checkpoint_step)
+     if env_name == 'kitchen':
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+     elif env_name == 'pointmaze':
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+     else:
+         raise ValueError(f"Invalid Environment: {env_name}")
+     model.load_state_dict(state_dict)
+     model.eval()
+     
+     # Get Processor
+     planner_processor = Planner_Processor(env_name, specific_env)
+     if(goal_cell is not None):
+         """
+         maze = env.unwrapped.maze  # Access the internal Maze object
+         maze_map = maze.maze_map
+         rows, cols = len(maze_map), len(maze_map[0])
+         free_cells = []
+         for row in range(rows):
+             for col in range(cols):
+                 if maze_map[row][col] != 1:  # 1 = wall; others are free/open
+                       free_cells.append(np.array([row, col]))
+         free_cells = np.array(free_cells)
+         """
+         free_cells = np.array([[6,6], [1,1], [1,6], [3,2], [5,4], [3,4], [4,1], [4,6]])
+         start_cells = []
+         for i in range(len(free_cells)):
+             if(np.array_equal(free_cells[i], goal_cell)):
+                 continue
+             else:
+                 start_cells.append(free_cells[i].copy())
+         start_cells = np.array(start_cells)
+     else:
+         start_cells = [None]
+     for start_cell in start_cells:
+       # Reset all environments
+       seeds = list(range(num_envs)) 
+       s0_vec = vec_env.reset(seed = seeds, options={"goal_cell": goal_cell, "reset_cell": start_cell})
+       current_states = s0_vec[0]['observation']
+     
+       # Store trajectories for each environment
+       all_rewards = [0.0 for _ in range(num_envs)]
+       done_envs = [False for _ in range(num_envs)]
+       observations = [[] for _ in range(num_envs)]
+       acts = [[] for _ in range(num_envs)]
+       rewards = [[] for _ in range(num_envs)]
+       for env_idx in range(num_envs):
+          observations[env_idx].append(current_states[env_idx].copy())
+     
+       for i in range(episode_length):
+          actions = np.zeros((num_envs, d_a))
+         
+          # Generate actions for each environment
+          for env_idx in range(num_envs):
+             if done_envs[env_idx]:
+                 continue
+             current_state = current_states[env_idx]
+             current_state_norm = planner_processor.preprocess(current_state)
+             x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+             action = x[0, d_s:(d_s+d_a)].copy()
+             actions[env_idx] = action
+         
+          # Step all environments at once
+          obs_vec, rewards_vec, terminated_vec, truncated_vec, info_vec = vec_env.step(actions)
+         
+          # Update trajectories
+          for env_idx in range(num_envs):
+             if done_envs[env_idx]:
+                 continue
+             
+             observations[env_idx].append(obs_vec['observation'][env_idx].copy())
+             acts[env_idx].append(actions[env_idx].copy())
+             rewards[env_idx].append(rewards_vec[env_idx])
+             all_rewards[env_idx] += rewards_vec[env_idx]
+             
+             current_states[env_idx] = obs_vec['observation'][env_idx].copy()
+             
+             if terminated_vec[env_idx] or truncated_vec[env_idx]:
+                 done_envs[env_idx] = True
+                 #print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
+         
+        
+          # Check if all environments are done
+          if all(done_envs):
+             #print("All environments completed!")
+             break
+         
+       #vec_env.close()
+     
+       # Find the trajectory with the maximum reward
+       #trajs = [[] for _ in range(num_envs)]
+       for env_idx in range(num_envs):
+          trajs.append({
+              'observations': np.asarray(observations[env_idx].copy()),
+              'actions': np.asarray(acts[env_idx].copy()),
+              'rewards': np.asarray(rewards[env_idx].copy())
+          })
+     
+     vec_env.close()
+     score = get_normalized_score(trajs)
+     print(f"Average Normalized Score: {score:.2f}")
+     return trajs

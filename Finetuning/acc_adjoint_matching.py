@@ -4,9 +4,6 @@ from dataclasses import dataclass
 from typing import Callable, List, Tuple
 import sys
 import os
-
-from sympy.core.evalf import pure_complex
-from sympy.functions.elementary.piecewise import false
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -14,7 +11,7 @@ from Pretrain.Planners.Backbone.Dit import DiT1d
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, karras_beta_schedule, clip_actions
+from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, karras_beta_schedule, clip_actions, save_planner, get_planner, getName
 from Pretrain.Planners.Backbone.utils import cosine_alpha_sigma, cosine_beta, compute_dot_alpha_beta, get_pretrained_planner
 import numpy as np
 from Pretrain.Dataset import get_PlannerName
@@ -57,7 +54,8 @@ class Acc_AdjointMatchingConfig:
     update_ema_every = 2
 
     finetune_lr: float = 1e-4
-    finetune_steps: int = 500
+    finetune_total_steps: int = 500
+    per_round_steps: int = 100
     lam: float = 0.01
     eta_lam: float = 0.001
     reward_scaling_factor: float = 100000
@@ -65,7 +63,7 @@ class Acc_AdjointMatchingConfig:
     MaxEnt: bool = False
     Entropy_Scaling_Factor: float = 0.5
 
-    save_freq = 50
+    save_freq = 10
     save_model_freq = 50
     log_freq = 10
 
@@ -141,7 +139,7 @@ class Acc_AdjointMatchingFineTuner:
     def set_optimizer_and_scheduler(self, new_lr=None, new_steps=None):
           # Use provided values or fall back to config defaults
          lr = new_lr if new_lr is not None else self.config.finetune_lr
-         steps = new_steps if new_steps is not None else self.config.finetune_steps
+         steps = new_steps if new_steps is not None else self.config.finetune_total_steps
     
           # Create new optimizer
          self.optimizer = torch.optim.Adam(
@@ -152,7 +150,8 @@ class Acc_AdjointMatchingFineTuner:
             self.optimizer, steps)
     
     def set_old_score_net(self, planner_checkpoint: int):
-        state_dict = get_pretrained_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
+        state_dict = get_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
+        #state_dict = get_pretrained_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
         if( self.config.dataset_name == 'kitchen'):
               self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
         elif (self.config.dataset_name == 'pointmaze'):
@@ -165,6 +164,7 @@ class Acc_AdjointMatchingFineTuner:
         self.old_score_net.eval()
     
     def reset_old_score_net(self, old_score_net: DiT1d):
+
         #state_dict = get_pretrained_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
         if( self.config.dataset_name == 'kitchen'):
               self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
@@ -190,7 +190,6 @@ class Acc_AdjointMatchingFineTuner:
               self.new_score_net.train()
 
     def set_reward_tracker(self):
-        self.logdir =  f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/Models/"
         self.reward_tracker = RewardTracker(save_dir=f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/logs/")
 
     def step_ema(self, step):
@@ -200,23 +199,26 @@ class Acc_AdjointMatchingFineTuner:
             self.ema_model.load_state_dict(base_new_score_net.state_dict())
             return
         self.ema.update_model_average(self.ema_model, base_new_score_net)
-        
-    def save(self, step: int):
+    
+    """
+    def save(self, round: int):
+        self.logdir = f"./Finetuning/Planners/{self.config.dataset_name}/{self.config.specific_dataset}/"
         self.ema_model.eval()
+       
         data = {
             'dataset_name': self.config.dataset_name,
             'specific_dataset': self.config.specific_dataset,
-            'step': step,
-            'ema': self.ema_model.state_dict(),
-            'model': self.new_score_net.state_dict()
+            'step': round,
+            'ema': self.ema_model.state_dict()
         }
         model_name = get_PlannerName(self.config.dataset_name, self.config.specific_dataset)
-        file_name = model_name + '_' + str(step) + '.pt'
+        file_name = model_name + '_Planner_' + str(round) + '.pt'
         os.makedirs(self.logdir, exist_ok=True)
         savepath = os.path.join(self.logdir, file_name)
         torch.save(data, savepath)
         print(f"saved model to {savepath}")
-    
+    """
+
     def save_initial_conds(self, step: int):
         filename = 'Initial_Conds_' + str(step) + '.pkl'
         save_dir =  f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/"
@@ -235,7 +237,7 @@ class Acc_AdjointMatchingFineTuner:
         if(float(k) < 0):
            return torch.sqrt(-2 * k)
         else:
-           raise ValueError(f'K should be negative, but got {k}')
+           raise ValueError(f'K should be negative, but got {k.item()}')
 
     def kt(self, t: torch.Tensor) -> torch.Tensor:
        t = t.clamp(0.0, 1.0 - 1e-3)
@@ -291,7 +293,7 @@ class Acc_AdjointMatchingFineTuner:
 
         s0_t = s0.to(self.device)
         if ( (s0_t.shape[0] != self.config.d_s)   ):
-             raise ValueError(f"s0 should have shape ({self.config.d_s},), but got {s0_t.shape[-1]}")
+             raise ValueError(f"s0 should have shape ({self.config.d_s},), but got {s0_t.shape[0]}")
         dim = self.config.d_s + self.config.d_a
         
         # Initialize x_T ~ N(0, I) with shape (horizon, dim)
@@ -560,21 +562,23 @@ class Acc_AdjointMatchingFineTuner:
 
 
     
-    def finetune_planner(self, dataloader: DataLoader, reward_model: TotalReward, old_score_net: Optional[DiT1d] = None):
+    def finetune_planner(self, dataloader: DataLoader, reward_model: TotalReward, round: int, old_score_net: Optional[DiT1d] = None):
         if old_score_net is not None:
             self.reset_old_score_net(old_score_net)
             self.set_new_score_net()
         reward_model.eval()
-        self.set_optimizer_and_scheduler()
-        self.set_ema_model()
-        self.set_lambda(reward_model.get_beta())
-        self.set_reward_tracker()
+        if(round > 1):
+            self.set_optimizer_and_scheduler(self.optimizer.param_groups[0]['lr'], self.config.finetune_total_steps - ((round-1)*self.config.per_round_steps))
+            self.set_ema_model()
+            self.set_lambda(reward_model.get_beta())
         
-        print(f"Starting Preparing")
+        if self.accelerator.is_main_process:
+             print(f"Starting Preparing")
         dataloader, reward_model = self.Accelerate_Prepare(dataloader, reward_model)
         self.accelerator.wait_for_everyone()
         dataloader = cycle(dataloader)
-        print(f"Starting Finetuning")
+        if self.accelerator.is_main_process:
+             print(f"Starting Finetuning")
         
         step = 0
         total_loss = 0.0
@@ -586,11 +590,13 @@ class Acc_AdjointMatchingFineTuner:
 
        
         #conds = next(dataloader)
-        while step < self.config.finetune_steps:
+        while step < self.config.per_round_steps:
              conds = next(dataloader)
              loss, avg_reward, avg_C = self.step(conds, reward_model)
+             """
              for cond in conds:
                  self.Initial_Conds.append(cond[:2].detach().cpu().numpy().copy())
+             """
              
              self.accelerator.wait_for_everyone()
              
@@ -602,7 +608,7 @@ class Acc_AdjointMatchingFineTuner:
 
 
                 Reward = avg_reward + (self.Lam.get_lam() * avg_C)
-                self.reward_tracker.log_reward(step, Reward, avg_C)
+                self.reward_tracker.log_reward(((round-1)*self.config.per_round_steps+step), Reward, avg_C)
                 pure_reward += Reward
             
                 
@@ -617,46 +623,43 @@ class Acc_AdjointMatchingFineTuner:
                 if ((step % self.config.log_freq) == 0):
                     print('---------------------------------------------------------')
                     if(step == 0):
-                         print(f"step: {step}, loss {total_loss}")
-                         print(f"step: {step}, total reward {total_reward}")
-                         print(f"step: {step}, reward {pure_reward }")
-                         print(f"step: {step}, constraint {total_C}")
+                         print(f"round: {round}, step: {step}, loss {total_loss}")
+                         print(f"round: {round}, step: {step}, total reward {total_reward}")
+                         print(f"round: {round}, step: {step}, reward {pure_reward }")
+                         print(f"round: {round}, step: {step}, constraint {total_C}")
                     else:
-                         print(f"step: {step}, loss {total_loss / self.config.log_freq}")
-                         print(f"step: {step}, total reward {total_reward / self.config.log_freq}")
-                         print(f"step: {step}, reward {pure_reward / self.config.log_freq}")
-                         print(f"step: {step}, constraint {total_C / self.config.log_freq}")
+                         print(f"round: {round}, step: {step}, loss {total_loss / self.config.log_freq}")
+                         print(f"round: {round}, step: {step}, total reward {total_reward / self.config.log_freq}")
+                         print(f"round: {round}, step: {step}, reward {pure_reward / self.config.log_freq}")
+                         print(f"round: {round}, step: {step}, constraint {total_C / self.config.log_freq}")
                     total_loss = 0.0
                     total_reward = 0.0
                     pure_reward = 0.0
                     total_C = 0.0
 
                     
-             
                 if ((step % self.config.save_freq == 0) and (step!=0)):
-                    model_name = get_PlannerName(self.config.dataset_name, self.config.specific_dataset)
-                    self.reward_tracker.save_logs(f"{model_name}_finetune_reward_logs.pkl")
+                    model_name = getName(self.config.dataset_name, self.config.specific_dataset)
+                    #model_name = get_PlannerName(self.config.dataset_name, self.config.specific_dataset)
+                    self.reward_tracker.save_logs(f"{model_name}_step{((round-1)*self.config.per_round_steps+step)}_finetune_reward_logs.pkl")
                     self.reward_tracker.plot_reward_curve(
-                    save_path=f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/logs/{model_name}_finetune_reward_curve.png",
-                    title=f"{model_name} Finetuning Avg Reward",
+                    save_path=f"./Finetuning/Results/{self.config.dataset_name}/{self.config.specific_dataset}/logs/{model_name}_step{((round-1)*self.config.per_round_steps+step)}_finetune_reward_curve.png",
+                    title=f"{model_name} of step {((round-1)*self.config.per_round_steps+step)} Finetuning Avg Reward",
                     show_constraint=True,
                     smooth_window=50,
                   ) 
-
+                """
                 if ( (step % self.config.save_model_freq == 0) and (step!=0)):
                     self.save(step)
-                    self.save_initial_conds(step)
-             
+                    #self.save_initial_conds(step)
+                """
              if(step % self.config.update_lambda_every == 0):
                  self.sync_lambda()
              
              step = step+1
              self.accelerator.wait_for_everyone()
-        """
-        self.new_score_net.eval()
+        
         if self.accelerator.is_main_process:
-            return self.new_score_net.state_dict()
-        else:
-            return None
-        """
+             save_planner(self.ema_model, self.config.dataset_name, self.config.specific_dataset, (round*self.config.per_round_steps))
+
         

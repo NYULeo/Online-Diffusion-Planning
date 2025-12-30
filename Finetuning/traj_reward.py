@@ -11,6 +11,7 @@ import torch.nn as nn
 from Pretrain.Rewards.nets import Reward, ScalarReward, SimpleReward
 from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel
 from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
+from Finetuning.utils import get_reward_model, get_kernel, get_reward_stats, get_kernel_stats
 from Pretrain.Transition_Kernel.Kernel_Backbone import get_pretrained_kernel, get_pretrained_kernel_stats
 from typing import Optional
 from torch.nn import functional as F
@@ -29,14 +30,14 @@ class RewardConfig:
     device = None
     d_s: int = 0 
     d_a: int = 0
-    delta: float = None 
+    delta: Optional[float] = None 
     
 
 class TotalReward(nn.Module):
     def __init__(self, device, config: RewardConfig, dataset_name: str, specific_dataset: str, reward_checkpoint: int, kernel_checkpoint: int):
         super().__init__()
         self.config = config
-        reward_state_dict, obs_dim, act_dim, reward_name = get_pretrained_reward(dataset_name, reward_checkpoint, specific_dataset)
+        reward_state_dict, obs_dim, act_dim = get_reward_model(dataset_name, specific_dataset, reward_checkpoint)
         self.config.device = device
         #self.reward_net = MLPNetwork(input_dim = obs_dim + act_dim, out_dim = 1, hidden_dims = [200, 200, 200, 200], act_fn = 'swish', out_act_fn = 'identity').to(self.config.device)
         #self.reward_net = Reward(obs_dim, act_dim).to(self.config.device)
@@ -47,18 +48,17 @@ class TotalReward(nn.Module):
         self.config.delta = F.softplus(torch.tensor(0.0, requires_grad = False), beta = self.config.beta).to(self.config.device)
 
 
-
         
-        kernel_state_dicts, obs_dim, act_dim, kernel_name = get_pretrained_kernel(dataset_name, kernel_checkpoint, specific_dataset)
+        kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
         for i in range(len(kernel_state_dicts)):
                 kernel_net = RobustTransitionKernel(obs_dim, act_dim).to(self.config.device)
                 kernel_net.load_state_dict(kernel_state_dicts[i])
                 kernel_net.eval()
                 self.kernels.append(kernel_net)
         
-
-        self.reward_stat = get_pretrained_reward_stats(reward_name)
-        self.kernel_stat = get_pretrained_kernel_stats(kernel_name)
+        self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint)
+        self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
+       
 
         self.config.d_s = obs_dim
         self.config.d_a = act_dim

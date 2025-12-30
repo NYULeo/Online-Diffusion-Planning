@@ -9,7 +9,7 @@ import mediapy as media
 from Pretrain.Dataset import get_env
 from Pretrain.Planners.Backbone.Dit import DiT1d
 #from Pretrain.Planners.Backbone.utils import get_pretrained_planner
-from utils import get_pretrained_planner
+from utils import get_planner
 from Pretrain.Dataset import Planner_Processor
 from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde, sample_euler_karras, sample_euler_karras2
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
@@ -18,6 +18,7 @@ import random
 import gymnasium as gym
 import gymnasium_robotics
 from Pretrain.Dataset import get_dataset
+from typing import Optional
 
 
 def get_normalized_score(trajs):
@@ -26,11 +27,17 @@ def get_normalized_score(trajs):
     
     # 3. Count how many goals your agent reaches on average
     avg_goals = np.mean([np.sum(traj['rewards']) for traj in trajs])
-    avg_discounted_return = np.mean([np.sum(traj['rewards']) * (0.99**len(traj['rewards'])) for traj in trajs])
-    #print(f"Average Success Rate: {avg_goals:.2f}")
-
+    total = 0.0
+    for i in range(len(trajs)):
+        temp = 0.0
+        for j in range(len(trajs[i]['rewards'])):
+            if(trajs[i]['rewards'][j] == 0):
+                 temp += (0.99**j) * trajs[i]['rewards'][j]
+        total += temp
+    avg_discounted_return = total / len(trajs)
     # 5. Compute normalized score
     normalized_score = 100 * avg_discounted_return 
+    print(f"Normalized Score: {normalized_score:.2f}")
     return normalized_score
 
     # Final result
@@ -58,7 +65,7 @@ def save_trajs(trajs, env_name, specific_env):
          pickle.dump(trajs, f)
     print(f"trajectories saved")
 
-def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False):
+def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, Checpoint_steps; {checkpoint_steps}")
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
@@ -69,10 +76,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array')
     
     # Create environment factory function
-     goal_cell  = np.array([6, 1], dtype=int) 
-     reset_cell = np.array([6, 3], dtype=int)
-     #reset_cell = None
-     state_dict = get_pretrained_planner(env_name, specific_env, checkpoint_steps)
+     state_dict = get_planner(env_name, specific_env, checkpoint_steps)
      if( env_name == 'kitchen'):
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
      elif (env_name == 'pointmaze'):
@@ -86,7 +90,12 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      planner_processor = Planner_Processor(env_name, specific_env)
 
      #reset
-     s0 = env.reset(seed = 0, options={"goal_cell": goal_cell, "reset_cell": reset_cell})
+     #s0 = env.reset(seed = 0, options={"goal_cell": goal_cell, "reset_cell": reset_cell})
+     if(goal_cell is not None):
+        reset_cell = np.array([2, 1], dtype=int)
+        s0 = env.reset(seed = 0, options={"goal_cell": goal_cell, "reset_cell": reset_cell})
+     else:
+        s0 = env.reset(seed = 0)
      s0 = s0[0]['observation']
      current_state = s0
      frames = []
@@ -125,7 +134,9 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
                 pickle.dump(traj_info, f)
      """
      
-def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, critic = False, checkpoint_steps = 1000000, num_envs=8):
+     print(len(rewards))
+     
+def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, critic = False, checkpoint_steps = 1000000, num_envs=8, goal_cell: Optional[np.ndarray] = None):
      
      #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
      #print(f"Running {num_envs} environments in parallel")
@@ -141,24 +152,8 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
      # Create vectorized environment
      vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
 
-     # Find all free cells (not walls)
-     """
-     maze = env.unwrapped.maze  # Access the internal Maze object
-     maze_map = maze.maze_map
-     rows, cols = len(maze_map), len(maze_map[0])
-     free_cells = []
-     for row in range(rows):
-       for col in range(cols):
-          if maze_map[row][col] != 1:  # 1 = wall; others are free/open
-               free_cells.append(np.array([row, col]))
-     free_cells = np.array(free_cells)
-     """
-     free_cells = np.array([[6,6], [1,1], [1,6], [3,2], [5,4], [3,4], [4,1], [4,6]])
-
-
-
      # Get Planner
-     state_dict = get_pretrained_planner(env_name, specific_env, checkpoint_steps)
+     state_dict = get_planner(env_name, specific_env, checkpoint_steps)
      if env_name == 'kitchen':
          model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
      elif env_name == 'pointmaze':
@@ -170,19 +165,36 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
      
      # Get Processor
      planner_processor = Planner_Processor(env_name, specific_env)
-     goal_cell  = np.array([6, 1], dtype=int) 
-     start_cells = []
-     for i in range(len(free_cells)):
-        if(np.array_equal(free_cells[i], goal_cell)):
-            continue
-        else:
-            start_cells.append(free_cells[i].copy())
-     start_cells = np.array(start_cells)
+     if(goal_cell is not None):
+         """
+         maze = env.unwrapped.maze  # Access the internal Maze object
+         maze_map = maze.maze_map
+         rows, cols = len(maze_map), len(maze_map[0])
+         free_cells = []
+         for row in range(rows):
+             for col in range(cols):
+                 if maze_map[row][col] != 1:  # 1 = wall; others are free/open
+                       free_cells.append(np.array([row, col]))
+         free_cells = np.array(free_cells)
+         """
+         free_cells = np.array([[6,6], [1,1], [1,6], [3,2], [5,4], [3,4], [4,1], [4,6]])
+         start_cells = []
+         for i in range(len(free_cells)):
+             if(np.array_equal(free_cells[i], goal_cell)):
+                 continue
+             else:
+                 start_cells.append(free_cells[i].copy())
+         start_cells = np.array(start_cells)
+     else:
+         start_cells = [[0]]
      normalized_scores = []
      for start_cell in start_cells:
        # Reset all environments
        seeds = list(range(num_envs)) 
-       s0_vec = vec_env.reset(seed = seeds, options={"goal_cell": goal_cell, "reset_cell": start_cell})
+       if(goal_cell is not None):
+            s0_vec = vec_env.reset(seed = seeds, options={"goal_cell": goal_cell, "reset_cell": start_cell})
+       else:
+            s0_vec = vec_env.reset(seed = seeds)
        current_states = s0_vec[0]['observation']
      
        # Store trajectories for each environment
@@ -269,18 +281,23 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
 
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
-    set_seed(3)
+    set_seed(0)
     horizon = 32
-    env_name = 'pointmaze'
-    specific_train_dataset = 'medium'
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True)
-    #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 50, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1500, num_envs = 50)
+    env_name = 'kitchen'
+    specific_train_dataset = 'partial'
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 50, eta = 0.8, episode_length = 4000, checkpoint_steps = 400, render = True,  goal_cell = np.array([6, 1], dtype = int))
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 4000, checkpoint_steps = 0, render = True)
+    #150, 8
+    #50, 3
     
+    #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 50, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1500, num_envs = 50)
+    """
     checkpoint = 0
     while(checkpoint < 450):
        print(f"Rollout for checkpoint: {checkpoint}")
        rollout_parallel(env_name,  specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, critic = False, checkpoint_steps = checkpoint, num_envs=8)
        checkpoint += 50
+    """
     
 
 

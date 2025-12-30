@@ -3,7 +3,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Rewards.Reward_Backbone import train_reward
 from Pretrain.utils import set_seed
-
+import numpy as np
 
 
 if __name__ == '__main__':
@@ -16,6 +16,7 @@ if __name__ == '__main__':
     lr = 3e-4,
     sigma = 7.0,
     target_reward = 1.0,
-    specific_dataset='medium')
+    specific_dataset='medium',
+    goal = np.array([[-2.5, -2.5]]))
 
 

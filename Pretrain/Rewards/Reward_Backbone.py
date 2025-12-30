@@ -29,9 +29,9 @@ import numpy as np
 
 
 
-def reward_filter(obs, rews):
+def reward_filter(obs, rews, goal):
     #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
-    target_goals = np.array([[-2.5, -2.5]])
+    target_goals = goal
     for i in range(len(obs)):
         goal_coord = np.floor(obs[i][:2]) + 0.5
         #goal_coord = np.round(goal_coord, 1)  
@@ -91,7 +91,7 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None):
          
 
 class RewardDataset(Dataset):
-    def __init__(self, trajs, sigma, reward_name, target_reward: Optional[float] = None):
+    def __init__(self, trajs, sigma, reward_name, target_reward: Optional[float] = None, goal: Optional[np.array] = None):
             
         # ----- gather raw obs/actions to fit stats -----
         obs_list, act_list = [], []
@@ -115,7 +115,8 @@ class RewardDataset(Dataset):
             obs = np.asarray(traj['observations'])
             acts = np.asarray(traj['actions'])
             rews = np.asarray(traj['rewards'])
-            rews = reward_filter(obs, rews)
+            if(goal is not None):
+                 rews = reward_filter(obs, rews, goal)
             if(not np.all(np.isin(rews, allowed_values))):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
             if(target_reward is not None):
@@ -161,12 +162,12 @@ class RewardDataset(Dataset):
         )
     
 
-def train_reward(dataset_name: str, batch_size, num_steps, save_freq, lr, sigma, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None):
+def train_reward(dataset_name: str, batch_size, num_steps, save_freq, lr, sigma, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None):
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
     print(f"Training reward approximator for {dataset_name} Dataset") 
-    dataset = RewardDataset(trajs, sigma, reward_name, target_reward)
+    dataset = RewardDataset(trajs, sigma, reward_name, target_reward, goal)
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
     
     """
@@ -213,7 +214,7 @@ def train_reward(dataset_name: str, batch_size, num_steps, save_freq, lr, sigma,
 
 
 class test_dataset(Dataset):
-    def __init__(self, trajs, sigma, Reward_name, target_reward: Optional[float] = None):
+    def __init__(self, trajs, sigma, Reward_name, target_reward: Optional[float] = None, goal: Optional[np.array] = None):
         self.stats = get_pretrained_reward_stats(Reward_name)
         transitions = []
         allowed_values = [0,1]
@@ -221,7 +222,8 @@ class test_dataset(Dataset):
             obs = np.asarray(traj['observations'])        
             acts = np.asarray(traj['actions'])
             rews = np.asarray(traj['rewards'])
-            rews = reward_filter(obs, rews)
+            if(goal is not None):
+                 rews = reward_filter(obs, rews, goal)
             if(not np.all(np.isin(rews, allowed_values))):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
             if(target_reward is not None):
@@ -252,7 +254,7 @@ class test_dataset(Dataset):
             torch.tensor(r, dtype=torch.float32),
         )
         
-def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: float = 3, target_reward: Optional[float] = None, save_freq: int = 50, num_steps: int = 500):
+def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: float = 3, target_reward: Optional[float] = None, goal: Optional[np.arrays] = None, save_freq: int = 50, num_steps: int = 500):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device {device}")
     print(f"Testing the reward model for {dataset_name} Dataset")
@@ -260,10 +262,10 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
 
     if(trajs is None): 
         train_Trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
-        dataset = RewardDataset(train_Trajs, sigma, reward_name, target_reward)
+        dataset = RewardDataset(train_Trajs, sigma, reward_name, target_reward, goal)
     else:
         _, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
-        dataset = test_dataset(trajs, sigma, reward_name, target_reward)
+        dataset = test_dataset(trajs, sigma, reward_name, target_reward, goal)
     print(f"Testing the reward model on {len(dataset)} samples")
     a = factorint(len(dataset))
     batch_size = int(np.min(list(a.keys())))

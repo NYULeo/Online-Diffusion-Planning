@@ -62,9 +62,9 @@ def check_speration(trajs):
 
 if __name__ == "__main__":
      set_seed(1)
-     data = get_dataset('antmaze', 'medium_play')
+     data = get_dataset('kitchen', 'partial')
      trajs = data.get_trajectories()
-     render('antmaze', 'medium_play', trajs[2])
+     render('kitchen', 'partial', trajs[0])
      """
      with open('Rollouts/pointmaze/medium/Generated_trajs_Info.pkl', 'rb') as f:
         info = pickle.load(f)

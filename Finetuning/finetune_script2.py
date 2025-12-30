@@ -7,7 +7,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 
-from Finetune_Backbone import OnlineFinetuner, FinetuningConfig
+from Finetune_Backbone import OnlineFinetuner, FinetuningConfig, Train_Kernel_Config, Train_Reward_Config
 from adjoint_matching import AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig
 from traj_reward import RewardConfig
@@ -34,36 +34,55 @@ if __name__ == "__main__":
     # loading of your pretrained models (e.g. via torch.load).
     env_name = 'pointmaze'
     specific_env = 'medium'
-    #AMConfig = AdjointMatchingConfig(horizon = 32) 
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32)
-    
     #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
-    RWConfig = RewardConfig(beta = 1.0, min_log_prob = 5.0, explore = False) 
+    RWConfig = RewardConfig(
+               beta = 1.0, 
+               min_log_prob = 5.0, 
+               explore = False) 
+    
+    TrainRewardConfig = Train_Reward_Config(
+                          batch_size = 256, 
+                          num_steps = 1000, 
+                          lr = 3e-4, 
+                          sigma = 7.0, 
+                          target_reward = 1.0, 
+                          goal = np.array([[-2.5, -2.5]]))
+    
+    TrainKernelConfig = Train_Kernel_Config(
+                            batch_size = 256, 
+                            num_steps = 1000,
+                            lr = 3e-4,
+                            ensemble_size = 10,
+                            λ_reg = 1e-3)
     
     FTConfig = FinetuningConfig(
         AMConfig = AMConfig, 
         RewardConfig = RWConfig, 
         dataset_name = env_name,
         specific_dataset = specific_env,
-        planner_checkpoint = 1000000,
-        reward_model_checkpoint = 200,
-        kernel_model_checkpoint = 34000,
-        finetune_steps = 5000,
+        planner_checkpoint = 0,
+        reward_model_checkpoint = 0,
+        kernel_model_checkpoint = 0,
+        finetune_steps = 3000,
+        finetune_rounds = 60,
         diffusion_steps = 50,
         karras_percent = 0.05,
         Loss_Clip_percent = 0.75,
         finetune_batch_size = 8,
         finetune_lr = 2e-05,
-        #inital_lam = 2.5,
-        inital_lam = 0.05,
+        initial_lam = 0.05,
         eta_lam = 0.5,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
         reward_scaling_factor = 50,
         MaxEnt = False,
-        Entropy_Scaling_Factor = 0.5) 
+        Entropy_Scaling_Factor = 0.5,
+        train_reward_config = TrainRewardConfig,
+        train_kernel_config = TrainKernelConfig) 
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
 
 #finetune_lr = 1e-05,
+

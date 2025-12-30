@@ -26,6 +26,7 @@ if __name__ == '__main__':
     trajs = trajs,
     sigma = 50.0, 
     target_reward = 10.0,
+    goal = np.array([[-2.5, -2.5]]),
     save_freq = 200, 
     num_steps = 1000)
 
