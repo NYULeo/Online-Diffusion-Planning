@@ -9,7 +9,7 @@ import mediapy as media
 from Pretrain.Dataset import get_env
 from Pretrain.Planners.Backbone.Dit import DiT1d
 #from Pretrain.Planners.Backbone.utils import get_pretrained_planner
-from utils import get_planner
+from utils import get_planner, get_normalized_score
 from Pretrain.Dataset import Planner_Processor
 from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde, sample_euler_karras, sample_euler_karras2
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
@@ -20,28 +20,6 @@ import gymnasium_robotics
 from Pretrain.Dataset import get_dataset
 from typing import Optional
 
-
-def get_normalized_score(trajs):
-    # 2. Get official references from Minari
-    #data = get_dataset(env_name, specific_env)
-    
-    # 3. Count how many goals your agent reaches on average
-    avg_goals = np.mean([np.sum(traj['rewards']) for traj in trajs])
-    total = 0.0
-    for i in range(len(trajs)):
-        temp = 0.0
-        for j in range(len(trajs[i]['rewards'])):
-            if(trajs[i]['rewards'][j] == 0):
-                 temp += (0.99**j) * trajs[i]['rewards'][j]
-        total += temp
-    avg_discounted_return = total / len(trajs)
-    # 5. Compute normalized score
-    normalized_score = 100 * avg_discounted_return 
-    print(f"Normalized Score: {normalized_score:.2f}")
-    return normalized_score
-
-    # Final result
-    #print(f"Normalized score (pointmaze/medium-v2): {normalized_score:.2f}")
 
 def set_seed(seed=0):
     # Python random

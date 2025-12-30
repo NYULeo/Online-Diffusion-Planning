@@ -33,6 +33,7 @@ from Pretrain.Planners.Backbone.Dit import DiT1d
 from Rollout import get_normalized_score
 
 
+
 def reward_filter(obs, rews, goal):
     #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
     target_goals = goal
@@ -561,6 +562,19 @@ def clip_actions(x: torch.Tensor, d_s: int) -> torch.Tensor:
 
 
 
+def get_normalized_score(trajs):
+    total = 0.0
+    for i in range(len(trajs)):
+        temp = 0.0
+        for j in range(len(trajs[i]['rewards'])):
+            if(trajs[i]['rewards'][j] == 0):
+                 temp += (0.99**j) * trajs[i]['rewards'][j]
+        total += temp
+    avg_discounted_return = total / len(trajs)
+    # 5. Compute normalized score
+    normalized_score = 100 * avg_discounted_return 
+    print(f"Normalized Score: {normalized_score:.2f}")
+    return normalized_score
 
 
 def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs=8, goal_cell: Optional[np.ndarray] = None):
