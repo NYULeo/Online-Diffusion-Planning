@@ -254,7 +254,7 @@ class test_dataset(Dataset):
             torch.tensor(r, dtype=torch.float32),
         )
         
-def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: float = 3, target_reward: Optional[float] = None, goal: Optional[np.arrays] = None, save_freq: int = 50, num_steps: int = 500):
+def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: float = 3, target_reward: Optional[float] = None, goal: Optional[np.array] = None, save_freq: int = 50, num_steps: int = 500):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device {device}")
     print(f"Testing the reward model for {dataset_name} Dataset")
