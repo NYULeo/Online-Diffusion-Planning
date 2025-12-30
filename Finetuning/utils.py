@@ -60,7 +60,7 @@ def save_kernel_model(kernel_net, dataset_name, specific_dataset, step, ensemble
     name = getName(dataset_name, specific_dataset)
     net_dict =  kernel_net.state_dict()
     os.makedirs(f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{step}', exist_ok=True)
-    save_path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{step}/{name}_kernel_{str(step)}_{str(ensemble_idx)}.pkl'
+    save_path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{step}/{name}_Kernel_{str(ensemble_idx)}.pkl'
     torch.save(net_dict, save_path)
     print(f"Kernel model save to {name}_{str(step)}_{str(ensemble_idx)}.pkl")
 
@@ -85,7 +85,7 @@ def get_kernel(dataset_name, specific_dataset, step):
     file_count = count_files_in_folder(path)
     kernel_state_dicts = []
     for i in range(file_count):
-        dir = f"./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}/{name}_kernel_{str(step)}_{str(i)}.pkl"
+        dir = f"./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}/{name}_Kernel_{str(i)}.pkl"
         kernel_state_dicts.append(torch.load(dir, weights_only=True, map_location='cpu'))
     return kernel_state_dicts, obs_dim, act_dim
 
