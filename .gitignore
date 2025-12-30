@@ -1,2 +1,3 @@
-# Only ignore git directory itself
+# Only ignore git directory itself and .venv310 (contains files >100MB that GitHub rejects)
 .git/
+.venv310/
