@@ -50,7 +50,7 @@ def save_reward_model(reward_net, dataset_name, specific_dataset, step):
     name = getName(dataset_name, specific_dataset)
     net_dict = reward_net.state_dict()
     os.makedirs(f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
-    save_path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{name}_reward_{str(step)}.pkl'
+    save_path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{name}_Reward_{str(step)}.pkl'
     #print("Exists:", os.path.isfile(save_path), "Size:", os.path.getsize(save_path) if os.path.isfile(save_path) else None)
     torch.save(net_dict, save_path)
     print(f"reward model save to {name}_{str(step)}.pkl")
@@ -67,13 +67,13 @@ def save_kernel_model(kernel_net, dataset_name, specific_dataset, step, ensemble
 def get_reward_model(dataset_name, specific_dataset, step):
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
     name = getName(dataset_name, specific_dataset)
-    path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{name}_reward_{str(step)}.pkl'
+    path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{name}_Reward_{str(step)}.pkl'
     model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
     return model_state_dict, obs_dim, act_dim
 
 def get_reward_stats(dataset_name, specific_dataset, step):
     name = getName(dataset_name, specific_dataset)
-    path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/{name}_reward_stats_{str(step)}.pkl'
+    path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/{name}_Reward_stats_{str(step)}.pkl'
     with open(path, 'rb') as f:
         stats = pickle.load(f)
     return stats  
@@ -91,7 +91,7 @@ def get_kernel(dataset_name, specific_dataset, step):
 
 def get_kernel_stats(dataset_name, specific_dataset, step):
     name = getName(dataset_name, specific_dataset)
-    path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Stats/{name}_kernel_stats_{str(step)}.pkl'
+    path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Stats/{name}_Kernel_stats_{str(step)}.pkl'
     with open(path, 'rb') as f:
         stats = pickle.load(f)
     return stats  
