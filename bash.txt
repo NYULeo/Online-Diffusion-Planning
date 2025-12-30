@@ -1,0 +1,12 @@
+cd Online-Diffusion-Planning/Finetuning
+
+export PYGLFW_LIBRARY=/usr/lib/x86_64-linux-gnu/libglfw.so.3 && export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/directory/with/libglfw &&  ldconfig 
+
+export CUDA_VISIBLE_DEVICES=0,2,3,4
+export TORCH_DISTRIBUTED_BACKEND=gloo
+export NCCL_IB_DISABLE=1
+export NCCL_P2P_DISABLE=1
+export NCCL_ALGO=Ring
+
+
+ accelerate launch --multi_gpu --num_processes=4 finetune_script2.py | tee output.txt
