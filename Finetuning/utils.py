@@ -30,7 +30,6 @@ from Pretrain.Dataset import KitchenDataset, PointMazeDataset, get_env, Planner_
 from gymnasium.vector import AsyncVectorEnv
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 from Pretrain.Planners.Backbone.Dit import DiT1d
-from Rollout import get_normalized_score
 
 
 
