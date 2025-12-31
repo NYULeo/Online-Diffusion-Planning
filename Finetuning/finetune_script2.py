@@ -65,7 +65,7 @@ if __name__ == "__main__":
         reward_model_checkpoint = 0,
         kernel_model_checkpoint = 0,
         finetune_steps = 3000,
-        finetune_rounds = 150,
+        finetune_rounds = 300,
         diffusion_steps = 50,
         karras_percent = 0.05,
         Loss_Clip_percent = 0.75,
