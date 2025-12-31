@@ -621,7 +621,8 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
                        free_cells.append(np.array([row, col]))
          free_cells = np.array(free_cells)
          """
-         free_cells = np.array([[6,6], [1,1], [1,6], [3,2], [5,4], [3,4], [4,1], [4,6]])
+         #free_cells = np.array([[6,6], [1,1], [1,6], [3,2], [5,4], [3,4], [4,1], [4,6]])
+         free_cells = np.array([[6,6], [5,4], [2,4], [2,1]])
          start_cells = []
          for i in range(len(free_cells)):
              if(np.array_equal(free_cells[i], goal_cell)):
@@ -634,7 +635,7 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
      for start_cell in start_cells:
        # Reset all environments
        seeds = list(range(num_envs)) 
-       s0_vec = vec_env.reset(seed = seeds, options={"goal_cell": goal_cell, "reset_cell": start_cell})
+       s0_vec = vec_env.reset(seed = seeds, options=[{"goal_cell": goal_cell.copy(), "reset_cell": start_cell.copy()} for _ in range(num_envs)])
        current_states = s0_vec[0]['observation']
      
        # Store trajectories for each environment
