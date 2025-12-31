@@ -62,7 +62,7 @@ def save_kernel_model(kernel_net, dataset_name, specific_dataset, step, ensemble
     os.makedirs(f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{step}', exist_ok=True)
     save_path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{step}/{name}_Kernel_{str(ensemble_idx)}.pkl'
     torch.save(net_dict, save_path)
-    print(f"Kernel model save to {name}_{str(step)}_{str(ensemble_idx)}.pkl")
+    #print(f"Kernel model save to {name}_{str(step)}_{str(ensemble_idx)}.pkl")
 
 def get_reward_model(dataset_name, specific_dataset, step):
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
@@ -380,7 +380,7 @@ def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
     for idx, m in enumerate(ensemble):
          ckpt = copy.deepcopy(m).cpu()
          save_kernel_model(ckpt, dataset_name, specific_dataset, step, idx)
-
+    print(f"Kernel model saved")
 
 
 class PlannerDataset(Dataset):
@@ -566,8 +566,8 @@ def get_normalized_score(trajs):
     for i in range(len(trajs)):
         temp = 0.0
         for j in range(len(trajs[i]['rewards'])):
-            if(trajs[i]['rewards'][j] == 0):
-                 temp += (0.99**j) * trajs[i]['rewards'][j]
+            #if(trajs[i]['rewards'][j] == 1):
+            temp += (0.99**j) * trajs[i]['rewards'][j]
         total += temp
     avg_discounted_return = total / len(trajs)
     # 5. Compute normalized score

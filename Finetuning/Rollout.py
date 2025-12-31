@@ -19,6 +19,7 @@ import gymnasium as gym
 import gymnasium_robotics
 from Pretrain.Dataset import get_dataset
 from typing import Optional
+from utils import get_normalized_score
 
 
 def set_seed(seed=0):
@@ -112,7 +113,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
                 pickle.dump(traj_info, f)
      """
      
-     print(len(rewards))
+     print(get_normalized_score([traj]))
      
 def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, critic = False, checkpoint_steps = 1000000, num_envs=8, goal_cell: Optional[np.ndarray] = None):
      
@@ -261,10 +262,10 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
 if __name__ == "__main__":
     set_seed(0)
     horizon = 32
-    env_name = 'kitchen'
-    specific_train_dataset = 'partial'
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 50, eta = 0.8, episode_length = 4000, checkpoint_steps = 400, render = True,  goal_cell = np.array([6, 1], dtype = int))
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 4000, checkpoint_steps = 0, render = True)
+    env_name = 'pointmaze'
+    specific_train_dataset = 'medium'
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 50, eta = 0.8, episode_length = 4000, checkpoint_steps = 0, render = True,  goal_cell = np.array([6, 1], dtype = int))
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 4000, checkpoint_steps = 0, render = True)
     #150, 8
     #50, 3
     
