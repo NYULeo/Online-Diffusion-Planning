@@ -674,5 +674,10 @@ class Acc_AdjointMatchingFineTuner:
         
         if self.accelerator.is_main_process:
              save_planner(self.ema_model, self.config.dataset_name, self.config.specific_dataset, (round*self.config.per_round_steps))
+        
+        self.accelerator.wait_for_everyone()
+        if torch.cuda.is_available():
+             torch.cuda.synchronize()
+        self.accelerator.wait_for_everyone()
 
         

@@ -203,6 +203,11 @@ class OnlineFinetuner():
             self.accelerator.wait_for_everyone()
             self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
             self.accelerator.wait_for_everyone()
+            
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()  
+            self.accelerator.wait_for_everyone() 
+            
             if self.accelerator.is_main_process:
                 print(f"Starting Rollout")
                 trajs = rollout_parallel(self.config.dataset_name, 
