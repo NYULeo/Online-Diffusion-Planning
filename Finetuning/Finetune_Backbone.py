@@ -70,7 +70,7 @@ class FinetuningConfig():
     MaxEnt: bool = False
     Entropy_Scaling_Factor: float = 0.5
     rollout_length: int = 4000
-    rollout_num_envs: int = 8
+    rollout_num_envs: int = 4
    
     
 
@@ -199,6 +199,7 @@ class OnlineFinetuner():
                                          checkpoint_step = ((step+1) * self.config.AMConfig.per_round_steps), 
                                          num_envs = self.config.rollout_num_envs, 
                                          goal_cell = self.config.train_reward_config.goal)
+                print(f"Rollout Completed")
                 self.Buffer.extend(trajs)
                 print(f"Starting Reward Training")
                 train_reward(self.Buffer, 
