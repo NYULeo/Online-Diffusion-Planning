@@ -618,7 +618,7 @@ class Acc_AdjointMatchingFineTuner:
                      print(f"step: {step}, lambda: {self.Lam.get_lam()}")
                 
                 if ((((round-1)*self.config.per_round_steps + step) % self.config.update_ema_every) == 0):
-                     self.step_ema(step)
+                     self.step_ema(((round-1)*self.config.per_round_steps + step))
                 
                 if ((step % self.config.log_freq) == 0):
                     print('---------------------------------------------------------')

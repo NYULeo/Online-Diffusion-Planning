@@ -576,11 +576,12 @@ def get_normalized_score(trajs):
     return normalized_score
 
 
-def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs=8, goal_cell: Optional[np.ndarray] = None):
+def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs=8, goal_cell: Optional[np.ndarray] = None, device: torch.device = None):
      
      #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
      #print(f"Running {num_envs} environments in parallel")
-     device = "cuda" if torch.cuda.is_available() else "cpu"
+     if device is None:
+          device = "cuda" if torch.cuda.is_available() else "cpu"
      trajs = []
      #print(f"Using device {device}")
      
