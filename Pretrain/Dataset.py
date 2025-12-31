@@ -562,7 +562,7 @@ class PlannerDataset_Rollout(Dataset):
     def __getitem__(self, idx):
         return self.windows[idx], self.conditions[idx]
 
-
+"""
 vectors = []
 data = get_dataset('kitchen', 'complete')
 trajs = data.get_trajectories()
@@ -621,7 +621,7 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 def visualize_clusters(vectors, assignments, cluster_centers, title_prefix=""):
-    """Comprehensive clustering visualization"""
+   
     vectors = np.array(vectors)
     n_clusters = len(cluster_centers)
     colors = plt.cm.tab10(np.linspace(0, 1, n_clusters))
@@ -692,3 +692,4 @@ def visualize_clusters(vectors, assignments, cluster_centers, title_prefix=""):
 
 # Usage:
 #visualize_clusters(vectors, assignments, stats['cluster_centers'], "Kitchen Rewards: ")
+"""
