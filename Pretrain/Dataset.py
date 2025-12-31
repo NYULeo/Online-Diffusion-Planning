@@ -607,7 +607,7 @@ def verify_four_clusters(vectors):
 
 
 # Usage:
-kmeans, assignments, centers, stats = verify_four_clusters(vectors)
+#kmeans, assignments, centers, stats = verify_four_clusters(vectors)
 
 
 
@@ -691,4 +691,4 @@ def visualize_clusters(vectors, assignments, cluster_centers, title_prefix=""):
     plt.show()
 
 # Usage:
-visualize_clusters(vectors, assignments, stats['cluster_centers'], "Kitchen Rewards: ")
+#visualize_clusters(vectors, assignments, stats['cluster_centers'], "Kitchen Rewards: ")
