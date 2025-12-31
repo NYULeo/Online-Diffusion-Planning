@@ -47,7 +47,7 @@ if __name__ == "__main__":
                           lr = 3e-4, 
                           sigma = 7.0, 
                           target_reward = 1.0, 
-                          goal = np.array([[-2.5, -2.5]]))
+                          goal = np.array([[6, 1]], dtype = int))
     
     TrainKernelConfig = Train_Kernel_Config(
                             batch_size = 256, 

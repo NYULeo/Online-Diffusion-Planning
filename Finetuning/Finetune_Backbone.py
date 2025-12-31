@@ -176,8 +176,9 @@ class OnlineFinetuner():
             print(f"The GPU name is: {torch.cuda.get_device_name(0)}")
             print('-------------------------------------------------------------------------------------------')
         
-        for step in range(self.config.finetune_rounds):
-            if self.accelerator.is_main_process:
+
+
+        if self.accelerator.is_main_process:
                 print(f"Starting Rollout")
                 trajs = rollout_parallel(self.config.dataset_name, 
                                          self.config.specific_dataset, 
@@ -186,10 +187,12 @@ class OnlineFinetuner():
                                          num_karras = self.config.AMConfig.num_karras, 
                                          eta = self.config.AMConfig.eta, 
                                          episode_length = self.config.rollout_length, 
-                                         checkpoint_step = ((step) * self.config.AMConfig.per_round_steps), 
+                                         checkpoint_step = 0, 
                                          num_envs = self.config.rollout_num_envs, 
                                          goal_cell = self.config.train_reward_config.goal)
-            self.accelerator.wait_for_everyone()
+        self.accelerator.wait_for_everyone()
+        for step in range(self.config.finetune_rounds):
+           
             if (torch.cuda.device_count() > 1):
                 sampler = DistributedSampler(self.PlannerDataset, shuffle=True, drop_last=True)
                 dataloader = DataLoader(self.PlannerDataset, self.config.finetune_batch_size, pin_memory = True, num_workers = 2,  sampler = sampler,  drop_last = True)
