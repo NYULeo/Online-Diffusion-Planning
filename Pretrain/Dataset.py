@@ -571,3 +571,65 @@ for i in range(20):
     Goals.append(env.generate_target_goal())
 print(np.array(Goals))
 """
+vectors = []
+data = get_dataset('kitchen', 'complete')
+trajs = data.get_trajectories()
+for traj in trajs:
+     for i in range(len(traj['rewards'])):
+         if(traj['rewards'][i] == 1):
+             vectors.append(traj['observations'][i])
+vectors = np.array(vectors)
+
+
+
+import numpy as np
+from sklearn.cluster import KMeans
+from scipy.spatial.distance import cdist
+
+def verify_four_clusters(vectors):
+    """
+    Check if vectors naturally form 4 clusters using K-means.
+    
+    Returns:
+        kmeans: fitted KMeans model
+        assignments: cluster assignment for each vector
+        centers: cluster centers
+        stats: clustering quality metrics
+    """
+    vectors = np.array(vectors)
+    
+    # Fit K-means with 4 clusters
+    kmeans = KMeans(n_clusters=4, random_state=42, n_init=10)
+    assignments = kmeans.fit_predict(vectors)
+    
+    # Compute distances to assigned cluster centers
+    centers = kmeans.cluster_centers_
+    distances = cdist(vectors, centers, metric='euclidean')
+    min_distances = distances[np.arange(len(vectors)), assignments]
+    
+    # Inertia (within-cluster sum of squares)
+    inertia = kmeans.inertia_
+    
+    stats = {
+        'inertia': inertia,
+        'mean_distance_to_center': np.mean(min_distances),
+        'max_distance_to_center': np.max(min_distances),
+        'cluster_counts': np.bincount(assignments, minlength=4),
+        'cluster_percentages': np.bincount(assignments, minlength=4) / len(vectors) * 100,
+        'cluster_centers': centers
+    }
+    
+    return kmeans, assignments, centers, stats
+
+"""
+# Usage:
+kmeans, assignments, centers, stats = verify_four_clusters(vectors)
+
+
+print(f"Cluster distribution: {stats['cluster_counts']}")
+print(f"Cluster percentages: {stats['cluster_percentages']}")
+print(f"Inertia (within-cluster sum of squares): {stats['inertia']:.4f}")
+print(f"Mean distance to center: {stats['mean_distance_to_center']:.4f}")
+print(f"Max distance to center: {stats['max_distance_to_center']:.4f}")
+print(f"\nCluster centers:\n{stats['cluster_centers']}")
+"""
