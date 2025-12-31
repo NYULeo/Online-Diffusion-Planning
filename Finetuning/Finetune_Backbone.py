@@ -192,7 +192,6 @@ class OnlineFinetuner():
                                          goal_cell = self.config.train_reward_config.goal)
         self.accelerator.wait_for_everyone()
         for step in range(self.config.finetune_rounds):
-           
             if (torch.cuda.device_count() > 1):
                 sampler = DistributedSampler(self.PlannerDataset, shuffle=True, drop_last=True)
                 dataloader = DataLoader(self.PlannerDataset, self.config.finetune_batch_size, pin_memory = True, num_workers = 2,  sampler = sampler,  drop_last = True)
