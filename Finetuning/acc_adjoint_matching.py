@@ -117,12 +117,25 @@ class Acc_AdjointMatchingFineTuner:
          self.new_score_net.train()
          self.old_score_net.eval()
          return dataloader, reward_model
-
+    """
     def set_ema_model(self):
           self.ema_model = copy.deepcopy(self.new_score_net)
           for p in self.ema_model.parameters():
               p.requires_grad_(False)
           self.ema_model.eval()
+    """
+    
+    def set_ema_model(self):
+        try:
+            base_model = self.accelerator.unwrap_model(self.new_score_net)
+        except (AttributeError, RuntimeError):
+            # If unwrap fails, model is not wrapped yet (e.g., during __init__)
+            base_model = self.new_score_net
+        
+        self.ema_model = copy.deepcopy(base_model)
+        for p in self.ema_model.parameters():
+            p.requires_grad_(False)
+        self.ema_model.eval()
           
     def set_lambda(self, beta: Optional[float] = None):
         if beta is None:
