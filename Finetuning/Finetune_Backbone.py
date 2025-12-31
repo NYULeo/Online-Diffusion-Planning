@@ -195,7 +195,7 @@ class OnlineFinetuner():
                                          num_karras = self.config.AMConfig.num_karras, 
                                          eta = self.config.AMConfig.eta, 
                                          episode_length = self.config.rollout_length, 
-                                         checkpoint_step = step+1, 
+                                         checkpoint_step = ((step+1) * self.config.AMConfig.per_round_steps), 
                                          num_envs = self.config.rollout_num_envs, 
                                          goal_cell = self.config.train_reward_config.goal)
                 self.Buffer.extend(trajs)
@@ -206,7 +206,7 @@ class OnlineFinetuner():
                              num_steps = self.config.train_reward_config.num_steps, 
                              lr = self.config.train_reward_config.lr, 
                              sigma = self.config.train_reward_config.sigma, 
-                             step = step+1, 
+                             step = ((step+1) * self.config.AMConfig.per_round_steps), 
                              target_reward = self.config.train_reward_config.target_reward, 
                              specific_dataset = self.config.specific_dataset, 
                              goal = self.config.train_reward_config.goal)
@@ -219,14 +219,14 @@ class OnlineFinetuner():
                              num_steps = self.config.train_kernel_config.num_steps,
                              ensemble_size = self.config.train_kernel_config.ensemble_size, 
                              λ_reg = self.config.train_kernel_config.λ_reg, 
-                             step = step+1)
+                             step = ((step+1) * self.config.AMConfig.per_round_steps))
             
             #sync the buffer across all processes
             self.sync_bufferDataset()
     
             #set the new total reward model
-            self.config.reward_model_checkpoint = step+1
-            self.config.kernel_model_checkpoint = step+1
+            self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
+            self.config.kernel_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             self.set_reward_model(self.device)
             if self.accelerator.is_main_process:
                  print(f"Finetuning round {step+1} completed")
