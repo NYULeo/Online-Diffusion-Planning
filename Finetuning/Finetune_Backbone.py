@@ -70,7 +70,7 @@ class FinetuningConfig():
     MaxEnt: bool = False
     Entropy_Scaling_Factor: float = 0.5
     rollout_length: int = 4000
-    rollout_num_envs: int = 4
+    rollout_num_envs: int = 1
    
     
 
@@ -119,7 +119,8 @@ class OnlineFinetuner():
                    self.config.dataset_name, 
                    self.config.specific_dataset)
 
-    def sync_bufferDataset(self):
+    def sync_bufferDataset(self, trajs):
+        """
         #sync the buffer across all processes
         self.accelerator.wait_for_everyone() 
         if self.accelerator.is_main_process:
@@ -130,6 +131,9 @@ class OnlineFinetuner():
         if gathered and gathered[0] is not None:
              self.Buffer = gathered[0]
         self.accelerator.wait_for_everyone() 
+        """
+        all_trajs = self._gather_and_concat_trajectories(trajs)
+        self.Buffer.extend(all_trajs)
         # sync the planner dataset across all processes
         self.PlannerDataset = PlannerDataset(
                     self.Buffer, 
@@ -137,11 +141,25 @@ class OnlineFinetuner():
                     self.config.dataset_name, 
                     self.config.specific_dataset
              )
-        self.accelerator.wait_for_everyone()
     
     def set_reward_model(self, device):
         self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
     
+    def _gather_and_concat_trajectories(self, trajs):
+         # All processes contribute their trajectories
+        trajs_list = [trajs]
+        gathered_trajs = self.accelerator.gather_for_metrics(trajs_list, use_gather_object=True)
+        self.accelerator.wait_for_everyone()
+        
+        # Concatenate all trajectories from all processes
+        all_trajs = []
+        if gathered_trajs:
+           for process_trajs in gathered_trajs:
+               if process_trajs is not None:
+                   unwarpped_process_trajs = process_trajs[0] 
+                   all_trajs.extend(unwarpped_process_trajs)
+        return all_trajs
+
     def finetune_planner(self):
         if self.accelerator.is_main_process:
             print("Env Details: ------------------------------------------------------------------------------")
@@ -177,10 +195,10 @@ class OnlineFinetuner():
             print('-------------------------------------------------------------------------------------------')
         
 
-
+       
         if self.accelerator.is_main_process:
-                print(f"Starting Rollout")
-                trajs = rollout_parallel(self.config.dataset_name, 
+            print(f"Starting Rollout")
+            trajs = rollout_parallel(self.config.dataset_name, 
                                          self.config.specific_dataset, 
                                          horizon = self.config.AMConfig.horizon, 
                                          steps_T = self.config.diffusion_steps, 
@@ -191,25 +209,27 @@ class OnlineFinetuner():
                                          num_envs = self.config.rollout_num_envs, 
                                          goal_cell = self.config.train_reward_config.goal)
         self.accelerator.wait_for_everyone()
+        
         for step in range(self.config.finetune_rounds):
             if (torch.cuda.device_count() > 1):
                 sampler = DistributedSampler(self.PlannerDataset, shuffle=True, drop_last=True)
+                sampler.set_epoch(step)
                 dataloader = DataLoader(self.PlannerDataset, self.config.finetune_batch_size, pin_memory = True, num_workers = 2,  sampler = sampler,  drop_last = True)
             else:
                 dataloader = DataLoader(self.PlannerDataset, self.config.finetune_batch_size, pin_memory = True, num_workers = 2, shuffle = True, drop_last = True)
+            
             if self.accelerator.is_main_process:
                  print(f"Finetuning round {step+1} started")
-            self.accelerator.wait_for_everyone()
             self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
             self.accelerator.wait_for_everyone()
             
             if torch.cuda.is_available():
-                torch.cuda.synchronize()  
+                  torch.cuda.synchronize()  
             self.accelerator.wait_for_everyone() 
-            
+
             if self.accelerator.is_main_process:
-                print(f"Starting Rollout")
-                trajs = rollout_parallel(self.config.dataset_name, 
+                  print(f"Starting Rollout")
+            trajs = rollout_parallel(self.config.dataset_name, 
                                          self.config.specific_dataset, 
                                          horizon = self.config.AMConfig.horizon, 
                                          steps_T = self.config.diffusion_steps, 
@@ -220,9 +240,15 @@ class OnlineFinetuner():
                                          num_envs = self.config.rollout_num_envs, 
                                          goal_cell = self.config.train_reward_config.goal,
                                          device = self.device)
-                print(f"Rollout Completed")
-                self.Buffer.extend(trajs)
-                """
+            self.accelerator.wait_for_everyone() 
+            if self.accelerator.is_main_process:                            
+                  print(f"Rollout Completed")
+        
+            
+            self.sync_bufferDataset(trajs)
+            self.accelerator.wait_for_everyone()
+
+            if self.accelerator.is_main_process:
                 print(f"Starting Reward Training")
                 train_reward(self.Buffer, 
                              dataset_name = self.config.dataset_name, 
@@ -244,20 +270,17 @@ class OnlineFinetuner():
                              ensemble_size = self.config.train_kernel_config.ensemble_size, 
                              λ_reg = self.config.train_kernel_config.λ_reg, 
                              step = ((step+1) * self.config.AMConfig.per_round_steps))
-                 """
-            #sync the buffer across all processes
             self.accelerator.wait_for_everyone()
-            self.accelerator.wait_for_everyone()
-            self.sync_bufferDataset()
-    
+
             #set the new total reward model
-            #self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
-            #self.config.kernel_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
-            #self.config.planner_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
-            #self.set_reward_model(self.device)
+            self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
+            self.config.kernel_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
+            self.set_reward_model(self.device)
             if self.accelerator.is_main_process:
-                 print(f"Finetuning round {step+1} completed")
-        
+                   print(f"Finetuning round {step+1} completed")
+            self.accelerator.wait_for_everyone()
+            
+
      
         
             
