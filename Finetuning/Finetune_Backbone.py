@@ -206,7 +206,7 @@ class OnlineFinetuner():
                                          eta = self.config.AMConfig.eta, 
                                          episode_length = self.config.rollout_length, 
                                          checkpoint_step = 0, 
-                                         num_envs = self.config.rollout_num_envs, 
+                                         num_envs = 4, 
                                          goal_cell = self.config.train_reward_config.goal)
         self.accelerator.wait_for_everyone()
         
