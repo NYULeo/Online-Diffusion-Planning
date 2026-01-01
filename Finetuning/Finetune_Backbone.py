@@ -70,7 +70,7 @@ class FinetuningConfig():
     MaxEnt: bool = False
     Entropy_Scaling_Factor: float = 0.5
     rollout_length: int = 4000
-    rollout_num_envs: int = 1
+    rollout_num_envs: int = 4
    
     
 
@@ -119,21 +119,15 @@ class OnlineFinetuner():
                    self.config.dataset_name, 
                    self.config.specific_dataset)
 
-    def sync_bufferDataset(self, trajs):
-        """
+    def sync_bufferDataset(self):
         #sync the buffer across all processes
-        self.accelerator.wait_for_everyone() 
         if self.accelerator.is_main_process:
              buffer_list = [self.Buffer]  # Wrap in list for gather_object
         else:
              buffer_list = [None]
         gathered = self.accelerator.gather_for_metrics(buffer_list, use_gather_object=True)
         if gathered and gathered[0] is not None:
-             self.Buffer = gathered[0]
-        self.accelerator.wait_for_everyone() 
-        """
-        all_trajs = self._gather_and_concat_trajectories(trajs)
-        self.Buffer.extend(all_trajs)
+             self.Buffer = gathered[0] 
         # sync the planner dataset across all processes
         self.PlannerDataset = PlannerDataset(
                     self.Buffer, 
@@ -144,7 +138,7 @@ class OnlineFinetuner():
     
     def set_reward_model(self, device):
         self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
-    
+    """
     def _gather_and_concat_trajectories(self, trajs):
          # All processes contribute their trajectories
         trajs_list = [trajs]
@@ -159,7 +153,7 @@ class OnlineFinetuner():
                    unwarpped_process_trajs = process_trajs[0] 
                    all_trajs.extend(unwarpped_process_trajs)
         return all_trajs
-
+    """
     def finetune_planner(self):
         if self.accelerator.is_main_process:
             print("Env Details: ------------------------------------------------------------------------------")
@@ -206,7 +200,7 @@ class OnlineFinetuner():
                                          eta = self.config.AMConfig.eta, 
                                          episode_length = self.config.rollout_length, 
                                          checkpoint_step = 0, 
-                                         num_envs = 4, 
+                                         num_envs = self.config.rollout_num_envs, 
                                          goal_cell = self.config.train_reward_config.goal)
         self.accelerator.wait_for_everyone()
         
@@ -229,7 +223,7 @@ class OnlineFinetuner():
 
             if self.accelerator.is_main_process:
                   print(f"Starting Rollout")
-            trajs = rollout_parallel(self.config.dataset_name, 
+                  trajs = rollout_parallel(self.config.dataset_name, 
                                          self.config.specific_dataset, 
                                          horizon = self.config.AMConfig.horizon, 
                                          steps_T = self.config.diffusion_steps, 
@@ -239,18 +233,11 @@ class OnlineFinetuner():
                                          checkpoint_step = ((step+1) * self.config.AMConfig.per_round_steps), 
                                          num_envs = self.config.rollout_num_envs, 
                                          goal_cell = self.config.train_reward_config.goal,
-                                         device = self.device)
-            self.accelerator.wait_for_everyone() 
-            if self.accelerator.is_main_process:                            
+                                         device = self.device)                     
                   print(f"Rollout Completed")
-        
-            
-            self.sync_bufferDataset(trajs)
-            self.accelerator.wait_for_everyone()
-
-            if self.accelerator.is_main_process:
-                print(f"Starting Reward Training")
-                train_reward(self.Buffer, 
+                  print(f"Starting Reward Training")
+                  self.Buffer.extend(trajs)
+                  train_reward(self.Buffer, 
                              dataset_name = self.config.dataset_name, 
                              batch_size = self.config.train_reward_config.batch_size, 
                              num_steps = self.config.train_reward_config.num_steps, 
@@ -260,8 +247,8 @@ class OnlineFinetuner():
                              target_reward = self.config.train_reward_config.target_reward, 
                              specific_dataset = self.config.specific_dataset, 
                              goal = self.config.train_reward_config.goal)
-                print(f"Starting Kernel Training")
-                train_kernel(self.Buffer, 
+                  print(f"Starting Kernel Training")
+                  train_kernel(self.Buffer, 
                              dataset_name = self.config.dataset_name, 
                              specific_dataset = self.config.specific_dataset,
                              batch_size = self.config.train_kernel_config.batch_size, 
@@ -271,6 +258,9 @@ class OnlineFinetuner():
                              λ_reg = self.config.train_kernel_config.λ_reg, 
                              step = ((step+1) * self.config.AMConfig.per_round_steps))
             self.accelerator.wait_for_everyone()
+            
+            self.sync_bufferDataset()
+            self.accelerator.wait_for_everyone() 
 
             #set the new total reward model
             self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
