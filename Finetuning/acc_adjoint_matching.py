@@ -581,8 +581,10 @@ class Acc_AdjointMatchingFineTuner:
             self.set_new_score_net()
         reward_model.eval()
         if(round > 1):
-            self.set_optimizer_and_scheduler(self.optimizer.param_groups[0]['lr'], self.config.finetune_total_steps - ((round-1)*self.config.per_round_steps))
+            #self.set_old_score_net(self.config.planner_checkpoint)
+            #self.set_new_score_net()
             self.set_ema_model()
+            self.set_optimizer_and_scheduler(new_lr = self.optimizer.param_groups[0]['lr'], new_steps = self.config.finetune_total_steps - ((round-1)*self.config.per_round_steps))
             self.set_lambda(reward_model.get_beta())
         
         if self.accelerator.is_main_process:
@@ -674,7 +676,7 @@ class Acc_AdjointMatchingFineTuner:
         
         if self.accelerator.is_main_process:
              save_planner(self.ema_model, self.config.dataset_name, self.config.specific_dataset, (round*self.config.per_round_steps))
-        
+        #self.config.finetune_lr = self.optimizer.param_groups[0]['lr']
         self.accelerator.wait_for_everyone()
         if torch.cuda.is_available():
              torch.cuda.synchronize()
