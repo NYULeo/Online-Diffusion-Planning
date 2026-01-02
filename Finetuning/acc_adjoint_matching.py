@@ -114,9 +114,9 @@ class Acc_AdjointMatchingFineTuner:
 
     def Accelerate_Prepare(self, dataloader: DataLoader, reward_model: TotalReward, round: int):
          if round == 1:
-            self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model = self.accelerator.prepare(self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model)
+              self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model = self.accelerator.prepare(self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model)
          else:
-            dataloader, reward_model = self.accelerator.prepare(dataloader, reward_model)
+              dataloader, reward_model = self.accelerator.prepare(dataloader, reward_model)
          self.new_score_net.train()
          self.old_score_net.eval()
          return dataloader, reward_model
@@ -583,8 +583,12 @@ class Acc_AdjointMatchingFineTuner:
             self.reset_old_score_net(old_score_net)
             self.set_new_score_net()
         reward_model.eval()
+        
         if(round > 1):
             self.set_lambda(reward_model.get_beta())
+            self.set_ema_model()
+            self.set_optimizer_and_scheduler(new_lr = self.optimizer.param_groups[0]['lr'], new_steps = self.config.finetune_total_steps - ((round-1)*self.config.per_round_steps))
+        
         
         if self.accelerator.is_main_process:
              print(f"Starting Preparing")

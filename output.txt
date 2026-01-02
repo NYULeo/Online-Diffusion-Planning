@@ -1,0 +1,510 @@
+Env Details: ------------------------------------------------------------------------------
+env_name: pointmaze
+specific_env: medium
+Pretrained Model Details: -----------------------------------------------------------------
+planner_checkpoint: 0
+reward_model_checkpoint: 0
+kernel_model_checkpoint: 0
+Finetuning Hyperparameters: ---------------------------------------------------------------
+finetune_batch_size: 8
+finetune_lr: 2e-05
+reward_scaling_factor: 50
+finetune_total_steps: 3000
+finetuning rounds: 300
+diffusion_steps: 50
+karras steps: 3
+Loss clip steps: 38
+gradient accumulate every: 1
+Initial lambda: 0.05
+eta_lam: 0.5
+update_lambda_every: 1
+Differential Entropy Maximization:: False
+Entropy Scaling Factor: 0.5
+Exploration Hyperarameters: --------------------------------------------------------------
+Rollout Episode Length: 4000
+Rollout Number of Environments: 4
+Rollout Goal Cell: [[6 1]]
+Device Details: ---------------------------------------------------------------------------
+The device is: cuda:0
+The number of GPUs is: 4
+The GPU name is: Quadro RTX 6000
+-------------------------------------------------------------------------------------------
+Starting Rollout
+Normalized Score: 10.17
+Average Normalized Score: 10.17
+Finetuning round 1 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 1, step: 0, loss 1.1958770751953125
+round: 1, step: 0, total reward 0.06480155885219574
+round: 1, step: 0, reward 0.03014422357082367
+round: 1, step: 0, constraint -0.6931467056274414
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_10.pt
+Starting Rollout
+Normalized Score: 12.53
+Average Normalized Score: 12.53
+Rollout Completed
+Finetuning round 1 completed
+Finetuning round 2 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 2, step: 0, loss 3.2343053817749023
+round: 2, step: 0, total reward 0.0361521914601326
+round: 2, step: 0, reward 0.0014948531985282884
+round: 2, step: 0, constraint -0.6931467652320862
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_20.pt
+Starting Rollout
+Normalized Score: 10.14
+Average Normalized Score: 10.14
+Rollout Completed
+Finetuning round 2 completed
+Finetuning round 3 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 3, step: 0, loss 252.3225860595703
+round: 3, step: 0, total reward 0.03525471314787865
+round: 3, step: 0, reward 0.0005973748862743364
+round: 3, step: 0, constraint -0.6931467652320862
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_30.pt
+Starting Rollout
+Normalized Score: 11.87
+Average Normalized Score: 11.87
+Rollout Completed
+Finetuning round 3 completed
+Finetuning round 4 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 4, step: 0, loss 0.8791018128395081
+round: 4, step: 0, total reward 0.03651250898838043
+round: 4, step: 0, reward 0.0018551677465438801
+round: 4, step: 0, constraint -0.693146824836731
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_40.pt
+Starting Rollout
+Normalized Score: 7.44
+Average Normalized Score: 7.44
+Rollout Completed
+Finetuning round 4 completed
+Finetuning round 5 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 5, step: 0, loss 26.669151306152344
+round: 5, step: 0, total reward 0.03739701956510544
+round: 5, step: 0, reward 0.0027396783232688862
+round: 5, step: 0, constraint -0.693146824836731
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_50.pt
+Starting Rollout
+Normalized Score: 7.91
+Average Normalized Score: 7.91
+Rollout Completed
+Finetuning round 5 completed
+Finetuning round 6 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 6, step: 0, loss 35.277122497558594
+round: 6, step: 0, total reward 0.0608706995844841
+round: 6, step: 0, reward 0.02621335834264755
+round: 6, step: 0, constraint -0.693146824836731
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_60.pt
+Starting Rollout
+Normalized Score: 8.29
+Average Normalized Score: 8.29
+Rollout Completed
+Finetuning round 6 completed
+Finetuning round 7 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 7, step: 0, loss 338.47393798828125
+round: 7, step: 0, total reward 0.03465733677148819
+round: 7, step: 0, reward 1.4901161207725444e-09
+round: 7, step: 0, constraint -0.6931467056274414
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_70.pt
+Starting Rollout
+Normalized Score: 9.35
+Average Normalized Score: 9.35
+Rollout Completed
+Finetuning round 7 completed
+Finetuning round 8 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 8, step: 0, loss 5.262619972229004
+round: 8, step: 0, total reward 0.05655409395694733
+round: 8, step: 0, reward 0.021896755695343016
+round: 8, step: 0, constraint -0.6931467652320862
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_80.pt
+Starting Rollout
+Normalized Score: 15.30
+Average Normalized Score: 15.30
+Rollout Completed
+Finetuning round 8 completed
+Finetuning round 9 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 9, step: 0, loss 147.67681884765625
+round: 9, step: 0, total reward 0.05728452652692795
+round: 9, step: 0, reward 0.022627185285091396
+round: 9, step: 0, constraint -0.693146824836731
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_90.pt
+Starting Rollout
+Normalized Score: 26.43
+Average Normalized Score: 26.43
+Rollout Completed
+Finetuning round 9 completed
+Finetuning round 10 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 10, step: 0, loss 6.5215840339660645
+round: 10, step: 0, total reward 0.074787437915802
+round: 10, step: 0, reward 0.04013010263442993
+round: 10, step: 0, constraint -0.6931467056274414
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_100.pt
+Starting Rollout
+Normalized Score: 21.11
+Average Normalized Score: 21.11
+Rollout Completed
+Finetuning round 10 completed
+Finetuning round 11 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 11, step: 0, loss 871.9539184570312
+round: 11, step: 0, total reward 0.03465733677148819
+round: 11, step: 0, reward -1.4901161207725444e-09
+round: 11, step: 0, constraint -0.6931467652320862
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_110.pt
+Starting Rollout
+Normalized Score: 21.29
+Average Normalized Score: 21.29
+Rollout Completed
+Finetuning round 11 completed
+Finetuning round 12 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 12, step: 0, loss 85.6005859375
+round: 12, step: 0, total reward 0.05595332756638527
+round: 12, step: 0, reward 0.021295986324548717
+round: 12, step: 0, constraint -0.693146824836731
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_120.pt
+Starting Rollout
+Normalized Score: 26.23
+Average Normalized Score: 26.23
+Rollout Completed
+Finetuning round 12 completed
+Finetuning round 13 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 13, step: 0, loss 0.8264739513397217
+round: 13, step: 0, total reward 0.040879860520362854
+round: 13, step: 0, reward 0.006222525238990785
+round: 13, step: 0, constraint -0.6931467056274414
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_130.pt
+Starting Rollout
+Normalized Score: 26.26
+Average Normalized Score: 26.26
+Rollout Completed
+Finetuning round 13 completed
+Finetuning round 14 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 14, step: 0, loss 6.143131256103516
+round: 14, step: 0, total reward 0.08162664622068405
+round: 14, step: 0, reward 0.04696931093931198
+round: 14, step: 0, constraint -0.6931467056274414
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_140.pt
+Starting Rollout
+Normalized Score: 31.12
+Average Normalized Score: 31.12
+Rollout Completed
+Finetuning round 14 completed
+Finetuning round 15 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 15, step: 0, loss 0.9219799041748047
+round: 15, step: 0, total reward 0.05560413748025894
+round: 15, step: 0, reward 0.02094679921865463
+round: 15, step: 0, constraint -0.6931467652320862
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_150.pt
+Starting Rollout
+Normalized Score: 31.16
+Average Normalized Score: 31.16
+Rollout Completed
+Finetuning round 15 completed
+Finetuning round 16 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 16, step: 0, loss 30.91872787475586
+round: 16, step: 0, total reward 0.05130620300769806
+round: 16, step: 0, reward 0.01857876181602478
+round: 16, step: 0, constraint -0.6545488238334656
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_160.pt
+Starting Rollout
+Normalized Score: 31.12
+Average Normalized Score: 31.12
+Rollout Completed
+Finetuning round 16 completed
+Finetuning round 17 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 17, step: 0, loss 0.45399805903434753
+round: 17, step: 0, total reward 0.05512657389044762
+round: 17, step: 0, reward 0.020469238609075548
+round: 17, step: 0, constraint -0.6931467056274414
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_170.pt
+Starting Rollout
+Normalized Score: 30.98
+Average Normalized Score: 30.98
+Rollout Completed
+Finetuning round 17 completed
+Finetuning round 18 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 18, step: 0, loss 76.8357925415039
+round: 18, step: 0, total reward 0.048732783645391464
+round: 18, step: 0, reward 0.014075442403554912
+round: 18, step: 0, constraint -0.693146824836731
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_180.pt
+Starting Rollout
+Normalized Score: 31.28
+Average Normalized Score: 31.28
+Rollout Completed
+Finetuning round 18 completed
+Finetuning round 19 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 19, step: 0, loss 29.679210662841797
+round: 19, step: 0, total reward 0.11709456145763397
+round: 19, step: 0, reward 0.0824372261762619
+round: 19, step: 0, constraint -0.6931467056274414
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_190.pt
+Starting Rollout
+Normalized Score: 31.36
+Average Normalized Score: 31.36
+Rollout Completed
+Finetuning round 19 completed
+Finetuning round 20 started
+Starting Preparing
+Starting Finetuning
+step: 0, lambda: 0.05
+---------------------------------------------------------
+round: 20, step: 0, loss 17.89809799194336
+round: 20, step: 0, total reward 0.10350289940834045
+round: 20, step: 0, reward 0.06884556114673615
+round: 20, step: 0, constraint -0.6931467652320862
+step: 1, lambda: 0.05
+step: 2, lambda: 0.05
+step: 3, lambda: 0.05
+step: 4, lambda: 0.05
+step: 5, lambda: 0.05
+step: 6, lambda: 0.05
+step: 7, lambda: 0.05
+step: 8, lambda: 0.05
+step: 9, lambda: 0.05
+saved model to ./Finetuning/Planners/pointmaze/medium/PointMaze_Medium_Planner_200.pt
+Starting Rollout

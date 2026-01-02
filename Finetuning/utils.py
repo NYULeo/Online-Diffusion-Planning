@@ -576,7 +576,7 @@ def get_normalized_score(trajs):
     return normalized_score
 
 
-def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs=8, goal_cell: Optional[np.ndarray] = None, device: torch.device = None):
+def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs=8, goal_cell: Optional[np.ndarray] = None, device: torch.device = None, seed_base: int = 0):
      
      #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
      #print(f"Running {num_envs} environments in parallel")
@@ -584,6 +584,11 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
           device = "cuda" if torch.cuda.is_available() else "cpu"
      trajs = []
      #print(f"Using device {device}")
+     
+     # Uses Accelerate's RANK env var (automatically set in DDP)
+     rank = int(os.environ.get("RANK", 0))
+     np.random.seed(12345 + rank + seed_base)
+     torch.manual_seed(12345 + rank + seed_base)
      
      # Create environment factory function
      _, d_s, d_a = get_env(env_name, specific_env)
@@ -610,6 +615,9 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
      
      # Get Processor
      planner_processor = Planner_Processor(env_name, specific_env)
+     
+     # <<< MODIFIED: Unique env reset seeds per process to prevent identical trajectories across GPUs
+     reset_seeds = list(range(seed_base, seed_base + num_envs))
      if(goal_cell is not None):
          """
          maze = env.unwrapped.maze  # Access the internal Maze object
@@ -633,10 +641,11 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
          start_cells = np.array(start_cells)
      else:
          start_cells = [None]
+     
      for start_cell in start_cells:
        # Reset all environments
-       seeds = list(range(num_envs)) 
-       s0_vec = vec_env.reset(seed = seeds, options=[{"goal_cell": goal_cell.copy(), "reset_cell": start_cell.copy()} for _ in range(num_envs)])
+       #seeds = list(range(num_envs)) 
+       s0_vec = vec_env.reset(seed = reset_seeds, options=[{"goal_cell": goal_cell.copy(), "reset_cell": start_cell.copy()} for _ in range(num_envs)])
        current_states = s0_vec[0]['observation']
      
        # Store trajectories for each environment
@@ -699,5 +708,7 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
      
      vec_env.close()
      score = get_normalized_score(trajs)
-     print(f"Average Normalized Score: {score:.2f}")
-     return trajs
+     #print(f"Average Normalized Score: {score:.2f}")
+     return trajs, score
+
+
