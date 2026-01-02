@@ -572,7 +572,7 @@ def get_normalized_score(trajs):
     avg_discounted_return = total / len(trajs)
     # 5. Compute normalized score
     normalized_score = 100 * avg_discounted_return 
-    print(f"Normalized Score: {normalized_score:.2f}")
+    #print(f"Normalized Score: {normalized_score:.2f}")
     return normalized_score
 
 

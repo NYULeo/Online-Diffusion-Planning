@@ -34,7 +34,8 @@ class Train_Reward_Config:
     lr: float = 2e-4
     sigma: float = 7.0
     target_reward: Optional[float] = None
-    goal: Optional[np.ndarray] = None
+    train_goal: np.ndarray = None
+    rollout_goal: np.ndarray = None
 
 @dataclass
 class Train_Kernel_Config:
@@ -70,7 +71,7 @@ class FinetuningConfig():
     MaxEnt: bool = False
     Entropy_Scaling_Factor: float = 0.5
     rollout_length: int = 4000
-    rollout_num_envs: int = 4
+    rollout_num_envs: int = 1
    
     
 
@@ -245,7 +246,7 @@ class OnlineFinetuner():
                                          episode_length = self.config.rollout_length, 
                                          checkpoint_step = 0, 
                                          num_envs = self.config.rollout_num_envs, 
-                                         goal_cell = self.config.train_reward_config.goal)
+                                         goal_cell = self.config.train_reward_config.rollout_goal)
             print(f"Average Normalized Score: {score:.2f}")
         self.accelerator.wait_for_everyone()
         
@@ -282,7 +283,7 @@ class OnlineFinetuner():
                                          episode_length = self.config.rollout_length, 
                                          checkpoint_step = ((step+1) * self.config.AMConfig.per_round_steps), 
                                          num_envs = self.config.rollout_num_envs, 
-                                         goal_cell = self.config.train_reward_config.goal,
+                                         goal_cell = self.config.train_reward_config.rollout_goal,
                                          device = self.device,
                                          seed_base = seed_base)  
             self.accelerator.wait_for_everyone()                    
@@ -308,7 +309,7 @@ class OnlineFinetuner():
                              step = ((step+1) * self.config.AMConfig.per_round_steps), 
                              target_reward = self.config.train_reward_config.target_reward, 
                              specific_dataset = self.config.specific_dataset, 
-                             goal = self.config.train_reward_config.goal)
+                             goal = self.config.train_reward_config.train_goal)
                   print(f"Starting Kernel Training")
                   train_kernel(self.Buffer, 
                              dataset_name = self.config.dataset_name, 
