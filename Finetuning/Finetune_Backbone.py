@@ -226,7 +226,7 @@ class OnlineFinetuner():
             print(f"Exploration Hyperarameters: --------------------------------------------------------------")
             print(f"Rollout Episode Length: {self.config.rollout_length}")
             print(f"Rollout Number of Environments: {self.config.rollout_num_envs}")
-            print(f"Rollout Goal Cell: {self.config.train_reward_config.goal}")
+            print(f"Rollout Goal Cell: {self.config.train_reward_config.rollout_goal}")
             print('Device Details: ---------------------------------------------------------------------------')
             print(f"The device is: {self.device}")
             print(f"The number of GPUs is: {torch.cuda.device_count()}")
