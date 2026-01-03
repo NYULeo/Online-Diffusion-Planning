@@ -9,9 +9,9 @@ import torch
 import torch.optim as optim
 import numpy as np
 import torch.nn as nn
-from Pretrain.Dataset import get_dataset, get_env
-from Pretrain.utils import set_seed, SAStats
-from Pretrain.Critic.nets import Critic
+from Dataset import get_dataset, get_env
+from utils import set_seed, SAStats
+from Critic.nets import Critic
 import pickle
 from scipy.ndimage import gaussian_filter1d
 import os
