@@ -45,15 +45,29 @@ def reward_filter(obs, rews, goal):
             rews[i-1] = 0
     return rews
 
-def save_critic(model, dataset_name, specific_dataset):
+def save_critic(model, dataset_name, specific_dataset, step):
     model.eval()
     name = get_CriticName(dataset_name, specific_dataset)
     net_dict = model.state_dict()
     os.makedirs(f'./Pretrain/Critics/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
-    save_path = f'./Pretrain/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic.pkl'
+    save_path = f'./Pretrain/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl'
     #print("Exists:", os.path.isfile(save_path), "Size:", os.path.getsize(save_path) if os.path.isfile(save_path) else None)
     torch.save(net_dict, save_path)
     print(f"critic model save to {name}.pkl")
+
+def get_critic_model(dataset_name, specific_dataset, step):
+    _, obs_dim, _ = get_env(dataset_name, specific_dataset)
+    name = get_CriticName(dataset_name, specific_dataset)
+    path = f'./Pretrain/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl'
+    model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
+    return model_state_dict, obs_dim
+
+def get_critic_stats(dataset_name, specific_dataset):
+    name = get_CriticName(dataset_name, specific_dataset)
+    path = f'./Pretrain/Critics/{dataset_name}/{specific_dataset}/Stats/{name}_Critic_stats.pkl'
+    with open(path, 'rb') as f:
+        stats = pickle.load(f)
+    return stats 
 """
 class Critic(nn.Module):
     def __init__(self, obs_dim, act_dim, hidden = 256):
@@ -71,7 +85,7 @@ class Critic(nn.Module):
         x = torch.cat([obs, act], dim=-1)
         return self.net(x).squeeze(2-1)
 """
-
+"""
 class Critic_Processor():
      def __init__(self, dataset_name, speific_dataset):
           critic_name = get_CriticName(dataset_name, speific_dataset)
@@ -83,9 +97,9 @@ class Critic_Processor():
           obs = self.stats.norm_obs(obs)
           act = np.clip(act, -1.0, 1.0)
           return obs, act
-
+"""
 class CriticDataset(Dataset):
-    def __init__(self, sigma: float, dataset_name: str, specific_dataset: str, step: int, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
+    def __init__(self, sigma: float, dataset_name: str, specific_dataset: str, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
         # ----- gather raw obs/actions to fit stats -----
         data = get_dataset(dataset_name, specific_dataset)
         trajs = data.get_trajectories()
@@ -153,18 +167,18 @@ class CriticDataset(Dataset):
         new_rews = []
         for t in range(len(rews)):
             R = 0.0
-            for i in range(t, t + horizon):
+            for i in range(t, min(t + horizon, len(rews))):
                 R += (gamma**(i-t + 1))*rews[i]
             new_rews.append(R)
         return new_rews
 
 
-def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau):
+def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, goal = None, target_reward = 1.0):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #print(f"Using device {device}")
 
     #get information
-    dataset = CriticDataset(sigma, dataset_name, specific_dataset)
+    dataset = CriticDataset(sigma, dataset_name, specific_dataset, goal, target_reward, horizon, gamma)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
    
     #prepare training
@@ -173,17 +187,15 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
     target_critic = Critic(obs_dim).to(device)
     target_critic.load_state_dict(critic.state_dict())
     optimizer = optim.Adam(critic.parameters(), lr = lr)
-
+   
     print(f"Training critic for {dataset_name}-{specific_dataset}")
     for k in range(1, num_steps + 1):  # number of passes over dataset
-           s, r, s_next, a_next = next(dataloader)
+           s, r, s_next = next(dataloader)
            s = s.to(device)
-           a = a.to(device)
            r = r.to(device)
            s_next = s_next.to(device)
-           a_next = a_next.to(device)
 
-           # Compute target Q-values
+           # Compute target V-values
            with torch.no_grad():
               q_next = target_critic(s_next)
               target = r + ( (gamma**horizon) * q_next)
@@ -194,15 +206,18 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
 
            optimizer.zero_grad()
            loss.backward()
-           total_loss += loss.item()
            optimizer.step()
 
            # Soft update target network
            for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):
                tgt_param.data.mul_(1 - tau)
                tgt_param.data.add_(tau * param.data)
-    critic.eval()
-    save_critic(critic, dataset_name, specific_dataset)
+            
+           if(k % 200 == 0):
+                target_critic.eval()
+                save_critic(target_critic, dataset_name, specific_dataset, k)
+    target_critic.eval()
+    save_critic(target_critic, dataset_name, specific_dataset, num_steps)
     print(f"critic model saved")
 
 
@@ -210,13 +225,14 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
 
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
-    train_critic(
-    dataset_name = 'kitchen', 
-    specific_dataset = 'complete', 
-    batch_size=1024, 
-    epochs=300,  
-    gamma=0.99, 
-    lr=1e-4, 
-    tau = 0.005)
-
-
+    train_critic(dataset_name = 'pointmaze', 
+                 specific_dataset = 'medium', 
+                 sigma = 7.0, 
+                 batch_size = 1024, 
+                 num_steps = 200, 
+                 gamma = 0.99, 
+                 horizon = 32, 
+                 lr = 1e-4, 
+                 tau = 0.005,
+                 goal = np.array([[-2.5, -2.5]], dtype = float),
+                 target_reward = 1.0)

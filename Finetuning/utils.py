@@ -390,7 +390,7 @@ class CriticDataset(Dataset):
         new_rews = []
         for t in range(len(rews)):
             R = 0.0
-            for i in range(t, t + horizon):
+            for i in range(t, min(t + horizon, len(rews))):
                 R += (gamma**(i-t + 1))*rews[i]
             new_rews.append(R)
         return new_rews
@@ -478,12 +478,12 @@ def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
          save_kernel_model(ckpt, dataset_name, specific_dataset, step, idx)
     print(f"Kernel model saved")
 
-def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, step: int):
+def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, step: int, goal = None, target_reward = 1.0):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #print(f"Using device {device}")
 
     #get information
-    dataset = CriticDataset(trajs, sigma,dataset_name, specific_dataset, step)
+    dataset = CriticDataset(trajs, sigma, dataset_name, specific_dataset, step, goal, target_reward, horizon, gamma)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
    
     #prepare training
@@ -495,12 +495,10 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
 
     print(f"Training critic for {dataset_name}-{specific_dataset}")
     for k in range(1, num_steps + 1):  # number of passes over dataset
-           s, r, s_next, a_next = next(dataloader)
+           s, r, s_next = next(dataloader)
            s = s.to(device)
-           a = a.to(device)
            r = r.to(device)
            s_next = s_next.to(device)
-           a_next = a_next.to(device)
 
            # Compute target Q-values
            with torch.no_grad():
@@ -513,7 +511,6 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
 
            optimizer.zero_grad()
            loss.backward()
-           total_loss += loss.item()
            optimizer.step()
 
            # Soft update target network
@@ -771,14 +768,18 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
                        free_cells.append(np.array([row, col]))
          free_cells = np.array(free_cells)
          """
-         #free_cells = np.array([[6,6], [1,1], [1,6], [3,2], [5,4], [3,4], [4,1], [4,6]])
-         free_cells = np.array([[6,6], [5,4], [2,4], [2,1]])
+         """
+         free_cells = np.array([[6,6], [1,1], [1,6], [3,2], [5,4], [3,4], [4,1], [4,6], [2,4], [2,1]])
+         selected_indices = np.random.choice(len(free_cells), size=4, replace=False)
+         selected_free_cells = free_cells[selected_indices]
+         """
+         selected_free_cells = np.array([[6,6], [5,4], [2,4], [2,1]])
          start_cells = []
-         for i in range(len(free_cells)):
-             if(np.array_equal(free_cells[i], goal_cell)):
+         for i in range(len(selected_free_cells)):
+             if(np.array_equal(selected_free_cells[i], goal_cell)):
                  continue
              else:
-                 start_cells.append(free_cells[i].copy())
+                 start_cells.append(selected_free_cells[i].copy())
          start_cells = np.array(start_cells)
      else:
          start_cells = [None]
