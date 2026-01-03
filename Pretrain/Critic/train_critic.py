@@ -229,7 +229,7 @@ if __name__ == '__main__':  # pragma: no cover
                  specific_dataset = 'medium', 
                  sigma = 7.0, 
                  batch_size = 1024, 
-                 num_steps = 200, 
+                 num_steps = 1000, 
                  gamma = 0.99, 
                  horizon = 32, 
                  lr = 1e-4, 
