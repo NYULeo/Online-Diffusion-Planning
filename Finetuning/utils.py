@@ -487,7 +487,7 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
    
     #prepare training
-    dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True)
+    dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True))
     critic = Critic(obs_dim).to(device)
     target_critic = Critic(obs_dim).to(device)
     target_critic.load_state_dict(critic.state_dict())
