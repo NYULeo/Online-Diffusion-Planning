@@ -133,10 +133,10 @@ class CriticDataset(Dataset):
                 rews = self.boost_signal(target_reward, rews)
             rews = gaussian_filter1d(rews, sigma)
             rews = self.reward_processor(rews, horizon, gamma)
-            for t in range(len(obs)-1):
+            for t in range(len(obs)-horizon):
                 obs_t = self.stats.norm_obs(obs[t])
                 r_t   = rews[t]
-                obs_next_t = self.stats.norm_obs(obs[t+1])
+                obs_next_t = self.stats.norm_obs(obs[t+horizon])
                 transitions.append((obs_t, r_t, obs_next_t))
 
         self.transitions = transitions
@@ -235,7 +235,7 @@ if __name__ == '__main__':  # pragma: no cover
     train_critic(dataset_name = 'pointmaze', 
                  specific_dataset = 'medium', 
                  sigma = 7.0, 
-                 batch_size = 1024, 
+                 batch_size = 256, 
                  num_steps = 1000, 
                  gamma = 0.99, 
                  horizon = 32, 

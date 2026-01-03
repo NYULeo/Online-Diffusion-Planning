@@ -350,10 +350,10 @@ class CriticDataset(Dataset):
                 rews = self.boost_signal(target_reward, rews)
             rews = gaussian_filter1d(rews, sigma)
             rews = self.reward_processor(rews, horizon, gamma)
-            for t in range(len(obs)-1):
+            for t in range(len(obs)-horizon):
                 obs_t = self.stats.norm_obs(obs[t])
                 r_t   = rews[t]
-                obs_next_t = self.stats.norm_obs(obs[t+1])
+                obs_next_t = self.stats.norm_obs(obs[t + horizon])
                 transitions.append((obs_t, r_t, obs_next_t))
 
         self.transitions = transitions
