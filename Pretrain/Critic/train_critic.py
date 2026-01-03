@@ -1,12 +1,17 @@
 import random
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(project_root)
 from torch.utils.data import Dataset, DataLoader
 import torch
 import torch.optim as optim
 import numpy as np
 import torch.nn as nn
-from Dataset import get_dataset, get_env
-from utils import set_seed, SAStats
-from nets import Critic
+from Pretrain.Dataset import get_dataset, get_env
+from Pretrain.utils import set_seed, SAStats
+from Pretrain.Critic.nets import Critic
 import pickle
 from scipy.ndimage import gaussian_filter1d
 import os
@@ -216,6 +221,7 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
            if(k % 200 == 0):
                 target_critic.eval()
                 save_critic(target_critic, dataset_name, specific_dataset, k)
+                print(f"Checkpoint saved at step {k}")
     target_critic.eval()
     save_critic(target_critic, dataset_name, specific_dataset, num_steps)
     print(f"critic model saved")
