@@ -44,7 +44,7 @@ def save_trajs(trajs, env_name, specific_env):
          pickle.dump(trajs, f)
     print(f"trajectories saved")
 
-def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None):
+def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, Checpoint_steps; {checkpoint_steps}")
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
@@ -71,8 +71,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      #reset
      #s0 = env.reset(seed = 0, options={"goal_cell": goal_cell, "reset_cell": reset_cell})
      if(goal_cell is not None):
-        reset_cell = np.array([2, 1], dtype=int)
-        s0 = env.reset(seed = 0, options={"goal_cell": goal_cell, "reset_cell": reset_cell})
+        s0 = env.reset(seed = 0, options={"goal_cell": goal_cell, "reset_cell": start_cell})
      else:
         s0 = env.reset(seed = 0)
      s0 = s0[0]['observation']
@@ -264,7 +263,7 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 50, eta = 0.8, episode_length = 4000, checkpoint_steps = 0, render = True,  goal_cell = np.array([6, 1], dtype = int))
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_steps = 130, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([3, 2], dtype = int))
     #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 4000, checkpoint_steps = 0, render = True)
     #150, 8
     #50, 3

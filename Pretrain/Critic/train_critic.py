@@ -6,8 +6,11 @@ import numpy as np
 import torch.nn as nn
 from Dataset import get_dataset, get_env
 from utils import set_seed, SAStats
+from nets import Critic
 import pickle
-
+from scipy.ndimage import gaussian_filter1d
+import os
+from typing import Optional
 def get_CriticName(env_name, specific_env):
      if(env_name == 'kitchen'):
           if(specific_env == 'complete'):
@@ -30,6 +33,28 @@ def get_CriticName(env_name, specific_env):
      else:
          raise ValueError(f"Invalid environment name: '{env_name}")
 
+def reward_filter(obs, rews, goal):
+    #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
+    target_goals = goal
+    for i in range(1, len(obs)):
+        goal_coord = np.floor(obs[i][:2]) + 0.5
+        #goal_coord = np.round(goal_coord, 1)  
+        if np.any(np.all(np.equal(goal_coord, target_goals), axis=1)):
+            rews[i-1] = 1
+        else:
+            rews[i-1] = 0
+    return rews
+
+def save_critic(model, dataset_name, specific_dataset):
+    model.eval()
+    name = get_CriticName(dataset_name, specific_dataset)
+    net_dict = model.state_dict()
+    os.makedirs(f'./Pretrain/Critics/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
+    save_path = f'./Pretrain/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic.pkl'
+    #print("Exists:", os.path.isfile(save_path), "Size:", os.path.getsize(save_path) if os.path.isfile(save_path) else None)
+    torch.save(net_dict, save_path)
+    print(f"critic model save to {name}.pkl")
+"""
 class Critic(nn.Module):
     def __init__(self, obs_dim, act_dim, hidden = 256):
         super().__init__()
@@ -45,7 +70,7 @@ class Critic(nn.Module):
     def forward(self, obs, act):
         x = torch.cat([obs, act], dim=-1)
         return self.net(x).squeeze(2-1)
-
+"""
 
 class Critic_Processor():
      def __init__(self, dataset_name, speific_dataset):
@@ -60,101 +85,111 @@ class Critic_Processor():
           return obs, act
 
 class CriticDataset(Dataset):
-    def __init__(self, dataset_name, specific_dataset):
-        data = get_dataset(dataset_name, specific_dataset)
-        self.critic_name = get_CriticName(dataset_name, specific_dataset)
-        self.trajs = data.get_trajectories()
-        transitions = []
-        
+    def __init__(self, sigma: float, dataset_name: str, specific_dataset: str, step: int, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
         # ----- gather raw obs/actions to fit stats -----
-        obs_list, act_list = [], []
-        for traj in self.trajs:
-            obs, acts = traj['observations'], traj['actions']
-            L = min(len(obs), len(acts))
-            obs_list.append(obs[:L])
-            act_list.append(acts[:L])
-        obs_all = np.concatenate(obs_list, axis=0)  # [N, d_s]
+        data = get_dataset(dataset_name, specific_dataset)
+        trajs = data.get_trajectories()
+        obs_all = []
+        for traj in trajs:
+            obs_all.append(traj['observations'])
+        obs_all = np.concatenate(obs_all, axis = 0)
         
         
         #get stats
         self.stats = SAStats()
-        self.stats.obs_mean=obs_all.mean(axis=0)
-        self.stats.obs_std =obs_all.std(axis=0)
+        self.stats.obs_mean = obs_all.mean(axis=0)
+        self.stats.obs_std = obs_all.std(axis=0)+ 1e-8
+        allowed_values = [0,1]
 
-        
-        for traj in self.trajs:
-            obs = np.asarray(traj['observations'])      
-            acts = np.asarray(traj['actions'])
-            rews = np.asarray(traj['rewards'])
-            for t in range(len(acts)):
-                s_t   = self.stats.norm_obs(obs[t])
-                a_t   = self.stats.norm_act(acts[t])
+        transitions = []
+        for traj in trajs:
+            obs = traj['observations']      
+            rews = traj['rewards']
+            if( goal is not None):
+                rews = reward_filter(obs, rews, goal)
+            if(not np.all(np.isin(rews, allowed_values))):
+                raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
+            if(target_reward is not None):
+                rews = self.boost_signal(target_reward, rews)
+            rews = gaussian_filter1d(rews, sigma)
+            rews = self.reward_processor(rews, horizon, gamma)
+            for t in range(len(obs)-1):
+                obs_t = self.stats.norm_obs(obs[t])
                 r_t   = rews[t]
-                s_tp1 = self.stats.norm_obs(obs[t+1])  if t < (len(acts)-1) else np.zeros_like(s_t)
-                a_tp1 = self.stats.norm_act(acts[t+1]) if t < (len(acts)-1) else np.zeros_like(a_t)
-                done_t = 1.0 if t == (len(acts)-1) else 0.0
-                transitions.append((s_t, a_t, r_t, s_tp1, a_tp1, done_t))
-        
-        self.transitions = transitions
-        self.save_stats()
-    
-    def save_stats(self):
-        stats_name = self.critic_name.replace('.pt', '_stats.pkl')
-        with open(stats_name, 'wb') as f:
-              pickle.dump(self.stats, f)
+                obs_next_t = self.stats.norm_obs(obs[t+1])
+                transitions.append((obs_t, r_t, obs_next_t))
 
+        self.transitions = transitions
+        self.save_stats(dataset_name, specific_dataset)
+    
+    def save_stats(self, dataset_name, specific_dataset):
+        name = get_CriticName(dataset_name, specific_dataset)
+        stats_name =  str(name) + f'_Critic_stats.pkl'
+        stats_dir = f'./Pretrain/Critics/{dataset_name}/{specific_dataset}/Stats/'
+        os.makedirs(stats_dir, exist_ok=True)
+        savepath = os.path.join(stats_dir, stats_name)
+        with open(savepath, 'wb') as f:
+              pickle.dump(self.stats, f)
+        print(f"saved stats to {savepath}")
 
     def __len__(self):
         return len(self.transitions)
 
     def __getitem__(self, idx):
-        s, a, r, s_next, a_next, d = self.transitions[idx]
+        s, r, s_next = self.transitions[idx]
         return (
             torch.tensor(s, dtype=torch.float32),
-            torch.tensor(a, dtype=torch.float32),
             torch.tensor(r, dtype=torch.float32),
             torch.tensor(s_next, dtype=torch.float32),
-            torch.tensor(a_next, dtype=torch.float32),
-            torch.tensor(d, dtype=torch.float32)
         )
     
+    def boost_signal(self, target_reward, rews):
+        for t in range(len(rews)):
+            if(rews[t] == 1):
+                 rews[t] = target_reward
+        return rews
+    
+    def reward_processor(self, rews, horizon, gamma):
+        new_rews = []
+        for t in range(len(rews)):
+            R = 0.0
+            for i in range(t, t + horizon):
+                R += (gamma**(i-t + 1))*rews[i]
+            new_rews.append(R)
+        return new_rews
 
 
-def train_critic(dataset_name: str, specific_dataset: str, batch_size, epochs, gamma, lr, tau):
+def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device {device}")
+    #print(f"Using device {device}")
 
     #get information
-    model_name = get_CriticName(dataset_name, specific_dataset)
-    dataset = CriticDataset(dataset_name, specific_dataset)
-    env, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+    dataset = CriticDataset(sigma, dataset_name, specific_dataset)
+    _, obs_dim, _ = get_env(dataset_name, specific_dataset)
    
     #prepare training
     dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True)
-    critic = Critic(obs_dim, act_dim).to(device)
-    target_critic = Critic(obs_dim, act_dim).to(device)
+    critic = Critic(obs_dim).to(device)
+    target_critic = Critic(obs_dim).to(device)
     target_critic.load_state_dict(critic.state_dict())
     optimizer = optim.Adam(critic.parameters(), lr = lr)
 
     print(f"Training critic for {dataset_name}-{specific_dataset}")
-    for epoch in range(epochs):  # number of passes over dataset
-       total_loss = 0
-       for batch in dataloader:
-           s, a, r, s_next, a_next, d = batch
+    for k in range(1, num_steps + 1):  # number of passes over dataset
+           s, r, s_next, a_next = next(dataloader)
            s = s.to(device)
            a = a.to(device)
            r = r.to(device)
            s_next = s_next.to(device)
            a_next = a_next.to(device)
-           d = d.to(device)
 
            # Compute target Q-values
            with torch.no_grad():
-              q_next = target_critic(s_next, a_next)
-              target = r + gamma * (1 - d) * q_next
+              q_next = target_critic(s_next)
+              target = r + ( (gamma**horizon) * q_next)
 
-           # Predicted Q-values
-           q_pred = critic(s, a)
+           # Predicted V-values
+           q_pred = critic(s)
            loss = ((q_pred - target) ** 2).mean()
 
            optimizer.zero_grad()
@@ -166,13 +201,11 @@ def train_critic(dataset_name: str, specific_dataset: str, batch_size, epochs, g
            for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):
                tgt_param.data.mul_(1 - tau)
                tgt_param.data.add_(tau * param.data)
-       avg_loss = total_loss / len(dataloader)
-       if epoch % 10 == 0:
-              print(f"Epoch {epoch+10}, loss {avg_loss:.4f}")
-    
     critic.eval()
-    torch.save(critic.state_dict(), model_name) 
-    print(f"critic model save to {model_name}")
+    save_critic(critic, dataset_name, specific_dataset)
+    print(f"critic model saved")
+
+
 
 
 if __name__ == '__main__':  # pragma: no cover

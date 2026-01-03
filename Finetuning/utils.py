@@ -30,6 +30,7 @@ from Pretrain.Dataset import KitchenDataset, PointMazeDataset, get_env, Planner_
 from gymnasium.vector import AsyncVectorEnv
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 from Pretrain.Planners.Backbone.Dit import DiT1d
+from Pretrain.Critic.nets import Critic
 
 
 
@@ -53,7 +54,6 @@ def save_reward_model(reward_net, dataset_name, specific_dataset, step):
     save_path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{name}_Reward_{str(step)}.pkl'
     #print("Exists:", os.path.isfile(save_path), "Size:", os.path.getsize(save_path) if os.path.isfile(save_path) else None)
     torch.save(net_dict, save_path)
-    print(f"reward model save to {name}_{str(step)}.pkl")
 
 def save_kernel_model(kernel_net, dataset_name, specific_dataset, step, ensemble_idx):
     kernel_net.eval()
@@ -117,6 +117,30 @@ def get_planner(dataset_name, specific_dataset, step):
     checkpoint = torch.load(path, weights_only = True,map_location='cpu')
     #checkpoint = torch.load(checkpoint_path,  weights_only=True)
     return checkpoint['ema']
+
+def save_critic(model, dataset_name, specific_dataset, step):
+    model.eval()
+    name = getName(dataset_name, specific_dataset)
+    net_dict = model.state_dict()
+    os.makedirs(f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
+    save_path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl'
+    #print("Exists:", os.path.isfile(save_path), "Size:", os.path.getsize(save_path) if os.path.isfile(save_path) else None)
+    torch.save(net_dict, save_path)
+    print(f"critic model save to {name}_{str(step)}.pkl")
+
+def get_critic_model(dataset_name, specific_dataset, step):
+    _, obs_dim, _ = get_env(dataset_name, specific_dataset)
+    name = getName(dataset_name, specific_dataset)
+    path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl'
+    model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
+    return model_state_dict, obs_dim
+
+def get_critic_stats(dataset_name, specific_dataset, step):
+    name = getName(dataset_name, specific_dataset)
+    path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/{name}_Critic_stats_{str(step)}.pkl'
+    with open(path, 'rb') as f:
+        stats = pickle.load(f)
+    return stats 
 
 class Lambda:
     def __init__(self, lam: float, beta: float, eta_lam: float):
@@ -300,6 +324,77 @@ class RewardDataset(Dataset):
                  rews[t] = target_reward
         return rews
 
+class CriticDataset(Dataset):
+    def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, step: int, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
+        # ----- gather raw obs/actions to fit stats -----
+        obs_all = []
+        for traj in trajs:
+            obs_all.append(traj['observations'])
+        obs_all = np.concatenate(obs_all, axis = 0)
+        
+        #get stats
+        self.stats = SAStats()
+        self.stats.obs_mean = obs_all.mean(axis=0)
+        self.stats.obs_std = obs_all.std(axis=0)+ 1e-8
+        allowed_values = [0,1]
+
+        transitions = []
+        for traj in trajs:
+            obs = traj['observations']      
+            rews = traj['rewards']
+            if( goal is not None):
+                rews = reward_filter(obs, rews, goal)
+            if(not np.all(np.isin(rews, allowed_values))):
+                raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
+            if(target_reward is not None):
+                rews = self.boost_signal(target_reward, rews)
+            rews = gaussian_filter1d(rews, sigma)
+            rews = self.reward_processor(rews, horizon, gamma)
+            for t in range(len(obs)-1):
+                obs_t = self.stats.norm_obs(obs[t])
+                r_t   = rews[t]
+                obs_next_t = self.stats.norm_obs(obs[t+1])
+                transitions.append((obs_t, r_t, obs_next_t))
+
+        self.transitions = transitions
+        self.save_stats(dataset_name, specific_dataset, step)
+    
+    def save_stats(self, dataset_name, specific_dataset, step):
+        name = getName(dataset_name, specific_dataset)
+        stats_name =  str(name) + f'_Critic_stats_{str(step)}.pkl'
+        stats_dir = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/'
+        os.makedirs(stats_dir, exist_ok=True)
+        savepath = os.path.join(stats_dir, stats_name)
+        with open(savepath, 'wb') as f:
+              pickle.dump(self.stats, f)
+        print(f"saved stats to {savepath}")
+
+    def __len__(self):
+        return len(self.transitions)
+
+    def __getitem__(self, idx):
+        s, r, s_next = self.transitions[idx]
+        return (
+            torch.tensor(s, dtype=torch.float32),
+            torch.tensor(r, dtype=torch.float32),
+            torch.tensor(s_next, dtype=torch.float32),
+        )
+    
+    def boost_signal(self, target_reward, rews):
+        for t in range(len(rews)):
+            if(rews[t] == 1):
+                 rews[t] = target_reward
+        return rews
+    
+    def reward_processor(self, rews, horizon, gamma):
+        new_rews = []
+        for t in range(len(rews)):
+            R = 0.0
+            for i in range(t, t + horizon):
+                R += (gamma**(i-t + 1))*rews[i]
+            new_rews.append(R)
+        return new_rews
+
 def train_reward(trajs: List[TrajectoryDict], dataset_name: str, batch_size, num_steps, lr, sigma, step, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
@@ -325,6 +420,7 @@ def train_reward(trajs: List[TrajectoryDict], dataset_name: str, batch_size, num
            total_loss += loss.item()
            counter += 1
     save_reward_model(reward_net, dataset_name, specific_dataset, step)
+    print(f"reward model saved")
            
 def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str,
                  batch_size=256, lr=1e-3, num_steps=10000,
@@ -332,7 +428,7 @@ def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
     # Prepare dataset / dataloader
     print(f"Training kernel for {dataset_name}_{specific_dataset}")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print("Using device:", device)
+    #print("Using device:", device)
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
     dataset = KernelDataset(trajs, dataset_name, specific_dataset, step)
     loader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
@@ -382,6 +478,51 @@ def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
          save_kernel_model(ckpt, dataset_name, specific_dataset, step, idx)
     print(f"Kernel model saved")
 
+def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, step: int):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #print(f"Using device {device}")
+
+    #get information
+    dataset = CriticDataset(trajs, sigma,dataset_name, specific_dataset, step)
+    _, obs_dim, _ = get_env(dataset_name, specific_dataset)
+   
+    #prepare training
+    dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True)
+    critic = Critic(obs_dim).to(device)
+    target_critic = Critic(obs_dim).to(device)
+    target_critic.load_state_dict(critic.state_dict())
+    optimizer = optim.Adam(critic.parameters(), lr = lr)
+
+    print(f"Training critic for {dataset_name}-{specific_dataset}")
+    for k in range(1, num_steps + 1):  # number of passes over dataset
+           s, r, s_next, a_next = next(dataloader)
+           s = s.to(device)
+           a = a.to(device)
+           r = r.to(device)
+           s_next = s_next.to(device)
+           a_next = a_next.to(device)
+
+           # Compute target Q-values
+           with torch.no_grad():
+              q_next = target_critic(s_next)
+              target = r + ( (gamma**horizon) * q_next)
+
+           # Predicted V-values
+           q_pred = critic(s)
+           loss = ((q_pred - target) ** 2).mean()
+
+           optimizer.zero_grad()
+           loss.backward()
+           total_loss += loss.item()
+           optimizer.step()
+
+           # Soft update target network
+           for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):
+               tgt_param.data.mul_(1 - tau)
+               tgt_param.data.add_(tau * param.data)
+    critic.eval()
+    save_critic(critic, dataset_name, specific_dataset, step)
+    print(f"critic model saved")
 
 class PlannerDataset(Dataset):
     def __init__(self, trajs: List[TrajectoryDict], horizon: int, dataset_name: str, specific_dataset: str):

@@ -56,6 +56,7 @@ class FinetuningConfig():
     kernel_model_checkpoint: int
     train_reward_config: Train_Reward_Config  # Moved before fields with defaults
     train_kernel_config: Train_Kernel_Config  # Moved before fields with defaults
+    buffer_size: int = 100000
     finetune_steps: int = 1000000
     finetune_rounds: int = 10
     diffusion_steps: int = 30
@@ -110,12 +111,15 @@ class OnlineFinetuner():
                    self.config.AMConfig)
     
     def Initialize_BufferDataset(self):
-        self.Buffer = []
+        self.Finetune_Buffer = []
+        self.Train_Buffer = []
         dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
         trajs = dataset.get_trajectories()
-        self.Buffer.extend(trajs)
+        self.Finetune_Buffer.extend(trajs)
+        self.Train_Buffer.extend(trajs)
+
         self.PlannerDataset = PlannerDataset(
-                   self.Buffer, 
+                   self.Finetune_Buffer, 
                    self.config.AMConfig.horizon, 
                    self.config.dataset_name, 
                    self.config.specific_dataset)
@@ -179,21 +183,26 @@ class OnlineFinetuner():
                   collected_trajs.extend(process_trajs)
             print(f"Rollout Completed: Collected {len(collected_trajs)} trajectories across {self.accelerator.num_processes} processes")
         
-            self.Buffer.extend(collected_trajs)
-        
+            self.Train_Buffer.extend(collected_trajs)
+            self.Finetune_Buffer.extend(collected_trajs)
+            if len(self.Finetune_Buffer) > self.config.buffer_size:
+                 num_to_remove = len(self.Finetune_Buffer) - self.config.buffer_size
+                 self.Finetune_Buffer = self.Finetune_Buffer[num_to_remove:] 
+                 #print(f"Buffer size limited to {self.config.buffer_size}, removed {num_to_remove} oldest trajectories")
+    
             # Prepare updated buffer for sync
-            buffer_for_sync = [self.Buffer]
+            buffer_for_sync = [self.Finetune_Buffer]
         else:
             buffer_for_sync = [None]
     
         # Broadcast full updated buffer to all processes
         synced_buffer = self.accelerator.gather_for_metrics(buffer_for_sync, use_gather_object=True)
         if synced_buffer[0] is not None:
-             self.Buffer = synced_buffer[0]
+             self.Finetune_Buffer = synced_buffer[0]
     
         # Recreate PlannerDataset consistently on all processes
         self.PlannerDataset = PlannerDataset(
-              self.Buffer,
+              self.Finetune_Buffer,
               self.config.AMConfig.horizon,
               self.config.dataset_name,
               self.config.specific_dataset
@@ -210,6 +219,7 @@ class OnlineFinetuner():
             print(f"kernel_model_checkpoint: {self.config.kernel_model_checkpoint}")
             print('Finetuning Hyperparameters: ---------------------------------------------------------------')
             print(f"finetune_batch_size: {self.config.finetune_batch_size}")
+            print(f"Finetuning Buffer Size: {self.config.buffer_size}")
             print(f"finetune_lr: {self.config.AMConfig.finetune_lr}")
             print(f"reward_scaling_factor: {self.config.AMConfig.reward_scaling_factor}")
             print(f"finetune_total_steps: {self.config.AMConfig.finetune_total_steps}")
@@ -245,7 +255,7 @@ class OnlineFinetuner():
                                          eta = self.config.AMConfig.eta, 
                                          episode_length = self.config.rollout_length, 
                                          checkpoint_step = 0, 
-                                         num_envs = self.config.rollout_num_envs, 
+                                         num_envs = 4, 
                                          goal_cell = self.config.train_reward_config.rollout_goal)
             print(f"Average Normalized Score: {score:.2f}")
         self.accelerator.wait_for_everyone()
@@ -297,10 +307,10 @@ class OnlineFinetuner():
                 avg_score = gathered_scores.float().mean().item()
                 print(f"Average Normalized Score: {avg_score:.2f}")
             self.accelerator.wait_for_everyone()         
-            """
+            
             if self.accelerator.is_main_process:
                   print(f"Starting Reward Training")
-                  train_reward(self.Buffer, 
+                  train_reward(self.Train_Buffer, 
                              dataset_name = self.config.dataset_name, 
                              batch_size = self.config.train_reward_config.batch_size, 
                              num_steps = self.config.train_reward_config.num_steps, 
@@ -311,7 +321,7 @@ class OnlineFinetuner():
                              specific_dataset = self.config.specific_dataset, 
                              goal = self.config.train_reward_config.train_goal)
                   print(f"Starting Kernel Training")
-                  train_kernel(self.Buffer, 
+                  train_kernel(self.Train_Buffer, 
                              dataset_name = self.config.dataset_name, 
                              specific_dataset = self.config.specific_dataset,
                              batch_size = self.config.train_kernel_config.batch_size, 
@@ -326,7 +336,7 @@ class OnlineFinetuner():
             self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             self.config.kernel_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             self.set_reward_model(self.device)
-            """
+            
             if self.accelerator.is_main_process:
                    print(f"Finetuning round {step+1} completed")
             self.accelerator.wait_for_everyone()
