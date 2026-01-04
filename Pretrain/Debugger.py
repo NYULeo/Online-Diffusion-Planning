@@ -843,8 +843,8 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
 
     model_state_dict, obs_dim = get_critic_model('pointmaze', 'medium', STEP)
     stats = get_critic_stats('pointmaze', 'medium')
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    critic = Critic(obs_dim).to(device)
+    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    critic = Critic(obs_dim)
     critic.load_state_dict(model_state_dict)
     critic.eval()
 
