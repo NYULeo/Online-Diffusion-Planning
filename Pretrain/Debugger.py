@@ -404,111 +404,80 @@ import gymnasium_robotics
 import gymnasium as gym
 from typing import Optional
 
-def plot_critic_heatmap(
-    dataset_name: str = 'pointmaze',
-    specific_dataset: str = 'medium',
-    step: int = 1000,
-    resolution: int = 256,
-    batch_size: int = 16384,
-    max_goals_to_plot: int = 20,
-    grid_margin: float = 0.5,
-    output_dir: Optional[str] = None,
-    goal: Optional[np.ndarray] = None
-):
+
+def plot_critic_heatmap(STEP, agg_method='max', highlight_negatives=True):
     """
     Plot a heatmap of critic values for the pointmaze environment.
+    Similar structure to the reward heatmap function.
     
     Args:
-        dataset_name: Name of the dataset ('pointmaze')
-        specific_dataset: Specific dataset variant ('medium', 'large', 'umaze')
-        step: Checkpoint step to load
-        resolution: Grid resolution for the heatmap (default: 256)
-        batch_size: Batch size for processing (default: 16384)
-        max_goals_to_plot: Maximum number of goals to plot (default: 20)
-        grid_margin: Extra padding around observed positions (default: 0.5)
-        output_dir: Directory to save the heatmap (default: './reward_map')
-        goal: Optional specific goal to plot. If None, extracts goals from dataset
+        STEP: Checkpoint step to load
+        agg_method: 'max', 'min', or 'mean' for aggregating across goals
+        highlight_negatives: Whether to show a negative zoom panel
     """
     from Pretrain.Critic.train_critic import get_critic_model, get_critic_stats
     from Pretrain.Critic.nets import Critic
     
-    output_file = f"critic_{step}_heatmap.png"
-    if output_dir is None:
-        output_dir = os.path.join(project_root, "reward_map")
-    
-    print(f'Plotting the critic heatmap for checkpoint: {step}')
+    # ================== Configuration ==================
+    RESOLUTION = 256                # Grid resolution
+    BATCH_SIZE = 16384              # Batch size for efficient processing
+    MAX_GOALS_TO_PLOT = 20           # Plot only the first few unique goals
+    GRID_MARGIN = 0.5               # Extra padding around observed positions
+    OUTPUT_FILE = f"critic_{STEP}_heatmap.png"
+
+    print(f'Plotting the critic heatmap for checkpoint: {STEP}')
     
     # ================== Load Environment ==================
-    if specific_dataset == 'medium':
-        dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
-    elif specific_dataset == 'large':
-        dataset = minari.load_dataset('D4RL/pointmaze/large-v2', download=True)
-    elif specific_dataset == 'umaze':
-        dataset = minari.load_dataset('D4RL/pointmaze/umaze-v2', download=True)
-    else:
-        raise ValueError(f"Unsupported specific_dataset: {specific_dataset}")
-    
+    dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
     env = dataset.recover_environment().unwrapped
+
+    # ================== Extract All Unique Goals from Dataset ==================
+    all_goals = set()
+    pos_min = np.array([np.inf, np.inf], dtype=np.float32)
+    pos_max = np.array([-np.inf, -np.inf], dtype=np.float32)
+    first_start = None
+
+    # Fixed goal extraction loop
+    t = 0
+    while t < 20:
+        obs, info = env.reset(seed=t)
+        goal = env.generate_target_goal()
+        
+        # Convert to tuple and round to avoid floating point precision issues
+        if isinstance(goal, np.ndarray):
+            goal_2d = goal[:2] if len(goal) >= 2 else goal
+            goal_rounded = tuple(np.round(goal_2d, 2))
+        else:
+            goal_rounded = tuple(np.round(goal[:2], 2))
+        
+        all_goals.add(goal_rounded)
+        
+        # Update position bounds from observation
+        obs_dict, info = env.reset(seed=t)
+        obs = obs_dict['observation']  # extract the numpy array
+        if len(obs) >= 2:
+            positions = obs[:2]  # Current position
+            pos_min = np.minimum(pos_min, positions)
+            pos_max = np.maximum(pos_max, positions)
+            if first_start is None:
+                first_start = positions
+        
+        t += 1
     
-    # ================== Extract Goals ==================
-    if goal is not None:
-        # Use provided goal
-        GOALS = np.array([goal]) if goal.ndim == 1 else goal
-        if GOALS.ndim == 1:
-            GOALS = GOALS.reshape(1, -1)
-    else:
-        # Extract goals from dataset
-        all_goals = set()
-        pos_min = np.array([np.inf, np.inf], dtype=np.float32)
-        pos_max = np.array([-np.inf, -np.inf], dtype=np.float32)
-        
-        t = 0
-        while t < 20:
-            obs, info = env.reset(seed=t)
-            goal_extracted = env.generate_target_goal()
-            
-            if isinstance(goal_extracted, np.ndarray):
-                goal_2d = goal_extracted[:2] if len(goal_extracted) >= 2 else goal_extracted
-                goal_rounded = tuple(np.round(goal_2d, 2))
-            else:
-                goal_rounded = tuple(np.round(goal_extracted[:2], 2))
-            
-            all_goals.add(goal_rounded)
-            
-            # Update position bounds
-            obs_dict, info = env.reset(seed=t)
-            obs = obs_dict['observation']
-            if len(obs) >= 2:
-                positions = obs[:2]
-                pos_min = np.minimum(pos_min, positions)
-                pos_max = np.maximum(pos_max, positions)
-            
-            t += 1
-        
-        if len(all_goals) == 0:
-            raise ValueError("No goals found in dataset!")
-        
-        goal_list = sorted(all_goals)
-        if len(goal_list) > max_goals_to_plot:
-            print(f"Found {len(goal_list)} unique goals, limiting to first {max_goals_to_plot}.")
-            goal_list = goal_list[:max_goals_to_plot]
-        
-        GOALS = np.array(goal_list)
-        
-        # Determine plotting bounds from observations
-        if np.isinf(pos_min).any() or np.isinf(pos_max).any():
-            if hasattr(env, 'maze') and hasattr(env.maze, 'maze_map'):
-                map_height = env.maze.map_length
-                map_width = env.maze.map_width
-                cell = env.maze.maze_size_scaling
-                pos_min = np.array([-map_width / 2.0 * cell, -map_height / 2.0 * cell], dtype=np.float32)
-                pos_max = np.array([map_width / 2.0 * cell, map_height / 2.0 * cell], dtype=np.float32)
-            else:
-                raise ValueError("Could not determine position bounds from dataset or maze.")
-    
-    # Set grid bounds
-    if goal is not None:
-        # If single goal provided, use default bounds or extract from env
+    # Convert to numpy array (limit to a few goals for clarity)
+    if len(all_goals) == 0:
+        raise ValueError("No goals found in dataset! Check dataset structure.")
+
+    goal_list = sorted(all_goals)
+    if len(goal_list) > MAX_GOALS_TO_PLOT:
+        print(f"Found {len(goal_list)} unique goals, limiting to first {MAX_GOALS_TO_PLOT}.")
+        goal_list = goal_list[:MAX_GOALS_TO_PLOT]
+
+    GOALS = np.array(goal_list)
+    print(f"Found {len(GOALS)} unique goals.")
+
+    # Determine plotting bounds based on observed positions
+    if np.isinf(pos_min).any() or np.isinf(pos_max).any():
         if hasattr(env, 'maze') and hasattr(env.maze, 'maze_map'):
             map_height = env.maze.map_length
             map_width = env.maze.map_width
@@ -516,19 +485,20 @@ def plot_critic_heatmap(
             pos_min = np.array([-map_width / 2.0 * cell, -map_height / 2.0 * cell], dtype=np.float32)
             pos_max = np.array([map_width / 2.0 * cell, map_height / 2.0 * cell], dtype=np.float32)
         else:
-            pos_min = np.array([-4.0, -4.0], dtype=np.float32)
-            pos_max = np.array([4.0, 4.0], dtype=np.float32)
+            raise ValueError("Could not determine position bounds from dataset or maze.")
+
+    # Expand bounds a bit so the heatmap includes some context outside trajectories
+    grid_min = (pos_min - GRID_MARGIN).astype(np.float32)
+    grid_max = (pos_max + GRID_MARGIN).astype(np.float32)
     
-    grid_min = (pos_min - grid_margin).astype(np.float32)
-    grid_max = (pos_max + grid_margin).astype(np.float32)
-    
+    # Determine start position
     default_start = np.array([-1.5, -0.5], dtype=np.float32)
     start_pos = default_start
-    
+
     # ================== Load Critic Model ==================
-    print(f"Loading critic model (step {step})...")
-    model_state_dict, obs_dim = get_critic_model(dataset_name, specific_dataset, step)
-    stats = get_critic_stats(dataset_name, specific_dataset)
+    print(f"Loading critic model (step {STEP})...")
+    model_state_dict, obs_dim = get_critic_model('pointmaze', 'medium', STEP)
+    stats = get_critic_stats('pointmaze', 'medium')
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     critic = Critic(obs_dim).to(device)
@@ -536,142 +506,261 @@ def plot_critic_heatmap(
     critic.eval()
     
     print(f"Critic loaded. Observation dimension: {obs_dim}")
-    
+
     # ================== Create Grid ==================
-    print(f"Creating {resolution}x{resolution} grid...")
-    x = np.linspace(grid_min[0], grid_max[0], resolution)
-    y = np.linspace(grid_min[1], grid_max[1], resolution)
+    x = np.linspace(grid_min[0], grid_max[0], RESOLUTION)
+    y = np.linspace(grid_min[1], grid_max[1], RESOLUTION)
     X, Y = np.meshgrid(x, y, indexing='xy')
-    
+
     # ================== Evaluate Critic for All Goals ==================
-    print("Evaluating critic for all goals...")
     value_maps_per_goal = []
+    gradnorm_maps_per_goal = []
+
+    # Prepare normalization tensors
+    obs_mean_t = torch.as_tensor(stats.obs_mean, dtype=torch.float32)
+    obs_std_t = torch.as_tensor(np.maximum(stats.obs_std, getattr(stats, "std_floor", 1e-3)), dtype=torch.float32)
+
+    for goal_idx, goal in enumerate(GOALS):
+        print(f"Processing goal {goal_idx+1}/{len(GOALS)}: [{goal[0]:.2f}, {goal[1]:.2f}]")
     
-    for goal_idx, goal_pos in enumerate(GOALS):
-        print(f"Processing goal {goal_idx+1}/{len(GOALS)}: [{goal_pos[0]:.2f}, {goal_pos[1]:.2f}]")
-        
         # Create observations: [x, y, goal_x, goal_y]
         obs_base = np.stack([
             X.ravel(),
             Y.ravel(),
-            np.full(resolution**2, goal_pos[0]),
-            np.full(resolution**2, goal_pos[1])
+            np.full(RESOLUTION**2, goal[0]),
+            np.full(RESOLUTION**2, goal[1])
         ], axis=1).astype(np.float32)
+    
+        value_map_goal = np.zeros(RESOLUTION**2, dtype=np.float32)
+        gradnorm_map_goal = np.full(RESOLUTION**2, np.nan, dtype=np.float32)
+
+        for start in range(0, len(obs_base), BATCH_SIZE):
+            end = min(start + BATCH_SIZE, len(obs_base))
+
+            batch_obs = torch.from_numpy(obs_base[start:end]).float()
+            batch_obs.requires_grad_(True)  # gradients w.r.t. [x,y,goal_x,goal_y]
+
+            # Differentiable normalization
+            obs_norm = (batch_obs - obs_mean_t) / obs_std_t
+
+            # Compute critic values
+            values = critic(obs_norm.to(device))  # [B]
+            value_map_goal[start:end] = values.detach().cpu().numpy()
+
+            # Compute gradient norm w.r.t. position (x, y) only
+            grads = torch.autograd.grad(values.sum(), batch_obs, create_graph=False)[0]  # [B,4]
+            gradnorm = torch.norm(grads[:, :2], dim=1)  # only ∇ w.r.t (x,y)
+            gradnorm_map_goal[start:end] = gradnorm.detach().cpu().numpy()
         
-        value_map_goal = np.zeros(resolution**2, dtype=np.float32)
-        
-        with torch.no_grad():
-            for start in range(0, len(obs_base), batch_size):
-                end = min(start + batch_size, len(obs_base))
-                batch_obs = obs_base[start:end]
-                
-                # Normalize observations
-                obs_norm = stats.norm_obs(batch_obs)
-                obs_tensor = torch.from_numpy(obs_norm).float().to(device)
-                
-                # Compute critic values
-                values = critic(obs_tensor).cpu().numpy()
-                value_map_goal[start:end] = values
-        
-        value_maps_per_goal.append(value_map_goal.reshape(resolution, resolution))
-    
-    # Aggregate value maps (take maximum across all goals for each position)
-    value_map = np.stack(value_maps_per_goal, axis=0).max(axis=0)
-    
-    # ================== Plot Heatmap ==================
-    print("Creating heatmap...")
-    fig, ax = plt.subplots(figsize=(12, 12))
-    
-    # Plot heatmap
-    im = ax.imshow(
-        value_map,
-        extent=[grid_min[0], grid_max[0], grid_min[1], grid_max[1]],
-        origin='lower',
-        cmap='RdYlBu_r',
-        interpolation='bilinear'
-    )
-    plt.colorbar(im, ax=ax, label='Critic Value (V)')
-    
-    # Draw walls
-    print("Drawing maze walls...")
-    if hasattr(env.maze, 'walls'):
-        for wall in env.maze.walls:
-            (x0, y0), (x1, y1) = wall
-            ax.plot([x0, x1], [y0, y1], 'k-', linewidth=3, zorder=10)
+        value_maps_per_goal.append(value_map_goal.reshape(RESOLUTION, RESOLUTION))
+        gradnorm_maps_per_goal.append(gradnorm_map_goal.reshape(RESOLUTION, RESOLUTION))
+
+    # Aggregate value maps (customizable: 'max', 'min', or 'mean')
+    print(f"Aggregating with method: {agg_method}")
+    if agg_method == 'max':
+        value_map = np.stack(value_maps_per_goal, axis=0).max(axis=0)
+        gradnorm_map = np.stack(gradnorm_maps_per_goal, axis=0).max(axis=0)
+    elif agg_method == 'min':
+        value_map = np.stack(value_maps_per_goal, axis=0).min(axis=0)
+        gradnorm_map = np.stack(gradnorm_maps_per_goal, axis=0).min(axis=0)
+    elif agg_method == 'mean':
+        value_map = np.stack(value_maps_per_goal, axis=0).mean(axis=0)
+        gradnorm_map = np.stack(gradnorm_maps_per_goal, axis=0).mean(axis=0)
     else:
-        # Fallback: use maze_map if walls attribute doesn't exist
-        maze_map = env.maze.maze_map
-        map_height = env.maze.map_length
-        map_width = env.maze.map_width
-        cell_size = env.maze.maze_size_scaling
-        
-        for row in range(map_height):
-            for col in range(map_width):
-                if maze_map[row][col] == 1:  # This is a wall cell
-                    try:
-                        if hasattr(env.maze, 'cell_rowcol_to_xy'):
-                            cell_center = env.maze.cell_rowcol_to_xy(row, col)
-                            x_center, y_center = float(cell_center[0]), float(cell_center[1])
-                        else:
-                            raise AttributeError("Method not available")
-                    except:
-                        x_center = (col - map_width / 2.0 + 0.5) * cell_size
-                        y_center = (map_height / 2.0 - row - 0.5) * cell_size
-                    
-                    half_cell = cell_size / 2.0
-                    corners = [
-                        [x_center - half_cell, y_center - half_cell],
-                        [x_center + half_cell, y_center - half_cell],
-                        [x_center + half_cell, y_center + half_cell],
-                        [x_center - half_cell, y_center + half_cell],
-                        [x_center - half_cell, y_center - half_cell]
-                    ]
-                    corners = np.array(corners)
-                    ax.plot(corners[:, 0], corners[:, 1], 'k-', linewidth=2, zorder=10)
-    
-    # Mark start position
-    ax.plot(
-        start_pos[0],
-        start_pos[1],
-        'go',
-        markersize=15,
-        label='Start',
-        markeredgecolor='black',
-        markeredgewidth=2,
-        zorder=20
-    )
-    
-    # Mark all goal positions
-    print(f"Plotting {len(GOALS)} goals...")
-    for i, goal_pos in enumerate(GOALS):
-        ax.plot(goal_pos[0], goal_pos[1], 'y*', markersize=20, 
-                markeredgecolor='black', markeredgewidth=1, zorder=20)
-        ax.text(goal_pos[0] + 0.3, goal_pos[1] + 0.3, f'G{i+1}', 
-                fontsize=10, color='black', weight='bold', zorder=21,
-                bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7))
-    
-    ax.set_xlabel('X position', fontsize=12)
-    ax.set_ylabel('Y position', fontsize=12)
-    ax.set_title(f'Critic Value Heatmap (Step {step}) - All {len(GOALS)} Goals', fontsize=14, fontweight='bold')
-    ax.legend(loc='upper right', fontsize=10)
-    ax.grid(True, alpha=0.3)
-    ax.set_aspect('equal')
-    ax.set_xlim(grid_min[0], grid_max[0])
-    ax.set_ylim(grid_min[1], grid_max[1])
-    
-    plt.tight_layout()
-    
-    # Save the figure
-    os.makedirs(output_dir, exist_ok=True)
-    save_path = os.path.join(output_dir, output_file)
-    plt.savefig(save_path, dpi=150, bbox_inches='tight')
-    print(f"Critic heatmap saved to {save_path}")
-    
-    plt.close()
-    
+        raise ValueError("agg_method must be 'max', 'min', or 'mean'")
+
+    # Debug print (enhanced)
+    neg_count = (value_map < 0).sum()
+    neg_pct = 100 * neg_count / value_map.size
     print(f"Final value_map stats: min={value_map.min():.4f}, max={value_map.max():.4f}, mean={value_map.mean():.4f}")
     
-    return value_map, save_path
+    # Value stats over the entire grid
+    vm_finite = np.isfinite(value_map)
+    vm_mean = value_map[vm_finite].mean()
+    vm_var = value_map[vm_finite].var()
+    vm_std = value_map[vm_finite].std()
+
+    print(f"Final value_map stats: min={value_map[vm_finite].min():.4f}, "
+          f"max={value_map[vm_finite].max():.4f}, mean={vm_mean:.4f}, "
+          f"var={vm_var:.6f}, std={vm_std:.6f}, N={vm_finite.sum()}")
+
+    # Grad-norm stats
+    gn_finite = np.isfinite(gradnorm_map)
+    gn_mean = gradnorm_map[gn_finite].mean()
+    gn_var = gradnorm_map[gn_finite].var()
+    gn_std = gradnorm_map[gn_finite].std()
+    print(f"Final gradnorm_map stats: min={gradnorm_map[gn_finite].min():.6f}, "
+          f"max={gradnorm_map[gn_finite].max():.6f}, mean={gn_mean:.6f}, "
+          f"var={gn_var:.6f}, std={gn_std:.6f}, N={gn_finite.sum()}")
+
+    print(f"Negative positions: {neg_count} / {value_map.size} ({neg_pct:.1f}%)")
+    if neg_pct < 1.0:
+        print("Warning: Negatives are sparse (<1%). Try agg_method='mean' or 'min' to reveal more.")
+
+    # Find and print top 5 most negative positions (world coords)
+    neg_mask = value_map < 0
+    if neg_mask.any():
+        neg_indices = np.argwhere(neg_mask)
+        sorted_neg = neg_indices[np.argsort(value_map[neg_mask])[::-1]]  # Most negative first
+        print("Top 5 most negative positions (x, y, value):")
+        for i in range(min(5, len(sorted_neg))):
+            row, col = sorted_neg[i]
+            print(f"  {i+1}: ({x[col]:.2f}, {y[row]:.2f}) = {value_map[row, col]:.4f}")
+    else:
+        print("No negative positions found—check model outputs.")
+
+    # ================== Plot Heatmap ==================
+    if MATPLOTLIB_AVAILABLE:
+        print("Creating heatmap...")
+        
+        if highlight_negatives and neg_mask.any():
+            fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(30, 10))
+            axes = [ax1, ax2, ax3]
+            titles = [
+                f'Full Range (Step {STEP}) - Critic Value ({agg_method} agg)',
+                f'Negative Zoom (Step {STEP}) - Critic Value',
+                f'Grad-Norm (Step {STEP}) - ||∇_(x,y) V|| ({agg_method} agg)',
+            ]
+        else:
+            fig, (ax1, ax3) = plt.subplots(1, 2, figsize=(20, 10))
+            axes = [ax1, ax3]
+            titles = [
+                f'Critic Value Heatmap (Step {STEP}) - Value ({agg_method} agg)',
+                f'Grad-Norm Heatmap (Step {STEP}) - ||∇_(x,y) V|| ({agg_method} agg)',
+            ]
+
+        data_min, data_max = value_map.min(), value_map.max()
+        finite = np.isfinite(gradnorm_map)
+        grad_vmax = np.percentile(gradnorm_map[finite], 99) if finite.any() else 1.0
+
+        for idx, ax in enumerate(axes):
+            is_grad_panel = (idx == len(axes) - 1)  # last axis is gradnorm
+
+            if is_grad_panel:
+                data = gradnorm_map
+                vmin, vmax = 0.0, grad_vmax
+                cmap = "viridis"
+                cbar_label = r"||∇_{x,y} V||"
+            else:
+                data = value_map
+                cbar_label = "Critic Value (V)"
+                if idx == 0:  # full value
+                    vmin, vmax = data_min, data_max
+                    cmap = "coolwarm"
+                else:  # negative zoom value
+                    zoom_min, zoom_max = -0.1, 0.2
+                    vmin = max(data_min, zoom_min)
+                    vmax = min(0.0, zoom_max) if data_max > 0 else data_max
+                    cmap = "Blues_r"
+
+            im = ax.imshow(
+                data,
+                extent=[grid_min[0], grid_max[0], grid_min[1], grid_max[1]],
+                origin="lower",
+                cmap=cmap,
+                vmin=vmin, vmax=vmax,
+                interpolation="bilinear",
+            )
+            plt.colorbar(im, ax=ax, label=cbar_label, shrink=0.8)
+
+            # Only overlay value=0 contour on value panels (not gradnorm)
+            if (not is_grad_panel) and neg_mask.any():
+                ax.contour(X, Y, value_map, levels=[0.0], colors="red",
+                          linestyles="--", linewidths=2, alpha=0.7)
+            
+            # Draw walls using env.maze.walls (more accurate than maze_map)
+            print("Drawing maze walls...")
+            if hasattr(env.maze, 'walls'):
+                for wall in env.maze.walls:
+                    (x0, y0), (x1, y1) = wall
+                    ax.plot([x0, x1], [y0, y1], 'k-', linewidth=3, zorder=10)
+            else:
+                # Fallback: use maze_map if walls attribute doesn't exist
+                print("  Using maze_map fallback...")
+                maze_map = env.maze.maze_map
+                map_height = env.maze.map_length
+                map_width = env.maze.map_width
+                cell_size = env.maze.maze_size_scaling
+                
+                for row in range(map_height):
+                    for col in range(map_width):
+                        if maze_map[row][col] == 1:  # This is a wall cell
+                            try:
+                                if hasattr(env.maze, 'cell_rowcol_to_xy'):
+                                    cell_center = env.maze.cell_rowcol_to_xy(row, col)
+                                    x_center, y_center = float(cell_center[0]), float(cell_center[1])
+                                else:
+                                    raise AttributeError("Method not available")
+                            except:
+                                x_center = (col - map_width / 2.0 + 0.5) * cell_size
+                                y_center = (map_height / 2.0 - row - 0.5) * cell_size
+                            
+                            half_cell = cell_size / 2.0
+                            corners = [
+                                [x_center - half_cell, y_center - half_cell],
+                                [x_center + half_cell, y_center - half_cell],
+                                [x_center + half_cell, y_center + half_cell],
+                                [x_center - half_cell, y_center + half_cell],
+                                [x_center - half_cell, y_center - half_cell]
+                            ]
+                            corners = np.array(corners)
+                            ax.plot(corners[:, 0], corners[:, 1], 'k-', linewidth=2, zorder=10)
+
+            # Mark start position
+            ax.plot(
+                start_pos[0],
+                start_pos[1],
+                'go',
+                markersize=15,
+                label='Start',
+                markeredgecolor='black',
+                markeredgewidth=2,
+                zorder=20)
+
+            # Mark all goal positions
+            print(f"Plotting {len(GOALS)} goals...")
+            for i, goal in enumerate(GOALS):
+                ax.plot(goal[0], goal[1], 'y*', markersize=20 if idx==0 else 10, 
+                        markeredgecolor='black', markeredgewidth=1, zorder=20)
+                # Add goal number label (only on full plot)
+                if idx == 0:
+                    ax.text(goal[0] + 0.3, goal[1] + 0.3, f'G{i+1}', 
+                            fontsize=10, color='black', weight='bold', zorder=21,
+                            bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7))
+
+            ax.set_xlabel('X position', fontsize=12)
+            ax.set_ylabel('Y position', fontsize=12)
+            ax.set_title(titles[idx], fontsize=14, fontweight='bold')
+            if idx == 0:
+                ax.legend(loc='upper right', fontsize=10)
+            ax.grid(True, alpha=0.3)
+            ax.set_aspect('equal')
+            ax.set_xlim(grid_min[0], grid_max[0])
+            ax.set_ylim(grid_min[1], grid_max[1])
+
+        plt.tight_layout()
+        
+        # Ensure we save to the project root directory
+        reward_dir = os.path.join(project_root, "reward_map")
+        os.makedirs(reward_dir, exist_ok=True)
+        save_path = os.path.join(reward_dir, OUTPUT_FILE) if not os.path.isabs(OUTPUT_FILE) else OUTPUT_FILE
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        print(f"Critic heatmap saved to {save_path}")
+        
+        # Close figure to free memory
+        plt.close()
+        
+    else:
+        print("Skipping plotting due to matplotlib import error.")
+        print(f"Value map statistics:")
+        print(f"  Min: {value_map.min():.4f}, Max: {value_map.max():.4f}, Mean: {value_map.mean():.4f}")
+        print(f"  Shape: {value_map.shape}")
+        # Save raw data as numpy array instead
+        npy_path = os.path.join(project_root, OUTPUT_FILE.replace('.png', '.npy'))
+        np.save(npy_path, value_map)
+        print(f"Value map saved as numpy array to {npy_path}")
+
+
 
 
 if __name__ == '__main__':
