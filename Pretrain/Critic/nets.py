@@ -10,10 +10,10 @@ import torch.nn as nn
 
 
 class Critic(nn.Module):
-    def __init__(self, obs_dim, hidden = 32):
+    def __init__(self, obs_dim, act_dim, hidden = 32):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(obs_dim, hidden),
+            nn.Linear(obs_dim+act_dim, hidden),
             nn.LayerNorm(hidden),
             nn.SiLU(),
             nn.Linear(hidden, hidden), 
@@ -22,9 +22,9 @@ class Critic(nn.Module):
             nn.Linear(hidden, 1),
             nn.ReLU()                              
         )
-        #self.scale = nn.Parameter(torch.tensor(5.0))
+        self.scale = nn.Parameter(torch.tensor(5.0))
 
-    def forward(self, obs):
-        #return self.net(x).squeeze(-1) * self.scale
-        return self.net(obs).squeeze(-1)
+    def forward(self, obs, act):
+        return self.net([obs, act]).squeeze(-1) * self.scale
+        #return self.net(obs).squeeze(-1)
 
