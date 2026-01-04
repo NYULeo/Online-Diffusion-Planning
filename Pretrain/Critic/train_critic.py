@@ -155,7 +155,7 @@ class CriticDataset(Dataset):
     def save_stats(self, dataset_name, specific_dataset):
         name = get_CriticName(dataset_name, specific_dataset)
         stats_name =  str(name) + f'_Critic_stats.pkl'
-        stats_dir = f'./Pretrain/Critics/{dataset_name}/{specific_dataset}/Stats/'
+        stats_dir = f'./Pretrain/Critic/{dataset_name}/{specific_dataset}/Stats/'
         os.makedirs(stats_dir, exist_ok=True)
         savepath = os.path.join(stats_dir, stats_name)
         with open(savepath, 'wb') as f:
