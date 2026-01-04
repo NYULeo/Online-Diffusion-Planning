@@ -126,7 +126,7 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
                 batch.requires_grad_(True)
 
                 norm = (batch - obs_mean_t) / obs_std_t
-                v = model(norm)  # V(s)
+                v = model(norm.requires_grad_(True))  # V(s)
 
                 v_map[start:end] = v.cpu().numpy().flatten()
 
