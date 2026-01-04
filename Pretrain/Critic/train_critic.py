@@ -124,7 +124,7 @@ class CriticDataset(Dataset):
         transitions = []
         for traj in trajs:
             obs = traj['observations']    
-            acts = traj['actions']  
+            #acts = traj['actions']  
             rews = traj['rewards']
             if( goal is not None):
                 rews = reward_filter(obs, rews, goal)
@@ -133,22 +133,12 @@ class CriticDataset(Dataset):
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
             rews = gaussian_filter1d(rews, sigma)
-            """
             rews = self.reward_processor(rews, horizon, gamma)
             for t in range(len(obs)-horizon):
                 obs_t = self.stats.norm_obs(obs[t])
                 r_t   = rews[t]
                 obs_next_t = self.stats.norm_obs(obs[t+horizon])
                 transitions.append((obs_t, r_t, obs_next_t))
-            """
-            
-            for t in range(len(obs)-1):
-                obs_t = self.stats.norm_obs(obs[t])
-                r_t   = rews[t]
-                act_t = acts[t]
-                #obs_next_t = self.stats.norm_obs(obs[t+1])
-                transitions.append((obs_t, act_t, r_t))
-
         self.transitions = transitions
         self.save_stats(dataset_name, specific_dataset)
     
@@ -166,19 +156,11 @@ class CriticDataset(Dataset):
         return len(self.transitions)
 
     def __getitem__(self, idx):
-        """
         s, r, s_next = self.transitions[idx]
         return (
-            torch.tensor(s, dtype=torch.float32),
-            torch.tensor(r, dtype=torch.float32),
-            torch.tensor(s_next, dtype=torch.float32),
-        )
-        """
-        s, a, r = self.transitions[idx]
-        return (
             torch.tensor(s, dtype = torch.float32),
-            torch.tensor(a, dtype = torch.float32),
             torch.tensor(r, dtype = torch.float32),
+            torch.tensor(s_next, dtype = torch.float32)
         )
     
     def boost_signal(self, target_reward, rews):
@@ -192,7 +174,7 @@ class CriticDataset(Dataset):
         for t in range(len(rews)):
             R = 0.0
             for i in range(t, min(t + horizon, len(rews))):
-                R += (gamma**(i-t + 1))*rews[i]
+                R += (gamma**(i-t))*rews[i]
             new_rews.append(R)
         return new_rews
 
@@ -203,32 +185,31 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
 
     #get information
     dataset = CriticDataset(sigma, dataset_name, specific_dataset, goal, target_reward, horizon, gamma)
-    _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+    _, obs_dim, _ = get_env(dataset_name, specific_dataset)
    
     #prepare training
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True))
-    critic = Critic(obs_dim, act_dim).to(device)
-    target_critic = Critic(obs_dim, act_dim).to(device)
+    critic = Critic(obs_dim).to(device)
+    target_critic = Critic(obs_dim).to(device)
     target_critic.load_state_dict(critic.state_dict())
     optimizer = optim.Adam(critic.parameters(), lr = lr)
    
     print(f"Training critic for {dataset_name}-{specific_dataset}")
     for k in range(1, num_steps + 1):  # number of passes over dataset
            #s, r, s_next = next(dataloader)
-           s, a, r = next(dataloader)
+           s, r, s_next = next(dataloader)
            s = s.to(device)
-           a = a.to(device)
            r = r.to(device)
-           #s_next = s_next.to(device)
+           s_next = s_next.to(device)
 
            # Compute target V-values
            with torch.no_grad():
-              #q_next = target_critic(s_next)
-              #target = r + ( (gamma**horizon) * q_next)
-              target = r 
+              q_next = target_critic(s_next)
+              target = r + ( (gamma**horizon) * q_next)
+              #target = r 
 
            # Predicted V-values
-           q_pred = critic(s, a)
+           q_pred = critic(s)
            loss = ((q_pred - target) ** 2).mean()
 
            optimizer.zero_grad()
