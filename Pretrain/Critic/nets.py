@@ -24,7 +24,7 @@ class Critic(nn.Module):
         )
         #self.scale = nn.Parameter(torch.tensor(5.0))
 
-    def forward(self, obs, act):
+    def forward(self, obs):
         #return self.net([obs, act]).squeeze(-1) * self.scale
         return self.net(obs).squeeze(-1)
 
