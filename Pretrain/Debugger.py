@@ -887,7 +887,7 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
             np.full(RESOLUTION**2, goal[1])
         ], axis=1).astype(np.float32)
     
-        reward_map_goal = np.full(RESOLUTION**2, -1e10, dtype=np.float32)
+        reward_map_goal = np.zeros(RESOLUTION**2, dtype=np.float32)
        
         #Replace 
         """
