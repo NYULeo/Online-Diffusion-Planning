@@ -164,11 +164,18 @@ class CriticDataset(Dataset):
         return len(self.transitions)
 
     def __getitem__(self, idx):
+        """
         s, r, s_next = self.transitions[idx]
         return (
             torch.tensor(s, dtype=torch.float32),
             torch.tensor(r, dtype=torch.float32),
             torch.tensor(s_next, dtype=torch.float32),
+        )
+        """
+        s, r = self.transitions[idx]
+        return (
+            torch.tensor(s, dtype=torch.float32),
+            torch.tensor(r, dtype=torch.float32),
         )
     
     def boost_signal(self, target_reward, rews):
