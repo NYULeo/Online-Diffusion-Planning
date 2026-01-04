@@ -55,8 +55,8 @@ def save_critic(model, dataset_name, specific_dataset, step):
     model.eval()
     name = get_CriticName(dataset_name, specific_dataset)
     net_dict = model.state_dict()
-    os.makedirs(f'./Pretrain/Critics/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
-    save_path = f'./Pretrain/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl'
+    os.makedirs(f'./Pretrain/Critic/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
+    save_path = f'./Pretrain/Critic/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl'
     #print("Exists:", os.path.isfile(save_path), "Size:", os.path.getsize(save_path) if os.path.isfile(save_path) else None)
     torch.save(net_dict, save_path)
     print(f"critic model save to {name}.pkl")
@@ -64,13 +64,13 @@ def save_critic(model, dataset_name, specific_dataset, step):
 def get_critic_model(dataset_name, specific_dataset, step):
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
     name = get_CriticName(dataset_name, specific_dataset)
-    path = f'./Pretrain/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl'
+    path = f'./Pretrain/Critic/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl'
     model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
     return model_state_dict, obs_dim
 
 def get_critic_stats(dataset_name, specific_dataset):
     name = get_CriticName(dataset_name, specific_dataset)
-    path = f'./Pretrain/Critics/{dataset_name}/{specific_dataset}/Stats/{name}_Critic_stats.pkl'
+    path = f'./Pretrain/Critic/{dataset_name}/{specific_dataset}/Stats/{name}_Critic_stats.pkl'
     with open(path, 'rb') as f:
         stats = pickle.load(f)
     return stats 
