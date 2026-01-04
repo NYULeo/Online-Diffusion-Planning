@@ -182,10 +182,13 @@ class CriticDataset(Dataset):
     def reward_processor(self, rews, horizon, gamma):
         new_rews = []
         for t in range(len(rews)):
+            """
             R = 0.0
             for i in range(t, min(t + horizon, len(rews))):
                 R += (gamma**(i-t))*rews[i]
             new_rews.append(R)
+            """
+            new_rews.append(np.sum(rews[t:]))
         return new_rews
 
 
@@ -215,9 +218,9 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
 
            # Compute target V-values
            with torch.no_grad():
-              q_next = target_critic(s_next)
-              target = r + ( (gamma**horizon) * q_next)
-              #target = r 
+              #q_next = target_critic(s_next)
+              #target = r + ( (gamma**horizon) * q_next)
+              target = r 
 
            # Predicted V-values
            q_pred = critic(s)
@@ -226,18 +229,23 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
            optimizer.zero_grad()
            loss.backward()
            optimizer.step()
+           
 
+           """
            # Soft update target network
            for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):
                tgt_param.data.mul_(1 - tau)
                tgt_param.data.add_(tau * param.data)
+            """
             
+        
            if(k % 200 == 0):
-                target_critic.eval()
-                save_critic(target_critic, dataset_name, specific_dataset, k)
+                #target_critic.eval()
+                #save_critic(target_critic, dataset_name, specific_dataset, k)
+                critic.eval()
+                save_critic(critic, dataset_name, specific_dataset, k)
                 print(f"Checkpoint saved at step {k}")
-    target_critic.eval()
-    save_critic(target_critic, dataset_name, specific_dataset, num_steps)
+                
     print(f"critic model saved")
 
 
