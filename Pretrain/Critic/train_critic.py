@@ -256,7 +256,7 @@ if __name__ == '__main__':  # pragma: no cover
                  sigma = 7.0, 
                  batch_size = 256, 
                  num_steps = 1000, 
-                 gamma = 0.99, 
+                 gamma = 1.0, 
                  horizon = 32, 
                  lr = 1e-4, 
                  tau = 0.005,
