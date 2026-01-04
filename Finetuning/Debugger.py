@@ -796,6 +796,15 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
 
 
 
+if __name__ == '__main__':
+    # Example usage
+    step = 200
+    while(step <= 1000):
+         np.random.seed(0)
+         random.seed(0)
+         heatmap(step, agg_method='mean', highlight_negatives=True)
+         step += 200
+    print('Done')
 
 
 
