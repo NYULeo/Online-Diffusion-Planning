@@ -75,9 +75,8 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
 
     # ================== Load Dataset & Env ==================
     import minari
-    dataset = get_dataset('pointmaze', 'medium')
-    #dataset = minari.load_dataset('pointmaze/medium-v2')  # or medium-v1 if needed
-    env = dataset.recover_environment().unwrapped
+    dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
+    env = dataset.recover_environment().unwrapped  # Unwrap to access maze attribute
 
     # ================== Extract Positions & Goals from ALL Trajs ==================
     trajs = dataset.episode_data  # Minari structure; adjust if needed
