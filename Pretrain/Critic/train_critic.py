@@ -141,8 +141,8 @@ class CriticDataset(Dataset):
                 transitions.append((obs_t, r_t, obs_next_t))
             """
             
-            for t in range(len(obs)):
-                obs_t = self.stats.norm_obs(obs[t])
+            for t in range(len(obs)-1):
+                obs_t = self.stats.norm_obs(obs[t+1])
                 r_t   = rews[t]
                 #obs_next_t = self.stats.norm_obs(obs[t+1])
                 transitions.append((obs_t, r_t))
