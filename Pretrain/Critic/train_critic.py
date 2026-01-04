@@ -182,13 +182,11 @@ class CriticDataset(Dataset):
     def reward_processor(self, rews, horizon, gamma):
         new_rews = []
         for t in range(len(rews)):
-            """
             R = 0.0
             for i in range(t, min(t + horizon, len(rews))):
                 R += (gamma**(i-t))*rews[i]
             new_rews.append(R)
-            """
-            new_rews.append(np.sum(rews[t:]))
+            #new_rews.append(np.sum(rews[t:]))
         return new_rews
 
 
@@ -218,9 +216,9 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
 
            # Compute target V-values
            with torch.no_grad():
-              #q_next = target_critic(s_next)
-              #target = r + ( (gamma**horizon) * q_next)
-              target = r 
+              q_next = target_critic(s_next)
+              target = r + ( (gamma**horizon) * q_next)
+              #target = r 
 
            # Predicted V-values
            q_pred = critic(s)
