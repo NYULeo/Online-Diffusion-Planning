@@ -769,12 +769,7 @@ if __name__ == '__main__':
     while(step <= 1000):
          np.random.seed(0)
          random.seed(0)
-         plot_critic_heatmap(
-             dataset_name='pointmaze',
-             specific_dataset='medium',
-             step=1000,
-             goal=np.array([[-2.5, -2.5]], dtype=float)  # Optional: specific goal
-         )
+         plot_critic_heatmap(step, agg_method='mean', highlight_negatives=True)
          step += 200
     print('Done')
 
