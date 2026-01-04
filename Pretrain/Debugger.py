@@ -263,14 +263,6 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
 
 
 
-
-
-
-
-
-
-
-
     # Debug print (enhanced)
     neg_count = (reward_map < 0).sum()
     neg_pct = 100 * neg_count / reward_map.size
@@ -294,9 +286,6 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
     print(f"Final gradnorm_map stats: min={gradnorm_map[gn_finite].min():.6f}, "
       f"max={gradnorm_map[gn_finite].max():.6f}, mean={gn_mean:.6f}, "
       f"var={gn_var:.6f}, std={gn_std:.6f}, N={gn_finite.sum()}")
-
-
-
 
 
 

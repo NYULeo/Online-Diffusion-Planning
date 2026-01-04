@@ -132,12 +132,20 @@ class CriticDataset(Dataset):
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
             rews = gaussian_filter1d(rews, sigma)
+            """
             rews = self.reward_processor(rews, horizon, gamma)
             for t in range(len(obs)-horizon):
                 obs_t = self.stats.norm_obs(obs[t])
                 r_t   = rews[t]
                 obs_next_t = self.stats.norm_obs(obs[t+horizon])
                 transitions.append((obs_t, r_t, obs_next_t))
+            """
+            
+            for t in range(len(obs)):
+                obs_t = self.stats.norm_obs(obs[t])
+                r_t   = rews[t]
+                #obs_next_t = self.stats.norm_obs(obs[t+1])
+                transitions.append((obs_t, r_t))
 
         self.transitions = transitions
         self.save_stats(dataset_name, specific_dataset)
@@ -203,8 +211,9 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
 
            # Compute target V-values
            with torch.no_grad():
-              q_next = target_critic(s_next)
-              target = r + ( (gamma**horizon) * q_next)
+              #q_next = target_critic(s_next)
+              #target = r + ( (gamma**horizon) * q_next)
+              target = r 
 
            # Predicted V-values
            q_pred = critic(s)
