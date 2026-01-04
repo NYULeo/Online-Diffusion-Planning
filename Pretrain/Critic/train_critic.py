@@ -211,10 +211,11 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
    
     print(f"Training critic for {dataset_name}-{specific_dataset}")
     for k in range(1, num_steps + 1):  # number of passes over dataset
-           s, r, s_next = next(dataloader)
+           #s, r, s_next = next(dataloader)
+           s, r = next(dataloader)
            s = s.to(device)
            r = r.to(device)
-           s_next = s_next.to(device)
+           #s_next = s_next.to(device)
 
            # Compute target V-values
            with torch.no_grad():
