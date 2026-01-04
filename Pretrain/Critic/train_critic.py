@@ -133,12 +133,22 @@ class CriticDataset(Dataset):
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
             rews = gaussian_filter1d(rews, sigma)
-            rews = self.reward_processor(rews, horizon, gamma)
-            for t in range(len(obs)-horizon):
-                obs_t = self.stats.norm_obs(obs[t])
+            if(len(obs) > horizon):
+               rews = self.reward_processor(rews, horizon, gamma)
+               for t in range(len(obs)-horizon):
+                 obs_t = self.stats.norm_obs(obs[t])
+                 r_t   = rews[t]
+                 obs_next_t = self.stats.norm_obs(obs[min(t+horizon, len(obs)-1)])
+                 transitions.append((obs_t, r_t, obs_next_t))
+            
+            """
+            for t in range(len(obs)-1):
+                obs_t = self.stats.norm_obs(obs[t+1])
                 r_t   = rews[t]
-                obs_next_t = self.stats.norm_obs(obs[t+horizon])
-                transitions.append((obs_t, r_t, obs_next_t))
+                transitions.append((obs_t, r_t))
+                Total += 1
+            """
+                
         self.transitions = transitions
         self.save_stats(dataset_name, specific_dataset)
     
@@ -153,7 +163,7 @@ class CriticDataset(Dataset):
         print(f"saved stats to {savepath}")
 
     def __len__(self):
-        return len(self.transitions)
+        return len(self.transitions)#
 
     def __getitem__(self, idx):
         s, r, s_next = self.transitions[idx]
@@ -198,6 +208,7 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
     for k in range(1, num_steps + 1):  # number of passes over dataset
            #s, r, s_next = next(dataloader)
            s, r, s_next = next(dataloader)
+           #s, r = next(dataloader)
            s = s.to(device)
            r = r.to(device)
            s_next = s_next.to(device)
@@ -245,3 +256,8 @@ if __name__ == '__main__':  # pragma: no cover
                  tau = 0.005,
                  goal = np.array([[-2.5, -2.5]], dtype = float),
                  target_reward = 1.0)
+
+
+
+
+
