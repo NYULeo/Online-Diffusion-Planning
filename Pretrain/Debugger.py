@@ -926,7 +926,7 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
             # differentiable normalization (DON’T use stats.norm_obs here)
             obs_norm = (batch_obs - obs_mean_t) / obs_std_t
 
-            r = Critic(obs_norm)  # [B]
+            r = critic(obs_norm)  # [B]
             reward_map_goal[start:end] = r.detach().cpu().numpy()
 
             grads = torch.autograd.grad(r.sum(), batch_obs, create_graph=False)[0]  # [B,4]
