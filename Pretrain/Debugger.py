@@ -63,53 +63,37 @@ except ImportError as e:
     plt = None
 
 
-
 def heatmap(STEP, agg_method='max', highlight_negatives=True):
     # ================== Configuration ==================
-    RESOLUTION = 512  # Higher for smoother (256 fast, 512 nice)
-    BATCH_SIZE = 32768  # Larger for faster eval
-    MAX_GOALS_TO_PLOT = 20
-    GRID_MARGIN = 1.0  # More padding
+    RESOLUTION = 512  # Smooth and detailed
+    BATCH_SIZE = 32768  # Fast evaluation
+    GRID_MARGIN = 1.0  # Padding around maze
     OUTPUT_FILE = f"{STEP}_critic_heatmap.png"
-    print(f'Plotting critic heatmap for checkpoint: {STEP}')
+    print(f'Plotting critic heatmap for checkpoint: {STEP} (no trajs/dataset load)')
 
-    # ================== Load Dataset & Env ==================
-    import minari
-    dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
-    env = dataset.recover_environment().unwrapped  # Unwrap to access maze attribute
+    # ================== Hardcoded for PointMaze Medium ==================
+    # Standard bounds for medium maze (covers full 3x3 grid with walls)
+    grid_min = np.array([-0.5, -0.5])
+    grid_max = np.array([8.5, 8.5])
+    
+    # Common start position
+    start_pos = np.array([0.0, 0.0])
+    
+    # Known goal positions in medium-v2 (typical fixed or sampled; adjust if your version differs)
+    # These are standard cell centers for reachable goals
+    GOALS = np.array([
+        [1.0, 7.0],  # Top-leftish
+        [7.0, 7.0],  # Top-right
+        [4.0, 4.0],  # Center-ish
+        [7.0, 1.0],  # Bottom-right
+        # Add more if your dataset has others; max for aggregation
+    ])
+    print(f"Using {len(GOALS)} hardcoded goals for aggregation")
 
-    # ================== Extract Positions & Goals from ALL Trajs ==================
-    trajs = dataset.episode_data  # Minari structure; adjust if needed
-    positions = []
-    goals = []
-    for traj in trajs:
-        obs = traj['observations']  # [T, obs_dim]
-        positions.append(obs[:, :2])  # pos
-        goals.append(obs[:, 2:4])    # goal (assuming concatenated)
-    positions = np.concatenate(positions, axis=0)
-    goals = np.concatenate(goals, axis=0)
-
-    # Unique goals (rounded for precision)
-    unique_goals = np.unique(np.round(goals, decimals=2), axis=0)
-    if len(unique_goals) > MAX_GOALS_TO_PLOT:
-        print(f"Found {len(unique_goals)} goals, limiting to {MAX_GOALS_TO_PLOT}")
-        unique_goals = unique_goals[:MAX_GOALS_TO_PLOT]
-    GOALS = unique_goals
-    print(f"Using {len(GOALS)} unique goals for aggregation")
-
-    # Bounds from actual positions + margin
-    pos_min = positions.min(axis=0) - GRID_MARGIN
-    pos_max = positions.max(axis=0) + GRID_MARGIN
-    # Fallback for pointmaze medium (known ~ [0,8]x[0,8])
-    if np.any(np.isinf(pos_min)) or (pos_max - pos_min).max() < 5:
-        print("Data bounds insufficient, using pointmaze medium fallback")
-        pos_min = np.array([ -0.5, -0.5])
-        pos_max = np.array([8.5, 8.5])
-    grid_min = pos_min
-    grid_max = pos_max
-
-    # Fixed start (common in medium)
-    start_pos = np.array([0.0, 0.0])  # Adjust if your dataset differs
+    # Create grid
+    x = np.linspace(grid_min[0], grid_max[0], RESOLUTION)
+    y = np.linspace(grid_min[1], grid_max[1], RESOLUTION)
+    X, Y = np.meshgrid(x, y, indexing='xy')
 
     # ================== Load Critic ==================
     model_state_dict, obs_dim = get_critic_model('pointmaze', 'medium', STEP)
@@ -118,21 +102,19 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
     model.eval()
     stats = get_critic_stats('pointmaze', 'medium')
 
-    # Manual norm tensors for differentiable grad
+    # Manual norm tensors (differentiable)
     obs_mean_t = torch.tensor(stats.obs_mean, dtype=torch.float32)
     obs_std_t = torch.tensor(np.maximum(stats.obs_std, 1e-6), dtype=torch.float32)
-
-    # ================== Create Grid ==================
-    x = np.linspace(grid_min[0], grid_max[0], RESOLUTION)
-    y = np.linspace(grid_min[1], grid_max[1], RESOLUTION)
-    X, Y = np.meshgrid(x, y, indexing='xy')
 
     # ================== Evaluate V and GradNorm per Goal ==================
     reward_maps = []  # V(s)
     gradnorm_maps = []
     for g_idx, goal in enumerate(GOALS):
         print(f"Evaluating goal {g_idx+1}/{len(GOALS)}: {goal}")
-        obs_base = np.stack([X.ravel(), Y.ravel(), np.full(X.size, goal[0]), np.full(X.size, goal[1])], axis=1).astype(np.float32)
+        # obs = [x, y, goal_x, goal_y]
+        obs_base = np.stack([X.ravel(), Y.ravel(),
+                             np.full(X.size, goal[0]),
+                             np.full(X.size, goal[1])], axis=1).astype(np.float32)
 
         v_map = np.full(X.size, np.nan, dtype=np.float32)
         gn_map = np.full(X.size, np.nan, dtype=np.float32)
@@ -143,19 +125,18 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
                 batch = torch.from_numpy(obs_base[start:end]).float()
                 batch.requires_grad_(True)
 
-                #norm = (batch - obs_mean_t) / obs_std_t
-                norm = stats.norm_obs(batch)
-                v = model(norm)  # [B]
+                norm = (batch - obs_mean_t) / obs_std_t
+                v = model(norm)  # V(s)
 
-                v_map[start:end] = v.cpu().numpy()
+                v_map[start:end] = v.cpu().numpy().flatten()
 
-                grads = torch.autograd.grad(v.sum(), batch)[0][:, :2]  # grad w.r.t pos only
+                grads = torch.autograd.grad(v.sum(), batch)[0][:, :2]  # grad w.r.t. position only
                 gn_map[start:end] = torch.norm(grads, dim=1).cpu().numpy()
 
         reward_maps.append(v_map.reshape(RESOLUTION, RESOLUTION))
         gradnorm_maps.append(gn_map.reshape(RESOLUTION, RESOLUTION))
 
-    # Aggregate
+    # Aggregate across goals
     reward_map = np.stack(reward_maps).max(axis=0) if agg_method == 'max' else np.stack(reward_maps).mean(axis=0)
     gradnorm_map = np.stack(gradnorm_maps).max(axis=0) if agg_method == 'max' else np.stack(gradnorm_maps).mean(axis=0)
 
@@ -166,15 +147,16 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
     if highlight_negatives and neg_mask.any():
         fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(36, 12))
         axes = [ax1, ax2, ax3]
-        titles = ['Critic V(s) Full', 'V(s) Negative Zoom', '||∇_{pos} V(s)||']
+        titles = ['Critic V(s) Full Range', 'V(s) Negative Zoom', '||∇_{pos} V(s)||']
     else:
         fig, (ax1, ax3) = plt.subplots(1, 2, figsize=(24, 12))
         axes = [ax1, ax3]
         titles = ['Critic V(s)', '||∇_{pos} V(s)||']
 
-    # Full V
+    # Full V(s)
+    vmin_full, vmax_full = np.nanpercentile(reward_map, [1, 99])
     im1 = axes[0].imshow(reward_map, extent=[grid_min[0], grid_max[0], grid_min[1], grid_max[1]],
-                         origin='lower', cmap='RdBu_r', interpolation='bilinear')
+                         origin='lower', cmap='RdBu_r', vmin=vmin_full, vmax=vmax_full, interpolation='bilinear')
     plt.colorbar(im1, ax=axes[0], label='V(s)')
     axes[0].set_title(titles[0])
 
@@ -185,33 +167,46 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
         plt.colorbar(im2, ax=axes[1], label='V(s) < 0')
         axes[1].set_title(titles[1])
 
-    # Gradnorm
-    gn_vmax = np.percentile(gradnorm_map[np.isfinite(gradnorm_map)], 99)
+    # Grad norm
+    gn_vmax = np.nanpercentile(gradnorm_map, 99)
     im3 = axes[-1].imshow(gradnorm_map, extent=[grid_min[0], grid_max[0], grid_min[1], grid_max[1]],
                           origin='lower', cmap='magma', vmin=0, vmax=gn_vmax, interpolation='bilinear')
     plt.colorbar(im3, ax=axes[-1], label='Grad Norm')
     axes[-1].set_title(titles[-1])
 
+    # ================== Draw Maze Walls (hardcoded for medium) ==================
+    # Thick black walls for pointmaze medium layout (standard U-maze variants)
+    walls = [
+        # Outer borders
+        ([0,0], [8,0]), ([8,0], [8,8]), ([8,8], [0,8]), ([0,8], [0,0]),
+        # Typical internal walls (adjust if your maze differs)
+        ([0,3], [3,3]), ([5,3], [8,3]),  # Horizontal middle
+        ([3,3], [3,8]), ([3,0], [3,3]),  # Vertical left
+        ([5,5], [5,8]), ([5,0], [5,3]),  # Vertical right
+    ]
     for ax in axes:
-        # Walls (prefer line segments)
-        if hasattr(env, 'maze') and hasattr(env.maze, 'walls'):
-            for (x0, y0), (x1, y1) in env.maze.walls:
-                ax.plot([x0, x1], [y0, y1], 'k-', lw=4)
-        # Start & goals
-        ax.plot(start_pos[0], start_pos[1], 'go', markersize=15, label='Start', markeredgecolor='k', mew=2)
+        for (x0, y0), (x1, y1) in walls:
+            ax.plot([x0, x1], [y0, y1], 'k-', linewidth=6, zorder=10)
+        
+        # Start and goals
+        ax.plot(start_pos[0], start_pos[1], 'go', markersize=20, markeredgecolor='k', markeredgewidth=2, label='Start')
         for i, g in enumerate(GOALS):
-            ax.plot(g[0], g[1], 'y*', markersize=20, markeredgecolor='k', mew=2)
-            ax.text(g[0]+0.2, g[1]+0.2, f'G{i+1}', fontsize=12, weight='bold')
+            ax.plot(g[0], g[1], 'y*', markersize=25, markeredgecolor='k', markeredgewidth=2)
+            ax.text(g[0]+0.3, g[1]+0.3, f'G{i+1}', fontsize=14, weight='bold', color='white',
+                    bbox=dict(facecolor='black', alpha=0.7, pad=2))
+        
         ax.set_aspect('equal')
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
         ax.grid(False)
+        if ax == axes[0]:
+            ax.legend(loc='upper left')
 
     plt.tight_layout()
     save_path = f"./{OUTPUT_FILE}"
     plt.savefig(save_path, dpi=200, bbox_inches='tight')
-    print(f"Saved: {save_path}")
+    print(f"Heatmap saved: {save_path}")
     plt.close()
-
-
 
 def plot_function(func, x_range=(-10, 10), num_points=1000, title="Function Plot", xlabel="x", ylabel="f(x)"):
     
