@@ -1,6 +1,8 @@
 import random
 import sys
 import os
+
+from Finetuning.utils import TrajectoryDict, get_trajs
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(project_root)
@@ -15,8 +17,10 @@ from Critic.nets import Critic
 import pickle
 from scipy.ndimage import gaussian_filter1d
 import os
-from typing import Optional
+from typing import Optional, List
 from utils import cycle
+
+
 
 
 def get_CriticName(env_name, specific_env):
@@ -107,10 +111,11 @@ class Critic_Processor():
           return obs, act
 """
 class CriticDataset(Dataset):
-    def __init__(self, sigma: float, dataset_name: str, specific_dataset: str, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
+    def __init__(self, sigma: float, dataset_name: str, specific_dataset: str, trajs: Optional[List[TrajectoryDict]] = None, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
         # ----- gather raw obs/actions to fit stats -----
-        data = get_dataset(dataset_name, specific_dataset)
-        trajs = data.get_trajectories()
+        if(trajs is None):
+            data = get_dataset(dataset_name, specific_dataset)
+            trajs = data.get_trajectories()
         obs_all = []
         for traj in trajs:
             obs_all.append(traj['observations'])
@@ -192,12 +197,12 @@ class CriticDataset(Dataset):
         return new_rews
 
 
-def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, goal = None, target_reward = 1.0):
+def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, goal = None, target_reward = 1.0, trajs: Optional[List[TrajectoryDict]] = None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #print(f"Using device {device}")
 
     #get information
-    dataset = CriticDataset(sigma, dataset_name, specific_dataset, goal, target_reward, horizon, gamma)
+    dataset = CriticDataset(sigma, dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
    
     #prepare training
@@ -253,8 +258,11 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
 
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
-    train_critic(dataset_name = 'pointmaze', 
-                 specific_dataset = 'medium', 
+    env_name = 'pointmaze'
+    specific_env = 'medium'
+    trajs = get_trajs(env_name, specific_env, 0)
+    train_critic(dataset_name = env_name, 
+                 specific_dataset = specific_env, 
                  sigma = 7.0, 
                  batch_size = 256, 
                  num_steps = 1000, 
@@ -262,7 +270,7 @@ if __name__ == '__main__':  # pragma: no cover
                  horizon = 32, 
                  lr = 1e-4, 
                  tau = 0.005,
-                 goal = np.array([[-0.5, 0.5]], dtype = float),
+                 goal = np.array([[-2.5, 2.5]], dtype = float),
                  target_reward = 1.0)
 
 

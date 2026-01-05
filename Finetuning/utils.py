@@ -142,6 +142,19 @@ def get_critic_stats(dataset_name, specific_dataset, step):
         stats = pickle.load(f)
     return stats 
 
+def save_trajs(trajs, env_name, specific_env, step):
+    os.makedirs(f'./Finetuning/Rollouts/{env_name}/{specific_env}/', exist_ok=True)
+    save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info_{str(step)}.pkl'
+    with open(save_path, 'wb') as f:
+         pickle.dump(trajs, f)
+    print(f"trajectories saved")
+
+def get_trajs(env_name, specific_env, step):
+    path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info_{str(step)}.pkl'
+    with open(path, 'rb') as f:
+        trajs = pickle.load(f)
+    return trajs
+
 class Lambda:
     def __init__(self, lam: float, beta: float, eta_lam: float):
         self.lam = lam
@@ -847,10 +860,13 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
               'actions': np.asarray(acts[env_idx].copy()),
               'rewards': np.asarray(rewards[env_idx].copy())
           })
+        
      
      vec_env.close()
      score = get_normalized_score(trajs)
+     save_trajs(trajs, env_name, specific_env, checkpoint_step)
      #print(f"Average Normalized Score: {score:.2f}")
      return trajs, score
+
 
 

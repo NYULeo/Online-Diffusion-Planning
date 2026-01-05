@@ -19,7 +19,7 @@ import gymnasium as gym
 import gymnasium_robotics
 from Pretrain.Dataset import get_dataset
 from typing import Optional
-from utils import get_normalized_score
+from utils import get_normalized_score, rollout_parallel
 
 
 def set_seed(seed=0):
@@ -113,147 +113,9 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      """
      
      print(get_normalized_score([traj]))
-     
-def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, critic = False, checkpoint_steps = 1000000, num_envs=8, goal_cell: Optional[np.ndarray] = None):
-     
-     #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
-     #print(f"Running {num_envs} environments in parallel")
-     device = "cuda" if torch.cuda.is_available() else "cpu"
-     #print(f"Using device {device}")
-     
-     # Create environment factory function
-     _, d_s, d_a = get_env(env_name, specific_env)
-     def make_env():
-         env, _, _ = get_env(env_name, specific_env)
-         return env
-     
-     # Create vectorized environment
-     vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
 
-     # Get Planner
-     state_dict = get_planner(env_name, specific_env, checkpoint_steps)
-     if env_name == 'kitchen':
-         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
-     elif env_name == 'pointmaze':
-         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
-     else:
-         raise ValueError(f"Invalid Environment: {env_name}")
-     model.load_state_dict(state_dict)
-     model.eval()
-     
-     # Get Processor
-     planner_processor = Planner_Processor(env_name, specific_env)
-     if(goal_cell is not None):
-         """
-         maze = env.unwrapped.maze  # Access the internal Maze object
-         maze_map = maze.maze_map
-         rows, cols = len(maze_map), len(maze_map[0])
-         free_cells = []
-         for row in range(rows):
-             for col in range(cols):
-                 if maze_map[row][col] != 1:  # 1 = wall; others are free/open
-                       free_cells.append(np.array([row, col]))
-         free_cells = np.array(free_cells)
-         """
-         free_cells = np.array([[6,6], [1,1], [1,6], [3,2], [5,4], [3,4], [4,1], [4,6]])
-         start_cells = []
-         for i in range(len(free_cells)):
-             if(np.array_equal(free_cells[i], goal_cell)):
-                 continue
-             else:
-                 start_cells.append(free_cells[i].copy())
-         start_cells = np.array(start_cells)
-     else:
-         start_cells = [[0]]
-     normalized_scores = []
-     for start_cell in start_cells:
-       # Reset all environments
-       seeds = list(range(num_envs)) 
-       if(goal_cell is not None):
-            s0_vec = vec_env.reset(seed = seeds, options={"goal_cell": goal_cell, "reset_cell": start_cell})
-       else:
-            s0_vec = vec_env.reset(seed = seeds)
-       current_states = s0_vec[0]['observation']
-     
-       # Store trajectories for each environment
-       all_rewards = [0.0 for _ in range(num_envs)]
-       done_envs = [False for _ in range(num_envs)]
-       observations = [[] for _ in range(num_envs)]
-       acts = [[] for _ in range(num_envs)]
-       rewards = [[] for _ in range(num_envs)]
-       for env_idx in range(num_envs):
-          observations[env_idx].append(current_states[env_idx].copy())
-     
-       for i in range(episode_length):
-          actions = np.zeros((num_envs, d_a))
-         
-          # Generate actions for each environment
-          for env_idx in range(num_envs):
-             if done_envs[env_idx]:
-                 continue
-             current_state = current_states[env_idx]
-             current_state_norm = planner_processor.preprocess(current_state)
-             x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
-             action = x[0, d_s:(d_s+d_a)].copy()
-             actions[env_idx] = action
-         
-          # Step all environments at once
-          obs_vec, rewards_vec, terminated_vec, truncated_vec, info_vec = vec_env.step(actions)
-         
-          # Update trajectories
-          for env_idx in range(num_envs):
-             if done_envs[env_idx]:
-                 continue
-             
-             observations[env_idx].append(obs_vec['observation'][env_idx].copy())
-             acts[env_idx].append(actions[env_idx].copy())
-             rewards[env_idx].append(rewards_vec[env_idx])
-             all_rewards[env_idx] += rewards_vec[env_idx]
-             
-             current_states[env_idx] = obs_vec['observation'][env_idx].copy()
-             
-             if terminated_vec[env_idx] or truncated_vec[env_idx]:
-                 done_envs[env_idx] = True
-                 #print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
-         
-        
-          # Check if all environments are done
-          if all(done_envs):
-             #print("All environments completed!")
-             break
-         
-       #vec_env.close()
-     
-       # Find the trajectory with the maximum reward
-       trajs = [[] for _ in range(num_envs)]
-       for env_idx in range(num_envs):
-          trajs[env_idx] = {
-              'observations': np.asarray(observations[env_idx].copy()),
-              'actions': np.asarray(acts[env_idx].copy()),
-              'rewards': np.asarray(rewards[env_idx].copy())
-          }
-          #best_idx = np.argmax(all_rewards)
-          #best_reward = all_rewards[best_idx]
-          #best_trajectory = trajs[best_idx]
-       normalized_scores.append(get_normalized_score(trajs))
-       
-         # Save the best trajectory in the same format as single rollout
-       """
-        trajs_info = {
-         'trajs': trajs,
-         'env_name': env_name,
-         'specific_env': specific_env,
-         'all_rewards': all_rewards
-          }
-          save_trajs(trajs_info, env_name, specific_env)
-       """
-     vec_env.close()
-     print(f"Average Normalized Score: {np.mean(normalized_scores):.2f}")
-     
+
     
-     
-
-
 
 
 
@@ -263,12 +125,11 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_steps = 210, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([3, 2], dtype = int))
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_steps = 210, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([3, 2], dtype = int))
     #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 4000, checkpoint_steps = 0, render = True)
     #150, 8
     #50, 3
-    
-    #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 50, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1500, num_envs = 50)
+    rollout_parallel(env_name, specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_step = 0, num_envs = 4, goal_cell = np.array([[6,1]], dtype = int), seed_base = 0)
     """
     checkpoint = 0
     while(checkpoint < 450):
