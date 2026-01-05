@@ -263,8 +263,8 @@ if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     env_name = 'pointmaze'
     specific_env = 'medium'
-    #trajs = get_trajs(env_name, specific_env, 0)
-    trajs = None
+    trajs = get_trajs(env_name, specific_env, 0)
+    #trajs = None
     train_critic(dataset_name = env_name, 
                  specific_dataset = specific_env, 
                  sigma = 7.0, 
