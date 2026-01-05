@@ -56,6 +56,10 @@ def reward_filter(obs, rews, goal):
             rews[i-1] = 0
     return rews
 
+def obs_filter(obs):
+    obs = obs[:, 2]
+    return obs
+
 def save_critic(model, dataset_name, specific_dataset, step):
     model.eval()
     name = get_CriticName(dataset_name, specific_dataset)
@@ -118,6 +122,10 @@ class CriticDataset(Dataset):
         else:
             trajs = trajs
         obs_all = []
+        #change the observation setting
+        for traj in trajs:
+            traj['observations'][:, 2:] = 0.0
+
         for traj in trajs:
             obs_all.append(traj['observations'])
         obs_all = np.concatenate(obs_all, axis = 0)
@@ -131,7 +139,7 @@ class CriticDataset(Dataset):
 
         transitions = []
         for traj in trajs:
-            obs = traj['observations']    
+            obs = traj['observations']
             #acts = traj['actions']  
             rews = traj['rewards']
             if( goal is not None):
@@ -210,8 +218,8 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
     #prepare training
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True))
-    critic = Critic(obs_dim).to(device)
-    target_critic = Critic(obs_dim).to(device)
+    critic = Critic(obs_dim-2).to(device)
+    target_critic = Critic(obs_dim-2).to(device)
     target_critic.load_state_dict(critic.state_dict())
     optimizer = optim.Adam(critic.parameters(), lr = lr)
    

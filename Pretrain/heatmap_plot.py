@@ -26,17 +26,9 @@ from Pretrain.Critic.train_critic import get_critic_model, get_critic_stats
 from Pretrain.Critic.nets import Critic
 import random
 
-
+"""
 def plot_critic_heatmap(STEP, agg_method='max', highlight_negatives=True):
-    """
-    Plot a heatmap of critic values for the pointmaze environment.
-    Similar structure to the reward heatmap function.
     
-    Args:
-        STEP: Checkpoint step to load
-        agg_method: 'max', 'min', or 'mean' for aggregating across goals
-        highlight_negatives: Whether to show a negative zoom panel
-    """
     from Pretrain.Critic.train_critic import get_critic_model, get_critic_stats
     from Pretrain.Critic.nets import Critic
     
@@ -381,9 +373,9 @@ def plot_critic_heatmap(STEP, agg_method='max', highlight_negatives=True):
         npy_path = os.path.join(project_root, OUTPUT_FILE.replace('.png', '.npy'))
         np.save(npy_path, value_map)
         print(f"Value map saved as numpy array to {npy_path}")
+"""
 
-
-def heatmap(STEP, agg_method='max', highlight_negatives=True):
+def plot_critic_heatmap(STEP, agg_method='max', highlight_negatives=True):
     # ================== Configuration ==================
     RESOLUTION = 256                # Grid resolution (256x256 is fast and looks good)
     BATCH_SIZE = 16384              # Batch size for efficient processing
@@ -502,15 +494,22 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
         print(f"Processing goal {goal_idx+1}/{len(GOALS)}: [{goal[0]:.2f}, {goal[1]:.2f}]")
     
         # Create observations: [x, y, goal_x, goal_y]
+        """
         obs_base = np.stack([
             X.ravel(),
             Y.ravel(),
             np.full(RESOLUTION**2, goal[0]),
             np.full(RESOLUTION**2, goal[1])
         ], axis=1).astype(np.float32)
-    
+        """
+
+        obs_base = np.stack([
+                X.ravel(),
+                Y.ravel(),
+                np.zeros(RESOLUTION**2, dtype=np.float32),  # vx = 0
+                np.zeros(RESOLUTION**2, dtype=np.float32)], axis=1).astype(np.float32)
+        
         reward_map_goal = np.zeros(RESOLUTION**2, dtype=np.float32)
-       
         #Replace 
         """
         with torch.no_grad():
@@ -839,7 +838,7 @@ if __name__ == '__main__':
          np.random.seed(0)
          random.seed(0)
          #plot_critic_heatmap(step, agg_method='mean', highlight_negatives=True)
-         heatmap(step, agg_method='mean', highlight_negatives = True)
+         plot_critic_heatmap(step, agg_method='mean', highlight_negatives = True)
          step += 200
     print('Done')
 
