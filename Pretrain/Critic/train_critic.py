@@ -122,10 +122,11 @@ class CriticDataset(Dataset):
         else:
             trajs = trajs
         obs_all = []
+        """
         #change the observation setting
         for traj in trajs:
             traj['observations'][:, 2:] = 0.0
-
+        """
         for traj in trajs:
             obs_all.append(traj['observations'])
         obs_all = np.concatenate(obs_all, axis = 0)
@@ -277,7 +278,7 @@ if __name__ == '__main__':  # pragma: no cover
                  specific_dataset = specific_env, 
                  sigma = 7.0, 
                  batch_size = 256, 
-                 num_steps = 5000, 
+                 num_steps = 1000, 
                  gamma = 1.0, 
                  horizon = 32, 
                  lr = 1e-4, 
