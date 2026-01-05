@@ -204,7 +204,7 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
 
     #get information
     if(trajs is None):
-         dataset = CriticDataset(sigma, dataset_name, specific_dataset, goal, target_reward, horizon, gamma)
+         dataset = CriticDataset(sigma, dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma)
     else:
          dataset = CriticDataset(sigma, dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
@@ -263,7 +263,8 @@ if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     env_name = 'pointmaze'
     specific_env = 'medium'
-    trajs = get_trajs(env_name, specific_env, 0)
+    #trajs = get_trajs(env_name, specific_env, 0)
+    trajs = None
     train_critic(dataset_name = env_name, 
                  specific_dataset = specific_env, 
                  sigma = 7.0, 
@@ -273,7 +274,7 @@ if __name__ == '__main__':  # pragma: no cover
                  horizon = 32, 
                  lr = 1e-4, 
                  tau = 0.005,
-                 goal = np.array([[-2.5, -2.5]], dtype = float),
+                 goal = np.array([[-1.5, -2.5]], dtype = float),
                  target_reward = 1.0,
                  trajs = trajs)
 
