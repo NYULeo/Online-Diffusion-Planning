@@ -274,7 +274,7 @@ if __name__ == '__main__':  # pragma: no cover
                  horizon = 32, 
                  lr = 1e-4, 
                  tau = 0.005,
-                 goal = np.array([[-1.5, -2.5]], dtype = float),
+                 goal = np.array([[-0.5, -2.5]], dtype = float),
                  target_reward = 1.0,
                  trajs = trajs)
 
