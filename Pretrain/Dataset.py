@@ -8,6 +8,7 @@ from sympy.core import I
 import warnings
 import gymnasium as gym
 import gymnasium_robotics
+import ogbench
 warnings.filterwarnings("ignore", category=UserWarning)
 from collections import namedtuple
 import torch
@@ -693,3 +694,4 @@ def visualize_clusters(vectors, assignments, cluster_centers, title_prefix=""):
 # Usage:
 #visualize_clusters(vectors, assignments, stats['cluster_centers'], "Kitchen Rewards: ")
 """
+

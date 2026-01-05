@@ -125,7 +125,7 @@ class CriticDataset(Dataset):
 
         if(dataset_name == 'pointmaze'):
            for traj in trajs:
-                traj['observations'][:] = traj['observations'][:,:2]
+                traj['observations'] = traj['observations'][:,:2]
         
         for traj in trajs:
             obs_all.append(traj['observations'])
