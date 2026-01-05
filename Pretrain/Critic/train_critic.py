@@ -17,6 +17,8 @@ from scipy.ndimage import gaussian_filter1d
 import os
 from typing import Optional
 from utils import cycle
+
+
 def get_CriticName(env_name, specific_env):
      if(env_name == 'kitchen'):
           if(specific_env == 'complete'):
@@ -260,7 +262,7 @@ if __name__ == '__main__':  # pragma: no cover
                  horizon = 32, 
                  lr = 1e-4, 
                  tau = 0.005,
-                 goal = np.array([[-2.5, -2.5]], dtype = float),
+                 goal = np.array([-[0.5, 0.5]], dtype = float),
                  target_reward = 1.0)
 
 
