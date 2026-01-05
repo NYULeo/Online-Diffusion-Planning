@@ -115,6 +115,8 @@ class CriticDataset(Dataset):
         if(trajs is None):
             data = get_dataset(dataset_name, specific_dataset)
             trajs = data.get_trajectories()
+        else:
+            trajs = trajs
         obs_all = []
         for traj in trajs:
             obs_all.append(traj['observations'])
@@ -201,9 +203,11 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
     #print(f"Using device {device}")
 
     #get information
-    dataset = CriticDataset(sigma, dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma)
+    if(trajs is None):
+         dataset = CriticDataset(sigma, dataset_name, specific_dataset, goal, target_reward, horizon, gamma)
+    else:
+         dataset = CriticDataset(sigma, dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
-   
     #prepare training
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True))
     critic = Critic(obs_dim).to(device)
@@ -270,7 +274,8 @@ if __name__ == '__main__':  # pragma: no cover
                  lr = 1e-4, 
                  tau = 0.005,
                  goal = np.array([[-2.5, -2.5]], dtype = float),
-                 target_reward = 1.0)
+                 target_reward = 1.0,
+                 trajs = trajs)
 
 
 
