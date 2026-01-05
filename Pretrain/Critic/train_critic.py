@@ -269,12 +269,12 @@ if __name__ == '__main__':  # pragma: no cover
                  specific_dataset = specific_env, 
                  sigma = 7.0, 
                  batch_size = 256, 
-                 num_steps = 1000, 
+                 num_steps = 5000, 
                  gamma = 1.0, 
                  horizon = 32, 
                  lr = 1e-4, 
                  tau = 0.005,
-                 goal = np.array([[-0.5, -2.5]], dtype = float),
+                 goal = np.array([[-2.5, -2.5]], dtype = float),
                  target_reward = 1.0,
                  trajs = trajs)
 
