@@ -1,11 +1,10 @@
 import random
 import sys
 import os
-
-from Finetuning.utils import TrajectoryDict, get_trajs
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(project_root)
+from Finetuning.utils import TrajectoryDict, get_trajs
 from torch.utils.data import Dataset, DataLoader
 import torch
 import torch.optim as optim
