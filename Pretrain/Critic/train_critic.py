@@ -122,11 +122,11 @@ class CriticDataset(Dataset):
         else:
             trajs = trajs
         obs_all = []
-        """
-        #change the observation setting
-        for traj in trajs:
-            traj['observations'][:, 2:] = 0.0
-        """
+        
+        if(dataset_name == 'pointmaze'):
+           for traj in trajs:
+                traj['observations'][:] = traj['observations'][:,:2]
+        
         for traj in trajs:
             obs_all.append(traj['observations'])
         obs_all = np.concatenate(obs_all, axis = 0)
@@ -157,14 +157,7 @@ class CriticDataset(Dataset):
                  r_t   = rews[t]
                  obs_next_t = self.stats.norm_obs(obs[min(t+horizon, len(obs)-1)])
                  transitions.append((obs_t, r_t, obs_next_t))
-            
-            """
-            for t in range(len(obs)-1):
-                obs_t = self.stats.norm_obs(obs[t+1])
-                r_t   = rews[t]
-                transitions.append((obs_t, r_t))
-                Total += 1
-            """
+           
                 
         self.transitions = transitions
         self.save_stats(dataset_name, specific_dataset)
@@ -218,6 +211,8 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
          dataset = CriticDataset(sigma, dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
     #prepare training
+    if(dataset_name == 'pointmaze'):
+        obs_dim = obs_dim - 2
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True))
     critic = Critic(obs_dim).to(device)
     target_critic = Critic(obs_dim).to(device)
