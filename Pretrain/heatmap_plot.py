@@ -853,22 +853,17 @@ def plot_critic_heatmap(STEP, agg_method='max', highlight_negatives=True):
     
     # Extract only position statistics (first 2 dimensions) and mean velocities
     # For 2D-only visualization, we use mean velocities from training
-    if obs_dim >= 4:
-        # Extract position mean/std (indices 0, 1)
-        pos_mean = stats.obs_mean[:2]
-        pos_std = stats.obs_std[:2]
-        # Extract mean velocities (indices 2, 3)
-        mean_vx = stats.obs_mean[2]
-        mean_vy = stats.obs_mean[3]
+    if len(stats.obs_mean) == 2:
+        # Stats are already 2D (from training with [:,:2] slice)
+        pos_mean = stats.obs_mean
+        pos_std = stats.obs_std
         print(f"Using 2D position stats: mean={pos_mean}, std={pos_std}")
-        print(f"Using mean velocities from training: vx={mean_vx:.4f}, vy={mean_vy:.4f}")
+        print(f"Note: Critic was trained on 2D observations only")
     else:
-        # Fallback if obs_dim < 4
+        # Fallback: extract first 2 dimensions if stats are somehow larger
         pos_mean = stats.obs_mean[:2] if len(stats.obs_mean) >= 2 else np.array([0.0, 0.0])
         pos_std = stats.obs_std[:2] if len(stats.obs_std) >= 2 else np.array([1.0, 1.0])
-        mean_vx = 0.0
-        mean_vy = 0.0
-        print(f"Warning: obs_dim={obs_dim} < 4, using zero velocities")
+        print(f"Warning: Stats have {len(stats.obs_mean)} dims, extracting first 2")
 
     # ================== Create Grid ==================
     x = np.linspace(grid_min[0], grid_max[0], RESOLUTION)
@@ -879,25 +874,18 @@ def plot_critic_heatmap(STEP, agg_method='max', highlight_negatives=True):
     reward_maps_per_goal = []
     gradnorm_maps_per_goal = []
 
-    # Prepare normalization tensors for full 4D observation
-    obs_mean_t = torch.as_tensor(stats.obs_mean, dtype=torch.float32)
-    obs_std_t = torch.as_tensor(np.maximum(stats.obs_std, getattr(stats, "std_floor", 1e-3)), dtype=torch.float32)
+    obs_mean_t = torch.as_tensor(pos_mean, dtype=torch.float32)
+    obs_std_t = torch.as_tensor(np.maximum(pos_std, getattr(stats, "std_floor", 1e-3)), dtype=torch.float32)
 
     for goal_idx, goal in enumerate(GOALS):
         print(f"Processing goal {goal_idx+1}/{len(GOALS)}: [{goal[0]:.2f}, {goal[1]:.2f}]")
     
         # Create 2D observations: [x, y] only
-        obs_2d = np.stack([
+        obs_base = np.stack([
             X.ravel(),
             Y.ravel()
         ], axis=1).astype(np.float32)
         
-        # Pad to 4D by adding mean velocities: [x, y, vx, vy]
-        obs_base = np.column_stack([
-            obs_2d,
-            np.full(RESOLUTION**2, mean_vx, dtype=np.float32),  # mean vx
-            np.full(RESOLUTION**2, mean_vy, dtype=np.float32)   # mean vy
-        ])
         
         reward_map_goal = np.zeros(RESOLUTION**2, dtype=np.float32)
         gradnorm_map_goal = np.full(RESOLUTION**2, np.nan, dtype=np.float32)
@@ -916,7 +904,7 @@ def plot_critic_heatmap(STEP, agg_method='max', highlight_negatives=True):
 
             # Compute gradient norm w.r.t. position (x, y) only (first 2 dims)
             grads = torch.autograd.grad(r.sum(), batch_obs, create_graph=False)[0]  # [B,4]
-            gradnorm = torch.norm(grads[:, :2], dim=1)  # only ∇ w.r.t (x,y)
+            gradnorm = torch.norm(grads, dim=1)
             gradnorm_map_goal[start:end] = gradnorm.detach().cpu().numpy()
         
         reward_maps_per_goal.append(reward_map_goal.reshape(RESOLUTION, RESOLUTION))
