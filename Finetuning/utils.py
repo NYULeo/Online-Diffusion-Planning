@@ -130,6 +130,8 @@ def save_critic(model, dataset_name, specific_dataset, step):
 
 def get_critic_model(dataset_name, specific_dataset, step):
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
+    if(dataset_name == 'pointmaze'):
+        obs_dim = obs_dim - 2
     name = getName(dataset_name, specific_dataset)
     path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl'
     model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
@@ -340,6 +342,9 @@ class RewardDataset(Dataset):
 class CriticDataset(Dataset):
     def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, step: int, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
         # ----- gather raw obs/actions to fit stats -----
+        if(dataset_name == 'pointmaze'):
+            for traj in trajs:
+                traj['observations'] = traj['observations'][:,:2]
         obs_all = []
         for traj in trajs:
             obs_all.append(traj['observations'])
@@ -493,17 +498,20 @@ def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
 
 def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, step: int, goal = None, target_reward = 1.0):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #print(f"Using device {device}")
 
     #get information
     dataset = CriticDataset(trajs, sigma, dataset_name, specific_dataset, step, goal, target_reward, horizon, gamma)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
+    if(dataset_name == 'pointmaze'):
+        obs_dim = obs_dim - 2
    
     #prepare training
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True))
     critic = Critic(obs_dim).to(device)
+    critic.train()
     target_critic = Critic(obs_dim).to(device)
     target_critic.load_state_dict(critic.state_dict())
+    target_critic.eval()
     optimizer = optim.Adam(critic.parameters(), lr = lr)
 
     print(f"Training critic for {dataset_name}-{specific_dataset}")
@@ -515,7 +523,7 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
 
            # Compute target Q-values
            with torch.no_grad():
-              q_next = target_critic(s_next)
+              q_next = critic(s_next)
               target = r + ( (gamma**horizon) * q_next)
 
            # Predicted V-values
@@ -530,8 +538,8 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
            for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):
                tgt_param.data.mul_(1 - tau)
                tgt_param.data.add_(tau * param.data)
-    critic.eval()
-    save_critic(critic, dataset_name, specific_dataset, step)
+    target_critic.eval()
+    save_critic(target_critic, dataset_name, specific_dataset, step)
     print(f"critic model saved")
 
 class PlannerDataset(Dataset):
@@ -552,7 +560,6 @@ class PlannerDataset(Dataset):
    
     def __getitem__(self, idx):
         return self.conditions[idx]
- 
 
 def cycle(dl):
     while True:
@@ -710,8 +717,6 @@ def clip_actions(x: torch.Tensor, d_s: int) -> torch.Tensor:
     x[..., d_s:] = actions
     return x
 
-
-
 def get_normalized_score(trajs):
     total = 0.0
     for i in range(len(trajs)):
@@ -725,7 +730,6 @@ def get_normalized_score(trajs):
     normalized_score = 100 * avg_discounted_return 
     #print(f"Normalized Score: {normalized_score:.2f}")
     return normalized_score
-
 
 def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs=8, goal_cell: Optional[np.ndarray] = None, device: torch.device = None, seed_base: int = 0):
      

@@ -8,11 +8,9 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 import torch
 import torch.nn as nn
-from Pretrain.Rewards.nets import Reward, ScalarReward, SimpleReward
+from Pretrain.Rewards.nets import SimpleReward
 from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel
-from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 from Finetuning.utils import get_reward_model, get_kernel, get_reward_stats, get_kernel_stats
-from Pretrain.Transition_Kernel.Kernel_Backbone import get_pretrained_kernel, get_pretrained_kernel_stats
 from typing import Optional
 from torch.nn import functional as F
 from dataclasses import dataclass

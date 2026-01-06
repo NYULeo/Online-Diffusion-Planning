@@ -10,9 +10,9 @@ import torch
 import torch.optim as optim
 import numpy as np
 import torch.nn as nn
-from Dataset import get_dataset, get_env
+from Pretrain.Dataset import get_dataset, get_env
 from utils import set_seed, SAStats
-from Critic.nets import Critic
+from Finetuning.Critics.nets import Critic
 import pickle
 from scipy.ndimage import gaussian_filter1d
 import os
@@ -230,7 +230,7 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
 
            # Compute target V-values
            with torch.no_grad():
-              q_next = critic(s_next)
+              q_next = target_critic(s_next)
               target = r + ( (gamma**horizon) * q_next)
               #target = r 
 
@@ -277,42 +277,3 @@ def test_critic(dataset_name: str, specific_dataset: str, checkpoint_step, sigma
            total_loss += ((pred - r)**2).mean().item()
     avg_loss = total_loss/len(dataloader)
     print(f"Average Loss: {avg_loss:.4f}")
-
-
-if __name__ == '__main__':  # pragma: no cover
-    set_seed(1)
-    env_name = 'pointmaze'
-    specific_env = 'medium'
-    trajs = get_trajs(env_name, specific_env, 0)
-    train_critic(dataset_name = env_name, 
-                 specific_dataset = specific_env, 
-                 sigma = 7.0, 
-                 batch_size = 256, 
-                 num_steps = 3000, 
-                 gamma = 1.0, 
-                 horizon = 32, 
-                 lr = 1e-5, 
-                 tau = 0.005,
-                 goal = np.array([[-2.5, -2.5]], dtype = float),
-                 target_reward = 1.0,
-                 trajs = trajs)
-    print('training complete')
-    
-    step = 200
-    while(step <= 3000):
-        test_critic(dataset_name = env_name, 
-                    specific_dataset = specific_env, 
-                    checkpoint_step = step, 
-                    sigma = 7.0, 
-                    gamma = 1.0, 
-                    horizon = 32, 
-                    goal = np.array([[-2.5, -2.5]], dtype = float), 
-                    target_reward = 1.0, 
-                    trajs = trajs)
-        step += 200
-    print('testing complete')
-
-
-
-
-
