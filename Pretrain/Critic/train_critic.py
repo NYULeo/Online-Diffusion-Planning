@@ -42,7 +42,7 @@ def get_CriticName(env_name, specific_env):
          else:
               raise ValueError(f"Invalid specific environment: {specific_env}")
      else:
-         raise ValueError(f"Invalid environment name: '{env_name}")
+         raise ValueError(f"Invalid environment name: {env_name}")
 
 def reward_filter(obs, rews, goal):
     #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
@@ -83,46 +83,11 @@ def get_critic_stats(dataset_name, specific_dataset):
     with open(path, 'rb') as f:
         stats = pickle.load(f)
     return stats 
-"""
-class Critic(nn.Module):
-    def __init__(self, obs_dim, act_dim, hidden = 256):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(obs_dim + act_dim, hidden),
-            nn.BatchNorm1d(hidden),
-            nn.ReLU(),
-            nn.Linear(hidden, hidden),
-            nn.BatchNorm1d(hidden),
-            nn.ReLU(),
-            nn.Linear(hidden, 1)
-        )
-    def forward(self, obs, act):
-        x = torch.cat([obs, act], dim=-1)
-        return self.net(x).squeeze(2-1)
-"""
-"""
-class Critic_Processor():
-     def __init__(self, dataset_name, speific_dataset):
-          critic_name = get_CriticName(dataset_name, speific_dataset)
-          stats_name = critic_name.replace('.pt', '_stats.pkl')
-          with open(stats_name, 'rb') as f:
-                self.stats = pickle.load(f)
-    
-     def preprocess(self, obs, act):
-          obs = self.stats.norm_obs(obs)
-          act = np.clip(act, -1.0, 1.0)
-          return obs, act
-"""
-class CriticDataset(Dataset):
-    def __init__(self, sigma: float, dataset_name: str, specific_dataset: str, trajs: Optional[List[TrajectoryDict]] = None, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
-        # ----- gather raw obs/actions to fit stats -----
-        if(trajs is None):
-            data = get_dataset(dataset_name, specific_dataset)
-            trajs = data.get_trajectories()
-        else:
-            trajs = trajs
-        obs_all = []
 
+class CriticDataset(Dataset):
+    def __init__(self, sigma: float, dataset_name: str, specific_dataset: str, trajs: List[TrajectoryDict], goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
+        
+        obs_all = []
         if(dataset_name == 'pointmaze'):
            for traj in trajs:
                 traj['observations'] = traj['observations'][:,:2]
@@ -130,7 +95,6 @@ class CriticDataset(Dataset):
         for traj in trajs:
             obs_all.append(traj['observations'])
         obs_all = np.concatenate(obs_all, axis = 0)
-        
         
         #get stats
         self.stats = SAStats()
@@ -141,7 +105,6 @@ class CriticDataset(Dataset):
         transitions = []
         for traj in trajs:
             obs = traj['observations']
-            #acts = traj['actions']  
             rews = traj['rewards']
             if( goal is not None):
                 rews = reward_filter(obs, rews, goal)
@@ -153,12 +116,11 @@ class CriticDataset(Dataset):
             if(len(obs) > horizon):
                rews = self.reward_processor(rews, horizon, gamma)
                for t in range(len(obs)-horizon):
-                 obs_t = self.stats.norm_obs(obs[t])
-                 r_t   = rews[t]
-                 obs_next_t = self.stats.norm_obs(obs[min(t+horizon, len(obs)-1)])
-                 transitions.append((obs_t, r_t, obs_next_t))
+                   obs_t = self.stats.norm_obs(obs[t])
+                   r_t   = rews[t]
+                   obs_next_t = self.stats.norm_obs(obs[min(t+horizon, len(obs)-1)])
+                   transitions.append((obs_t, r_t, obs_next_t))
            
-                
         self.transitions = transitions
         self.save_stats(dataset_name, specific_dataset)
     
@@ -199,31 +161,69 @@ class CriticDataset(Dataset):
             #new_rews.append(np.sum(rews[t:]))
         return new_rews
 
+class Critic_Test_Dataset(Dataset):
+    def __init__(self, sigma: float, dataset_name: str, specific_dataset: str, trajs, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
+        # ----- gather raw obs/actions to fit stats -----
+        if(dataset_name == 'pointmaze'):
+           for traj in trajs:
+                traj['observations'] = traj['observations'][:,:2]
+        
+        self.stats = get_critic_stats(dataset_name, specific_dataset)
+        allowed_values = [0, 1]
 
-def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, goal = None, target_reward = 1.0, trajs: Optional[List[TrajectoryDict]] = None):
+        transitions = []
+        for traj in trajs:
+            obs = traj['observations']
+            rews = traj['rewards']
+            if( goal is not None):
+                rews = reward_filter(obs, rews, goal)
+            if(not np.all(np.isin(rews, allowed_values))):
+                raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
+            if(target_reward is not None):
+                rews = self.boost_signal(target_reward, rews)
+            rews = gaussian_filter1d(rews, sigma)
+            for t in range(len(obs)):
+                 obs_t = self.stats.norm_obs(obs[t])
+                 r_t   = np.sum(rews[t:])
+                 transitions.append((obs_t, r_t))
+        self.transitions = transitions
+    
+    def __len__(self):
+        return len(self.transitions)
+
+    def __getitem__(self, idx):
+        s, r = self.transitions[idx]
+        return (
+            torch.tensor(s, dtype = torch.float32),
+            torch.tensor(r, dtype = torch.float32)
+        )
+    
+    def boost_signal(self, target_reward, rews):
+        for t in range(len(rews)):
+            if(rews[t] == 1):
+                 rews[t] = target_reward
+        return rews
+
+def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, goal, target_reward = 1.0, trajs: List[TrajectoryDict] = None):
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #print(f"Using device {device}")
-
-    #get information
-    if(trajs is None):
-         dataset = CriticDataset(sigma, dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma)
-    else:
-         dataset = CriticDataset(sigma, dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma)
+    dataset = CriticDataset(sigma, dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
+
     #prepare training
     if(dataset_name == 'pointmaze'):
         obs_dim = obs_dim - 2
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True))
     critic = Critic(obs_dim).to(device)
+    critic.train()
     target_critic = Critic(obs_dim).to(device)
     target_critic.load_state_dict(critic.state_dict())
+    target_critic.eval()
     optimizer = optim.Adam(critic.parameters(), lr = lr)
    
     print(f"Training critic for {dataset_name}-{specific_dataset}")
     for k in range(1, num_steps + 1):  # number of passes over dataset
-           #s, r, s_next = next(dataloader)
            s, r, s_next = next(dataloader)
-           #s, r = next(dataloader)
            s = s.to(device)
            r = r.to(device)
            s_next = s_next.to(device)
@@ -247,7 +247,6 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
                tgt_param.data.mul_(1 - tau)
                tgt_param.data.add_(tau * param.data)
         
-        
            if(k % 200 == 0):
                 target_critic.eval()
                 save_critic(target_critic, dataset_name, specific_dataset, k)
@@ -256,6 +255,28 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
     print(f"critic model saved")
 
 
+def test_critic(dataset_name: str, specific_dataset: str, checkpoint_step, sigma, gamma, horizon, goal = None, target_reward = 1.0, trajs: Optional[List[TrajectoryDict]] = None):
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    dataset = Critic_Test_Dataset(sigma, dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma)
+    batch_size = 100
+    dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True)
+    model_state_dict, obs_dim = get_critic_model(dataset_name, specific_dataset, checkpoint_step)
+    if(dataset_name == 'pointmaze'):
+        obs_dim = obs_dim - 2
+    model = Critic(obs_dim).to(device)
+    model.load_state_dict(model_state_dict)
+    model.eval()
+   
+    print(f"Testing critic for {dataset_name}-{specific_dataset} at checkpoint step {checkpoint_step}")
+    total_loss = 0.0
+    for s, r in dataloader:
+           s = s.to(device)
+           r = r.to(device)
+           pred = model(s)
+           total_loss += ((pred - r)**2).mean().item()
+    avg_loss = total_loss/len(dataloader)
+    print(f"Average Loss: {avg_loss:.4f}")
 
 
 if __name__ == '__main__':  # pragma: no cover
@@ -263,12 +284,11 @@ if __name__ == '__main__':  # pragma: no cover
     env_name = 'pointmaze'
     specific_env = 'medium'
     trajs = get_trajs(env_name, specific_env, 0)
-    #trajs = None
     train_critic(dataset_name = env_name, 
                  specific_dataset = specific_env, 
                  sigma = 7.0, 
                  batch_size = 256, 
-                 num_steps = 2000, 
+                 num_steps = 2600, 
                  gamma = 1.0, 
                  horizon = 32, 
                  lr = 1e-5, 
@@ -276,6 +296,21 @@ if __name__ == '__main__':  # pragma: no cover
                  goal = np.array([[-2.5, -2.5]], dtype = float),
                  target_reward = 1.0,
                  trajs = trajs)
+    print('training complete')
+    
+    step = 200
+    while(step <= 2600):
+        test_critic(dataset_name = env_name, 
+                    specific_dataset = specific_env, 
+                    checkpoint_step = step, 
+                    sigma = 7.0, 
+                    gamma = 1.0, 
+                    horizon = 32, 
+                    goal = np.array([[-2.5, -2.5]], dtype = float), 
+                    target_reward = 1.0, 
+                    trajs = trajs)
+        step += 200
+    print('testing complete')
 
 
 
