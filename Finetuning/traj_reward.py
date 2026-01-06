@@ -37,8 +37,6 @@ class TotalReward(nn.Module):
         self.config = config
         reward_state_dict, obs_dim, act_dim = get_reward_model(dataset_name, specific_dataset, reward_checkpoint)
         self.config.device = device
-        #self.reward_net = MLPNetwork(input_dim = obs_dim + act_dim, out_dim = 1, hidden_dims = [200, 200, 200, 200], act_fn = 'swish', out_act_fn = 'identity').to(self.config.device)
-        #self.reward_net = Reward(obs_dim, act_dim).to(self.config.device)
         self.reward_net = SimpleReward(obs_dim, act_dim).to(self.config.device)
         self.reward_net.load_state_dict(reward_state_dict)
         self.reward_net.eval()
