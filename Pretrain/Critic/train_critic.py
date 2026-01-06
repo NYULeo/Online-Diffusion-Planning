@@ -242,20 +242,15 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
            loss.backward()
            optimizer.step()
            
-
-           """
            # Soft update target network
            for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):
                tgt_param.data.mul_(1 - tau)
                tgt_param.data.add_(tau * param.data)
-            """
-            
+        
         
            if(k % 200 == 0):
-                #target_critic.eval()
-                #save_critic(target_critic, dataset_name, specific_dataset, k)
-                critic.eval()
-                save_critic(critic, dataset_name, specific_dataset, k)
+                target_critic.eval()
+                save_critic(target_critic, dataset_name, specific_dataset, k)
                 print(f"Checkpoint saved at step {k}")
                 
     print(f"critic model saved")
@@ -276,7 +271,7 @@ if __name__ == '__main__':  # pragma: no cover
                  num_steps = 2000, 
                  gamma = 1.0, 
                  horizon = 32, 
-                 lr = 2e-5, 
+                 lr = 1e-5, 
                  tau = 0.005,
                  goal = np.array([[-2.5, -2.5]], dtype = float),
                  target_reward = 1.0,
