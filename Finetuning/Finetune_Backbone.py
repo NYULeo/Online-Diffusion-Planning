@@ -222,7 +222,7 @@ class OnlineFinetuner():
               self.config.dataset_name,
               self.config.specific_dataset
              )
-    
+    """
     def collect_critic_buffer(self, local_trajs):
         gathered_trajs_list = self.accelerator.gather_for_metrics([local_trajs if local_trajs else []], use_gather_object=True)
         self.accelerator.wait_for_everyone()
@@ -231,6 +231,21 @@ class OnlineFinetuner():
             if process_trajs:
                 critic_buffer.extend(process_trajs)
         return critic_buffer
+    """
+    def collect_critic_buffer(self, local_trajs):
+          # ALL processes must participate in gather_for_metrics (collective operation)
+          gathered_trajs_list = self.accelerator.gather_for_metrics([local_trajs if local_trajs else []], use_gather_object=True)
+          self.accelerator.wait_for_everyone()
+    
+          # Only main process needs to process the gathered data
+          if self.accelerator.is_main_process:
+              critic_buffer = []
+              for process_trajs in gathered_trajs_list:
+                  if process_trajs:
+                      critic_buffer.extend(process_trajs)
+              return critic_buffer
+          else:
+              return None  # Other processes don't need the buffer
 
     def finetune_planner(self):
         if self.accelerator.is_main_process:
@@ -263,7 +278,7 @@ class OnlineFinetuner():
             print(f"Rollout Goal Cell: {self.config.train_reward_config.rollout_goal}")
             print(f"Critic: {self.config.critic}")
             if(self.config.critic):
-                print(f"Critic Training Hyperarameters: --------------------------------------------------------------")
+                print(f"Critic Training Hyperarameters: ----------------------------------------------------------")
                 print(f"Critic Model Checkpoint: {self.config.critic_model_checkpoint}")
                 print(f"Critic Batch Size: {self.config.train_critic_config.batch_size}")
                 print(f"Critic Number of Steps: {self.config.train_critic_config.num_steps}")
@@ -336,11 +351,8 @@ class OnlineFinetuner():
             
             self.gather_and_sync_trajs_and_buffer(trajs)
             if self.config.critic:
-                if self.accelerator.is_main_process:
-                     critic_buffer = self.collect_critic_buffer(trajs)
-                else:
-                     critic_buffer = None
-                self.accelerator.wait_for_everyone()
+                 critic_buffer = self.collect_critic_buffer(trajs)
+                 self.accelerator.wait_for_everyone()
             gathered_scores = self.accelerator.gather_for_metrics(torch.tensor([score], device=self.device))
             if self.accelerator.is_main_process:
                  avg_score = gathered_scores.float().mean().item()
