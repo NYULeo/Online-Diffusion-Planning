@@ -868,14 +868,16 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
      
        # Find the trajectory with the maximum reward
        #trajs = [[] for _ in range(num_envs)]
+       total_steps = 0
        for env_idx in range(num_envs):
+          total_steps += len(observations[env_idx])
           trajs.append({
               'observations': np.asarray(observations[env_idx].copy()),
               'actions': np.asarray(acts[env_idx].copy()),
               'rewards': np.asarray(rewards[env_idx].copy())
           })
         
-     
+     print(total_steps)
      vec_env.close()
      score = get_normalized_score(trajs)
      save_trajs(trajs, env_name, specific_env, checkpoint_step)

@@ -60,21 +60,57 @@ def check_speration(trajs):
          print(i)
 
 
+
+"""
 if __name__ == "__main__":
      set_seed(1)
      data = get_dataset('kitchen', 'partial')
      trajs = data.get_trajectories()
      render('kitchen', 'partial', trajs[0])
-     """
+"""
+import ogbench
+env, train_dataset, val_dataset = ogbench.make_env_and_datasets('cube-single-noisy-singletask-task2-v0', compact_dataset=True)
+import mediapy as media
+print(val_dataset.keys())
+trajectories = []
+last = 0
+for i in range(len(val_dataset['observations'])):
+         if(val_dataset['valids'][i] == 0):
+              trajectory = {
+                   'observations': val_dataset['observations'][last: i],
+                   'actions': val_dataset['actions'][last: i]
+              }
+              trajectories.append(trajectory)
+              last = i+1
+for i in range(len(val_dataset['rewards'])):
+     if(val_dataset['valids'][i] == 0):
+        print(i)
+        print(val_dataset['rewards'][i])
+frames = []
+env.reset()
+for i in range(len(trajectories[2]['actions'])):
+          action = trajectories[2]['actions'][i]
+          _, reward, terminated, truncated, info = env.step(action)
+          frames.append(env.render())
+          #print(reward, info['success'])
+          if terminated or truncated:
+               break
+         
+media.write_video("demo2.mp4", frames, fps=50)
+env.close()
+
+
+     
+"""
      with open('Rollouts/pointmaze/medium/Generated_trajs_Info.pkl', 'rb') as f:
         info = pickle.load(f)
      trajs = info['trajs']
      best_traj = info['best_traj']
-     """
+"""
      
      #render('pointmaze', 'medium', trajs[0])
      
-     """
+"""
      env_name = info['env_name']
      specific_env = info['specific_env']
      all_rewards = []

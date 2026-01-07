@@ -608,10 +608,10 @@ def verify_four_clusters(vectors):
 
 
 # Usage:
-#kmeans, assignments, centers, stats = verify_four_clusters(vectors)
+kmeans, assignments, centers, stats = verify_four_clusters(vectors)
 
 
-
+import sklearn
 print(f"Cluster distribution: {stats['cluster_counts']}")
 print(f"Cluster percentages: {stats['cluster_percentages']}")
 print(f"Inertia (within-cluster sum of squares): {stats['inertia']:.4f}")
@@ -619,13 +619,15 @@ print(f"Mean distance to center: {stats['mean_distance_to_center']:.4f}")
 print(f"Max distance to center: {stats['max_distance_to_center']:.4f}")
 print(f"\nCluster centers:\n{stats['cluster_centers']}")
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
+
 def visualize_clusters(vectors, assignments, cluster_centers, title_prefix=""):
    
     vectors = np.array(vectors)
     n_clusters = len(cluster_centers)
-    colors = plt.cm.tab10(np.linspace(0, 1, n_clusters))
+    colors = cm.get_cmap('tab10')(np.linspace(0, 1, n_clusters))
     
     # 1. 2D PCA plot
     pca_2d = PCA(n_components=2)
@@ -692,5 +694,6 @@ def visualize_clusters(vectors, assignments, cluster_centers, title_prefix=""):
     plt.show()
 
 # Usage:
-#visualize_clusters(vectors, assignments, stats['cluster_centers'], "Kitchen Rewards: ")
+visualize_clusters(vectors, assignments, stats['cluster_centers'], "Kitchen Rewards: ")
 """
+

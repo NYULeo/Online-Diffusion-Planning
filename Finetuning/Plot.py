@@ -86,6 +86,29 @@ data = [
     [720, 31.27]
 ]
 
+data = [
+    [0, 9.22],      # Initial rollout
+    [24, 11.22],    # Round 1
+    [48, 9.52],     # Round 2
+    [72, 18.28],    # Round 3
+    [96, 12.48],    # Round 4
+    [120, 12.98],   # Round 5
+    [144, 22.23],   # Round 6
+    [168, 30.65],   # Round 7
+    [192, 30.47],   # Round 8
+    [216, 30.73],   # Round 9
+    [240, 30.91],   # Round 10
+    [264, 30.83],   # Round 11
+    [288, 30.98],   # Round 12
+    [312, 30.89],   # Round 13
+    [336, 30.47],   # Round 14
+    [360, 31.10],   # Round 15
+    [384, 30.85],   # Round 16
+    [408, 30.92],   # Round 17
+    [432, 30.64],   # Round 18
+    [456, 30.60],   # Round 19
+    [480, 30.62]    # Round 20
+]
 plot_lines(
     [data],
     labels=['Normalized Score'],
