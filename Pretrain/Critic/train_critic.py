@@ -18,6 +18,7 @@ from scipy.ndimage import gaussian_filter1d
 import os
 from typing import Optional, List
 from utils import cycle
+import copy
 
 
 
@@ -89,6 +90,7 @@ class CriticDataset(Dataset):
         
         obs_all = []
         if(dataset_name == 'pointmaze'):
+           trajs = copy.deepcopy(trajs)
            for traj in trajs:
                 traj['observations'] = traj['observations'][:,:2]
         
@@ -165,6 +167,7 @@ class Critic_Test_Dataset(Dataset):
     def __init__(self, sigma: float, dataset_name: str, specific_dataset: str, trajs, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
         # ----- gather raw obs/actions to fit stats -----
         if(dataset_name == 'pointmaze'):
+           trajs = copy.deepcopy(trajs)
            for traj in trajs:
                 traj['observations'] = traj['observations'][:,:2]
         
