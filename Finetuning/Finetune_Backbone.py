@@ -63,10 +63,10 @@ class FinetuningConfig():
     reward_model_checkpoint: int
     kernel_model_checkpoint: int
     critic_model_checkpoint: int
-    critic: bool = False
     train_reward_config: Train_Reward_Config  # Moved before fields with defaults
     train_kernel_config: Train_Kernel_Config  # Moved before fields with defaults
     train_critic_config: Train_Critic_Config
+    critic: bool = False
     buffer_size: int = 100000
     finetune_steps: int = 1000000
     finetune_rounds: int = 10
