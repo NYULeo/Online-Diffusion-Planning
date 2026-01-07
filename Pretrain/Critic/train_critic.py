@@ -230,7 +230,7 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
 
            # Compute target V-values
            with torch.no_grad():
-              q_next = critic(s_next)
+              q_next = target_critic(s_next)
               target = r + ( (gamma**horizon) * q_next)
               #target = r 
 

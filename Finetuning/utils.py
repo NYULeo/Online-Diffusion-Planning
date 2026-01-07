@@ -343,6 +343,7 @@ class CriticDataset(Dataset):
     def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, step: int, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
         # ----- gather raw obs/actions to fit stats -----
         if(dataset_name == 'pointmaze'):
+            trajs = copy.deepcopy(trajs) 
             for traj in trajs:
                 traj['observations'] = traj['observations'][:,:2]
         obs_all = []
@@ -523,7 +524,7 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
 
            # Compute target Q-values
            with torch.no_grad():
-              q_next = critic(s_next)
+              q_next = target_critic(s_next)
               target = r + ( (gamma**horizon) * q_next)
 
            # Predicted V-values
@@ -804,7 +805,16 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
      for start_cell in start_cells:
        # Reset all environments
        #seeds = list(range(num_envs)) 
-       s0_vec = vec_env.reset(seed = reset_seeds, options=[{"goal_cell": goal_cell.copy(), "reset_cell": start_cell.copy()} for _ in range(num_envs)])
+       opt = {}
+       if goal_cell is not None:
+             opt["goal_cell"] = goal_cell.copy()
+       else:
+             opt['goal_cell'] = None
+       if start_cell is not None:
+             opt["reset_cell"] = start_cell.copy()
+       else:
+             opt['reset_cell'] = None
+       s0_vec = vec_env.reset(seed = reset_seeds, options=[opt for _ in range(num_envs)])
        current_states = s0_vec[0]['observation']
      
        # Store trajectories for each environment

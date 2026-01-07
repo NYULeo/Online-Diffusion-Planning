@@ -7,7 +7,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 
-from Finetune_Backbone import OnlineFinetuner, FinetuningConfig, Train_Kernel_Config, Train_Reward_Config
+from Finetune_Backbone import OnlineFinetuner, FinetuningConfig, Train_Critic_Config, Train_Kernel_Config, Train_Reward_Config
 from adjoint_matching import AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig
 from traj_reward import RewardConfig
@@ -57,6 +57,13 @@ if __name__ == "__main__":
                             ensemble_size = 10,
                             λ_reg = 1e-3)
     
+    TrainCriticConfig = Train_Critic_Config(
+                            batch_size = 256,
+                            num_steps= 3000,
+                            lr = 1e-5,
+                            tau = 0.005,
+                            gamma = 1.0)
+    
     FTConfig = FinetuningConfig(
         AMConfig = AMConfig, 
         RewardConfig = RWConfig, 
@@ -65,6 +72,8 @@ if __name__ == "__main__":
         planner_checkpoint = 0,
         reward_model_checkpoint = 0,
         kernel_model_checkpoint = 0,
+        critic_model_checkpoint = 0,
+        critic = True,
         buffer_size = 5500,
         finetune_steps = 3000,
         finetune_rounds = 300,
@@ -81,7 +90,8 @@ if __name__ == "__main__":
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         train_reward_config = TrainRewardConfig,
-        train_kernel_config = TrainKernelConfig) 
+        train_kernel_config = TrainKernelConfig,
+        train_critic_config =  TrainCriticConfig) 
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
