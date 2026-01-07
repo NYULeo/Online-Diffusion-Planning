@@ -126,7 +126,7 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_steps = 0, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([5, 4], dtype = int))
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_steps = 0, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([6, 6], dtype = int))
     #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 4000, checkpoint_steps = 0, render = True)
     #150, 8
     #50, 3
