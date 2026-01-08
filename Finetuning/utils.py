@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import seaborn as sns
 from Pretrain.Dataset import get_PlannerName
-from typing import Tuple
+from typing import Tuple, Dict
 #from Pretrain.Rewards.Reward_Backbone import Train_Dataset
 from Pretrain.Transition_Kernel.Kernel_Backbone import count_files_in_folder
 import copy
@@ -31,6 +31,7 @@ from gymnasium.vector import AsyncVectorEnv
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Critic.nets import Critic
+import json
 
 
 
@@ -864,25 +865,24 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
           if all(done_envs):
              #print("All environments completed!")
              break
-         
-       #vec_env.close()
      
        # Find the trajectory with the maximum reward
-       #trajs = [[] for _ in range(num_envs)]
        for env_idx in range(num_envs):
-          total_steps += len(observations[env_idx])
+          total_steps += (len(observations[env_idx]) - 1)
           trajs.append({
               'observations': np.asarray(observations[env_idx].copy()),
               'actions': np.asarray(acts[env_idx].copy()),
               'rewards': np.asarray(rewards[env_idx].copy())
           })
         
-     print(total_steps)
      vec_env.close()
      score = get_normalized_score(trajs)
      save_trajs(trajs, env_name, specific_env, checkpoint_step)
      #print(f"Average Normalized Score: {score:.2f}")
-     return trajs, score
+     return trajs, score, total_steps
 
 
-
+def load_hyperparameters(filepath: str) -> Dict:
+    with open(filepath, 'r') as f:
+        hyperparams = json.load(f)
+    return hyperparams

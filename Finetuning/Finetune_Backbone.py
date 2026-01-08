@@ -24,6 +24,8 @@ from accelerate import Accelerator
 import math
 import numpy as np
 from typing import Optional, Dict
+import json
+from dataclasses import asdict
 
 @dataclass
 class Train_Reward_Config: 
@@ -61,8 +63,8 @@ class FinetuningConfig():
     reward_model_checkpoint: int
     kernel_model_checkpoint: int
     critic_model_checkpoint: int
-    train_reward_config: Train_Reward_Config  # Moved before fields with defaults
-    train_kernel_config: Train_Kernel_Config  # Moved before fields with defaults
+    train_reward_config: Train_Reward_Config 
+    train_kernel_config: Train_Kernel_Config 
     train_critic_config: Train_Critic_Config
     critic: bool = False
     buffer_size: int = 100000
@@ -83,8 +85,86 @@ class FinetuningConfig():
     rollout_length: int = 4000
     rollout_num_envs: int = 1
    
+def save_hyperparameters(config: FinetuningConfig, filepath: Optional[str] = None):
+    if filepath is None:
+        os.makedirs(f"./Finetuning/args/{config.dataset_name}/{config.specific_dataset}/", exist_ok=True)
+        filepath = f"./Finetuning/args/{config.dataset_name}/{config.specific_dataset}/hyperparameters.json"
     
-
+    def convert_to_json_serializable(obj):
+        """Recursively convert objects to JSON-serializable types"""
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, np.generic):
+            return obj.item()
+        elif isinstance(obj, torch.device):
+            return str(obj)
+        elif isinstance(obj, (np.integer, np.floating)):
+            return obj.item()
+        elif obj is None:
+            return None
+        elif isinstance(obj, dict):
+            return {k: convert_to_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, (list, tuple)):
+            return [convert_to_json_serializable(item) for item in obj]
+        elif hasattr(obj, '__dict__') and not isinstance(obj, (str, int, float, bool, type(None))):
+            # Handle other custom objects by converting to string
+            return str(obj)
+        return obj
+    
+    # Convert all config dataclasses to dictionaries
+    hyperparams = {
+        'env_details': {
+            'dataset_name': config.dataset_name,
+            'specific_dataset': config.specific_dataset,
+        },
+        'pretrained_models': {
+            'planner_checkpoint': config.planner_checkpoint,
+            'reward_model_checkpoint': config.reward_model_checkpoint,
+            'kernel_model_checkpoint': config.kernel_model_checkpoint,
+            'critic_model_checkpoint': getattr(config, 'critic_model_checkpoint', None),
+        },
+        'adjoint_matching_config': convert_to_json_serializable(asdict(config.AMConfig)),
+        'reward_config': convert_to_json_serializable(asdict(config.RewardConfig)),
+        'finetuning_hyperparameters': {
+            'finetune_batch_size': config.finetune_batch_size,
+            'buffer_size': config.buffer_size,
+            'finetune_lr': config.finetune_lr,
+            'reward_scaling_factor': config.reward_scaling_factor,
+            'finetune_total_steps': config.finetune_steps,
+            'finetune_rounds': config.finetune_rounds,
+            'diffusion_steps': config.diffusion_steps,
+            'karras_percent': config.karras_percent,
+            'Loss_Clip_percent': config.Loss_Clip_percent,
+            'gradient_accumulate_every': config.gradient_accumulate_every,
+            'initial_lam': config.initial_lam,
+            'eta_lam': config.eta_lam,
+            'update_lambda_every': config.update_lambda_every,
+            'MaxEnt': config.MaxEnt,
+            'Entropy_Scaling_Factor': config.Entropy_Scaling_Factor,
+        },
+        'exploration_hyperparameters': {
+            'rollout_length': config.rollout_length,
+            'rollout_num_envs': config.rollout_num_envs,
+            'rollout_goal': config.train_reward_config.rollout_goal.tolist() if hasattr(config.train_reward_config.rollout_goal, 'tolist') else config.train_reward_config.rollout_goal,
+        },
+        'reward_training': convert_to_json_serializable(asdict(config.train_reward_config)),
+        'kernel_training': convert_to_json_serializable(asdict(config.train_kernel_config)),
+        'critic_training': convert_to_json_serializable(asdict(config.train_critic_config)) if config.critic else None,
+        'device_info': {
+            'device': str(config.AMConfig.device),
+            'num_gpus': torch.cuda.device_count(),
+            'gpu_name': torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
+        }
+    }
+    
+    # Handle numpy arrays, torch.device, and other non-JSON-serializable types
+    hyperparams = convert_to_json_serializable(hyperparams)
+    
+    # Save with pretty printing (indent=4 makes it human-readable)
+    with open(filepath, 'w') as f:
+        json.dump(hyperparams, f, indent=4, sort_keys=False)
+    
+    print(f"Hyperparameters saved to {filepath}")
 
 
 class OnlineFinetuner():
@@ -109,7 +189,7 @@ class OnlineFinetuner():
         self.config.AMConfig.MaxEnt = self.config.MaxEnt
         self.config.AMConfig.Entropy_Scaling_Factor = self.config.Entropy_Scaling_Factor
        
-        self.accelerator = Accelerator(mixed_precision='bf16')
+        self.accelerator = Accelerator(mixed_precision = 'bf16')
         self.device = self.accelerator.device
         
         self.Initialize_BufferDataset()
@@ -132,57 +212,13 @@ class OnlineFinetuner():
                    self.config.AMConfig.horizon, 
                    self.config.dataset_name, 
                    self.config.specific_dataset)
-    
-    """
-    def sync_bufferDataset(self):
-        
-        #sync the buffer across all processes
-        if self.accelerator.is_main_process:
-             buffer_list = [self.Buffer]  # Wrap in list for gather_object
-        else:
-             buffer_list = [None]
-        gathered = self.accelerator.gather_for_metrics(buffer_list, use_gather_object=True)
-        if gathered and gathered[0] is not None:
-             self.Buffer = gathered[0] 
-        # sync the planner dataset across all processes
-        
-        self.PlannerDataset = PlannerDataset(
-                    self.Buffer, 
-                    self.config.AMConfig.horizon, 
-                    self.config.dataset_name, 
-                    self.config.specific_dataset
-             )
-    """
 
     def set_reward_model(self, device):
         if self.config.critic:
             self.reward_model = TotalReward_Critic(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, self.config.critic_model_checkpoint)
         else:
             self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
-    """
-    def _gather_and_concat_trajectories(self, trajs):
-         # All processes contribute their trajectories
-        trajs_list = [trajs]
-        gathered_trajs = self.accelerator.gather_for_metrics(trajs_list, use_gather_object=True)
-        self.accelerator.wait_for_everyone()
-        
-        # Concatenate all trajectories from all processes
-        all_trajs = []
-        if gathered_trajs:
-           for process_trajs in gathered_trajs:
-               if process_trajs is not None:
-                   unwarpped_process_trajs = process_trajs[0] 
-                   all_trajs.extend(unwarpped_process_trajs)
-        return all_trajs
-    """
-    """
-    def gather_trajs(self, trajs):
-        gathered_trajs_list = self.accelerator.gather_for_metrics([trajs], use_gather_object=True)
-        collected_trajs = []
-        for process_trajs in gathered_trajs_list:
-                collected_trajs.extend(process_trajs)
-        return collected_trajs
-    """
+    
     def gather_and_sync_trajs_and_buffer(self, local_trajs):
         # Gather local trajectories from all processes
         gathered_trajs_list = self.accelerator.gather_for_metrics([local_trajs if local_trajs else []], use_gather_object=True)
@@ -220,16 +256,7 @@ class OnlineFinetuner():
               self.config.dataset_name,
               self.config.specific_dataset
              )
-    """
-    def collect_critic_buffer(self, local_trajs):
-        gathered_trajs_list = self.accelerator.gather_for_metrics([local_trajs if local_trajs else []], use_gather_object=True)
-        self.accelerator.wait_for_everyone()
-        critic_buffer = []
-        for process_trajs in gathered_trajs_list:
-            if process_trajs:
-                critic_buffer.extend(process_trajs)
-        return critic_buffer
-    """
+   
     def collect_critic_buffer(self, local_trajs):
           # ALL processes must participate in gather_for_metrics (collective operation)
           gathered_trajs_list = self.accelerator.gather_for_metrics([local_trajs if local_trajs else []], use_gather_object=True)
@@ -289,8 +316,9 @@ class OnlineFinetuner():
             print(f"The GPU name is: {torch.cuda.get_device_name(0)}")
             print('-------------------------------------------------------------------------------------------')
         
+        if self.accelerator.is_main_process:
+             save_hyperparameters(self.config)
 
-       
         if self.accelerator.is_main_process:
              print(f"Starting Rollout")
              trajs, score = rollout_parallel(self.config.dataset_name, 
@@ -303,6 +331,7 @@ class OnlineFinetuner():
                                          checkpoint_step = 0, 
                                          num_envs = 4, 
                                          goal_cell = self.config.train_reward_config.rollout_goal)
+             print(f"Total Number of Environment Steps: {0}")
              print(f"Average Normalized Score: {score:.2f}")
         self.accelerator.wait_for_everyone()
         
@@ -330,7 +359,7 @@ class OnlineFinetuner():
             if self.accelerator.is_main_process:
                   print(f"Starting Rollout")
             seed_base = rank * num_envs_per_process
-            trajs, score = rollout_parallel(self.config.dataset_name, 
+            trajs, score, total_steps = rollout_parallel(self.config.dataset_name, 
                                          self.config.specific_dataset, 
                                          horizon = self.config.AMConfig.horizon, 
                                          steps_T = self.config.diffusion_steps, 
@@ -351,12 +380,17 @@ class OnlineFinetuner():
             if self.config.critic:
                  critic_buffer = self.collect_critic_buffer(trajs)
                  self.accelerator.wait_for_everyone()
-            gathered_scores = self.accelerator.gather_for_metrics(torch.tensor([score], device=self.device))
-            if self.accelerator.is_main_process:
-                 avg_score = gathered_scores.float().mean().item()
-                 print(f"Average Normalized Score: {avg_score:.2f}")
-            self.accelerator.wait_for_everyone()         
             
+            #collect the score and number of env stepsacross all processes
+            gathered_scores = self.accelerator.gather_for_metrics(torch.tensor([score], device=self.device, dtype = torch.float32),  use_gather_object=False)
+            gathered_steps = self.accelerator.gather_for_metrics(torch.tensor([total_steps], device=self.device, dtype = torch.int64),  use_gather_object=False)
+            if self.accelerator.is_main_process:
+                 total_steps = gathered_steps.int().sum().item()
+                 avg_score = gathered_scores.float().mean().item()
+                 print(f"Total Number of Environment Steps: {total_steps}")
+                 print(f"Average Normalized Score: {avg_score:.2f}")
+            self.accelerator.wait_for_everyone()  
+
             if self.accelerator.is_main_process:
                   print(f"Starting Reward Training")
                   train_reward(self.Train_Buffer, 
