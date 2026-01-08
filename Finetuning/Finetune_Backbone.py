@@ -321,7 +321,7 @@ class OnlineFinetuner():
 
         if self.accelerator.is_main_process:
              print(f"Starting Rollout")
-             trajs, score = rollout_parallel(self.config.dataset_name, 
+             trajs, score, _ = rollout_parallel(self.config.dataset_name, 
                                          self.config.specific_dataset, 
                                          horizon = self.config.AMConfig.horizon, 
                                          steps_T = self.config.diffusion_steps, 
