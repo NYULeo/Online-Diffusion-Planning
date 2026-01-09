@@ -33,7 +33,18 @@ from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Critic.nets import Critic
 import json
 
-
+def spare_reward_prcocessor(rewards):
+         Temp = []
+         for i in range(1, len(rewards)):
+            if(rewards[i] == rewards[i-1]+1):
+                  Temp.append(i)
+         new_rewards = [0]*len(rewards)
+         for i in range(len(rewards)):
+             if(i in Temp):
+                  new_rewards[i] = 1
+             else:
+                  new_rewards[i] = 0
+         return np.array(new_rewards, dtype = np.float64) 
 
 def reward_filter(obs, rews, goal):
     #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
@@ -871,7 +882,7 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
           trajs.append({
               'observations': np.asarray(observations[env_idx].copy()),
               'actions': np.asarray(acts[env_idx].copy()),
-              'rewards': np.asarray(rewards[env_idx].copy())
+              'rewards': np.asarray(spare_reward_prcocessor(rewards[env_idx].copy()))
           })
         
      vec_env.close()
