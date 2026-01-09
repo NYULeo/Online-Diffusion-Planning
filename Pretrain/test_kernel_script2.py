@@ -1,17 +1,18 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(project_root)
 from Transition_Kernel.Kernel_Backbone import test_kernel
 from utils import set_seed
+from Finetuning.utils import get_trajs
 import pickle
-
 
 
 
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
-    """
-    with open('Rollouts/kitchen/partial/Generated_trajs_Info.pkl', 'rb') as f:
-         trajs_info = pickle.load(f)
-    trajs = trajs_info['trajs']
-    """
+    trajs = get_trajs(dataset_name = 'kitchen', specific_env = 'partial', step = 0)
    
     #test_Model(dataset_name = 'pointmaze', specific_dataset = 'medium', trajs = trajs, save_freq = 2000, num_steps = 50000)
-    test_kernel(dataset_name = 'kitchen', trajs = None, save_freq = 5000, num_steps = 50000, ensemble_size = 10)
+    test_kernel(dataset_name = 'kitchen', trajs = trajs, save_freq = 5000, num_steps = 50000, ensemble_size = 10)
