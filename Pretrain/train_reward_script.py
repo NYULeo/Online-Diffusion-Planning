@@ -9,14 +9,14 @@ import numpy as np
 if __name__ == '__main__':
     set_seed(1)
     train_reward(
-    dataset_name = 'pointmaze',
-    batch_size = 256, 
-    num_steps = 1000, 
-    save_freq = 200,  
+    dataset_name = 'kitchen',
+    batch_size = 128, 
+    num_steps = 5000, 
+    save_freq = 1000,  
     lr = 3e-4,
-    sigma = 7.0,
+    sigma = 5.0,
     target_reward = 1.0,
-    specific_dataset='medium',
-    goal = np.array([[-2.5, -2.5]]))
+    specific_dataset='partial',
+    goal = None)
 
 

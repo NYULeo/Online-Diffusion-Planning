@@ -8,7 +8,6 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from Dataset import KitchenDataset, PointMazeDataset
-
 from .Kernel_Net import  RobustTransitionKernel
 from sympy import factorint
 import pickle
@@ -16,7 +15,129 @@ import os
 from typing import Optional
 import math
 import copy
-#from utils import SAStats, cycle
+from Pretrain.utils import SAStats, cycle
+import json
+
+def getName(env_name, specific_env):
+     if(env_name == 'kitchen'):
+          return 'Kitchen'
+     elif(env_name == 'pointmaze'):
+          if specific_env == 'open_dense':
+               return 'PointMaze_OpenDense'
+          elif specific_env == 'umaze':
+               return 'PointMaze_Umaze'
+          elif specific_env == 'large_dense':
+               return 'PointMaze_LargeDense'
+          elif specific_env == 'medium':
+               return 'PointMaze_Medium'
+          elif specific_env == 'umaze_dense':
+               return 'PointMaze_UmazeDense'
+          elif specific_env == 'large':
+               return 'PointMaze_Large'
+          elif specific_env == 'open':
+               return 'PointMaze_Open'
+          else:
+              raise ValueError(f"Invalid specific environment: {specific_env}")
+     elif(env_name == 'antmaze'):
+          if specific_env == 'medium_play':
+               return 'AntMaze_MediumPlay'
+          elif specific_env == 'umaze_diverse':
+               return 'AntMaze_UmazeDiverse'
+          elif specific_env == 'large_diverse':
+               return 'AntMaze_LargeDiverse'
+          elif specific_env == 'large_play':
+               return 'AntMaze_LargePlay'
+          elif specific_env == 'medium_diverse':
+               return 'AntMaze_MediumDiverse'
+          elif specific_env == 'umaze':
+               return 'AntMaze_Umaze'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
+     else:
+         raise ValueError(f"Invalid environment name: {env_name}")
+
+def save_kernel_hyperparameters(dataset_name, batch_size, num_steps, lr, 
+                                obs_dim, act_dim, kernel_name, optimizer, kernel_net, 
+                                ensemble_size, λ_reg, specific_dataset: Optional[str] = None):
+  
+   
+    os.makedirs(f"./Pretrain/Transition_Kernel/{kernel_name}/args/", exist_ok=True)
+    filepath = f"./Pretrain/Transition_Kernel/{kernel_name}/args/hyperparameters.json"
+    
+    def convert_to_json_serializable(obj):
+        """Recursively convert objects to JSON-serializable types"""
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, np.generic):
+            return obj.item()
+        elif isinstance(obj, torch.device):
+            return str(obj)
+        elif isinstance(obj, (np.integer, np.floating)):
+            return obj.item()
+        elif obj is None:
+            return None
+        elif isinstance(obj, dict):
+            return {k: convert_to_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, (list, tuple)):
+            return [convert_to_json_serializable(item) for item in obj]
+        elif hasattr(obj, '__dict__') and not isinstance(obj, (str, int, float, bool, type(None))):
+            return str(obj)
+        return obj
+    
+    # Get optimizer info
+    optimizer_type = type(optimizer).__name__
+    optimizer_params = {
+        'type': optimizer_type,
+        'lr': lr,
+        'weight_decay': optimizer.param_groups[0].get('weight_decay', 0)
+    }
+    
+    # Get model architecture info
+    model_info = {
+        'model_type': type(kernel_net).__name__,
+        'obs_dim': int(obs_dim),
+        'act_dim': int(act_dim),
+    }
+    
+    # Add model-specific parameters if available
+    if hasattr(kernel_net, 'min_log_std'):
+        model_info['min_log_std'] = float(kernel_net.min_log_std)
+    if hasattr(kernel_net, 'max_log_std'):
+        model_info['max_log_std'] = float(kernel_net.max_log_std)
+    if hasattr(kernel_net, 'noise_floor'):
+        model_info['noise_floor'] = float(kernel_net.noise_floor)
+    
+    # Compile all hyperparameters
+    hyperparams = {
+        'env_details': {
+            'dataset_name': dataset_name,
+            'specific_dataset': specific_dataset,
+            'obs_dim': int(obs_dim),
+            'act_dim': int(act_dim),
+            'kernel_name': kernel_name,
+        },
+        'model_architecture': model_info,
+        'training_hyperparameters': {
+            'num_steps': num_steps,
+            'batch_size': batch_size,
+            'lr': lr,
+            'optimizer': optimizer_params,
+            'save_freq': 2000,  # Hardcoded in train_kernel
+        },
+        'ensemble_config': {
+            'ensemble_size': int(ensemble_size),
+            'λ_reg': float(λ_reg),
+        }
+    }
+    
+    # Handle numpy arrays, torch.device, and other non-JSON-serializable types
+    hyperparams = convert_to_json_serializable(hyperparams)
+    
+    # Save with pretty printing (indent=4 makes it human-readable)
+    with open(filepath, 'w') as f:
+        json.dump(hyperparams, f, indent=4, sort_keys=False)
+    
+    print(f"Kernel pretraining hyperparameters saved to {filepath}", flush=True)
 
 
 # Define the Gaussian forward dynamics model: inputs (s, a), outputs mean and log_std of s'
@@ -34,12 +155,36 @@ def compute_log_prob(model, s, a, s_next):
 """
 def save_model(kernel_net, kernel_name, num_steps, ensemble_idx):
     kernel_net.eval()
-    net_dict =  kernel_net.state_dict()
+    net_dict = kernel_net.state_dict()
     os.makedirs(f'./Pretrain/Transition_Kernel/{kernel_name}/Models/{num_steps}', exist_ok=True)
     save_path = f'./Pretrain/Transition_Kernel/{kernel_name}/Models/{num_steps}/{kernel_name}_{num_steps}_{ensemble_idx}.pkl'
     torch.save(net_dict, save_path)
     print(f"Kernel model save to {kernel_name}_{num_steps}_{ensemble_idx}.pkl")
 
+def save_to_finetuning(kernel_net, dataset_name, ensemble_idx, specific_dataset: Optional[str] = None):
+    kernel_net.eval()
+    net_dict = kernel_net.state_dict()
+    name = getName(dataset_name, specific_dataset)
+    if(specific_dataset is None):
+        os.makedirs(f'./Finetuning/Kernels/{dataset_name}/Models/{str(0)}', exist_ok=True)
+        save_path = f'./Finetuning/Kernels/{dataset_name}/Models/{str(0)}/{name}_Kernel_{str(ensemble_idx)}.pkl'
+    else:
+        os.makedirs(f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(0)}', exist_ok=True)
+        save_path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(0)}/{name}_Kernel_{str(ensemble_idx)}.pkl'
+    torch.save(net_dict, save_path)
+    print(f"kernel model save to {save_path}")
+
+def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str] = None):
+    name = getName(dataset_name, specific_dataset)
+    if(specific_dataset is None):
+        os.makedirs(f'./Finetuning/Kernels/{dataset_name}/Stats/', exist_ok=True)
+        savepath = f'./Finetuning/Kernels/{dataset_name}/Stats/{name}_Kernel_stats_{str(0)}.pkl'
+    else:
+        os.makedirs(f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Stats/', exist_ok=True)
+        savepath = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Stats/{name}_Kernel_stats_{str(0)}.pkl'
+    with open(savepath, 'wb') as f:
+        pickle.dump(stats, f)
+    print(f"saved stats to {savepath}")
 
 def count_files_in_folder(folder_path):
     """
@@ -285,6 +430,23 @@ def train_kernel(dataset_name, specific_dataset: str = None,
     ensemble = [RobustTransitionKernel(obs_dim, act_dim).to(device) for _ in range(ensemble_size)]
     optimizers = [optim.Adam(m.parameters(), lr, weight_decay=1e-5) for m in ensemble]
 
+
+    # Save hyperparameters at the start of training
+    save_kernel_hyperparameters(
+        dataset_name, 
+        batch_size, 
+        num_steps, 
+        lr,
+        obs_dim,
+        act_dim, 
+        kernel_name, 
+        optimizers[0],  # Use first optimizer as representative
+        ensemble[0],    # Use first model as representative
+        ensemble_size,
+        λ_reg,
+        specific_dataset=specific_dataset
+    )
+
     step = 0
     total_loss = 0.0
     save_freq = 2000
@@ -337,11 +499,16 @@ def train_kernel(dataset_name, specific_dataset: str = None,
             for idx, m in enumerate(ensemble):
                 ckpt = copy.deepcopy(m).cpu()
                 save_model(ckpt, kernel_name, step, idx)
-
+            if(step == num_steps):
+                for idx, m in enumerate(ensemble):
+                    ckpt = copy.deepcopy(m).cpu()
+                    save_to_finetuning(ckpt, dataset_name, idx, specific_dataset)
+                 
+    
+    stats = get_pretrained_kernel_stats(kernel_name)
+    save_stats_to_finetuning(stats, dataset_name, specific_dataset)
     # Return final ensemble
     return ensemble
-
-
 
 
 def test_kernel(dataset_name, specific_dataset: str = None,
@@ -406,8 +573,6 @@ def get_pretrained_kernel(dataset_name, checkpoints, specific_dataset: Optional[
        for i in range(file_count):
            kernel_state_dicts.append(load_model(name, checkpoints, i))
        return kernel_state_dicts, obs_dim, act_dim, name
-
-
 
 def get_pretrained_kernel_stats(kernel_name):
      stats_path = f'./Pretrain/Transition_Kernel/{kernel_name}/Stats/{kernel_name}_stats.pkl'

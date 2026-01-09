@@ -13,10 +13,8 @@ from Backbone.Dit import DiT1d
 from Backbone.UNet import TemporalUnet
 import os
 from Dataset import get_PlannerName, PlannerDataset, PlannerDataset_Rollout
-from .utils import LossTracker, get_pretrained_planner
-
-
-
+from .utils import LossTracker, get_pretrained_planner, getName
+import json
 
 
 class SDETrainer:
@@ -38,9 +36,7 @@ class SDETrainer:
         log_freq = 10,
         s: float = 0.008,                  # cosine offset
         weight_type: str = 'sigma2',         # {"one", "sigma2", "beta"}
-        eps: float = 1e-5,                 # clamp for t, ᾱ stability
-        
-
+        eps: float = 1e-5               # clamp for t, ᾱ stability
     ):
         self.device = device
         self.dataset_name = dataset_name
@@ -69,6 +65,109 @@ class SDETrainer:
         self.save_freq = save_freq
         self.logdir = f"./{self.dataset_name}_{self.specific_dataset}_checkpoints/"
         self.loss_tracker = LossTracker(save_dir="./logs/")
+    
+    def save_hyperparameters(self, filepath: Optional[str] = None):
+        if filepath is None:
+            os.makedirs(f"./Pretrain/Planners/args/{self.dataset_name}/{self.specific_dataset}/", exist_ok=True)
+            filepath = f"./Pretrain/Planners/args/{self.dataset_name}/{self.specific_dataset}/hyperparameters.json"
+    
+        def convert_to_json_serializable(obj):
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            elif isinstance(obj, np.generic):
+                return obj.item()
+            elif isinstance(obj, torch.device):
+                return str(obj)
+            elif isinstance(obj, (np.integer, np.floating)):
+                return obj.item()
+            elif obj is None:
+                return None
+            elif isinstance(obj, dict):
+                return {k: convert_to_json_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, (list, tuple)):
+                return [convert_to_json_serializable(item) for item in obj]
+            elif hasattr(obj, '__dict__') and not isinstance(obj, (str, int, float, bool, type(None))):
+                return str(obj)
+            return obj
+    
+        # Get optimizer and scheduler info
+        optimizer_type = type(self.optim).__name__
+        optimizer_params = {
+             'type': optimizer_type,
+             'lr': self.lr,
+             'weight_decay': self.optim.param_groups[0].get('weight_decay', 0)
+         }
+    
+        scheduler_type = type(self.scheduler).__name__
+        scheduler_params = {
+             'type': scheduler_type,
+             'T_max': self.num_steps if hasattr(self.scheduler, 'T_max') else None
+        }
+    
+       # Get model architecture info
+        model_info = {
+             'backbone_name': self.backbone_name,
+             'state_dim': int(self.state_dim),
+             'action_dim': int(self.action_dim),
+             'horizon': self.horizon,
+         }
+    
+        # Add backbone-specific parameters if available
+        if hasattr(self.model, 'in_dim'):
+              model_info['model_in_dim'] = int(self.model.in_dim)
+        if hasattr(self.model, 'emb_dim'):
+              model_info['model_emb_dim'] = int(self.model.emb_dim)
+        if hasattr(self.model, 'd_model'):
+              model_info['model_d_model'] = int(self.model.d_model)
+        if hasattr(self.model, 'n_heads'):
+              model_info['model_n_heads'] = int(self.model.n_heads)
+        if hasattr(self.model, 'depth'):
+              model_info['model_depth'] = int(self.model.depth)
+    
+        # Compile all hyperparameters
+        hyperparams = {
+           'env_details': {
+                'dataset_name': self.dataset_name,
+                'specific_dataset': self.specific_dataset,
+                'state_dim': int(self.state_dim),
+                'action_dim': int(self.action_dim),
+            },
+           'model_architecture': model_info,
+           'training_hyperparameters': {
+                'horizon': self.horizon,
+                'num_steps': self.num_steps,
+                'batch_size': self.batch_size,
+                'lr': self.lr,
+                'gradient_accumulate_every': self.gradient_accumulate_every,
+                'optimizer': optimizer_params,
+                'scheduler': scheduler_params,
+            },
+           'ema_hyperparameters': {
+                'ema_decay': self.ema.beta,
+                'update_ema_every': self.update_ema_every,
+                'step_start_ema': self.step_start_ema,
+            },
+           'training_config': {
+                 'save_freq': self.save_freq,
+                 'log_freq': self.log_freq,
+                 'logdir': self.logdir,
+                 'model_name': self.model_name,
+             },
+           'sde_hyperparameters': {
+                's': self.s,
+                'weight_type':self.weight_type,
+                'eps': self.eps,
+            }
+        }
+    
+        # Handle numpy arrays, torch.device, and other non-JSON-serializable types
+        hyperparams = convert_to_json_serializable(hyperparams)
+    
+        # Save with pretty printing (indent=4 makes it human-readable)
+        with open(filepath, 'w') as f:
+            json.dump(hyperparams, f, indent=4, sort_keys=False)
+    
+        print(f"Pretraining hyperparameters saved to {filepath}", flush=True)
 
     def backbone_selection(self):
          if(self.backbone_name == 'transformer'):
@@ -81,14 +180,12 @@ class SDETrainer:
     def reset_parameters(self):
         self.ema_model.load_state_dict(self.model.state_dict())
 
-
     def step_ema(self):
         if self.step < self.step_start_ema:
             self.reset_parameters()
             return
         self.ema.update_model_average(self.ema_model, self.model)
     
-
     def save(self, epoch):
         '''
             saves model and ema to disk;
@@ -102,13 +199,18 @@ class SDETrainer:
             'step': self.step,
             'ema': self.ema_model.state_dict()
         }
-        file_mame = self.model_name + '_' + str(epoch) + '.pt'
-        os.makedirs(self.logdir, exist_ok=True)
-        savepath = os.path.join(self.logdir, file_mame)
+        if(epoch == self.num_steps):
+            name = getName(self.dataset_name, self.specific_dataset)
+            file_name = f"{name}_Planner_{str(0)}.pt"
+            dir = f"./Finetuning/Planners/{self.dataset_name}/{self.specific_dataset}/"
+            os.makedirs(dir, exist_ok=True)
+            savepath = os.path.join(dir, file_name)
+        else:
+            file_name = self.model_name + '_' + str(epoch) + '.pt'
+            os.makedirs(self.logdir, exist_ok=True)
+            savepath = os.path.join(self.logdir, file_name)
         torch.save(data, savepath)
         print(f'Saved model to {savepath}', flush=True)
-
-
 
     def train(self):
         print(self.device)
@@ -117,6 +219,9 @@ class SDETrainer:
         print(f"Training planner for {self.dataset_name}-{self.specific_dataset} Dataset")
         print(f"Backbone:{self.backbone_name}, Horizon: {self.horizon}, Epochs: {self.num_steps}, Batch Size: {self.batch_size}, Learning Rate; {self.lr}")
         
+        # Save hyperparameters at the start of training
+        self.save_hyperparameters()
+
         self.model.train()
         self.ema_model.eval()
         for p in self.ema_model.parameters():
@@ -162,7 +267,6 @@ class SDETrainer:
              show_lr=True,
              smooth_window=50)
     
-
     def selector(self, specific_dataset, times = 1000):
          dataset = PlannerDataset_Rollout(self.dataset_name, specific_dataset, self.specific_dataset, self.horizon, self.state_dim, self.action_dim)
          dataloader = DataLoader(dataset, 10, shuffle = True, pin_memory = True)
@@ -202,7 +306,6 @@ class SDETrainer:
              smooth_window=5)
          
          return best_checkpoint, min_Loss
-
 
     def Loss(self, x0: torch.Tensor, conditions: torch.Tensor) -> torch.Tensor:                       # (B,H,D)
         B, H, D = x0.shape

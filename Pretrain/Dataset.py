@@ -19,7 +19,6 @@ import os
 
 
 
-
 #-------------------------------------------------------------------------------------#
 #------------------------------------- Dataset ---------------------------------------#
 #-------------------------------------------------------------------------------------#
@@ -328,7 +327,6 @@ class AntMazeDataset():
           return self.dataset.total_steps
 
 
-
 #-------------------------------------------------------------------------------------#
 #---------------------------------- Planner Dataset ----------------------------------#
 #-------------------------------------------------------------------------------------#
@@ -400,8 +398,8 @@ class PlannerDataset(Dataset):
 
         #get stats
         self.stats = SAStats()
-        self.stats.obs_mean=obs_all.mean(axis=0)
-        self.stats.obs_std =obs_all.std(axis=0)
+        self.stats.obs_mean = obs_all.mean(axis=0)
+        self.stats.obs_std = obs_all.std(axis=0)
        
 
         # ----- build normalized sliding windows -----

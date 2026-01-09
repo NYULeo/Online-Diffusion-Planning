@@ -339,7 +339,6 @@ class LinearAttention(nn.Module):
         return self.to_out(out)
 
 
-
 def apply_conditioning(x, conditions, state_dim):
     x[:, 0, :state_dim] = conditions.clone()
     return x
@@ -349,8 +348,6 @@ def apply_conditioning(x, conditions, state_dim):
 #-----------------------------------------------------------------------------#
 #---------------------------------- Selection --------------------------------#
 #-----------------------------------------------------------------------------#
-
-
 def get_pretrained_planner(dataset_name, specific_dataset, checkpoint_steps):
       planner_name = get_PlannerName(dataset_name, specific_dataset)
       checkpoint_path = f"./Pretrain/Planners/{dataset_name}/{specific_dataset}/Models/{planner_name}_{checkpoint_steps}.pt"
@@ -359,8 +356,6 @@ def get_pretrained_planner(dataset_name, specific_dataset, checkpoint_steps):
       checkpoint = torch.load(checkpoint_path, map_location='cpu')
       #checkpoint = torch.load(checkpoint_path,  weights_only=True)
       return checkpoint['ema']
-
-
 
 
 
@@ -547,5 +542,44 @@ class LossTracker:
         return padded
 
 
+
+
+def getName(env_name, specific_env):
+     if(env_name == 'kitchen'):
+          return 'Kitchen'
+     elif(env_name == 'pointmaze'):
+          if specific_env == 'open_dense':
+               return 'PointMaze_OpenDense'
+          elif specific_env == 'umaze':
+               return 'PointMaze_Umaze'
+          elif specific_env == 'large_dense':
+               return 'PointMaze_LargeDense'
+          elif specific_env== 'medium':
+               return 'PointMaze_Medium'
+          elif specific_env == 'umaze_dense':
+               return 'PointMaze_UmazeDense'
+          elif specific_env == 'large':
+               return 'PointMaze_Large'
+          elif specific_env == 'open':
+               return 'PointMaze_Open'
+          else:
+              raise ValueError(f"Invalid specific environment: {specific_env}")
+     elif(env_name == 'antmaze'):
+          if specific_env == 'medium_play':
+               return 'AntMaze_MediumPlay'
+          elif specific_env == 'umaze_diverse':
+               return 'AntMaze_UmazeDiverse'
+          elif specific_env == 'large_diverse':
+               return 'AntMaze_LargeDiverse'
+          elif specific_env == 'large_play':
+               return 'AntMaze_LargePlay'
+          elif specific_env == 'medium_diverse':
+               return 'AntMaze_MediumDiverse'
+          elif specific_env == 'umaze':
+               return 'AntMaze_Umaze'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
+     else:
+         raise ValueError(f"Invalid environment name: {env_name}")
 
 

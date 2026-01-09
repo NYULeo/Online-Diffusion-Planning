@@ -881,7 +881,6 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
      #print(f"Average Normalized Score: {score:.2f}")
      return trajs, score, total_steps
 
-
 def load_hyperparameters(filepath: str) -> Dict:
     with open(filepath, 'r') as f:
         hyperparams = json.load(f)

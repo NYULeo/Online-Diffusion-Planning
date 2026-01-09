@@ -44,7 +44,7 @@ def save_trajs(trajs, env_name, specific_env):
          pickle.dump(trajs, f)
     print(f"trajectories saved")
 
-def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None):
+def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None, base_seed: int = 0):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, Checpoint_steps; {checkpoint_steps}")
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
@@ -71,9 +71,9 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      #reset
      #s0 = env.reset(seed = 0, options={"goal_cell": goal_cell, "reset_cell": reset_cell})
      if(goal_cell is not None):
-        s0 = env.reset(seed = 0, options={"goal_cell": goal_cell, "reset_cell": start_cell})
+        s0 = env.reset(seed = base_seed, options={"goal_cell": goal_cell, "reset_cell": start_cell})
      else:
-        s0 = env.reset(seed = 0)
+        s0 = env.reset(seed = base_seed)
      s0 = s0[0]['observation']
      current_state = s0
      frames = []
@@ -101,8 +101,6 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
                 break
      
      env.close()
-     #print(np.array(rewards))
-     print(len(rewards))
      traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(rewards)}
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      #print(rewards)
@@ -113,7 +111,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
                 pickle.dump(traj_info, f)
      """
      
-     print(get_normalized_score([traj]))
+     #print(get_normalized_score([traj]))
 
 
     
@@ -124,10 +122,10 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
 if __name__ == "__main__":
     set_seed(0)
     horizon = 32
-    env_name = 'pointmaze'
-    specific_train_dataset = 'medium'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_steps = 70, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([5, 4], dtype = int))
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 4000, checkpoint_steps = 0, render = True)
+    env_name = 'kitchen'
+    specific_train_dataset = 'partial'
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_steps = 70, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([5, 4], dtype = int))
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 4000, checkpoint_steps = 0, render = True, base_seed = 10)
     #150, 8
     #50, 3
     #rollout_parallel(env_name, specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_step = 0, num_envs = 4, goal_cell = np.array([[6,1]], dtype = int), seed_base = 0)

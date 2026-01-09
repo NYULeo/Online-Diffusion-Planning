@@ -8,36 +8,50 @@ import os
 from gymnasium.vector import AsyncVectorEnv
 from Dataset import get_dataset
 
+def spare_reward_checker(rewards):
+     Temp = []
+     for i in range(1, len(rewards)):
+          if(rewards[i] == rewards[i-1]+1):
+               Temp.append(i)
+     new_rewards = [0]*len(rewards)
+     for i in range(len(rewards)):
+          if(i in Temp):
+               new_rewards[i] = 1
+          else:
+               new_rewards[i] = 0
+     return np.array(new_rewards, dtype = np.float64) 
+
+def get_normalized_score(rewards):
+    total = 0.0
+    for i in range(len(rewards)):
+        temp = 0.0
+        for j in range(len(rewards)):
+            #if(trajs[i]['rewards'][j] == 1):
+            temp += (0.99**j) * rewards[j]
+        total += temp
+    avg_discounted_return = total / len(rewards)
+    # 5. Compute normalized score
+    normalized_score = 100 * avg_discounted_return 
+    #print(f"Normalized Score: {normalized_score:.2f}")
+    return normalized_score
+
 def render(dataset_name, specific_dataset, traj):
      env, _, _ = get_env(dataset_name, specific_dataset, render_mode = 'rgb_array')
      env.reset()
      frames = []
+     rewards = []
      for i in range(len(traj['actions'])):
           action = traj['actions'][i]
             #action = np.clip(action, -1.0, 1.0)
-          _, _, terminated, truncated, _ = env.step(action)
+          _, reward, terminated, truncated, _ = env.step(action)
+          rewards.append(reward)
           frames.append(env.render())
           if terminated or truncated:
                break
+     print(sum(spare_reward_checker(rewards)))
      media.write_video("demo2.mp4", frames, fps=50)
      env.close()
 
-
-
-
-
-def spare_reward_kitchen(rewards):
-         Temp = []
-         for i in range(1, len(rewards)):
-            if(rewards[i] == rewards[i-1]+1):
-                  Temp.append(i)
-         new_rewards = [0]*len(rewards)
-         for i in range(len(rewards)):
-             if(i in Temp):
-                  new_rewards[i] = 1
-             else:
-                  new_rewards[i] = 0
-         return np.array(new_rewards, dtype = np.float64) 
 
 def reward_checker(rewards, new_rewards):
          if(len(rewards) != len(new_rewards)):
@@ -61,12 +75,14 @@ def check_speration(trajs):
 
 
 
-"""
+
 if __name__ == "__main__":
      set_seed(1)
-     data = get_dataset('kitchen', 'partial')
+     data = get_dataset('kitchen', 'complete')
      trajs = data.get_trajectories()
      render('kitchen', 'partial', trajs[0])
+
+
 """
 import ogbench
 env, train_dataset, val_dataset = ogbench.make_env_and_datasets('cube-single-noisy-singletask-task2-v0', compact_dataset=True)
@@ -98,7 +114,7 @@ for i in range(len(trajectories[2]['actions'])):
          
 media.write_video("demo2.mp4", frames, fps=50)
 env.close()
-
+"""
 
      
 """

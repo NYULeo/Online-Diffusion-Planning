@@ -1,9 +1,7 @@
-
-
 import sys
 import os
-
 from sympy.printing.rcode import reserved_words
+from torch.distributions.utils import R
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(project_root)
@@ -15,7 +13,6 @@ import torch
 import torch.optim as optim
 import numpy as np
 from Pretrain.utils import set_seed, SAStats
-#from Critic.train_critic import get_CriticName
 import torch.nn as nn
 import pickle
 from Pretrain.Rewards.nets import Reward, MLPNetwork, ScalarReward, SimpleReward
@@ -26,13 +23,137 @@ import copy
 from sympy import Predicate, factorint
 import torch.nn.functional as F
 import numpy as np
+import json
 
+def getName(env_name, specific_env):
+     if(env_name == 'kitchen'):
+          return 'Kitchen'
+     elif(env_name == 'pointmaze'):
+          if specific_env == 'open_dense':
+               return 'PointMaze_OpenDense'
+          elif specific_env == 'umaze':
+               return 'PointMaze_Umaze'
+          elif specific_env == 'large_dense':
+               return 'PointMaze_LargeDense'
+          elif specific_env== 'medium':
+               return 'PointMaze_Medium'
+          elif specific_env == 'umaze_dense':
+               return 'PointMaze_UmazeDense'
+          elif specific_env == 'large':
+               return 'PointMaze_Large'
+          elif specific_env == 'open':
+               return 'PointMaze_Open'
+          else:
+              raise ValueError(f"Invalid specific environment: {specific_env}")
+     elif(env_name == 'antmaze'):
+          if specific_env == 'medium_play':
+               return 'AntMaze_MediumPlay'
+          elif specific_env == 'umaze_diverse':
+               return 'AntMaze_UmazeDiverse'
+          elif specific_env == 'large_diverse':
+               return 'AntMaze_LargeDiverse'
+          elif specific_env == 'large_play':
+               return 'AntMaze_LargePlay'
+          elif specific_env == 'medium_diverse':
+               return 'AntMaze_MediumDiverse'
+          elif specific_env == 'umaze':
+               return 'AntMaze_Umaze'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
+     else:
+         raise ValueError(f"Invalid environment name: {env_name}")
 
+def save_reward_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, 
+                                  obs_dim, act_dim, reward_name, optimizer, reward_net, filepath: Optional[str] = None, 
+                                  specific_dataset: Optional[str] = None, target_reward: Optional[float] = None,
+                                  goal: Optional[np.array] = None):
+    if filepath is None:
+        if specific_dataset is None:
+            os.makedirs(f"./Pretrain/Rewards/{dataset_name}/args/", exist_ok=True)
+            filepath = f"./Pretrain/Rewards/{dataset_name}/args/hyperparameters.json"
+        else:
+            os.makedirs(f"./Pretrain/Rewards/{dataset_name}/{specific_dataset}/args/", exist_ok=True)
+            filepath = f"./Pretrain/Rewards/{dataset_name}/{specific_dataset}/args/hyperparameters.json"
+    
+    def convert_to_json_serializable(obj):
+        """Recursively convert objects to JSON-serializable types"""
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, np.generic):
+            return obj.item()
+        elif isinstance(obj, torch.device):
+            return str(obj)
+        elif isinstance(obj, (np.integer, np.floating)):
+            return obj.item()
+        elif obj is None:
+            return None
+        elif isinstance(obj, dict):
+            return {k: convert_to_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, (list, tuple)):
+            return [convert_to_json_serializable(item) for item in obj]
+        elif hasattr(obj, '__dict__') and not isinstance(obj, (str, int, float, bool, type(None))):
+            return str(obj)
+        return obj
+    
+    # Get optimizer info
+    optimizer_type = type(optimizer).__name__
+    optimizer_params = {
+        'type': optimizer_type,
+        'lr': lr,
+        'weight_decay': optimizer.param_groups[0].get('weight_decay', 0)
+    }
+    
+    # Get model architecture info
+    model_info = {
+        'model_type': type(reward_net).__name__,
+        'obs_dim': int(obs_dim),
+        'act_dim': int(act_dim),
+    }
+    
+    # Add model-specific parameters if available
+    if hasattr(reward_net, 'hidden_dim'):
+        model_info['hidden_dim'] = int(reward_net.hidden_dim)
+    if hasattr(reward_net, 'num_layers'):
+        model_info['num_layers'] = int(reward_net.num_layers)
+    if hasattr(reward_net, 'output_dim'):
+        model_info['output_dim'] = int(reward_net.output_dim)
+    
+    # Compile all hyperparameters
+    hyperparams = {
+        'env_details': {
+            'dataset_name': dataset_name,
+            'specific_dataset': specific_dataset,
+            'obs_dim': int(obs_dim),
+            'act_dim': int(act_dim),
+            'reward_name': reward_name,
+        },
+        'model_architecture': model_info,
+        'training_hyperparameters': {
+            'num_steps': num_steps,
+            'batch_size': batch_size,
+            'lr': lr,
+            'optimizer': optimizer_params,
+        },
+        'reward_processing': {
+            'sigma': sigma,
+            'target_reward': target_reward,
+            'goal': convert_to_json_serializable(goal),
+        }
+    }
+    
+    # Handle numpy arrays, torch.device, and other non-JSON-serializable types
+    hyperparams = convert_to_json_serializable(hyperparams)
+    
+    # Save with pretty printing (indent=4 makes it human-readable)
+    with open(filepath, 'w') as f:
+        json.dump(hyperparams, f, indent=4, sort_keys=False)
+    
+    print(f"Reward pretraining hyperparameters saved to {filepath}", flush=True)
 
 def reward_filter(obs, rews, goal):
     #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
     target_goals = goal
-    for i in range(len(obs)):
+    for i in range(1, len(obs)):
         goal_coord = np.floor(obs[i][:2]) + 0.5
         #goal_coord = np.round(goal_coord, 1)  
         if np.any(np.all(np.equal(goal_coord, target_goals), axis=1)):
@@ -40,6 +161,31 @@ def reward_filter(obs, rews, goal):
         else:
             rews[i-1] = 0
     return rews
+
+def save_to_finetuning(reward_net, dataset_name, specific_dataset: Optional[str] = None):
+    reward_net.eval()
+    net_dict = reward_net.state_dict()
+    name = getName(dataset_name, specific_dataset)
+    if(specific_dataset is None):
+        os.makedirs(f'./Finetuning/Rewards/{dataset_name}/Models/', exist_ok=True)
+        save_path = f'./Finetuning/Rewards/{dataset_name}/Models/{name}_Reward_{str(0)}.pkl'
+    else:
+        os.makedirs(f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
+        save_path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{name}_Reward_{str(0)}.pkl'
+    torch.save(net_dict, save_path)
+    print(f"reward model save to {save_path}")
+
+def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str] = None):
+    name = getName(dataset_name, specific_dataset)
+    if(specific_dataset is None):
+        os.makedirs(f'./Finetuning/Rewards/{dataset_name}/Stats/', exist_ok=True)
+        savepath = f'./Finetuning/Rewards/{dataset_name}/Stats/{name}_Reward_stats_{str(0)}.pkl'
+    else:
+        os.makedirs(f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/', exist_ok=True)
+        savepath = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/{name}_Reward_stats_{str(0)}.pkl'
+    with open(savepath, 'wb') as f:
+        pickle.dump(stats, f)
+    print(f"saved stats to {savepath}")
 
 def save_model(reward_net, reward_name, num_steps):
     reward_net.eval()
@@ -163,26 +309,29 @@ class RewardDataset(Dataset):
     
 
 def train_reward(dataset_name: str, batch_size, num_steps, save_freq, lr, sigma, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None):
-    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
     print(f"Training reward approximator for {dataset_name} Dataset") 
     dataset = RewardDataset(trajs, sigma, reward_name, target_reward, goal)
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
-    
-    """
-    reward_net = ScalarReward(
-        obs_dim,
-        act_dim,
-        hidden_units=1024,
-        num_layers=5).to(device)
-    """
-    #reward_net = LargeScalarReward(obs_dim, act_dim, output_scale = target_reward).to(device)
     reward_net = SimpleReward(obs_dim, act_dim).to(device)
-    #reward_net = DeepScaledReward(obs_dim, act_dim).to(device)
-    #reward_net = Reward(obs_dim, act_dim).to(device)
-    #reward_net = MLPNetwork(input_dim = obs_dim + act_dim, out_dim = 1, hidden_dims = [200, 200, 200, 200], act_fn = 'swish', out_act_fn = 'identity').to(device)
     optimizer = optim.AdamW(reward_net.parameters(), lr = lr, weight_decay = 1e-4)
+    save_reward_hyperparameters(
+        dataset_name, 
+        batch_size, 
+        num_steps, 
+        lr, 
+        sigma,
+        obs_dim,
+        act_dim, 
+        reward_name, 
+        optimizer, 
+        reward_net, 
+        filepath = None,
+        specific_dataset = specific_dataset, 
+        target_reward = target_reward, 
+        goal = goal
+    )
     total_loss = 0
     step = 0
     for i in range(num_steps):
@@ -210,8 +359,9 @@ def train_reward(dataset_name: str, batch_size, num_steps, save_freq, lr, sigma,
            if step % save_freq == 0:
               checkpoint = copy.deepcopy(reward_net)
               save_model(checkpoint, reward_name, step)
-           
-
+    save_to_finetuning(reward_net, dataset_name, specific_dataset)
+    stats = get_pretrained_reward_stats(reward_name)
+    save_stats_to_finetuning(stats, dataset_name, specific_dataset)
 
 class test_dataset(Dataset):
     def __init__(self, trajs, sigma, Reward_name, target_reward: Optional[float] = None, goal: Optional[np.array] = None):
@@ -301,7 +451,6 @@ def get_pretrained_reward(dataset_name, checkpoints, specific_dataset: Optional[
        _, name, obs_dim, act_dim  =  Train_Dataset(dataset_name, specific_dataset)
        reward_model_state_dict = load_model(name, checkpoints)
        return reward_model_state_dict, obs_dim, act_dim, name
-
 
 def get_pretrained_reward_stats(Reward_name):
     stats_path = f'./Pretrain/Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
