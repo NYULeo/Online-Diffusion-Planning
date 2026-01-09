@@ -34,7 +34,11 @@ from Pretrain.Critic.nets import Critic
 from Pretrain.Dataset import get_dataset
 import json
 
-
+def check_specifc_dataset(dataset_name):
+    if(dataset_name == 'kitchen'):
+         return False
+    elif(dataset_name == 'pointmaze'):
+         return True
 
 def spare_reward_prcocessor(rewards):
     Temp = []
@@ -65,30 +69,44 @@ def save_reward_model(reward_net, dataset_name, specific_dataset, step):
     reward_net.eval()
     name = getName(dataset_name, specific_dataset)
     net_dict = reward_net.state_dict()
-    os.makedirs(f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
-    save_path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{name}_Reward_{str(step)}.pkl'
+    if(check_specifc_dataset(dataset_name)):
+          os.makedirs(f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
+          save_path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{name}_Reward_{str(step)}.pkl'
+    else: 
+          os.makedirs(f'./Finetuning/Rewards/{dataset_name}/Models/', exist_ok=True)
+          save_path = f'./Finetuning/Rewards/{dataset_name}/Models/{name}_Reward_{str(step)}.pkl'
     #print("Exists:", os.path.isfile(save_path), "Size:", os.path.getsize(save_path) if os.path.isfile(save_path) else None)
     torch.save(net_dict, save_path)
 
 def save_kernel_model(kernel_net, dataset_name, specific_dataset, step, ensemble_idx):
     kernel_net.eval()
     name = getName(dataset_name, specific_dataset)
-    net_dict =  kernel_net.state_dict()
-    os.makedirs(f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{step}', exist_ok=True)
-    save_path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{step}/{name}_Kernel_{str(ensemble_idx)}.pkl'
+    net_dict = kernel_net.state_dict()
+    if(check_specifc_dataset(dataset_name)):
+          os.makedirs(f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
+          save_path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}/{name}_Kernel_{str(ensemble_idx)}.pkl'
+    else: 
+          os.makedirs(f'./Finetuning/Kernels/{dataset_name}/Models/', exist_ok=True)
+          save_path = f'./Finetuning/Kernels/{dataset_name}/Models/{str(step)}/{name}_Kernel_{str(ensemble_idx)}.pkl'
     torch.save(net_dict, save_path)
     #print(f"Kernel model save to {name}_{str(step)}_{str(ensemble_idx)}.pkl")
 
 def get_reward_model(dataset_name, specific_dataset, step):
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
     name = getName(dataset_name, specific_dataset)
-    path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{name}_Reward_{str(step)}.pkl'
+    if(check_specifc_dataset(dataset_name)):
+         path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{name}_Reward_{str(step)}.pkl'
+    else:
+        path = f'./Finetuning/Rewards/{dataset_name}/Models/{name}_Reward_{str(step)}.pkl'
     model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
     return model_state_dict, obs_dim, act_dim
 
 def get_reward_stats(dataset_name, specific_dataset, step):
     name = getName(dataset_name, specific_dataset)
-    path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/{name}_Reward_stats_{str(step)}.pkl'
+    if(check_specifc_dataset(dataset_name)):
+        path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/{name}_Reward_stats_{str(step)}.pkl'
+    else:
+        path = f'./Finetuning/Rewards/{dataset_name}/Stats/{name}_Reward_stats_{str(step)}.pkl'
     with open(path, 'rb') as f:
         stats = pickle.load(f)
     return stats  
@@ -100,13 +118,19 @@ def get_kernel(dataset_name, specific_dataset, step):
     file_count = count_files_in_folder(path)
     kernel_state_dicts = []
     for i in range(file_count):
-        dir = f"./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}/{name}_Kernel_{str(i)}.pkl"
+        if(check_specifc_dataset(dataset_name)):
+            dir = f"./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}/{name}_Kernel_{str(i)}.pkl"
+        else:
+            dir = f"./Finetuning/Kernels/{dataset_name}/Models/{str(step)}/{name}_Kernel_{str(i)}.pkl"
         kernel_state_dicts.append(torch.load(dir, weights_only=True, map_location='cpu'))
     return kernel_state_dicts, obs_dim, act_dim
 
 def get_kernel_stats(dataset_name, specific_dataset, step):
     name = getName(dataset_name, specific_dataset)
-    path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Stats/{name}_Kernel_stats_{str(step)}.pkl'
+    if(check_specifc_dataset(dataset_name)):
+        path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Stats/{name}_Kernel_stats_{str(step)}.pkl'
+    else:
+        path = f'./Finetuning/Kernels/{dataset_name}/Stats/{name}_Kernel_stats_{str(step)}.pkl'
     with open(path, 'rb') as f:
         stats = pickle.load(f)
     return stats  
