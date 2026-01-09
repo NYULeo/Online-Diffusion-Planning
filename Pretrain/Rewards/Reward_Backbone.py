@@ -24,6 +24,12 @@ import torch.nn.functional as F
 import numpy as np
 import json
 
+def check_specifc_dataset(dataset_name):
+    if(dataset_name == 'kitchen'):
+         return False
+    elif(dataset_name == 'pointmaze'):
+         return True
+
 def getName(env_name, specific_env):
      if(env_name == 'kitchen'):
           return 'Kitchen'
@@ -62,18 +68,16 @@ def getName(env_name, specific_env):
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
+
 def save_reward_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, 
                                   obs_dim, act_dim, reward_name, optimizer, reward_net, filepath: Optional[str] = None, 
                                   specific_dataset: Optional[str] = None, target_reward: Optional[float] = None,
                                   goal: Optional[np.array] = None):
     
     if filepath is None:
-        if specific_dataset is None:
-            os.makedirs(f"./Pretrain/Rewards/{dataset_name}/args/", exist_ok=True)
-            filepath = f"./Pretrain/Rewards/{dataset_name}/args/hyperparameters.json"
-        else:
-            os.makedirs(f"./Pretrain/Rewards/{dataset_name}/{specific_dataset}/args/", exist_ok=True)
-            filepath = f"./Pretrain/Rewards/{dataset_name}/{specific_dataset}/args/hyperparameters.json"
+        os.makedirs(f"./Pretrain/Rewards/{reward_name}/args/", exist_ok=True)
+        filepath = f"./Pretrain/Rewards/{reward_name}/args/hyperparameters.json"
+
     
     def convert_to_json_serializable(obj):
         """Recursively convert objects to JSON-serializable types"""
@@ -307,7 +311,6 @@ class RewardDataset(Dataset):
             torch.tensor(r, dtype=torch.float32),
         )
     
-
 def train_reward(dataset_name: str, batch_size, num_steps, save_freq, lr, sigma, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
@@ -316,6 +319,10 @@ def train_reward(dataset_name: str, batch_size, num_steps, save_freq, lr, sigma,
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
     reward_net = SimpleReward(obs_dim, act_dim).to(device)
     optimizer = optim.AdamW(reward_net.parameters(), lr = lr, weight_decay = 1e-4)
+    if(check_specifc_dataset(dataset_name)):
+        SD = specific_dataset
+    else:
+        SD = None
     save_reward_hyperparameters(
         dataset_name, 
         batch_size, 
@@ -359,9 +366,9 @@ def train_reward(dataset_name: str, batch_size, num_steps, save_freq, lr, sigma,
            if step % save_freq == 0:
               checkpoint = copy.deepcopy(reward_net)
               save_model(checkpoint, reward_name, step)
-    save_to_finetuning(reward_net, dataset_name, specific_dataset)
+    save_to_finetuning(reward_net, dataset_name, SD)
     stats = get_pretrained_reward_stats(reward_name)
-    save_stats_to_finetuning(stats, dataset_name, specific_dataset)
+    save_stats_to_finetuning(stats, dataset_name, SD)
 
 class test_dataset(Dataset):
     def __init__(self, trajs, sigma, Reward_name, target_reward: Optional[float] = None, goal: Optional[np.array] = None):

@@ -31,20 +31,23 @@ from gymnasium.vector import AsyncVectorEnv
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Critic.nets import Critic
+from Pretrain.Dataset import get_dataset
 import json
 
+
+
 def spare_reward_prcocessor(rewards):
-         Temp = []
-         for i in range(1, len(rewards)):
-            if(rewards[i] == rewards[i-1]+1):
-                  Temp.append(i)
-         new_rewards = [0]*len(rewards)
-         for i in range(len(rewards)):
-             if(i in Temp):
-                  new_rewards[i] = 1
-             else:
-                  new_rewards[i] = 0
-         return np.array(new_rewards, dtype = np.float64) 
+    Temp = []
+    for i in range(1, len(rewards)):
+        if(rewards[i] == rewards[i-1]+1):
+            Temp.append(i)
+    new_rewards = [0]*len(rewards)
+    for i in range(len(rewards)):
+        if(i in Temp):
+            new_rewards[i] = 1
+        else:
+            new_rewards[i] = 0
+    return np.array(new_rewards, dtype = np.float64) 
 
 def reward_filter(obs, rews, goal):
     #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
@@ -730,7 +733,7 @@ def clip_actions(x: torch.Tensor, d_s: int) -> torch.Tensor:
     x[..., d_s:] = actions
     return x
 
-def get_normalized_score(trajs):
+def get_normalized_score(trajs, expert_score: Optional[float] = None):
     total = 0.0
     for i in range(len(trajs)):
         temp = 0.0
@@ -741,8 +744,17 @@ def get_normalized_score(trajs):
     avg_discounted_return = total / len(trajs)
     # 5. Compute normalized score
     normalized_score = 100 * avg_discounted_return 
+    if(expert_score is not None):
+        normalized_score = 100 * (normalized_score / expert_score)
     #print(f"Normalized Score: {normalized_score:.2f}")
     return normalized_score
+
+def get_expert_score(dataset_name):
+    if(dataset_name == 'kitchen'):
+         data = get_dataset(dataset_name, 'complete')
+    trajs = data.get_trajectories()
+    score = get_normalized_score(trajs, None)
+    return score
 
 def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs=8, goal_cell: Optional[np.ndarray] = None, device: torch.device = None, seed_base: int = 0):
      #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
@@ -886,7 +898,9 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
           })
         
      vec_env.close()
-     score = get_normalized_score(trajs)
+     if(goal_cell is None):
+          expert_score = get_expert_score(env_name)
+     score = get_normalized_score(trajs, expert_score)
      save_trajs(trajs, env_name, specific_env, checkpoint_step)
      #print(f"Average Normalized Score: {score:.2f}")
      return trajs, score, total_steps
@@ -895,3 +909,5 @@ def load_hyperparameters(filepath: str) -> Dict:
     with open(filepath, 'r') as f:
         hyperparams = json.load(f)
     return hyperparams
+
+

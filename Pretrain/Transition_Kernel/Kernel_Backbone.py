@@ -18,6 +18,12 @@ import copy
 from Pretrain.utils import SAStats, cycle
 import json
 
+def check_specifc_dataset(dataset_name):
+    if(dataset_name == 'kitchen'):
+         return False
+    elif(dataset_name == 'pointmaze'):
+         return True
+
 def getName(env_name, specific_env):
      if(env_name == 'kitchen'):
           return 'Kitchen'
@@ -446,7 +452,10 @@ def train_kernel(dataset_name, specific_dataset: str = None,
         λ_reg,
         specific_dataset=specific_dataset
     )
-
+    if(check_specifc_dataset(dataset_name)):
+        SD = specific_dataset
+    else:
+        SD = None
     step = 0
     total_loss = 0.0
     save_freq = 5000
@@ -502,11 +511,11 @@ def train_kernel(dataset_name, specific_dataset: str = None,
             if(step == num_steps):
                 for idx, m in enumerate(ensemble):
                     ckpt = copy.deepcopy(m).cpu()
-                    save_to_finetuning(ckpt, dataset_name, idx, specific_dataset)
+                    save_to_finetuning(ckpt, dataset_name, idx, SD)
                  
     
     stats = get_pretrained_kernel_stats(kernel_name)
-    save_stats_to_finetuning(stats, dataset_name, specific_dataset)
+    save_stats_to_finetuning(stats, dataset_name, SD)
     # Return final ensemble
     return ensemble
 
