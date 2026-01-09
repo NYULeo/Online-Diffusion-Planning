@@ -57,7 +57,7 @@ if __name__ == "__main__":
     
     TrainCriticConfig = Train_Critic_Config(
                             batch_size = 256,
-                            num_steps= 1000,
+                            num_steps= 2000,
                             lr = 1e-4,
                             tau = 0.005,
                             gamma = 1.0)
@@ -78,7 +78,7 @@ if __name__ == "__main__":
         diffusion_steps = 150,
         karras_percent = 0.05,
         Loss_Clip_percent = 0.75,
-        finetune_batch_size = 8,
+        finetune_batch_size = 5,
         finetune_lr = 2e-05,
         initial_lam = 0.05,
         eta_lam = 0.5,

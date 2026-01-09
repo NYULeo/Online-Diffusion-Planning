@@ -82,7 +82,7 @@ class FinetuningConfig():
     reward_scaling_factor: float = 100000
     MaxEnt: bool = False
     Entropy_Scaling_Factor: float = 0.5
-    rollout_length: int = 4000
+    rollout_length: int = 1000
     rollout_num_envs: int = 1
    
 def save_hyperparameters(config: FinetuningConfig, filepath: Optional[str] = None):

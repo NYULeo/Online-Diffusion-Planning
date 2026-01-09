@@ -46,7 +46,7 @@ def save_trajs(trajs, env_name, specific_env):
 
 def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None, base_seed: int = 0):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}")
+     print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}, episode_length: {episode_length}")
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      device = "cuda" if torch.cuda.is_available() else "cpu"
      print(f"Using device {device}")
@@ -103,6 +103,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(rewards)}
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      #print(rewards)
+     print(len(frames))
      if(render):
           media.write_video("demo.mp4", frames, fps=50) #save the video
      """
@@ -124,10 +125,10 @@ if __name__ == "__main__":
     env_name = 'kitchen'
     specific_train_dataset = 'partial'
     #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_steps = 70, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([5, 4], dtype = int))
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 4000, checkpoint_steps = 0, render = True, base_seed = 10)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 4000, checkpoint_steps = 0, render = True, base_seed = 00)
     #150, 8
     #50, 3
-    rollout_parallel(env_name, specific_train_dataset, horizon = 32, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 4000, checkpoint_step = 0, num_envs = 4, seed_base = 0)
+    #rollout_parallel(env_name, specific_train_dataset, horizon = 32, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 4000, checkpoint_step = 0, num_envs = 4, seed_base = 0)
     """
     checkpoint = 0
     while(checkpoint < 450):

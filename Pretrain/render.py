@@ -49,6 +49,7 @@ def render(dataset_name, specific_dataset, traj):
           if terminated or truncated:
                break
      print(sum(spare_reward_checker(rewards)))
+     print(len(frames))
      media.write_video("demo2.mp4", frames, fps=50)
      env.close()
 
