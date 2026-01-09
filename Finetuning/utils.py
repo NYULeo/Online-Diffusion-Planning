@@ -114,7 +114,10 @@ def get_reward_stats(dataset_name, specific_dataset, step):
 def get_kernel(dataset_name, specific_dataset, step):
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
     name = getName(dataset_name, specific_dataset)
-    path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}'
+    if(check_specifc_dataset(dataset_name)):
+        path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}'
+    else:
+        path = f'./Finetuning/Kernels/{dataset_name}/Models/{str(step)}'
     file_count = count_files_in_folder(path)
     kernel_state_dicts = []
     for i in range(file_count):

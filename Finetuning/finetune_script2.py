@@ -87,6 +87,8 @@ if __name__ == "__main__":
         reward_scaling_factor = 50,
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
+        rollout_length = 1000,  # or your desired value
+        rollout_num_envs = 1, 
         train_reward_config = TrainRewardConfig,
         train_kernel_config = TrainKernelConfig,
         train_critic_config =  TrainCriticConfig) 
