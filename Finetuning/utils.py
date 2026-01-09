@@ -411,7 +411,7 @@ class CriticDataset(Dataset):
         for t in range(len(rews)):
             R = 0.0
             for i in range(t, min(t + horizon, len(rews))):
-                R += (gamma**(i-t + 1))*rews[i]
+                R += (gamma**(i-t))*rews[i]
             new_rews.append(R)
         return new_rews
 
@@ -734,7 +734,6 @@ def get_normalized_score(trajs):
     return normalized_score
 
 def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs=8, goal_cell: Optional[np.ndarray] = None, device: torch.device = None, seed_base: int = 0):
-     
      #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
      #print(f"Running {num_envs} environments in parallel")
      if device is None:

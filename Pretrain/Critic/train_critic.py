@@ -4,7 +4,7 @@ import os
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_root)
 os.chdir(project_root)
-from Finetuning.utils import TrajectoryDict, get_trajs
+from Finetuning.utils import TrajectoryDict, get_trajs, getName
 from torch.utils.data import Dataset, DataLoader
 import torch
 import torch.optim as optim
@@ -70,6 +70,23 @@ def save_critic(model, dataset_name, specific_dataset, step):
     #print("Exists:", os.path.isfile(save_path), "Size:", os.path.getsize(save_path) if os.path.isfile(save_path) else None)
     torch.save(net_dict, save_path)
     print(f"critic model save to {name}.pkl")
+
+def save_to_finetuning(critic_net, dataset_name, specific_dataset):
+    critic_net.eval()
+    net_dict = critic_net.state_dict()
+    name = getName(dataset_name, specific_dataset)
+    os.makedirs(f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
+    save_path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(0)}.pkl'
+    torch.save(net_dict, save_path)
+    print(f"critic model save to {save_path}")
+
+def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str] = None):
+    name = getName(dataset_name, specific_dataset)
+    os.makedirs(f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/', exist_ok=True)
+    savepath = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/{name}_Critic_stats_{str(0)}.pkl'
+    with open(savepath, 'wb') as f:
+        pickle.dump(stats, f)
+    print(f"saved stats to {savepath}")
 
 def get_critic_model(dataset_name, specific_dataset, step):
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
@@ -208,7 +225,6 @@ class Critic_Test_Dataset(Dataset):
         return rews
 
 def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, goal, target_reward = 1.0, trajs: List[TrajectoryDict] = None):
-    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = CriticDataset(sigma, dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
@@ -235,7 +251,6 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
            with torch.no_grad():
               q_next = target_critic(s_next)
               target = r + ( (gamma**horizon) * q_next)
-              #target = r 
 
            # Predicted V-values
            q_pred = critic(s)
@@ -250,16 +265,17 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
                tgt_param.data.mul_(1 - tau)
                tgt_param.data.add_(tau * param.data)
         
-           if(k % 200 == 0):
+           if(k % 2000 == 0):
                 target_critic.eval()
                 save_critic(target_critic, dataset_name, specific_dataset, k)
                 print(f"Checkpoint saved at step {k}")
-                
+    save_to_finetuning(target_critic, dataset_name, specific_dataset)
+    stats = get_critic_stats(dataset_name, specific_dataset)
+    save_stats_to_finetuning(stats, dataset_name, specific_dataset)
     print(f"critic model saved")
 
 
 def test_critic(dataset_name: str, specific_dataset: str, checkpoint_step, sigma, gamma, horizon, goal = None, target_reward = 1.0, trajs: Optional[List[TrajectoryDict]] = None):
-    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = Critic_Test_Dataset(sigma, dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma)
     batch_size = 100
@@ -270,7 +286,7 @@ def test_critic(dataset_name: str, specific_dataset: str, checkpoint_step, sigma
     model = Critic(obs_dim).to(device)
     model.load_state_dict(model_state_dict)
     model.eval()
-   
+    
     print(f"Testing critic for {dataset_name}-{specific_dataset} at checkpoint step {checkpoint_step}")
     total_loss = 0.0
     for s, r in dataloader:
@@ -284,35 +300,33 @@ def test_critic(dataset_name: str, specific_dataset: str, checkpoint_step, sigma
 
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
-    env_name = 'pointmaze'
-    specific_env = 'medium'
+    env_name = 'kitchen'
+    specific_env = 'partial'
     trajs = get_trajs(env_name, specific_env, 0)
     train_critic(dataset_name = env_name, 
                  specific_dataset = specific_env, 
-                 sigma = 7.0, 
+                 sigma = 5.0, 
                  batch_size = 256, 
-                 num_steps = 3000, 
+                 num_steps = 10000, 
                  gamma = 1.0, 
                  horizon = 32, 
-                 lr = 1e-5, 
+                 lr = 1e-4, 
                  tau = 0.005,
-                 goal = np.array([[-2.5, -2.5]], dtype = float),
                  target_reward = 1.0,
                  trajs = trajs)
     print('training complete')
     
-    step = 200
-    while(step <= 3000):
+    step = 2000
+    while(step <= 10000):
         test_critic(dataset_name = env_name, 
                     specific_dataset = specific_env, 
                     checkpoint_step = step, 
-                    sigma = 7.0, 
+                    sigma = 5.0, 
                     gamma = 1.0, 
                     horizon = 32, 
-                    goal = np.array([[-2.5, -2.5]], dtype = float), 
                     target_reward = 1.0, 
                     trajs = trajs)
-        step += 200
+        step += 2000
     print('testing complete')
 
 

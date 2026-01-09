@@ -66,6 +66,7 @@ def save_reward_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma,
                                   obs_dim, act_dim, reward_name, optimizer, reward_net, filepath: Optional[str] = None, 
                                   specific_dataset: Optional[str] = None, target_reward: Optional[float] = None,
                                   goal: Optional[np.array] = None):
+    
     if filepath is None:
         if specific_dataset is None:
             os.makedirs(f"./Pretrain/Rewards/{dataset_name}/args/", exist_ok=True)
