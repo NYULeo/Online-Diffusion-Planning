@@ -410,6 +410,7 @@ if __name__ == '__main__':  # pragma: no cover
                  horizon = 32, 
                  lr = 1e-4, 
                  tau = 0.005,
+                 goal = None,
                  target_reward = 1.0,
                  trajs = trajs)
     print('training complete')
@@ -422,6 +423,7 @@ if __name__ == '__main__':  # pragma: no cover
                     sigma = 5.0, 
                     gamma = 1.0, 
                     horizon = 32, 
+                    goal = None,
                     target_reward = 1.0, 
                     trajs = trajs)
         step += 2000
