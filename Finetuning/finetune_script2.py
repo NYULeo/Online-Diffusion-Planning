@@ -30,8 +30,8 @@ if __name__ == "__main__":
     # 
     # replace the reward and backbone initialisations with
     # loading of your pretrained models (e.g. via torch.load).
-    env_name = 'pointmaze'
-    specific_env = 'medium'
+    env_name = 'kitchen'
+    specific_env = 'partial'
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32)
     #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
     RWConfig = RewardConfig(
@@ -40,25 +40,25 @@ if __name__ == "__main__":
                explore = False) 
     
     TrainRewardConfig = Train_Reward_Config(
-                          batch_size = 256, 
-                          num_steps = 200, 
+                          batch_size = 128, 
+                          num_steps = 1000, 
                           lr = 3e-4, 
-                          sigma = 7.0, 
+                          sigma = 5.0, 
                           target_reward = 1.0, 
-                          train_goal = np.array([[-2.5, -2.5]], dtype = float),
-                          rollout_goal = np.array([[6, 1]], dtype = int))
+                          train_goal = None,
+                          rollout_goal = None)
     
     TrainKernelConfig = Train_Kernel_Config(
                             batch_size = 256, 
-                            num_steps = 1000,
+                            num_steps = 5000,
                             lr = 3e-4,
                             ensemble_size = 10,
                             λ_reg = 1e-3)
     
     TrainCriticConfig = Train_Critic_Config(
                             batch_size = 256,
-                            num_steps= 3000,
-                            lr = 1e-5,
+                            num_steps= 1000,
+                            lr = 1e-4,
                             tau = 0.005,
                             gamma = 1.0)
     
@@ -75,7 +75,7 @@ if __name__ == "__main__":
         buffer_size = 5500,
         finetune_steps = 3000,
         finetune_rounds = 300,
-        diffusion_steps = 50,
+        diffusion_steps = 150,
         karras_percent = 0.05,
         Loss_Clip_percent = 0.75,
         finetune_batch_size = 8,
