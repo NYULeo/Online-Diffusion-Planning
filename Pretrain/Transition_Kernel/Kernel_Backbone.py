@@ -449,7 +449,7 @@ def train_kernel(dataset_name, specific_dataset: str = None,
 
     step = 0
     total_loss = 0.0
-    save_freq = 2000
+    save_freq = 5000
 
     for step in range(1, num_steps + 1):
         s, a, s_next = next(loader)
