@@ -21,6 +21,88 @@ from utils import cycle
 import copy
 
 
+def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, 
+                                obs_dim, critic_net, optimizer, gamma, horizon, tau,
+                                specific_dataset: Optional[str] = None, 
+                                target_reward: Optional[float] = None,
+                                goal: Optional[np.array] = None):
+    
+    os.makedirs(f"./Pretrain/Critic/{dataset_name}/{specific_dataset}/args/", exist_ok=True)
+    filepath = f"./Pretrain/Critic/{dataset_name}/{specific_dataset}/args/hyperparameters.json"
+    
+    def convert_to_json_serializable(obj):
+        """Recursively convert objects to JSON-serializable types"""
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, np.generic):
+            return obj.item()
+        elif isinstance(obj, torch.device):
+            return str(obj)
+        elif isinstance(obj, (np.integer, np.floating)):
+            return obj.item()
+        elif obj is None:
+            return None
+        elif isinstance(obj, dict):
+            return {k: convert_to_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, (list, tuple)):
+            return [convert_to_json_serializable(item) for item in obj]
+        elif hasattr(obj, '__dict__') and not isinstance(obj, (str, int, float, bool, type(None))):
+            return str(obj)
+        return obj
+    
+    # Get optimizer info
+    optimizer_type = type(optimizer).__name__
+    optimizer_params = {
+        'type': optimizer_type,
+        'lr': lr,
+        'weight_decay': optimizer.param_groups[0].get('weight_decay', 0)
+    }
+    
+    # Get model architecture info
+    model_info = {
+        'model_type': type(critic_net).__name__,
+        'obs_dim': int(obs_dim),
+    }
+    
+    # Add model-specific parameters if available
+    if hasattr(critic_net, 'hidden'):
+        model_info['hidden_dim'] = int(critic_net.hidden)
+    
+    # Compile all hyperparameters
+    hyperparams = {
+        'env_details': {
+            'dataset_name': dataset_name,
+            'specific_dataset': specific_dataset,
+            'obs_dim': int(obs_dim),
+        },
+        'model_architecture': model_info,
+        'training_hyperparameters': {
+            'num_steps': num_steps,
+            'batch_size': batch_size,
+            'lr': lr,
+            'optimizer': optimizer_params,
+        },
+        'critic_config': {
+            'gamma': float(gamma),
+            'horizon': int(horizon),
+            'tau': float(tau),
+        },
+        'reward_processing': {
+            'sigma': float(sigma),
+            'target_reward': target_reward,
+            'goal': convert_to_json_serializable(goal),
+        }
+    }
+    
+    # Handle numpy arrays, torch.device, and other non-JSON-serializable types
+    hyperparams = convert_to_json_serializable(hyperparams)
+    
+    # Save with pretty printing (indent=4 makes it human-readable)
+    import json
+    with open(filepath, 'w') as f:
+        json.dump(hyperparams, f, indent=4, sort_keys=False)
+    
+    print(f"Critic pretraining hyperparameters saved to {filepath}", flush=True)
 
 
 def get_CriticName(env_name, specific_env):
@@ -239,6 +321,22 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
     target_critic.load_state_dict(critic.state_dict())
     target_critic.eval()
     optimizer = optim.Adam(critic.parameters(), lr = lr)
+
+    save_critic_hyperparameters(
+            dataset_name=dataset_name,
+            batch_size=batch_size,
+            num_steps=num_steps,
+            lr=lr,
+            sigma=sigma,
+            obs_dim=obs_dim,
+            critic_net=critic,
+            optimizer=optimizer,
+            gamma=gamma,
+            horizon=horizon,
+            tau=tau,
+            specific_dataset=specific_dataset,
+            target_reward=target_reward,
+            goal=goal)  
    
     print(f"Training critic for {dataset_name}-{specific_dataset}")
     for k in range(1, num_steps + 1):  # number of passes over dataset
