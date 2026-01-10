@@ -302,6 +302,7 @@ class OnlineFinetuner():
             print(f"Rollout Number of Environments: {self.config.rollout_num_envs}")
             print(f"Rollout Goal Cell: {self.config.train_reward_config.rollout_goal}")
             print(f"Critic: {self.config.critic}")
+            print(f"Rollout Episode Length: {self.config.rollout_length}")
             if(self.config.critic):
                 print(f"Critic Training Hyperarameters: ----------------------------------------------------------")
                 print(f"Critic Model Checkpoint: {self.config.critic_model_checkpoint}")

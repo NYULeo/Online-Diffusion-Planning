@@ -128,7 +128,7 @@ def set_seed(seed: int):
     torch.backends.cudnn.benchmark = False
 
 
-"""
+
 if __name__ == "__main__":
     # Example usage of the Adjoint Matching training without a dataset.
     # In practice, 
@@ -141,7 +141,7 @@ if __name__ == "__main__":
     #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
     RWConfig = RewardConfig(
                beta = 1.0, 
-               min_log_prob = -10.0, 
+               min_log_prob = -20000.0, 
                explore = False) 
     
     TrainRewardConfig = Train_Reward_Config(
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     
     TrainKernelConfig = Train_Kernel_Config(
                             batch_size = 256, 
-                            num_steps = 5000,
+                            num_steps = 10000,
                             lr = 3e-4,
                             ensemble_size = 10,
                             λ_reg = 1e-3)
@@ -203,9 +203,8 @@ if __name__ == "__main__":
     OnlineFinetuner.finetune_planner()
 
 #finetune_lr = 1e-05,
+
 """
-
-
 if __name__ == "__main__":
     # Example usage of the Adjoint Matching training without a dataset.
     # In practice, 
@@ -216,7 +215,7 @@ if __name__ == "__main__":
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-    """
+    
     env_name = 'pointmaze'
     specific_env = 'medium'
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32)
@@ -283,6 +282,6 @@ if __name__ == "__main__":
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-    """
+"""
 
 
