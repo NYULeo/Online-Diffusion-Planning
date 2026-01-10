@@ -11,8 +11,8 @@ if __name__ == '__main__':
     train_reward(
     dataset_name = 'kitchen',
     batch_size = 128, 
-    num_steps = 5000, 
-    save_freq = 1000,  
+    num_steps = 1000, 
+    save_freq = 200,  
     lr = 3e-4,
     sigma = 5.0,
     target_reward = 1.0,

@@ -363,7 +363,7 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
                tgt_param.data.mul_(1 - tau)
                tgt_param.data.add_(tau * param.data)
         
-           if(k % 2000 == 0):
+           if(k % 200 == 0):
                 target_critic.eval()
                 save_critic(target_critic, dataset_name, specific_dataset, k)
                 print(f"Checkpoint saved at step {k}")
@@ -405,7 +405,7 @@ if __name__ == '__main__':  # pragma: no cover
                  specific_dataset = specific_env, 
                  sigma = 5.0, 
                  batch_size = 256, 
-                 num_steps = 10000, 
+                 num_steps = 1000, 
                  gamma = 1.0, 
                  horizon = 32, 
                  lr = 1e-4, 
@@ -415,8 +415,8 @@ if __name__ == '__main__':  # pragma: no cover
                  trajs = trajs)
     print('training complete')
     
-    step = 2000
-    while(step <= 10000):
+    step = 200
+    while(step <= 1000):
         test_critic(dataset_name = env_name, 
                     specific_dataset = specific_env, 
                     checkpoint_step = step, 
@@ -426,7 +426,7 @@ if __name__ == '__main__':  # pragma: no cover
                     goal = None,
                     target_reward = 1.0, 
                     trajs = trajs)
-        step += 2000
+        step += 200
     print('testing complete')
 
 

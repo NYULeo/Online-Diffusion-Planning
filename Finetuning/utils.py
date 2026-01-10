@@ -34,7 +34,7 @@ from Pretrain.Critic.nets import Critic
 from Pretrain.Dataset import get_dataset
 import json
 
-def check_specifc_dataset(dataset_name):
+def check_specific_dataset(dataset_name):
     if(dataset_name == 'kitchen'):
          return False
     elif(dataset_name == 'pointmaze'):
@@ -69,7 +69,7 @@ def save_reward_model(reward_net, dataset_name, specific_dataset, step):
     reward_net.eval()
     name = getName(dataset_name, specific_dataset)
     net_dict = reward_net.state_dict()
-    if(check_specifc_dataset(dataset_name)):
+    if(check_specific_dataset(dataset_name)):
           os.makedirs(f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
           save_path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{name}_Reward_{str(step)}.pkl'
     else: 
@@ -82,7 +82,7 @@ def save_kernel_model(kernel_net, dataset_name, specific_dataset, step, ensemble
     kernel_net.eval()
     name = getName(dataset_name, specific_dataset)
     net_dict = kernel_net.state_dict()
-    if(check_specifc_dataset(dataset_name)):
+    if(check_specific_dataset(dataset_name)):
           os.makedirs(f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}', exist_ok=True)
           save_path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}/{name}_Kernel_{str(ensemble_idx)}.pkl'
     else: 
@@ -94,7 +94,7 @@ def save_kernel_model(kernel_net, dataset_name, specific_dataset, step, ensemble
 def get_reward_model(dataset_name, specific_dataset, step):
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
     name = getName(dataset_name, specific_dataset)
-    if(check_specifc_dataset(dataset_name)):
+    if(check_specific_dataset(dataset_name)):
          path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{name}_Reward_{str(step)}.pkl'
     else:
         path = f'./Finetuning/Rewards/{dataset_name}/Models/{name}_Reward_{str(step)}.pkl'
@@ -103,7 +103,7 @@ def get_reward_model(dataset_name, specific_dataset, step):
 
 def get_reward_stats(dataset_name, specific_dataset, step):
     name = getName(dataset_name, specific_dataset)
-    if(check_specifc_dataset(dataset_name)):
+    if(check_specific_dataset(dataset_name)):
         path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/{name}_Reward_stats_{str(step)}.pkl'
     else:
         path = f'./Finetuning/Rewards/{dataset_name}/Stats/{name}_Reward_stats_{str(step)}.pkl'
@@ -114,14 +114,14 @@ def get_reward_stats(dataset_name, specific_dataset, step):
 def get_kernel(dataset_name, specific_dataset, step):
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
     name = getName(dataset_name, specific_dataset)
-    if(check_specifc_dataset(dataset_name)):
+    if(check_specific_dataset(dataset_name)):
         path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}'
     else:
         path = f'./Finetuning/Kernels/{dataset_name}/Models/{str(step)}'
     file_count = count_files_in_folder(path)
     kernel_state_dicts = []
     for i in range(file_count):
-        if(check_specifc_dataset(dataset_name)):
+        if(check_specific_dataset(dataset_name)):
             dir = f"./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}/{name}_Kernel_{str(i)}.pkl"
         else:
             dir = f"./Finetuning/Kernels/{dataset_name}/Models/{str(step)}/{name}_Kernel_{str(i)}.pkl"
@@ -130,7 +130,7 @@ def get_kernel(dataset_name, specific_dataset, step):
 
 def get_kernel_stats(dataset_name, specific_dataset, step):
     name = getName(dataset_name, specific_dataset)
-    if(check_specifc_dataset(dataset_name)):
+    if(check_specific_dataset(dataset_name)):
         path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Stats/{name}_Kernel_stats_{str(step)}.pkl'
     else:
         path = f'./Finetuning/Kernels/{dataset_name}/Stats/{name}_Kernel_stats_{str(step)}.pkl'
@@ -294,7 +294,10 @@ class KernelDataset(Dataset):
     def save_stats(self, dataset_name, specific_dataset, step):
         name = getName(dataset_name, specific_dataset)
         stats_name =  str(name) + f'_Kernel_stats_{str(step)}.pkl'
-        stats_dir = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Stats/'
+        if(check_specific_dataset(dataset_name)):
+             stats_dir = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Stats/'
+        else:
+             stats_dir = f'./Finetuning/Kernels/{dataset_name}/Stats/'
         os.makedirs(stats_dir, exist_ok=True)
         savepath = os.path.join(stats_dir, stats_name)
         with open(savepath, 'wb') as f:
@@ -357,7 +360,10 @@ class RewardDataset(Dataset):
     def save_stats(self, dataset_name, specific_dataset, step):
         name = getName(dataset_name, specific_dataset)
         stats_name =  str(name) + f'_Reward_stats_{str(step)}.pkl'
-        stats_dir = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/'
+        if(check_specific_dataset(dataset_name)):
+            stats_dir = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/'
+        else:
+            stats_dir = f'./Finetuning/Rewards/{dataset_name}/Stats/'
         os.makedirs(stats_dir, exist_ok=True)
         savepath = os.path.join(stats_dir, stats_name)
         with open(savepath, 'wb') as f:

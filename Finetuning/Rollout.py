@@ -22,6 +22,149 @@ from typing import Optional
 from utils import get_normalized_score, rollout_parallel
 
 
+def test_rollout_fit_for_model(traj, dataset_name=None, specific_dataset=None, 
+                                reward_checkpoint=0, kernel_checkpoint=0, 
+                                critic_checkpoint=0, device=None):
+    """
+    Calculate average log probability, average reward, and average critic value 
+    for a trajectory using the reward, kernel, and critic models.
+    
+    Args:
+        traj: Trajectory dictionary with 'observations', 'actions', and 'rewards'
+        dataset_name: Name of the dataset (e.g., 'kitchen', 'pointmaze')
+        specific_dataset: Specific dataset variant (e.g., 'partial', 'medium')
+        reward_checkpoint: Checkpoint step for reward model
+        kernel_checkpoint: Checkpoint step for kernel model
+        critic_checkpoint: Checkpoint step for critic model
+        device: torch device (defaults to cuda if available, else cpu)
+    
+    Returns:
+        dict: {
+            'avg_log_prob': float,    # Average log probability from kernel model
+            'avg_reward': float,      # Average reward from reward model
+            'avg_critic': float       # Average critic value from critic model
+        }
+    """
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    if dataset_name is None or specific_dataset is None:
+        raise ValueError("dataset_name and specific_dataset must be provided")
+    
+    # Load reward model and stats
+    from Finetuning.utils import (get_reward_model, get_reward_stats, get_kernel, 
+                                   get_kernel_stats, get_critic_model, get_critic_stats)
+    from Pretrain.Rewards.nets import SimpleReward
+    from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel
+    from Pretrain.Critic.nets import Critic
+    from Pretrain.Dataset import get_env
+    
+    reward_state_dict, obs_dim, act_dim = get_reward_model(dataset_name, specific_dataset, reward_checkpoint)
+    reward_net = SimpleReward(obs_dim, act_dim).to(device)
+    reward_net.load_state_dict(reward_state_dict)
+    reward_net.eval()
+    reward_stats = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint)
+    
+    # Load kernel models and stats
+    kernel_state_dicts, _, _ = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
+    kernels = []
+    for kernel_state_dict in kernel_state_dicts:
+        kernel_net = RobustTransitionKernel(obs_dim, act_dim).to(device)
+        kernel_net.load_state_dict(kernel_state_dict)
+        kernel_net.eval()
+        kernels.append(kernel_net)
+    kernel_stats = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
+    
+    # Load critic model and stats
+    critic_state_dict, critic_obs_dim = get_critic_model(dataset_name, specific_dataset, critic_checkpoint)
+    critic_net = Critic(critic_obs_dim).to(device)
+    critic_net.load_state_dict(critic_state_dict)
+    critic_net.eval()
+    critic_stats = get_critic_stats(dataset_name, specific_dataset, critic_checkpoint)
+    
+    observations = traj['observations']
+    actions = traj['actions']
+    
+    # Calculate average log probability, average reward, and average critic value
+    total_log_prob = 0.0
+    total_reward = 0.0
+    total_critic = 0.0
+    num_transitions = len(actions)
+    num_states = len(observations)
+    
+    with torch.no_grad():
+        for t in range(num_transitions):
+            # Get state, action, and next state
+            s = observations[t]
+            a = actions[t]
+            
+            # Compute reward
+            s_norm_reward = reward_stats.norm_obs(s)
+            s_tensor = torch.tensor(s_norm_reward, dtype=torch.float32, device=device).unsqueeze(0)
+            a_tensor = torch.tensor(a, dtype=torch.float32, device=device).unsqueeze(0)
+            r = reward_net(s_tensor, a_tensor)
+            total_reward += r.item()
+            
+            # Compute critic value for current state
+            # For pointmaze, critic uses only first 2 dimensions
+            if dataset_name == 'pointmaze':
+                s_critic = s[:2]
+            else:
+                s_critic = s
+            s_norm_critic = critic_stats.norm_obs(s_critic)
+            s_critic_tensor = torch.tensor(s_norm_critic, dtype=torch.float32, device=device).unsqueeze(0)
+            v = critic_net(s_critic_tensor)
+            total_critic += v.item()
+            
+            # Skip if we don't have next state for log prob calculation
+            if t >= len(observations) - 1:
+                continue
+            
+            s_next = observations[t + 1]
+            
+            # Compute log probability using kernel ensemble
+            s_norm_kernel = kernel_stats.norm_obs(s)
+            s_next_norm_kernel = kernel_stats.norm_obs(s_next)
+            
+            s_tensor = torch.tensor(s_norm_kernel, dtype=torch.float32, device=device).unsqueeze(0)
+            a_tensor = torch.tensor(a, dtype=torch.float32, device=device).unsqueeze(0)
+            s_next_tensor = torch.tensor(s_next_norm_kernel, dtype=torch.float32, device=device).unsqueeze(0)
+            
+            # Average log prob across ensemble
+            ensemble_log_probs = []
+            for kernel in kernels:
+                mu, log_std = kernel(s_tensor, a_tensor)
+                lp = kernel.log_prob(s_next_tensor, mu, log_std)
+                ensemble_log_probs.append(lp.item())
+            
+            avg_log_prob_transition = np.mean(ensemble_log_probs)
+            total_log_prob += avg_log_prob_transition
+        
+        # Compute critic value for the last state (if not already computed)
+        if num_states > num_transitions:
+            s_final = observations[num_states - 1]
+            if dataset_name == 'pointmaze':
+                s_final_critic = s_final[:2]
+            else:
+                s_final_critic = s_final
+            s_final_norm_critic = critic_stats.norm_obs(s_final_critic)
+            s_final_critic_tensor = torch.tensor(s_final_norm_critic, dtype=torch.float32, device=device).unsqueeze(0)
+            v_final = critic_net(s_final_critic_tensor)
+            total_critic += v_final.item()
+    
+    # Calculate averages
+    # For log prob, we have num_transitions-1 transitions (last step has no next state)
+    num_transitions_for_log_prob = num_transitions - 1 if num_transitions > 0 else 0
+    avg_log_prob = total_log_prob / num_transitions_for_log_prob if num_transitions_for_log_prob > 0 else 0.0
+    avg_reward = total_reward / num_transitions if num_transitions > 0 else 0.0
+    avg_critic = total_critic / num_states if num_states > 0 else 0.0
+    
+    return {
+        'avg_log_prob': avg_log_prob,
+        'avg_reward': avg_reward,
+        'avg_critic': avg_critic
+    }
+
 def set_seed(seed=0):
     # Python random
     random.seed(seed)
@@ -102,6 +245,10 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      env.close()
      traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(spare_reward_prcocessor(rewards))}
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
+     print(test_rollout_fit_for_model(traj, env_name, specific_env, 
+                                checkpoint_steps, checkpoint_steps, checkpoint_steps,
+                                device=None))
+     
      #print(rewards)
      expert_score = get_expert_score(env_name)
      print(get_normalized_score([traj], expert_score))
