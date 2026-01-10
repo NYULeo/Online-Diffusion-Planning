@@ -10,11 +10,11 @@ if __name__ == '__main__':
     set_seed(1)
     train_reward(
     dataset_name = 'kitchen',
-    batch_size = 128, 
-    num_steps = 1000, 
+    batch_size = 256, 
+    num_steps = 2000, 
     save_freq = 200,  
-    lr = 3e-4,
-    sigma = 5.0,
+    lr = 1e-4,
+    sigma = 30.0,
     target_reward = 1.0,
     specific_dataset='partial',
     goal = None)

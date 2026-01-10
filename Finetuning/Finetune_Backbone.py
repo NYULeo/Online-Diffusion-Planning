@@ -74,7 +74,7 @@ class FinetuningConfig():
     karras_percent: float = 0.05
     Loss_Clip_percent: float = 0.75
     finetune_batch_size: int = 12
-    finetune_lr: float = 2e-4
+    finetune_lr: float = 1e-6
     initial_lam: float = 0.01
     eta_lam: float = 0.001
     gradient_accumulate_every: int = 1

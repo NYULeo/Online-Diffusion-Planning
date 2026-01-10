@@ -50,7 +50,7 @@ class Acc_AdjointMatchingConfig:
     sigma_max: float = 30.0
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     step_start_ema = 50
-    ema_decay = 0.999
+    ema_decay = 0.9999
     update_ema_every = 2
 
     finetune_lr: float = 1e-4
@@ -415,7 +415,7 @@ class Acc_AdjointMatchingFineTuner:
        
         if(reward_std == 0.0):
             reward_std = 1.0
-        a0 =  (-1 * (self.config.reward_scaling_factor/reward_std) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * EntGrad)
+        a0 =  (-1 * (self.config.reward_scaling_factor/reward_std) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * (-1) * EntGrad)
         #max_norm = 5.0
         #a0 =   a0 * torch.clamp(max_norm / torch.norm(a0), max=1.0)
         #print(f"a0: {a0.norm().item()}")
