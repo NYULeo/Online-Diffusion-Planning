@@ -9,7 +9,7 @@ import mediapy as media
 from Pretrain.Dataset import get_env
 from Pretrain.Planners.Backbone.Dit import DiT1d
 #from Pretrain.Planners.Backbone.utils import get_pretrained_planner
-from utils import get_planner, get_normalized_score
+from Finetuning.utils import get_planner, get_normalized_score, get_expert_score, spare_reward_prcocessor
 from Pretrain.Dataset import Planner_Processor
 from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde, sample_euler_karras, sample_euler_karras2
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
@@ -100,10 +100,11 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
                 break
      
      env.close()
-     traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(rewards)}
+     traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(spare_reward_prcocessor(rewards))}
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      #print(rewards)
-     print(len(frames))
+     expert_score = get_expert_score(env_name)
+     print(get_normalized_score([traj], expert_score))
      if(render):
           media.write_video("demo.mp4", frames, fps=50) #save the video
      """
@@ -114,7 +115,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      #print(get_normalized_score([traj]))
 
 
-    
+
 
 
 
@@ -125,17 +126,20 @@ if __name__ == "__main__":
     env_name = 'kitchen'
     specific_train_dataset = 'partial'
     #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_steps = 70, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([5, 4], dtype = int))
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True, base_seed = 100)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True, base_seed = 0)
     #150, 8
     #50, 3
     #rollout_parallel(env_name, specific_train_dataset, horizon = 32, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 4000, checkpoint_step = 0, num_envs = 4, seed_base = 0)
-    """
+ 
+   
+   
+"""
     checkpoint = 0
     while(checkpoint < 450):
        print(f"Rollout for checkpoint: {checkpoint}")
        rollout_parallel(env_name,  specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, critic = False, checkpoint_steps = checkpoint, num_envs=8)
        checkpoint += 50
-    """
+"""
     
 
 
