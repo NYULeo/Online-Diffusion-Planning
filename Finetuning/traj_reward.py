@@ -269,6 +269,7 @@ class TotalReward_Critic(nn.Module):
             lp = self.kernels[i].log_prob(s_next, mu, log_std)
             total = total + lp 
         avg = total / len(self.kernels)
+        print(f"Avg: {avg}")
         x =  self.config.min_log_prob - avg
         c = F.softplus(x, beta = self.config.beta)
         return c
