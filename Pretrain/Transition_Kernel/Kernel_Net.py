@@ -101,4 +101,3 @@ class RobustTransitionKernel(nn.Module):
         lp = lp - 0.5 * (D * math.log(2 * math.pi) + 2 * log_std.sum(dim=-1))
         return lp  # tensor of shape batch
 
-    
