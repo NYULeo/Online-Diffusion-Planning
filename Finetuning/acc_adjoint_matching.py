@@ -474,7 +474,7 @@ class Acc_AdjointMatchingFineTuner:
             for s0 in local_s0:
                 s0 = s0.to (self.device)
                 #Mutiple Ones
-                for i in range(3):
+                for i in range(5):
                    with self.accelerator.autocast():
                        traj, reward = self.sample_Traj_karras(s0, base_reward_model) 
                    #print(f"Reward: {reward.item()}")
