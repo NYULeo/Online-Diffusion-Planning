@@ -497,7 +497,7 @@ class Acc_AdjointMatchingFineTuner:
                local_final_Cs = torch.tensor([0.0]*len(local_s0), device = self.device)
                local_rewards = torch.tensor([0.0]*len(local_s0), device = self.device)
               
-        
+            print(f"local_trajs: {local_trajs}")
         self.accelerator.wait_for_everyone()
         
         local_Cs_det = local_final_Cs.detach()
