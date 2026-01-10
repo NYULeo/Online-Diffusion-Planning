@@ -15,4 +15,4 @@ if __name__ == '__main__':  # pragma: no cover
     trajs = get_trajs('kitchen', 'partial', step = 0)
    
     #test_Model(dataset_name = 'pointmaze', specific_dataset = 'medium', trajs = trajs, save_freq = 2000, num_steps = 50000)
-    test_kernel(dataset_name = 'kitchen', trajs = trajs, save_freq = 50000, num_steps = 500000, ensemble_size = 10)
+    test_kernel(dataset_name = 'kitchen', trajs = trajs, save_freq = 50000, num_steps = 100000, ensemble_size = 10)
