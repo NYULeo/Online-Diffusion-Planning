@@ -83,10 +83,10 @@ def save_kernel_model(kernel_net, dataset_name, specific_dataset, step, ensemble
     name = getName(dataset_name, specific_dataset)
     net_dict = kernel_net.state_dict()
     if(check_specifc_dataset(dataset_name)):
-          os.makedirs(f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
+          os.makedirs(f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}', exist_ok=True)
           save_path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}/{name}_Kernel_{str(ensemble_idx)}.pkl'
     else: 
-          os.makedirs(f'./Finetuning/Kernels/{dataset_name}/Models/', exist_ok=True)
+          os.makedirs(f'./Finetuning/Kernels/{dataset_name}/Models/{str(step)}', exist_ok=True)
           save_path = f'./Finetuning/Kernels/{dataset_name}/Models/{str(step)}/{name}_Kernel_{str(ensemble_idx)}.pkl'
     torch.save(net_dict, save_path)
     #print(f"Kernel model save to {name}_{str(step)}_{str(ensemble_idx)}.pkl")
