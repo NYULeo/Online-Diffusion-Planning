@@ -76,6 +76,7 @@ class RobustTransitionKernel(nn.Module):
         # sum over state dims, but keep batch dims
         return nll.sum(dim=-1).mean()
     
+    """
     def log_prob(self, s_next, mu, log_std):
         var_pred = torch.exp(2 * log_std)
         var = var_pred + self.noise_floor
@@ -88,6 +89,8 @@ class RobustTransitionKernel(nn.Module):
         nll = const + 0.5 * log_det + mahal
         return -nll  
     """
+
+
     def log_prob(self, s_next, mu, log_std):
         # Compute log prob (not negative) — useful for testing / diagnostics
         var = torch.exp(2 * log_std) + self.noise_floor
@@ -97,5 +100,5 @@ class RobustTransitionKernel(nn.Module):
         lp = -0.5 * (((s_next - mu) ** 2) / var).sum(dim=-1)
         lp = lp - 0.5 * (D * math.log(2 * math.pi) + 2 * log_std.sum(dim=-1))
         return lp  # tensor of shape batch
-    """
+
     
