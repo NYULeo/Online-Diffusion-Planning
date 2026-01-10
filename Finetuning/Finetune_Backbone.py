@@ -318,7 +318,8 @@ class OnlineFinetuner():
         
         if self.accelerator.is_main_process:
              save_hyperparameters(self.config)
-
+        
+        """
         if self.accelerator.is_main_process:
              print(f"Starting Rollout")
              trajs, score, _ = rollout_parallel(self.config.dataset_name, 
@@ -333,6 +334,7 @@ class OnlineFinetuner():
                                          goal_cell = self.config.train_reward_config.rollout_goal)
              print(f"Total Number of Environment Steps: {0}")
              print(f"Average Normalized Score: {score:.2f}")
+        """
         self.accelerator.wait_for_everyone()
         
         rank = self.accelerator.process_index
