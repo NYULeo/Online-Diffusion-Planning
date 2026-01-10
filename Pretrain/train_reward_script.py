@@ -11,11 +11,11 @@ if __name__ == '__main__':
     train_reward(
     dataset_name = 'kitchen',
     batch_size = 256, 
-    num_steps = 2000, 
+    num_steps = 800, 
     save_freq = 200,  
     lr = 1e-4,
     sigma = 30.0,
-    target_reward = 1.0,
+    target_reward = 10.0,
     specific_dataset='partial',
     goal = None)
 

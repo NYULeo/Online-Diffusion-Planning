@@ -50,7 +50,7 @@ class Acc_AdjointMatchingConfig:
     sigma_max: float = 30.0
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     step_start_ema = 50
-    ema_decay = 0.9999
+    ema_decay = 0.99
     update_ema_every = 2
 
     finetune_lr: float = 1e-4
