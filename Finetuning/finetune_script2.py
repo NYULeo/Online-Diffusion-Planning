@@ -78,7 +78,7 @@ if __name__ == "__main__":
         diffusion_steps = 150,
         karras_percent = 0.05,
         Loss_Clip_percent = 0.75,
-        finetune_batch_size = 5,
+        finetune_batch_size = 4,
         finetune_lr = 2e-05,
         initial_lam = 0.05,
         eta_lam = 0.5,
