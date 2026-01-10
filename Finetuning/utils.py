@@ -927,7 +927,9 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
      vec_env.close()
      if(goal_cell is None):
           expert_score = get_expert_score(env_name)
-     score = get_normalized_score(trajs, expert_score)
+          score = get_normalized_score(trajs, expert_score)
+     else:
+          score = get_normalized_score(trajs)
      save_trajs(trajs, env_name, specific_env, checkpoint_step)
      #print(f"Average Normalized Score: {score:.2f}")
      return trajs, score, total_steps
