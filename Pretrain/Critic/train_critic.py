@@ -415,6 +415,7 @@ if __name__ == '__main__':  # pragma: no cover
                  trajs = trajs)
     print('training complete')
     
+    trajs = get_trajs(env_name, specific_env, 0)
     step = 2000
     while(step <= 10000):
         test_critic(dataset_name = env_name, 
