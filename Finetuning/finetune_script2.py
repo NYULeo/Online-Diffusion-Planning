@@ -81,7 +81,7 @@ if __name__ == "__main__":
         finetune_batch_size = 4,
         finetune_lr = 2e-05,
         #initial_lam = 0.05,
-        initial_lam = 0.0,
+        initial_lam = 0.5,
         eta_lam = 0.5,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
@@ -92,7 +92,7 @@ if __name__ == "__main__":
         rollout_num_envs = 1, 
         train_reward_config = TrainRewardConfig,
         train_kernel_config = TrainKernelConfig,
-        train_critic_config =  TrainCriticConfig) 
+        train_critic_config = TrainCriticConfig) 
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()

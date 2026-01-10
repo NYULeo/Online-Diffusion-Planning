@@ -318,7 +318,6 @@ class OnlineFinetuner():
         
         if self.accelerator.is_main_process:
              save_hyperparameters(self.config)
-        
         """
         if self.accelerator.is_main_process:
              print(f"Starting Rollout")
