@@ -81,7 +81,7 @@ if __name__ == "__main__":
         finetune_batch_size = 4,
         finetune_lr = 2e-05,
         #initial_lam = 0.05,
-        initial_lam = 100.0,
+        initial_lam = 10000.0,
         eta_lam = 10.0,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
