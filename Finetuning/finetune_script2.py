@@ -141,12 +141,12 @@ if __name__ == "__main__":
     #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
     RWConfig = RewardConfig(
                beta = 1.0, 
-               min_log_prob = -1e7, 
+               min_log_prob = -10000.0, 
                explore = False) 
     
     TrainRewardConfig = Train_Reward_Config(
                           batch_size = 256, 
-                          num_steps = 2000, 
+                          num_steps = 1500, 
                           lr = 1e-4, 
                           sigma = 30.0, 
                           target_reward = 1.0, 
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     
     TrainKernelConfig = Train_Kernel_Config(
                             batch_size = 512, 
-                            num_steps = 3000,
+                            num_steps = 1500,
                             lr = 1e-4,
                             ensemble_size = 20,
                             λ_reg = 5e-3)
