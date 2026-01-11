@@ -167,7 +167,6 @@ def save_hyperparameters(config: FinetuningConfig, filepath: Optional[str] = Non
     
     print(f"Hyperparameters saved to {filepath}")
 
-
 class OnlineFinetuner():
     def __init__(self, config: FinetuningConfig):
         self.config = config

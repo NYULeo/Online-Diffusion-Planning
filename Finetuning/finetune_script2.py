@@ -148,8 +148,8 @@ if __name__ == "__main__":
                           batch_size = 256, 
                           num_steps = 800, 
                           lr = 1e-4, 
-                          sigma = 5.0, 
-                          target_reward = 1.0, 
+                          sigma = 30.0, 
+                          target_reward = 50.0, 
                           train_goal = None,
                           rollout_goal = None)
     
