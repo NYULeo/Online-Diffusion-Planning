@@ -52,7 +52,6 @@ class Acc_AdjointMatchingConfig:
     step_start_ema = 50
     ema_decay = 0.99
     update_ema_every = 2
-
     finetune_lr: float = 1e-4
     finetune_total_steps: int = 500
     per_round_steps: int = 100
@@ -60,6 +59,7 @@ class Acc_AdjointMatchingConfig:
     eta_lam: float = 0.001
     reward_scaling_factor: float = 100000
     update_lambda_every = 3
+    update_kernel: bool = False
     MaxEnt: bool = False
     Entropy_Scaling_Factor: float = 0.5
 
@@ -630,7 +630,7 @@ class Acc_AdjointMatchingFineTuner:
                 pure_reward += Reward
             
                 
-                if step % self.config.update_lambda_every == 0:
+                if (step % self.config.update_lambda_every == 0) and (self.config.update_kernel):
                      self.Lam.update(Lambda_C / self.config.update_lambda_every) 
                      Lambda_C = 0.0
                      print(f"step: {step}, lambda: {self.Lam.get_lam()}")

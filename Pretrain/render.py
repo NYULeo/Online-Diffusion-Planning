@@ -1,6 +1,12 @@
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(project_root)
 import numpy as np
-from utils import set_seed
+from Pretrain.utils import set_seed
+from Finetuning.utils import get_trajs
 import mediapy as media
 from Dataset import get_env
 import pickle
@@ -76,28 +82,26 @@ def check_speration(trajs):
 
 
 
-"""
+
 if __name__ == "__main__":
      set_seed(1)
-     data = get_dataset('kitchen', 'complete')
+     data = get_dataset('kitchen', 'partial')
      trajs = data.get_trajectories()
-     render('kitchen', 'partial', trajs[0])
+     #trajs = get_trajs('kitchen', 'partial', step = 0)
+     print(len(trajs))
+     render('kitchen', 'partial', trajs[4])
+
+
+
+
+
 """
-
-
-
-
-
 import ogbench
 import numpy as np
 import imageio
 
 def find_success_episode(env, data, max_search=1000):
-    """
-    Find a successful trajectory in the dataset when replayed
-    in the goal-conditioned environment.
-    Returns a dict with keys 'actions' and 'observations' if found, else None.
-    """
+    
     actions = data["actions"]
     obs = data["observations"]
     terminals = data["terminals"]
@@ -137,13 +141,7 @@ def find_success_episode(env, data, max_search=1000):
     return None
 
 def render_success_episode(dataset_name, task_id=1, out_video="demo.mp4"):
-    """
-    Find one successful episode and render it to a video file.
-    Args:
-        dataset_name (str): e.g. "cube-single-play-v0"
-        task_id (int): which goal to evaluate (1..5)
-        out_video (str): output video filename
-    """
+    
     # Load the goal-conditioned environment + dataset
     env, train_data, _ = ogbench.make_env_and_datasets(dataset_name, render_mode="rgb_array")
     
@@ -182,7 +180,7 @@ if __name__ == "__main__":
     # Example usage
     render_success_episode("cube-single-play-singletask-v0", task_id=2, out_video="cube_success.mp4")
 
-
+"""
 
 
      

@@ -67,6 +67,7 @@ class FinetuningConfig():
     train_kernel_config: Train_Kernel_Config 
     train_critic_config: Train_Critic_Config
     critic: bool = False
+    kernel: bool = False
     buffer_size: int = 100000
     finetune_steps: int = 1000000
     finetune_rounds: int = 10
@@ -181,8 +182,12 @@ class OnlineFinetuner():
         self.env, d_s, d_a = get_env(self.config.dataset_name, self.config.specific_dataset)
         self.config.AMConfig.d_s = d_s
         self.config.AMConfig.d_a = d_a
-        self.config.AMConfig.lam = self.config.initial_lam
+        self.config.AMConfig.update_kernel = self.config.kernel
         self.config.AMConfig.eta_lam = self.config.eta_lam
+        if self.config.AMConfig.update_kernel:
+             self.config.AMConfig.lam = self.config.initial_lam
+        else:
+             self.config.AMConfig.lam = 0.0
         self.config.AMConfig.update_ema_every = self.config.update_lambda_every
         self.config.AMConfig.reward_scaling_factor = self.config.reward_scaling_factor
         self.config.AMConfig.update_lambda_every = self.config.update_lambda_every
@@ -405,8 +410,9 @@ class OnlineFinetuner():
                              target_reward = self.config.train_reward_config.target_reward, 
                              specific_dataset = self.config.specific_dataset, 
                              goal = self.config.train_reward_config.train_goal)
-                  print(f"Starting Kernel Training")
-                  train_kernel(self.Train_Buffer, 
+                  if self.config.kernel:
+                      print(f"Starting Kernel Training")
+                      train_kernel(self.Train_Buffer, 
                              dataset_name = self.config.dataset_name, 
                              specific_dataset = self.config.specific_dataset,
                              batch_size = self.config.train_kernel_config.batch_size, 

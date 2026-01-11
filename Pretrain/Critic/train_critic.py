@@ -400,10 +400,12 @@ if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     env_name = 'kitchen'
     specific_env = 'partial'
-    trajs = get_trajs(env_name, specific_env, 0)
+    data = get_dataset(env_name, specific_env)
+    trajs = data.get_trajectories()
+    #trajs = get_trajs(env_name, specific_env, 0)
     train_critic(dataset_name = env_name, 
                  specific_dataset = specific_env, 
-                 sigma = 30.0, 
+                 sigma = 20.0, 
                  batch_size = 512, 
                  num_steps = 10000, 
                  gamma = 0.99, 
@@ -411,21 +413,21 @@ if __name__ == '__main__':  # pragma: no cover
                  lr = 5e-5, 
                  tau = 0.01,
                  goal = None,
-                 target_reward = 30.0,
+                 target_reward = 10.0,
                  trajs = trajs)
     print('training complete')
     
-    trajs = get_trajs(env_name, specific_env, 0)
+    trajs = data.get_trajectories()
     step = 2000
     while(step <= 10000):
         test_critic(dataset_name = env_name, 
                     specific_dataset = specific_env, 
                     checkpoint_step = step, 
-                    sigma = 30.0, 
+                    sigma = 20.0, 
                     gamma = 0.99, 
                     horizon = 32, 
                     goal = None,
-                    target_reward = 30.0, 
+                    target_reward = 10.0, 
                     trajs = trajs)
         step += 2000
     print('testing complete')
