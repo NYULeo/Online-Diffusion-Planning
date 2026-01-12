@@ -101,7 +101,7 @@ class Acc_AdjointMatchingFineTuner:
         self.t_asc = torch.linspace(1.0, 0.0, self.config.diffusion_steps + 1, device = self.device)
         self.k = self.kt(self.t_asc) 
         self.t_grid, self.beta_1, self.sigma_grid = karras_beta_schedule(self.config.diffusion_steps, self.config.sigma_min, self.config.sigma_max, self.device)
-        self.beta_2 = cosine_beta(self.t_grid, s=self.config.s)
+        self.beta_2 = cosine_beta(self.t_grid, s = self.config.s)
         
         self.set_old_score_net(planner_checkpoint)
         self.set_new_score_net()

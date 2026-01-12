@@ -85,11 +85,12 @@ def check_speration(trajs):
 
 if __name__ == "__main__":
      set_seed(1)
-     data = get_dataset('kitchen', 'partial')
-     trajs = data.get_trajectories()
+     #data = get_dataset('kitchen', 'partial')
+    # trajs = data.get_trajectories()
      #trajs = get_trajs('kitchen', 'partial', step = 0)
+     trajs = get_trajs('kitchen', 'partial', step = 50)
      print(len(trajs))
-     render('kitchen', 'partial', trajs[4])
+     render('kitchen', 'partial', trajs[0])
 
 
 

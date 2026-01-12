@@ -563,7 +563,7 @@ class PlannerDataset_Rollout(Dataset):
 
 """
 vectors = []
-data = get_dataset('kitchen', 'complete')
+data = get_dataset('kitchen', 'partial')
 trajs = data.get_trajectories()
 for traj in trajs:
      for i in range(len(traj['rewards'])):
@@ -693,5 +693,5 @@ def visualize_clusters(vectors, assignments, cluster_centers, title_prefix=""):
 
 # Usage:
 visualize_clusters(vectors, assignments, stats['cluster_centers'], "Kitchen Rewards: ")
-"""
 
+"""

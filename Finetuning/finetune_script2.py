@@ -165,7 +165,7 @@ if __name__ == "__main__":
                             num_steps= 10000,
                             lr = 5e-5,
                             tau = 0.01,
-                            gamma = 0.99)
+                            gamma = 1.0)
     
     FTConfig = FinetuningConfig(
         AMConfig = AMConfig, 
@@ -191,7 +191,7 @@ if __name__ == "__main__":
         eta_lam = 0.05,
         gradient_accumulate_every = 1,
         update_lambda_every = 5,
-        reward_scaling_factor = 1000,
+        reward_scaling_factor = 500,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 2000,  # or your desired value
         rollout_num_envs = 1, 
