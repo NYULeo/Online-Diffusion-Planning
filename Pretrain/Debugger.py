@@ -385,7 +385,8 @@ def get_normalized_score(trajs, env_name, specific_env):
 """
 
 
-
+a = torch.tensor(-3)
+print(torch.exp(a))
 
 
 
