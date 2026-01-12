@@ -939,7 +939,7 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
      else:
           score = get_normalized_score(trajs)
      save_trajs(trajs, env_name, specific_env, checkpoint_step)
-     #print(f"Average Normalized Score: {score:.2f}")
+     print(f"Average Normalized Score: {score:.2f}")
      return trajs, score, total_steps
 
 def load_hyperparameters(filepath: str) -> Dict:
