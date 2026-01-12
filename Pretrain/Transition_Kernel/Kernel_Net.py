@@ -89,6 +89,11 @@ class RobustTransitionKernel(nn.Module):
         nll = const + 0.5 * log_det + mahal
         return -nll  
     
+    def prob(self, s_next, mu, log_std):
+        log_prob = self.log_prob(s_next, mu, log_std)
+        var_pred = torch.exp(log_prob)
+        return var_pred
+    
 
 """
     def log_prob(self, s_next, mu, log_std):

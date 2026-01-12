@@ -557,7 +557,7 @@ def test_kernel(dataset_name, specific_dataset: str = None,
             lps = []
             for m in ensemble:
                 mu, log_std = m(s, a)
-                lp = m.log_prob(s_next, mu, log_std).item()
+                lp = m.prob(s_next, mu, log_std).item()
                 lps.append(lp)
             # You can take mean, or min over ensemble.
             lp_mean = sum(lps) / len(lps)
