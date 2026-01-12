@@ -14,7 +14,7 @@ if __name__ == '__main__':
     num_steps = 800, 
     save_freq = 200,  
     lr = 1e-4,
-    sigma = 1.0,
+    sigma = 10.0,
     target_reward = 50.0,
     specific_dataset='partial',
     goal = None)
