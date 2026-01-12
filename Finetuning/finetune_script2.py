@@ -141,7 +141,7 @@ if __name__ == "__main__":
     #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
     RWConfig = RewardConfig(
                beta = 1.0, 
-               min_log_prob = -30000.0, 
+               min_log_prob = -100000.0, 
                explore = False) 
     
     TrainRewardConfig = Train_Reward_Config(
@@ -177,7 +177,7 @@ if __name__ == "__main__":
         kernel_model_checkpoint = 0,
         critic_model_checkpoint = 0,
         critic = False,
-        kernel = False,
+        kernel = True,
         MaxEnt = False,
         buffer_size = 5500,
         finetune_steps = 3000,
@@ -191,7 +191,7 @@ if __name__ == "__main__":
         eta_lam = 0.05,
         gradient_accumulate_every = 1,
         update_lambda_every = 5,
-        reward_scaling_factor = 50,
+        reward_scaling_factor = 1000,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 2000,  # or your desired value
         rollout_num_envs = 1, 

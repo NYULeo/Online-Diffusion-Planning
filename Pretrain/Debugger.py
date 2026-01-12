@@ -107,10 +107,6 @@ plt.show()
 
 
 
-
-
-
-
 """
 save_path = f'./Rollouts/{'pointmaze'}/{'medium'}/Generated_trajs_Info.pkl'
 with open(save_path, 'rb') as f:
