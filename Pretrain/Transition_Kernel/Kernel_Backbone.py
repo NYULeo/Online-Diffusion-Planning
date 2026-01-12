@@ -417,7 +417,7 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
 """
 
 def train_kernel(dataset_name, specific_dataset: str = None,
-                 batch_size=256, lr=1e-3, num_steps=10000,
+                 batch_size=256, lr=1e-3, num_steps=10000, save_freq = 200,
                  ensemble_size=10, λ_reg=1e-3):
     # Prepare dataset / dataloader
     if specific_dataset is None:
@@ -458,7 +458,6 @@ def train_kernel(dataset_name, specific_dataset: str = None,
         SD = None
     step = 0
     total_loss = 0.0
-    save_freq = 200
 
     for step in range(1, num_steps + 1):
         s, a, s_next = next(loader)

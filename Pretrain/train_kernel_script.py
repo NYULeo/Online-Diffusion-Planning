@@ -11,11 +11,11 @@ import pickle
 
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
-    train_kernel(dataset_name = 'kitchen', batch_size = 512, lr = 1e-4, num_steps =  600, ensemble_size = 20, λ_reg = 5e-3)
+    train_kernel(dataset_name = 'kitchen', batch_size = 512, lr = 1e-4, num_steps =  200, save_freq = 200, ensemble_size = 20, λ_reg = 5e-3)
     trajs = get_trajs('kitchen', 'partial', step = 0)
 
     #test_Model(dataset_name = 'pointmaze', specific_dataset = 'medium', trajs = trajs, save_freq = 2000, num_steps = 50000)
-    test_kernel(dataset_name = 'kitchen', trajs = trajs, save_freq = 600, num_steps = 600, ensemble_size = 20)
+    test_kernel(dataset_name = 'kitchen', trajs = trajs, save_freq = 200, num_steps = 200, ensemble_size = 20)
     #train_kernel(dataset_name = 'pointmaze', specific_dataset ='umaze', batch_size = 256, lr = 3e-4, num_steps = 25000, ensemble_size=3, λ_reg=1e-3)
     #train_kernel(dataset_name = 'pointmaze', specific_dataset ='medium', batch_size = 256, lr = 3e-4, num_steps = 50000, ensemble_size=3, λ_reg=1e-3)
     #train_kernel(dataset_name = 'pointmaze', specific_dataset ='large', batch_size = 256, lr = 3e-4, num_steps = 300000, ensemble_size=3, λ_reg=1e-3)

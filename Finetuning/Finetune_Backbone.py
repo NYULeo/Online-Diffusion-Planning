@@ -396,7 +396,8 @@ class OnlineFinetuner():
                  print(f"Total Number of Environment Steps: {total_steps}")
                  print(f"Average Normalized Score: {avg_score:.2f}")
             self.accelerator.wait_for_everyone()  
-
+           
+            """
             if self.accelerator.is_main_process:
                   print(f"Starting Reward Training")
                   train_reward(self.Train_Buffer, 
@@ -441,7 +442,7 @@ class OnlineFinetuner():
             self.config.kernel_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             self.set_reward_model(self.device)
-            
+            """
             if self.accelerator.is_main_process:
                    print(f"Finetuning round {step+1} completed")
                    print()
