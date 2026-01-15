@@ -6,6 +6,8 @@ from torch import Tensor
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(project_root)
 import torch.nn as nn
 import einops
 from einops.layers.torch import Rearrange
