@@ -9,8 +9,8 @@ import copy
 from Dataset import get_env
 from torch.utils.data import DataLoader
 import numpy as np
-from Backbone.Dit import DiT1d
-from Backbone.UNet import TemporalUnet
+from .Dit import DiT1d
+from .UNet import TemporalUnet
 import os
 from Dataset import get_PlannerName, PlannerDataset, PlannerDataset_Rollout
 from .utils import LossTracker, get_pretrained_planner, getName
