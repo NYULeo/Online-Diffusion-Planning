@@ -245,6 +245,7 @@ class PointMazeDataset():
 
 class AntMazeDataset():
      def __init__(self, name: str):
+          self.name = name
           if name == 'medium_play':
               self.dataset = minari.load_dataset('D4RL/antmaze/medium-play-v1', download=True)
           elif name == 'umaze_diverse':
