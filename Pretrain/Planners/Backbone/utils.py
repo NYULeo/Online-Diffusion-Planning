@@ -5,8 +5,8 @@ import torch
 from torch import Tensor
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(project_root)
 os.chdir(project_root)
 import torch.nn as nn
 import einops
@@ -16,10 +16,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import pickle
 import os
-from Pretrain.Dataset import get_PlannerName
-
-
-
+from Dataset import get_PlannerName
 
 
 #-----------------------------------------------------------------------------#
