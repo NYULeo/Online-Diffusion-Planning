@@ -421,11 +421,11 @@ class PlannerDataset(Dataset):
                 self.windows.append(torch.from_numpy(segment).float())
                 self.conditions.append(torch.from_numpy(sa_pairs[start][:self.state_dim]).float())
             
-        self.save_stats()
+        self.save_stats(dataset_name, specific_dataset)
 
-    def save_stats(self):
+    def save_stats(self, dataset_name, specific_dataset):
         stats_name =  str(self.planner_name) + '_stats.pkl'
-        stats_dir = f'./Pretrain/Planners/{self.dataset_name}/{self.specific_dataset}/Stats/'
+        stats_dir = f'./Pretrain/Planners/{dataset_name}/{specific_dataset}/Stats/'
         os.makedirs(stats_dir, exist_ok=True)
         savepath = os.path.join(stats_dir, stats_name)
         with open(savepath, 'wb') as f:
