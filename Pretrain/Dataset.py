@@ -307,11 +307,11 @@ class AntMazeDataset():
      def get_env(self, render_mode):
           gym.register_envs(gymnasium_robotics)
           if self.name in ['umaze', 'umaze_diverse']:
-              env = gym.make('AntMaze_UMaze-v3', max_episode_steps=1000, render_mode=render_mode, continuing_task=False)
+              env = gym.make('AntMaze_UMaze-v5', max_episode_steps=1000, render_mode=render_mode, continuing_task=False)
           elif self.name in ['medium_play', 'medium_diverse']:
-              env = gym.make('AntMaze_Medium-v3', max_episode_steps=1000, render_mode=render_mode, continuing_task=False)
+              env = gym.make('AntMaze_Medium-v5', max_episode_steps=1000, render_mode=render_mode, continuing_task=False)
           elif self.name in ['large_play', 'large_diverse']:
-              env = gym.make('AntMaze_Large-v3', max_episode_steps=1000, render_mode=render_mode, continuing_task=False)
+              env = gym.make('AntMaze_Large-v5', max_episode_steps=1000, render_mode=render_mode, continuing_task=False)
           else:
               raise ValueError(f'Invalid dataset name')
           return env

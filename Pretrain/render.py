@@ -96,10 +96,10 @@ if __name__ == "__main__":
     # trajs = data.get_trajectories()
      #trajs = get_trajs('kitchen', 'partial', step = 0)
      #trajs = get_trajs('kitchen', 'partial', step = 50)
-     data = get_dataset('pointmaze', 'large')
+     data = get_dataset('antmaze', 'large_play')
      trajs = data.get_trajectories()
      #print(len(trajs))
-     render('pointmaze', 'large', trajs[10])
+     render('antmaze', 'large_play', trajs[10])
 
 
 
