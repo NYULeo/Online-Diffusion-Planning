@@ -13,6 +13,7 @@ import pickle
 import os
 from gymnasium.vector import AsyncVectorEnv
 from Dataset import get_dataset
+import gymnasium as gym
 
 def spare_reward_checker(rewards):
      Temp = []
@@ -43,7 +44,13 @@ def get_normalized_score(rewards):
 
 def render(dataset_name, specific_dataset, traj):
      env, _, _ = get_env(dataset_name, specific_dataset, render_mode = 'rgb_array')
-     env.reset()
+     #env = gym.make("antmaze-medium-v0") 
+     obs0 = traj["observations"][0]
+
+     env.reset(seed=0)  # optional fixed seed for determinism
+
+    
+
      frames = []
      rewards = []
      for i in range(len(traj['actions'])):
@@ -55,7 +62,8 @@ def render(dataset_name, specific_dataset, traj):
           if terminated or truncated:
                break
      print(sum(spare_reward_checker(rewards)))
-     print(len(frames))
+     #print(rewards)
+     #print(len(frames))
      media.write_video("demo2.mp4", frames, fps=50)
      env.close()
 
@@ -88,9 +96,11 @@ if __name__ == "__main__":
      #data = get_dataset('kitchen', 'partial')
     # trajs = data.get_trajectories()
      #trajs = get_trajs('kitchen', 'partial', step = 0)
-     trajs = get_trajs('kitchen', 'partial', step = 50)
-     print(len(trajs))
-     render('kitchen', 'partial', trajs[0])
+     #trajs = get_trajs('kitchen', 'partial', step = 50)
+     data = get_dataset('pointmaze', 'large')
+     trajs = data.get_trajectories()
+     #print(len(trajs))
+     render('pointmaze', 'large', trajs[10])
 
 
 

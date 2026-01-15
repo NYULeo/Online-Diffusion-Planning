@@ -184,7 +184,7 @@ if __name__ == "__main__":
         finetune_rounds = 300,
         diffusion_steps = 150,
         karras_percent = 0.05,
-        Loss_Clip_percent = 0.75,
+        Loss_Clip_percent = 0.6,
         finetune_batch_size = 4,
         finetune_lr = 1e-05,
         initial_lam = 0.05,

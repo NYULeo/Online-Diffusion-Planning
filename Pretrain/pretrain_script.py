@@ -11,7 +11,7 @@ import torch
 if __name__ == '__main__':  # pragma: no cover
      set_seed(1)
      dataset_name = 'pointmaze'
-     specific_dataset = 'medium'
+     specific_dataset = 'large'
      horizon = 32
      device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
      trainer = SDETrainer(

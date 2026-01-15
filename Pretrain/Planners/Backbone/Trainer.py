@@ -41,7 +41,7 @@ class SDETrainer:
         self.device = device
         self.dataset_name = dataset_name
         self.specific_dataset = specific_dataset
-        self.state_dim, self.action_dim = get_env(self.dataset_name, self.specific_dataset)
+        _, self.state_dim, self.action_dim = get_env(self.dataset_name, self.specific_dataset)
         self.backbone_name = backbone_name
         self.backbone_selection()
         self.model_name = get_PlannerName(self.dataset_name, self.specific_dataset)

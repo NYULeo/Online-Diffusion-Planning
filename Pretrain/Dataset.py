@@ -185,14 +185,14 @@ class PointMazeDataset():
               done_seq = np.logical_or(terminated, truncated)
               
 
-              """
+              
               for i in range(len(actions)):
                    if(done_seq[i]):
                         observations = observations[:i+2]
                         actions = actions[:i+1]
                         rewards = rewards[:i+1]
                         break
-              """ 
+              
               
               if(len(actions) < 10):
                   continue
@@ -202,7 +202,7 @@ class PointMazeDataset():
                         'actions': actions,
                         'rewards': rewards
                       }
-                    """
+                    
                     if(len(trajectories) != 0):
                         Temp = merger(trajectories[len(trajectories)-1], trajectory)
                         if(Temp is not None):
@@ -212,8 +212,8 @@ class PointMazeDataset():
                             trajectories.append(trajectory)
                     else:
                          trajectories.append(trajectory)
-                    """
-                    trajectories.append(trajectory)
+                    
+                    #trajectories.append(trajectory)
           return trajectories
           
      
@@ -425,7 +425,7 @@ class PlannerDataset(Dataset):
 
     def save_stats(self):
         stats_name =  str(self.planner_name) + '_stats.pkl'
-        stats_dir = f'.Planners/{self.dataset_name}/{self.specific_dataset}/Stats/'
+        stats_dir = f'./Pretrain/Planners/{self.dataset_name}/{self.specific_dataset}/Stats/'
         os.makedirs(stats_dir, exist_ok=True)
         savepath = os.path.join(stats_dir, stats_name)
         with open(savepath, 'wb') as f:
