@@ -184,15 +184,12 @@ class PointMazeDataset():
               truncated = episode.truncations
               done_seq = np.logical_or(terminated, truncated)
               
-
-              
               for i in range(len(actions)):
                    if(done_seq[i]):
                         observations = observations[:i+2]
                         actions = actions[:i+1]
                         rewards = rewards[:i+1]
                         break
-              
               
               if(len(actions) < 10):
                   continue
@@ -215,7 +212,6 @@ class PointMazeDataset():
                     
                     #trajectories.append(trajectory)
           return trajectories
-          
      
      def get_state_dim(self):
           return self.dataset._observation_space['observation'].shape[0]
@@ -224,8 +220,6 @@ class PointMazeDataset():
           return self.dataset._action_space.shape[0]
     
      def get_env(self, render_mode):
-          # Use headless mode for servers without display capabilities
-          
           gym.register_envs(gymnasium_robotics)
           if(self.name == 'medium'):
               env = gym.make('PointMaze_Medium-v3', max_episode_steps = 1000, render_mode = render_mode, continuing_task=False)
@@ -239,7 +233,7 @@ class PointMazeDataset():
           
           #return self.dataset.recover_environment(render_mode = render_mode)
           #return self.dataset.recover_environment(render_mode = 'rgb_array')
-     
+
      def get_ref_max_score(self):
           return self.dataset.storage.metadata.get('ref_max_score')
 
@@ -310,13 +304,18 @@ class AntMazeDataset():
           return self.dataset._action_space.shape[0]
     
      def get_env(self, render_mode):
-          # Use headless mode for servers without display capabilities
-          return self.dataset.recover_environment(render_mode = render_mode)
-          #return self.dataset.recover_environment(render_mode = 'rgb_array')
-          #env_spec = self.dataset.spec.env_spec
-          #return gym.make(env_spec, render_mode='rgb_array')
-          #return gym.make(env_spec, render_mode = None)
-          
+          gym.register_envs(gymnasium_robotics)
+          if self.name in ['umaze', 'umaze_diverse']:
+              env = gym.make('AntMaze_UMaze-v3', max_episode_steps=1000, render_mode=render_mode, continuing_task=False)
+          elif self.name in ['medium_play', 'medium_diverse']:
+              env = gym.make('AntMaze_Medium-v3', max_episode_steps=1000, render_mode=render_mode, continuing_task=False)
+          elif self.name in ['large_play', 'large_diverse']:
+              env = gym.make('AntMaze_Large-v3', max_episode_steps=1000, render_mode=render_mode, continuing_task=False)
+          else:
+              raise ValueError(f'Invalid dataset name')
+          return env
+          #return self.dataset.recover_environment(render_mode = render_mode)
+         
      def get_ref_max_score(self):
           return self.dataset.storage.metadata.get('ref_max_score')
 

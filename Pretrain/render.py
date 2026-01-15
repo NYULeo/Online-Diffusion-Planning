@@ -50,7 +50,6 @@ def render(dataset_name, specific_dataset, traj):
      env.reset(seed=0)  # optional fixed seed for determinism
 
     
-
      frames = []
      rewards = []
      for i in range(len(traj['actions'])):

@@ -247,9 +247,8 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      #print(test_rollout_fit_for_model(traj, env_name, specific_env, checkpoint_steps, checkpoint_steps, checkpoint_steps, device=None))
      
-     print(len(rewards))
-     expert_score = get_expert_score(env_name)
-     print(get_normalized_score([traj], expert_score))
+     #expert_score = get_expert_score(env_name)
+     #print(get_normalized_score([traj], expert_score))
      if(render):
           media.write_video("demo.mp4", frames, fps=50) #save the video
      """
@@ -268,10 +267,10 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
 if __name__ == "__main__":
     set_seed(0)
     horizon = 32
-    env_name = 'kitchen'
-    specific_train_dataset = 'partial'
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_steps = 70, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([5, 4], dtype = int))
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 500, num_karras = 0, eta = 0.8, episode_length = 1000, checkpoint_steps = 40, render = True, base_seed = 0)
+    env_name = 'pointmaze'
+    specific_train_dataset = 'medium'
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_steps = 210, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([5, 4], dtype = int))
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 500, num_karras = 0, eta = 0.8, episode_length = 1000, checkpoint_steps = 40, render = True, base_seed = 0)
     #150, 8
     #50, 3
     #rollout_parallel(env_name, specific_train_dataset, horizon = 32, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 4000, checkpoint_step = 0, num_envs = 4, seed_base = 0)
