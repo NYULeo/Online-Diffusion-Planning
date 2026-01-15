@@ -3,6 +3,7 @@ import numpy as np
 from sympy.logic.boolalg import true
 import torch
 from torch import Tensor
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch.nn as nn
 import einops
 from einops.layers.torch import Rearrange
@@ -14,7 +15,7 @@ import os
 from Pretrain.Dataset import get_PlannerName
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 
 
