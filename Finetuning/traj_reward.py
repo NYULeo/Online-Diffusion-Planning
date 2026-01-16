@@ -29,6 +29,7 @@ class RewardConfig:
     device = None
     d_s: int = 0 
     d_a: int = 0
+    num_hidden_layers_kernel: int = 2
     critic_d_s: int = 0
     delta: Optional[float] = None 
     
@@ -49,7 +50,7 @@ class TotalReward(nn.Module):
         
         kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
         for i in range(len(kernel_state_dicts)):
-                kernel_net = RobustTransitionKernel(obs_dim, act_dim).to(self.config.device)
+                kernel_net = RobustTransitionKernel(obs_dim, act_dim, self.config.num_hidden_layers_kernel).to(self.config.device)
                 kernel_net.load_state_dict(kernel_state_dicts[i])
                 kernel_net.eval()
                 self.kernels.append(kernel_net)
@@ -243,7 +244,7 @@ class TotalReward_Critic(nn.Module):
 
         kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
         for i in range(len(kernel_state_dicts)):
-                kernel_net = RobustTransitionKernel(obs_dim, act_dim).to(self.config.device)
+                kernel_net = RobustTransitionKernel(obs_dim, act_dim, self.config.num_hidden_layers_kernel).to(self.config.device)
                 kernel_net.load_state_dict(kernel_state_dicts[i])
                 kernel_net.eval()
                 self.kernels.append(kernel_net)

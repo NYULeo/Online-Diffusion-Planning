@@ -43,6 +43,7 @@ class Train_Kernel_Config:
     num_steps: int = 1000
     lr: float = 1e-3
     ensemble_size: int = 10
+    num_hidden_layers: int = 2
     λ_reg: float = 1e-3
 
 @dataclass
@@ -170,6 +171,7 @@ def save_hyperparameters(config: FinetuningConfig, filepath: Optional[str] = Non
 class OnlineFinetuner():
     def __init__(self, config: FinetuningConfig):
         self.config = config
+        self.config.RewardConfig.num_hidden_layers_kernel = self.config.train_kernel_config.num_hidden_layers
         self.config.AMConfig.finetune_total_steps = self.config.finetune_steps
         self.config.AMConfig.per_round_steps = self.config.finetune_steps // self.config.finetune_rounds
         self.config.AMConfig.diffusion_steps = self.config.diffusion_steps
@@ -420,6 +422,7 @@ class OnlineFinetuner():
                              num_steps = self.config.train_kernel_config.num_steps,
                              ensemble_size = self.config.train_kernel_config.ensemble_size, 
                              λ_reg = self.config.train_kernel_config.λ_reg, 
+                             num_hidden_layers = self.config.train_kernel_config.num_hidden_layers,
                              step = ((step+1) * self.config.AMConfig.per_round_steps))
                   if self.config.critic:
                       print(f"Starting Critic Training")

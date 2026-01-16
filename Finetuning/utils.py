@@ -493,7 +493,7 @@ def train_reward(trajs: List[TrajectoryDict], dataset_name: str, batch_size, num
            
 def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str,
                  batch_size=256, lr=1e-3, num_steps=10000,
-                 ensemble_size=10, λ_reg=1e-3, step: int = 0):
+                 ensemble_size=10, λ_reg=1e-3, num_hidden_layers=2, step: int = 0):
     # Prepare dataset / dataloader
     print(f"Training kernel for {dataset_name}_{specific_dataset}")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -503,7 +503,7 @@ def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
     loader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
                               pin_memory=True, num_workers=8))
     # Create ensemble of models
-    ensemble = [RobustTransitionKernel(obs_dim, act_dim).to(device) for _ in range(ensemble_size)]
+    ensemble = [RobustTransitionKernel(obs_dim, act_dim, num_hidden_layers).to(device) for _ in range(ensemble_size)]
     optimizers = [optim.Adam(m.parameters(), lr, weight_decay=1e-5) for m in ensemble]
     total_loss = 0.0
     for k in range(1, num_steps + 1):
