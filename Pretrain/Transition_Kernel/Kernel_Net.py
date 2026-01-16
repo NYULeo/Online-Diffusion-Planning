@@ -148,6 +148,7 @@ class RobustTransitionKernel(nn.Module):
         log_std = self.min_log_std + F.softplus(raw_log_std - self.min_log_std)
         log_std = torch.clamp(log_std, max=self.max_log_std)
         return mu, log_std
+    
     def gaussian_nll(self, s_next, mu, log_std):
         # x, mu: (..., obs_dim); log_std: (..., obs_dim)
         var_pred = torch.exp(2 * log_std)
