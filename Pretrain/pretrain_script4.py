@@ -1,5 +1,4 @@
 
-
 from utils import set_seed
 from Planners.Backbone.Trainer import SDETrainer
 import torch
@@ -11,7 +10,7 @@ import torch
 if __name__ == '__main__':  # pragma: no cover
      set_seed(1)
      dataset_name = 'antmaze'
-     specific_dataset = 'large_play'
+     specific_dataset = 'large_diverse'
      horizon = 32
      device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
      trainer = SDETrainer(

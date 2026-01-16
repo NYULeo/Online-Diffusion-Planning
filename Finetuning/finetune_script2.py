@@ -128,93 +128,20 @@ def set_seed(seed: int):
     torch.backends.cudnn.benchmark = False
 
 
-
-if __name__ == "__main__":
-    # Example usage of the Adjoint Matching training without a dataset.
-    # In practice, 
-    # 
-    # replace the reward and backbone initialisations with
-    # loading of your pretrained models (e.g. via torch.load).
-    env_name = 'kitchen'
-    specific_env = 'partial'
-    AMConfig = Acc_AdjointMatchingConfig(horizon = 32)
-    #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
-    RWConfig = RewardConfig(
-               beta = 1.0, 
-               min_log_prob = -10000.0, 
-               explore = False) 
-    
-    TrainRewardConfig = Train_Reward_Config(
-                          batch_size = 256, 
-                          num_steps = 300, 
-                          lr = 1e-4, 
-                          sigma = 2.0, 
-                          target_reward = 100.0, 
-                          train_goal = None,
-                          rollout_goal = None)
-    
-    TrainKernelConfig = Train_Kernel_Config(
-                            batch_size = 512, 
-                            num_steps = 200,
-                            lr = 1e-4,
-                            ensemble_size = 20,
-                            λ_reg = 5e-3)
-    
-    TrainCriticConfig = Train_Critic_Config(
-                            batch_size = 512,
-                            num_steps= 10000,
-                            lr = 5e-5,
-                            tau = 0.01,
-                            gamma = 1.0)
-    
-    FTConfig = FinetuningConfig(
-        AMConfig = AMConfig, 
-        RewardConfig = RWConfig, 
-        dataset_name = env_name,
-        specific_dataset = specific_env,
-        planner_checkpoint = 0,
-        reward_model_checkpoint = 0,
-        kernel_model_checkpoint = 0,
-        critic_model_checkpoint = 0,
-        critic = False,
-        kernel = True,
-        MaxEnt = False,
-        buffer_size = 5500,
-        finetune_steps = 3000,
-        finetune_rounds = 300,
-        diffusion_steps = 150,
-        karras_percent = 0.05,
-        Loss_Clip_percent = 0.6,
-        finetune_batch_size = 4,
-        finetune_lr = 1e-05,
-        initial_lam = 0.05,
-        eta_lam = 0.05,
-        gradient_accumulate_every = 1,
-        update_lambda_every = 5,
-        reward_scaling_factor = 500,
-        Entropy_Scaling_Factor = 0.5,
-        rollout_length = 2000,  # or your desired value
-        rollout_num_envs = 1, 
-        train_reward_config = TrainRewardConfig,
-        train_kernel_config = TrainKernelConfig,
-        train_critic_config = TrainCriticConfig) 
-    set_seed(1)
-    OnlineFinetuner = OnlineFinetuner(FTConfig)
-    OnlineFinetuner.finetune_planner()
-
 #finetune_lr = 1e-05,
 
-"""
 if __name__ == "__main__":
     # Example usage of the Adjoint Matching training without a dataset.
     # In practice, 
     # 
     # replace the reward and backbone initialisations with
     # loading of your pretrained models (e.g. via torch.load).
+    """
     FTConfig = load_finetuning_args('pointmaze', 'medium')
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
+    """
     
     env_name = 'pointmaze'
     specific_env = 'medium'
@@ -282,6 +209,6 @@ if __name__ == "__main__":
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-"""
+
 
 
