@@ -20,7 +20,7 @@ from typing import Optional
 from Dataset import get_env
 from utils import set_seed
 from Planners.Backbone.utils import get_pretrained_planner
-from Critic.train_critic import Critic, Critic_Processor, get_CriticName
+from Critic.train_critic import Critic, get_CriticName
 from Dataset import Planner_Processor
 import gymnasium as gym
 import os
@@ -110,7 +110,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      planner_processor = Planner_Processor(env_name, specific_env)
 
      #reset
-     s0 = env.reset(seed=1)
+     s0 = env.reset(seed=10)
      s0 = s0[0]['observation']
      current_state = s0
      frames = []
@@ -310,12 +310,12 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 100, eta = 
 
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
-    set_seed(5)
+    set_seed(0)
     horizon = 32
     env_name = 'pointmaze'
-    specific_train_dataset = 'medium'
+    specific_train_dataset = 'large'
     #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 990000, render = True)
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 1000000, render = True)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 990000, render = True)
     #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 200, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1000000, num_envs = 50)
   
   

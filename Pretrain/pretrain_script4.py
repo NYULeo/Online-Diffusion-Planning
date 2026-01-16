@@ -11,7 +11,7 @@ if __name__ == '__main__':  # pragma: no cover
      set_seed(1)
      dataset_name = 'antmaze'
      specific_dataset = 'large_diverse'
-     horizon = 32
+     horizon = 40
      device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
      trainer = SDETrainer(
          dataset_name, 
