@@ -268,12 +268,12 @@ if __name__ == "__main__":
     set_seed(0)
     horizon = 32
     env_name = 'pointmaze'
-    specific_train_dataset = 'medium'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_steps = 100, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([4, 6], dtype = int))
+    specific_train_dataset = 'large'
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_steps = 100, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([4, 6], dtype = int))
     #rollout(env_name, specific_train_dataset, horizon, steps_T = 500, num_karras = 0, eta = 0.8, episode_length = 1000, checkpoint_steps = 40, render = True, base_seed = 0)
     #150, 8
     #50, 3
-    #rollout_parallel(env_name, specific_train_dataset, horizon = 32, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 4000, checkpoint_step = 0, num_envs = 4, seed_base = 0)
+    rollout_parallel(env_name, specific_train_dataset, horizon = 32, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 4000, checkpoint_step = 0, num_envs = 4, seed_base = 0)
  
    
    
