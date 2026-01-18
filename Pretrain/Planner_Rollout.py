@@ -101,6 +101,8 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
      elif (env_name == 'pointmaze'):
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     elif (env_name == 'antmaze'):
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
      else:
           raise ValueError(f"Invalid Environment: {env_name}")
      model.load_state_dict(state_dict)
@@ -111,6 +113,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
 
      #reset
      s0 = env.reset(seed=10)
+     #s0 = env.reset(seed = 10, options={"reset_cell": np.array([7, 10], dtype = int)})
      s0 = s0[0]['observation']
      current_state = s0
      frames = []
@@ -139,6 +142,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
                x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                #print(x[0])
                action = x[0, d_s:(d_s+d_a)].copy()
+               
                #print(action)
                #print(action.max(), action.min())
                #exit()
@@ -148,6 +152,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
                #action = x[0, d_s:(d_s+d_a)].copy()
                
            obs, reward, terminated, truncated, info = env.step(action)
+           #print(np.linalg.norm(obs['observation'] - current_state))
            if(render):
                 frames.append(env.render())
            
@@ -311,11 +316,11 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 100, eta = 
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
     set_seed(0)
-    horizon = 32
-    env_name = 'pointmaze'
-    specific_train_dataset = 'large'
+    horizon = 40
+    env_name = 'antmaze'
+    specific_train_dataset = 'large_play'
     #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 990000, render = True)
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 990000, render = True)
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 20, num_karras = 0, eta = 1.5, episode_length  = 100000, critic = False, checkpoint_steps = 10000, render = True)
     #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 200, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1000000, num_envs = 50)
   
   

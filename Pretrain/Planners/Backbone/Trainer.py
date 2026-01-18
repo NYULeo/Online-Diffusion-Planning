@@ -6,7 +6,7 @@ from .utils import cosine_alpha_sigma, cosine_beta, EMA, cycle
 import torch.nn.functional as F
 from typing import Dict
 import copy
-from Dataset import get_env
+from Dataset import get_env, determine_stride
 from torch.utils.data import DataLoader
 import numpy as np
 from .Dit import DiT1d
@@ -36,12 +36,19 @@ class SDETrainer:
         log_freq = 10,
         s: float = 0.008,                  # cosine offset
         weight_type: str = 'sigma2',         # {"one", "sigma2", "beta"}
-        eps: float = 1e-5               # clamp for t, ᾱ stability
+        eps: float = 1e-5,               # clamp for t, ᾱ stability
+        stride: Optional[int] = 0
     ):
         self.device = device
         self.dataset_name = dataset_name
         self.specific_dataset = specific_dataset
         _, self.state_dim, self.action_dim = get_env(self.dataset_name, self.specific_dataset)
+        if(determine_stride(self.dataset_name, self.specific_dataset)):
+            self.Dimension = self.state_dim
+            self.stride = stride
+        else:
+            self.Dimension = self.state_dim + self.action_dim
+            self.stride = 1
         self.backbone_name = backbone_name
         self.backbone_selection()
         self.model_name = get_PlannerName(self.dataset_name, self.specific_dataset)
@@ -172,10 +179,10 @@ class SDETrainer:
     def backbone_selection(self):
          if(self.backbone_name == 'transformer'):
               self.model = DiT1d(
-                   in_dim = (self.state_dim + self.action_dim), emb_dim = 128,
+                   in_dim = self.Dimension, emb_dim = 128,
                    d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(self.device)
          elif(self.backbone_name == 'unet'):
-              self.model = TemporalUnet(self.horizon, self.state_dim + self.action_dim).to(self.device)
+              self.model = TemporalUnet(self.horizon, self.Dimension).to(self.device)
               
     def reset_parameters(self):
         self.ema_model.load_state_dict(self.model.state_dict())
@@ -214,7 +221,7 @@ class SDETrainer:
 
     def train(self):
         print(self.device)
-        dataset = PlannerDataset(self.dataset_name, self.specific_dataset, self.horizon, self.state_dim, self.action_dim)
+        dataset = PlannerDataset(self.dataset_name, self.specific_dataset, self.horizon, self.state_dim, self.action_dim, self.stride)
         dataloader = cycle(DataLoader(dataset, self.batch_size, shuffle = True, pin_memory = True, num_workers = 8))
         print(f"Training planner for {self.dataset_name}-{self.specific_dataset} Dataset")
         print(f"Backbone:{self.backbone_name}, Horizon: {self.horizon}, Epochs: {self.num_steps}, Batch Size: {self.batch_size}, Learning Rate; {self.lr}")

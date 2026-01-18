@@ -1,6 +1,8 @@
 
 import sys
 import os
+
+from torch._higher_order_ops.invoke_subgraph import trace_joint_graph_as_bwd
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -99,7 +101,7 @@ if __name__ == "__main__":
      data = get_dataset('antmaze', 'large_play')
      trajs = data.get_trajectories()
      #print(len(trajs))
-     render('antmaze', 'large_play', trajs[10])
+     render('antmaze', 'large_play', trajs[800])
 
 
 

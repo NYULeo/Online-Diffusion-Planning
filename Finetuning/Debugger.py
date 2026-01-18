@@ -504,13 +504,14 @@ if __name__ == '__main__':
 
 
 
-
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 import minari
 
 
 dataset_id = "D4RL/antmaze/large-play-v1"
+dataset_id = 'D4RL/pointmaze/large-v2'
 dataset = minari.load_dataset(dataset_id, download=True)
 env = dataset.recover_environment().unwrapped
 
@@ -560,30 +561,57 @@ ax.legend(loc="upper right")
 
 plt.tight_layout()
 plt.show()
-
+"""
 
 
 """
 import minari
 
-dataset_id = "D4RL/antmaze/large-diverse-v1"
+dataset_id = "D4RL/antmaze/large-play-v1"
 #dataset_id = "D4RL/pointmaze/large-v2"
 dataset = minari.load_dataset(dataset_id, download=True)
 env = dataset.recover_environment().unwrapped
+print("distance_threshold:", getattr(env, "distance_threshold", None))
 
 print("obs space:", env.observation_space)
 print("action space:", env.action_space)
-
+count = 0
 #ep = next(dataset.iterate_episodes())
-
+goal = np.array([15.0, -13.0], dtype = np.float32)
 for ep in dataset.iterate_episodes():
-    print("observation keys:", ep.observations.keys())
-    print("Desired goals:", ep.observations['desired_goal'])
-    print("Acheived goals:", ep.observations['achieved_goal'][888])
-    print("observation shape:", ep.observations["observation"].shape)
-    print('rewards sum:', ep.rewards[888])
+    #print("observation keys:", ep.observations.keys())
+    #print("Desired goals:", ep.observations['desired_goal'][0])
+    for i in range(len(ep.observations['achieved_goal'])):
+         print("Acheived goals:", ep.observations['achieved_goal'][i])
+         print(type(ep.observations['achieved_goal'][i]))
+    #print(len(ep.observations['achieved_goal']))
     break
-"""  
+   
+    
+    #print("observation shape:", ep.observations["observation"].shape)
+    #print('rewards sum:', ep.rewards[888])
+    
+    for i in range(len(ep.observations['achieved_goal'])):
+        if np.allclose(ep.observations['achieved_goal'][i], goal, atol = 0.5):
+            count += 1
+"""
+
+
+import numpy as np
+
+# 1D
+a = np.array([1, 2])
+b = np.array([3, 4])
+np.concatenate([a, b])          # -> [1 2 3 4]
+
+# 2D: stack rows (axis=0) or columns (axis=1)
+A = np.array([[1, 2], [3, 4]])
+B = np.array([[5, 6], [7, 8]])
+
+C = np.concatenate([A, B], axis=1)  # same as np.vstack([A, B])
+print(C)
+
+
 
 
 

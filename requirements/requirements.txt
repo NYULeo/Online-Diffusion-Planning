@@ -20,6 +20,8 @@ mediapy  # For media processing and animations
 sympy  # For symbolic mathematics
 h5py>=3.0.0  # Required for D4RL dataset loading
 humanoid-bench  # Humanoid benchmark environments
+ogbench  # OGBench: Benchmarking Offline Goal-Conditioned RL (cube, scene, puzzle tasks)
+scikit-learn  # For clustering and dimensionality reduction
 
 torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124

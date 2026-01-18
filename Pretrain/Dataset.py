@@ -16,8 +16,13 @@ from torch.utils.data import Dataset
 import pickle
 from Pretrain.utils import SAStats
 import os
+from typing import Optional
 
-
+def determine_stride(dataset_name, specific_dataset):
+     if(dataset_name == 'antmaze'):
+          return True
+     else:
+          return False
 
 #-------------------------------------------------------------------------------------#
 #------------------------------------- Dataset ---------------------------------------#
@@ -265,6 +270,8 @@ class AntMazeDataset():
           trajectories = []
           for episode in self.dataset.iterate_episodes():
               observations = episode.observations['observation']
+              positions = episode.observations['achieved_goal']
+              observations = np.concatenate([observations, positions], axis = 1)
               actions = episode.actions
               rewards = episode.rewards
               terminated = episode.terminations
@@ -305,16 +312,18 @@ class AntMazeDataset():
           return self.dataset._action_space.shape[0]
     
      def get_env(self, render_mode):
+          
           gym.register_envs(gymnasium_robotics)
           if self.name in ['umaze', 'umaze_diverse']:
-              env = gym.make('AntMaze_UMaze-v5', max_episode_steps=1000, render_mode=render_mode, continuing_task=False)
+              env = gym.make('AntMaze_UMaze-v4', max_episode_steps=1000, render_mode=render_mode, continuing_task=False)
           elif self.name in ['medium_play', 'medium_diverse']:
-              env = gym.make('AntMaze_Medium-v5', max_episode_steps=1000, render_mode=render_mode, continuing_task=False)
+              env = gym.make('AntMaze_Medium-v4', max_episode_steps=1000, render_mode=render_mode, continuing_task=False)
           elif self.name in ['large_play', 'large_diverse']:
-              env = gym.make('AntMaze_Large-v5', max_episode_steps=1000, render_mode=render_mode, continuing_task=False)
+              env = gym.make('AntMaze_Large-v4', max_episode_steps=1000, render_mode=render_mode, continuing_task=False)
           else:
               raise ValueError(f'Invalid dataset name')
           return env
+          
           #return self.dataset.recover_environment(render_mode = render_mode)
          
      def get_ref_max_score(self):
@@ -376,7 +385,7 @@ def get_PlannerName(env_name, specific_env):
          raise ValueError(f"Invalid environment name: '{env_name}")
 
 class PlannerDataset(Dataset):
-    def __init__(self, dataset_name, specific_dataset, horizon, state_dim, action_dim):
+    def __init__(self, dataset_name, specific_dataset, horizon, state_dim, action_dim, stride: Optional[int] = 1):
         data = get_dataset(dataset_name, specific_dataset)
         self.planner_name = get_PlannerName(dataset_name, specific_dataset)
         self.traj = data.get_trajectories()
@@ -385,6 +394,11 @@ class PlannerDataset(Dataset):
         self.conditions = []
         self.state_dim = state_dim
         self.action_dim = action_dim
+        if(determine_stride(dataset_name, specific_dataset)):
+           self.stride = stride
+        else:
+           self.stride = 1
+        
         
 
         # ----- gather raw obs/actions to fit stats -----
@@ -408,19 +422,34 @@ class PlannerDataset(Dataset):
             L = min(len(obs), len(acts))     
             # per-step normalize then concat [s_t, a_t]
             sa_pairs = []
-            for t in range(L):
-                s_norm = self.stats.norm_obs(obs[t])
-                #a_norm = self.stats.norm_act(acts[t])
-                a_norm = acts[t]
-                sa_pairs.append(np.concatenate([s_norm, a_norm], axis=0))
-               
-            
-            # sliding horizon, then flatten to 1D
-            for start in range(0, L - horizon + 1):
-                segment = np.array(sa_pairs[start : start + horizon])  # [H, d_s+d_a]
-                self.windows.append(torch.from_numpy(segment).float())
-                self.conditions.append(torch.from_numpy(sa_pairs[start][:self.state_dim]).float())
-            
+            if(self.stride == 1):
+                for t in range(L):
+                    s_norm = self.stats.norm_obs(obs[t])
+                    #a_norm = self.stats.norm_act(acts[t])
+                    a_norm = acts[t]
+                    sa_pairs.append(np.concatenate([s_norm, a_norm], axis=0))
+            else:
+                 for t in range(L):
+                    s_norm = self.stats.norm_obs(obs[t])
+                    sa_pairs.append(s_norm)
+
+            if(self.stride == 1):
+              # sliding horizon, then flatten to 1D
+              for start in range(0, L - horizon + 1):
+                  segment = np.array(sa_pairs[start : start + horizon])  # [H, d_s+d_a]
+                  self.windows.append(torch.from_numpy(segment).float())
+                  self.conditions.append(torch.from_numpy(sa_pairs[start][:self.state_dim]).float())
+            else:
+                max_start = L - ((horizon - 1) * self.stride)
+                if max_start <= 0:
+                    continue
+                for start in range(0, max_start):
+                    idxs = start + (self.stride * np.arange(horizon))
+                    segment = np.array([sa_pairs[i] for i in idxs])  # [H, d_s]
+                    self.windows.append(torch.from_numpy(segment).float())
+                    self.conditions.append(torch.from_numpy(sa_pairs[start]).float())
+                
+        
         self.save_stats(dataset_name, specific_dataset)
 
     def save_stats(self, dataset_name, specific_dataset):
@@ -561,6 +590,9 @@ class PlannerDataset_Rollout(Dataset):
     def __getitem__(self, idx):
         return self.windows[idx], self.conditions[idx]
 
+
+
+
 """
 vectors = []
 data = get_dataset('kitchen', 'partial')
@@ -695,3 +727,4 @@ def visualize_clusters(vectors, assignments, cluster_centers, title_prefix=""):
 visualize_clusters(vectors, assignments, stats['cluster_centers'], "Kitchen Rewards: ")
 
 """
+

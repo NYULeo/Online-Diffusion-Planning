@@ -3,6 +3,7 @@ jax-jumpy==1.0.0 ; python_version >= "3.8" and python_version < "3.11"
 matplotlib
 moviepy
 numpy<2.0
+scikit-learn  # For clustering and dimensionality reduction (must be installed before packages that depend on sklearn)
 pandas
 protobuf
 pygame
