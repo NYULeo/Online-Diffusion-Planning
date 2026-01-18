@@ -156,11 +156,12 @@ def save_reward_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma,
 
 def reward_filter(obs, rews, goal):
     #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
-    target_goals = goal
     for i in range(1, len(obs)):
-        goal_coord = np.floor(obs[i][:2]) + 0.5
-        #goal_coord = np.round(goal_coord, 1)  
-        if np.any(np.all(np.equal(goal_coord, target_goals), axis=1)):
+        goal_coord = np.floor(obs[i][:2]) 
+
+        #goal_coord = np.round(goal_coord, 1) 
+        dist = np.linalg.norm(goal_coord - goal) 
+        if (dist < 0.5):
             rews[i-1] = 1
         else:
             rews[i-1] = 0
