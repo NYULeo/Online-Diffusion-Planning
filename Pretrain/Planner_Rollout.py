@@ -320,7 +320,7 @@ if __name__ == "__main__":
     env_name = 'antmaze'
     specific_train_dataset = 'large_play'
     #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 990000, render = True)
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 20, num_karras = 0, eta = 1.5, episode_length  = 100000, critic = False, checkpoint_steps = 10000, render = True)
-    #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 200, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1000000, num_envs = 50)
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 20, num_karras = 0, eta = 1.5, episode_length  = 10000, critic = False, checkpoint_steps = 990000, render = True)
+    rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 200, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1000000, num_envs = 50)
   
   

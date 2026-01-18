@@ -787,9 +787,11 @@ def get_normalized_score(trajs, expert_score: Optional[float] = None):
 def get_expert_score(dataset_name):
     if(dataset_name == 'kitchen'):
          data = get_dataset(dataset_name, 'complete')
-    trajs = data.get_trajectories()
-    score = get_normalized_score(trajs, None)
-    return score
+         trajs = data.get_trajectories()
+         score = get_normalized_score(trajs, None)
+         return score
+    else:
+         return None
 
 def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs=8, goal_cell: Optional[np.ndarray] = None, device: torch.device = None, seed_base: int = 0):
      #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")

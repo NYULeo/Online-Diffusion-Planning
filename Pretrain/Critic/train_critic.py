@@ -398,8 +398,8 @@ def test_critic(dataset_name: str, specific_dataset: str, checkpoint_step, sigma
 
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
-    env_name = 'kitchen'
-    specific_env = 'partial'
+    env_name = 'pointmaze'
+    specific_env = 'large'
     data = get_dataset(env_name, specific_env)
     trajs = data.get_trajectories()
     #trajs = get_trajs(env_name, specific_env, 0)
@@ -413,10 +413,11 @@ if __name__ == '__main__':  # pragma: no cover
                  lr = 5e-5, 
                  tau = 0.01,
                  goal = None,
-                 target_reward = 50.0,
+                 target_reward = 1.0,
                  trajs = trajs)
     print('training complete')
     
+    """
     trajs = data.get_trajectories()
     step = 2000
     while(step <= 10000):
@@ -431,6 +432,7 @@ if __name__ == '__main__':  # pragma: no cover
                     trajs = trajs)
         step += 2000
     print('testing complete')
+    """
 
 
 
