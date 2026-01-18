@@ -32,7 +32,7 @@ class SDETrainer:
         step_start_ema = 1000,
         gradient_accumulate_every=2,
         ema_decay=0.999,
-        save_freq= 10000,
+        save_freq= 100000,
         log_freq = 10,
         s: float = 0.008,                  # cosine offset
         weight_type: str = 'sigma2',         # {"one", "sigma2", "beta"}
