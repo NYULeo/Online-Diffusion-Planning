@@ -318,8 +318,8 @@ class SDETrainer:
         B, H, D = x0.shape
         mask = torch.zeros((B, H, D), dtype = torch.float32, device = self.device)
         y = torch.zeros((B, H, D), dtype = torch.float32, device = self.device)
-        mask[:, 0, :self.state_dim] = 1
-        y[:, 0, :self.state_dim] = conditions.clone()
+        mask[:, 0, :self.Dimension] = 1
+        y[:, 0, :self.Dimension] = conditions.clone()
 
         # 1) sample time t ~ U(eps, 1 - eps), per sample (shape: (B,))
         t = torch.rand(B, device=self.device) * (1.0 - 2*self.eps) + self.eps
