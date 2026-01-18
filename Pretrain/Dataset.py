@@ -32,6 +32,8 @@ def get_env(env_name, specific_env, render_mode = None):
     env = data.get_env(render_mode)
     d_s = data.get_state_dim()
     d_a = data.get_action_dim()
+    if(env_name == 'antmaze'):
+        d_s = d_s + 2
     return  env, d_s, d_a
 
 def merger(traj_1, traj_2):
