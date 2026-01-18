@@ -44,16 +44,16 @@ import os
 
 def heatmap(STEP, agg_method='max', highlight_negatives=True):
     # ================== Configuration ==================
-    RESOLUTION = 256                # Grid resolution (256x256 is fast and looks good)
+    RESOLUTION = 256           # Grid resolution (256x256 is fast and looks good)
     BATCH_SIZE = 16384              # Batch size for efficient processing
-    MAX_GOALS_TO_PLOT = 20           # Plot only the first few unique goals
+    MAX_GOALS_TO_PLOT = 3          # Plot only the first few unique goals
     GRID_MARGIN = 0.5               # Extra padding around observed positions for plotting
     OUTPUT_FILE = f"{STEP}_heatmap.png"
 
     print(f'Ploting the heatmap for checkpoint: {STEP}')
     
     # ================== Load Environment ==================
-    dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
+    dataset = minari.load_dataset('D4RL/pointmaze/large-v2', download=True)
     env = dataset.recover_environment().unwrapped  # Unwrap to access maze attribute
 
     # ================== Extract All Unique Goals from Dataset ==================
@@ -104,11 +104,18 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
     # Determine plotting bounds based on observed positions
     if np.isinf(pos_min).any() or np.isinf(pos_max).any():
         if hasattr(env, 'maze') and hasattr(env.maze, 'maze_map'):
+            """
             map_height = env.maze.map_length
             map_width = env.maze.map_width
             cell = env.maze.maze_size_scaling
             pos_min = np.array([-map_width / 2.0 * cell, -map_height / 2.0 * cell], dtype=np.float32)
             pos_max = np.array([map_width / 2.0 * cell, map_height / 2.0 * cell], dtype=np.float32)
+            """
+            map_height = env.maze.map_length
+            map_width = env.maze.map_width
+            cell = env.maze.maze_size_scaling
+            pos_min = np.array([-map_width/2*cell, -map_height/2*cell])
+            pos_max = np.array([ map_width/2*cell,  map_height/2*cell])
         else:
             raise ValueError("Could not determine position bounds from dataset or maze.")
 
@@ -121,7 +128,7 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
     start_pos = default_start
 
     # ================== Load Reward Model ==================
-    state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', STEP, 'medium')
+    state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', STEP, 'large')
     model = SimpleReward(obs_dim, act_dim)
     model.load_state_dict(state_dict)
     model.eval()
@@ -487,18 +494,138 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
         np.save(npy_path, reward_map)
         print(f"Reward map saved as numpy array to {npy_path}")
 
+def plot_reward_heatmap_large(
+    step=200,
+    dataset_id="D4RL/pointmaze/large-v2",
+    resolution=128,
+    batch_size=8192,
+):
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import minari
+    import torch
+    from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
+    from Pretrain.Rewards.nets import SimpleReward
 
-"""
+    dataset = minari.load_dataset(dataset_id, download=True)
+    env = dataset.recover_environment().unwrapped
+
+    # Full maze bounds
+    H = env.maze.map_length
+    W = env.maze.map_width
+    cell = env.maze.maze_size_scaling
+    grid_min = np.array([-W / 2 * cell, -H / 2 * cell], dtype=np.float32)
+    grid_max = np.array([ W / 2 * cell,  H / 2 * cell], dtype=np.float32)
+
+    # Grid
+    x = np.linspace(grid_min[0], grid_max[0], resolution)
+    y = np.linspace(grid_min[1], grid_max[1], resolution)
+    X, Y = np.meshgrid(x, y, indexing="xy")
+
+    # Reward model
+    state_dict, obs_dim, act_dim, name = get_pretrained_reward("pointmaze", step, "large")
+    model = SimpleReward(obs_dim, act_dim)
+    model.load_state_dict(state_dict)
+    model.eval()
+    stats = get_pretrained_reward_stats(name)
+
+    # Single goal (from env)
+    obs_dict, _ = env.reset(seed=0)
+    goal = env.generate_target_goal()
+    goal = np.array(goal[:2], dtype=np.float32)
+
+    # Evaluate reward at zero action
+    obs_base = np.stack(
+        [
+            X.ravel(),
+            Y.ravel(),
+            np.full(resolution**2, goal[0]),
+            np.full(resolution**2, goal[1]),
+        ],
+        axis=1,
+    ).astype(np.float32)
+
+    reward_map = np.full(resolution**2, -1e10, dtype=np.float32)
+
+    obs_mean_t = torch.as_tensor(stats.obs_mean, dtype=torch.float32)
+    obs_std_t = torch.as_tensor(
+        np.maximum(stats.obs_std, getattr(stats, "std_floor", 1e-3)),
+        dtype=torch.float32,
+    )
+
+    with torch.no_grad():
+        for start in range(0, len(obs_base), batch_size):
+            end = min(start + batch_size, len(obs_base))
+            batch_obs = torch.from_numpy(obs_base[start:end]).float()
+            act_rep = torch.zeros((end - start, 2), dtype=torch.float32)
+
+            obs_norm = (batch_obs - obs_mean_t) / obs_std_t
+            r = model(obs_norm, act_rep)
+            reward_map[start:end] = r.cpu().numpy()
+
+    reward_map = reward_map.reshape(resolution, resolution)
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(10, 7))
+    im = ax.imshow(
+        reward_map,
+        extent=[grid_min[0], grid_max[0], grid_min[1], grid_max[1]],
+        origin="lower",
+        cmap="coolwarm",
+        interpolation="bilinear",
+    )
+    plt.colorbar(im, ax=ax, label="Reward", shrink=0.8)
+
+    pad = 1.0
+    xmin, xmax = (-W/2 + pad) * cell, (W/2 - pad) * cell
+    ymin, ymax = (-H/2 + pad) * cell, (H/2 - pad) * cell
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+
+    # Draw walls
+    maze_map = env.maze.maze_map
+    for row in range(H):
+        for col in range(W):
+            if row == 0 or row == H - 1 or col == 0 or col == W - 1:
+                continue
+            if maze_map[row][col] == 1:
+                x0 = (col - W / 2.0 + 0.5) * cell
+                y0 = (H / 2.0 - row - 0.5) * cell
+                half = cell / 2.0
+                square = np.array(
+                    [
+                        [x0 - half, y0 - half],
+                        [x0 + half, y0 - half],
+                        [x0 + half, y0 + half],
+                        [x0 - half, y0 + half],
+                        [x0 - half, y0 - half],
+                    ]
+                )
+                ax.plot(square[:, 0], square[:, 1], "k-", linewidth=1)
+
+    ax.set_aspect("equal")
+    ax.set_xlabel("X position")
+    ax.set_ylabel("Y position")
+    ax.set_title(f"Reward Heatmap (Step {step})")
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+
+
+
 if __name__ == '__main__':
     # Example usage
     step = 200
-    while(step <= 1000):
+    
+    while(step <= 200):
          np.random.seed(0)
          random.seed(0)
-         heatmap(step, agg_method='mean', highlight_negatives=True)
+         plot_reward_heatmap_large(step)
          step += 200
     print('Done')
-"""
+    
+
+
 
 
 
@@ -561,8 +688,8 @@ ax.legend(loc="upper right")
 
 plt.tight_layout()
 plt.show()
-"""
 
+"""
 
 """
 import minari
@@ -597,19 +724,6 @@ for ep in dataset.iterate_episodes():
 """
 
 
-import numpy as np
-
-# 1D
-a = np.array([1, 2])
-b = np.array([3, 4])
-np.concatenate([a, b])          # -> [1 2 3 4]
-
-# 2D: stack rows (axis=0) or columns (axis=1)
-A = np.array([[1, 2], [3, 4]])
-B = np.array([[5, 6], [7, 8]])
-
-C = np.concatenate([A, B], axis=1)  # same as np.vstack([A, B])
-print(C)
 
 
 

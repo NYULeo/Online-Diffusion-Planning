@@ -154,6 +154,8 @@ def save_reward_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma,
     
     print(f"Reward pretraining hyperparameters saved to {filepath}", flush=True)
 
+
+"""
 def reward_filter(obs, rews, goal):
     #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
     for i in range(1, len(obs)):
@@ -166,7 +168,19 @@ def reward_filter(obs, rews, goal):
         else:
             rews[i-1] = 0
     return rews
-
+"""
+def reward_filter(obs, rews, goal):
+    #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
+    target_goals = goal
+    for i in range(1, len(obs)):
+        goal_coord = np.floor(obs[i][:2]) + 0.5
+        #goal_coord = np.round(goal_coord, 1)  
+        if np.any(np.all(np.equal(goal_coord, target_goals), axis=1)):
+            rews[i-1] = 1
+        else:
+            rews[i-1] = 0
+    return rews
+    
 def save_to_finetuning(reward_net, dataset_name, specific_dataset: Optional[str] = None):
     reward_net.eval()
     net_dict = reward_net.state_dict()
@@ -202,7 +216,15 @@ def save_model(reward_net, reward_name, num_steps):
     print(f"reward model save to {reward_name}_{num_steps}.pkl")
 
 def load_model(reward_name, num_steps):
-    load_path = f'./Pretrain/Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
+    #load_path = f'./Pretrain/Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
+    load_path = os.path.join(
+        project_root,
+        "Pretrain",
+        "Rewards",
+        reward_name,
+        "Models",
+        f"{reward_name}_{num_steps}.pkl",
+    )
     #state_dict = torch.load(load_path, map_location='cpu')
     state_dict = torch.load(load_path, weights_only=True, map_location='cpu')
     return state_dict
@@ -462,7 +484,15 @@ def get_pretrained_reward(dataset_name, checkpoints, specific_dataset: Optional[
        return reward_model_state_dict, obs_dim, act_dim, name
 
 def get_pretrained_reward_stats(Reward_name):
-    stats_path = f'./Pretrain/Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
+    #stats_path = f'./Pretrain/Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
+    stats_path = os.path.join(
+        project_root,
+        "Pretrain",
+        "Rewards",
+        Reward_name,
+        "Stats",
+        f"{Reward_name}_stats.pkl",
+    )
     with open(stats_path, 'rb') as f:
         stats = pickle.load(f)
     return stats
