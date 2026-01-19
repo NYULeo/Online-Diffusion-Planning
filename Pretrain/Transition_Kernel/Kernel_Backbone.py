@@ -546,6 +546,7 @@ def test_kernel(dataset_name, specific_dataset: str = None,
 
         # Compute log-probs over dataset
         all_lp = []
+        count = 0
         #worst = (None, float("inf"), None)  # (idx, log_prob, (s, a, s_next))
         for i, (s, a, s_next) in enumerate(dataloader):
             s = s.to(device)
@@ -561,6 +562,9 @@ def test_kernel(dataset_name, specific_dataset: str = None,
             # You can take mean, or min over ensemble.
             lp_mean = sum(lps) / len(lps)
             all_lp.append(lp_mean)
+            count += 1
+            if(count == 1000):
+                break
 
             #if lp_mean < worst[1]:
              #   worst = (i, lp_mean, (s.cpu().numpy(), a.cpu().numpy(), s_next.cpu().numpy()))
