@@ -1,8 +1,6 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-os.chdir(project_root)
 from Pretrain.Critic.train_critic import train_critic
 from Pretrain.utils import set_seed
 from Pretrain.Dataset import get_dataset
