@@ -9,7 +9,7 @@ from typing import Optional
 from Dataset import get_env
 from utils import set_seed
 from Planners.Backbone.utils import get_pretrained_planner
-from Critic.train_critic import Critic, Critic_Processor, get_CriticName
+from Critic.train_critic import Critic, get_CriticName
 from Dataset import Planner_Processor
 import gymnasium as gym
 import os
