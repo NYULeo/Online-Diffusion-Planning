@@ -1,6 +1,8 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(project_root)
 import numpy as np
 import minari
 from sympy.core import I
@@ -594,7 +596,8 @@ class PlannerDataset_Rollout(Dataset):
 
 
 
-
+#env, d_s, d_a = get_env('antmaze', 'medium_play')
+#data = PlannerDataset('antmaze', 'medium_play', 40, d_s, d_a)
 """
 vectors = []
 data = get_dataset('kitchen', 'partial')
@@ -729,4 +732,3 @@ def visualize_clusters(vectors, assignments, cluster_centers, title_prefix=""):
 visualize_clusters(vectors, assignments, stats['cluster_centers'], "Kitchen Rewards: ")
 
 """
-

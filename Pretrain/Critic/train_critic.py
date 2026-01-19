@@ -1,8 +1,8 @@
 import random
 import sys
 import os
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.append(project_root)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 from Finetuning.utils import TrajectoryDict, get_trajs, getName
 from torch.utils.data import Dataset, DataLoader
