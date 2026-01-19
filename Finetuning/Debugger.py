@@ -612,7 +612,7 @@ def plot_reward_heatmap_large(
     plt.show()
 
 
-
+"""
 if __name__ == '__main__':
     # Example usage
     step = 200
@@ -624,7 +624,16 @@ if __name__ == '__main__':
          step += 200
     print('Done')
     
+"""
+from Pretrain.Transition_Kernel.Kernel_Backbone import test_kernel
+dataset = 'pointmaze'
+specific_dataset = 'large'
+path = f'./Finetuning/Rollouts/{dataset}/{specific_dataset}/Generated_trajs_Info_{0}.pkl'
+with open(path, 'rb') as f:
+        trajs = pickle.load(f)
 
+test_kernel(dataset_name = dataset, specific_dataset = specific_dataset,
+                trajs = trajs, save_freq = 3000, num_steps = 30000, hidden_layers = 5, ensemble_size = 10)
 
 
 
