@@ -793,6 +793,15 @@ def get_expert_score(dataset_name):
     else:
          return None
 
+def get_current_state(s0, env_name):
+    if(env_name == 'antmaze'):
+        return np.concatenate([
+               s0['observation'],
+               s0['achieved_goal']
+           ])
+    else:
+        return s0['observation']
+
 def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs=8, goal_cell: Optional[np.ndarray] = None, device: torch.device = None, seed_base: int = 0):
      #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
      #print(f"Running {num_envs} environments in parallel")

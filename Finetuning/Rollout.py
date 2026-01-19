@@ -19,16 +19,8 @@ import gymnasium as gym
 import gymnasium_robotics
 from Pretrain.Dataset import get_dataset
 from typing import Optional
-from utils import get_normalized_score, rollout_parallel
+from utils import get_normalized_score, rollout_parallel, get_current_state
 
-def get_current_state(s0, env_name):
-    if(env_name == 'antmaze'):
-        return np.concatenate([
-               s0['observation'],
-               s0['achieved_goal']
-           ])
-    else:
-        return s0['observation']
 
 
 def test_rollout_fit_for_model(traj, dataset_name=None, specific_dataset=None, 
@@ -289,11 +281,11 @@ if __name__ == "__main__":
     horizon = 40
     env_name = 'pointmaze'
     specific_train_dataset = 'large'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 0, render = True,  goal_cell = np.array([1, 10], dtype = int), start_cell = np.array([7, 1], dtype = int))
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 0, render = True,  goal_cell = np.array([1, 10], dtype = int), start_cell = np.array([7, 1], dtype = int))
     #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True, base_seed = 0)
     #150, 8
     #50, 3
-    #rollout_parallel(env_name, specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_step = 0, num_envs = 4, seed_base = 0)
+    rollout_parallel(env_name, specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_step = 0, goal_cell = None, num_envs = 4, seed_base = 0)
  
    
    
