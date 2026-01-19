@@ -106,6 +106,7 @@ data = [
     [101439, 30.65],
     [103841, 31.42],
 ]
+print(data[27])
 data = [
     [5561, 8.55],
     [8877, 14.13],
@@ -183,6 +184,7 @@ data = [
     [1014, 30.65],
     [1038, 31.42],
 ]
+"""
 plot_lines(
     [data],
     labels=['Normalized Score'],
@@ -190,3 +192,4 @@ plot_lines(
     xlabel='Env Steps (x100)',
     ylabel='Normalized Score'
 )
+"""

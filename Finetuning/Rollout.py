@@ -202,6 +202,8 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
      elif (env_name == 'pointmaze'):
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     elif(env_name == 'antmaze'):
+           model = DiT1d(in_dim = (d_s), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
      else:
           raise ValueError(f"Invalid Environment: {env_name}")
      model.load_state_dict(state_dict)
@@ -225,6 +227,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      for i in range(episode_length):
            current_state_norm = planner_processor.preprocess(current_state)
            
+           
            #x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
            x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
            action = x[0, d_s:(d_s+d_a)].copy()
@@ -241,7 +244,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
            if(terminated or truncated):
                 #print(f"Episode {i} terminated or truncated")
                 break
-     
+     print(len(rewards))
      env.close()
      traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(spare_reward_prcocessor(rewards))}
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
@@ -269,11 +272,11 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'large'
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_steps = 100, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([4, 6], dtype = int))
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 500, num_karras = 0, eta = 0.8, episode_length = 1000, checkpoint_steps = 40, render = True, base_seed = 0)
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 0, render = True,  goal_cell = np.array([1, 10], dtype = int), start_cell = np.array([7, 1], dtype = int))
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True, base_seed = 0)
     #150, 8
     #50, 3
-    rollout_parallel(env_name, specific_train_dataset, horizon = 32, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 4000, checkpoint_step = 0, num_envs = 4, seed_base = 0)
+    rollout_parallel(env_name, specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_step = 0, num_envs = 4, seed_base = 0)
  
    
    
