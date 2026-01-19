@@ -13,7 +13,7 @@ if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     dataset = 'pointmaze'
     specific_dataset = 'large'
-    path = f'./Finetuning/Rollouts/{dataset}/{specific_dataset}/Generated_trajs_Info_{str(step)}.pkl'
+    path = f'./Finetuning/Rollouts/{dataset}/{specific_dataset}/Generated_trajs_Info_{str(0)}.pkl'
     with open(path, 'rb') as f:
         trajs = pickle.load(f)
     #train_kernel(dataset_name = 'kitchen', batch_size = 256, lr = 1e-4, num_steps =  50000, ensemble_size=10, λ_reg=1e-3)
