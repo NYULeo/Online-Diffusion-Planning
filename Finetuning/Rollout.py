@@ -21,6 +21,15 @@ from Pretrain.Dataset import get_dataset
 from typing import Optional
 from utils import get_normalized_score, rollout_parallel
 
+def get_current_state(s0, env_name):
+    if(env_name == 'antmaze'):
+        return np.concatenate([
+               s0['observation'],
+               s0['achieved_goal']
+           ])
+    else:
+        return s0['observation']
+
 
 def test_rollout_fit_for_model(traj, dataset_name=None, specific_dataset=None, 
                                 reward_checkpoint=0, kernel_checkpoint=0, 
@@ -218,15 +227,22 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
         s0 = env.reset(seed = base_seed, options={"goal_cell": goal_cell, "reset_cell": start_cell})
      else:
         s0 = env.reset(seed = base_seed)
-     s0 = s0[0]['observation']
-     current_state = s0
+     """
+     if(env_name == 'antmaze'):
+          current_state = np.concatenate([
+               s0[0]['observation'],
+               s0[0]['achieved_goal']
+           ])
+     else:
+         current_state = s0[0]['observation']
+     """
+     current_state = get_current_state(s0[0], env_name)
      frames = []
      observations = []
      actions = []
      rewards = []
      for i in range(episode_length):
            current_state_norm = planner_processor.preprocess(current_state)
-           
            
            
            #x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
@@ -236,11 +252,11 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
            if(render):
                 frames.append(env.render())
                 
-           
-           observations.append(obs['observation'].copy())
+           current_state = get_current_state(obs.copy(), env_name)
+           observations.append(current_state.copy())
            actions.append(action.copy())
            rewards.append(reward)
-           current_state = obs['observation'].copy()
+           #current_state = obs['observation'].copy()
            #print(f"Episode {i} reward: {reward}")
            if(terminated or truncated):
                 #print(f"Episode {i} terminated or truncated")
@@ -271,10 +287,10 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
 if __name__ == "__main__":
     set_seed(0)
     horizon = 40
-    env_name = 'antmaze'
-    specific_train_dataset = 'medium_play'
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 0, render = True,  goal_cell = np.array([1, 10], dtype = int), start_cell = np.array([7, 1], dtype = int))
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True, base_seed = 0)
+    env_name = 'pointmaze'
+    specific_train_dataset = 'large'
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 0, render = True,  goal_cell = np.array([1, 10], dtype = int), start_cell = np.array([7, 1], dtype = int))
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True, base_seed = 0)
     #150, 8
     #50, 3
     #rollout_parallel(env_name, specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_step = 0, num_envs = 4, seed_base = 0)
