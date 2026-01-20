@@ -1,6 +1,7 @@
 import os
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+script_dir = os.path.dirname(os.path.abspath(__file__))
+repo_root = os.path.dirname(script_dir)
 
 #project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 #os.chdir(project_root)
