@@ -5,7 +5,7 @@ repo_root = os.path.dirname(script_dir)
 
 #project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 #os.chdir(project_root)
-from Transition_Kernel.Kernel_Backbone import train_kernel, test_kernel
+from Pretrain.Transition_Kernel.Kernel_Backbone import train_kernel, test_kernel
 from utils import set_seed
 import pickle
 from Finetuning.utils import get_trajs
