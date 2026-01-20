@@ -24,3 +24,24 @@ venv/
 ## VS Code (keep settings if you want them versioned)
 .vscode/
 !.vscode/settings.json
+
+## Training outputs / checkpoints (keep out of git)
+*.pt
+*.pth
+*.ckpt
+*.pkl
+*.npz
+*.npy
+*.mp4
+*.png
+*.jpg
+*.jpeg
+
+Finetuning/**/Models/
+Finetuning/**/Stats/
+Finetuning/**/logs/
+Finetuning/Rollouts/
+
+Pretrain/**/Models/
+Pretrain/**/Stats/
+Pretrain/**/logs/

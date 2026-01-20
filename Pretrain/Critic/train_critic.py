@@ -1,26 +1,23 @@
-import random
-import sys
-import os
-import random
-import sys
-import os
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-os.chdir(project_root)
-from Finetuning.utils import TrajectoryDict, get_trajs, getName
-from torch.utils.data import Dataset, DataLoader
+
+from pathlib import Path
+import copy
+import pickle
+from typing import Optional, List
+
+import numpy as np
 import torch
 import torch.optim as optim
-import numpy as np
-import torch.nn as nn
-from Dataset import get_dataset, get_env
-from utils import set_seed, SAStats
-from Critic.nets import Critic
-import pickle
 from scipy.ndimage import gaussian_filter1d
-import os
-from typing import Optional, List
-from utils import cycle
-import copy
+from torch.utils.data import Dataset, DataLoader
+
+from Finetuning.utils import TrajectoryDict, get_trajs, getName
+from Pretrain.Dataset import get_dataset, get_env
+from Pretrain.utils import set_seed, SAStats, cycle
+from Pretrain.Critic.nets import Critic
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]   # Online-Diffusion-Planning/
+PRETRAIN_DIR = PROJECT_ROOT / "Pretrain"
+FINETUNE_DIR = PROJECT_ROOT / "Finetuning"
 
 
 def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, 
@@ -29,9 +26,14 @@ def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma,
                                 target_reward: Optional[float] = None,
                                 goal: Optional[np.array] = None):
     
+    """
     os.makedirs(f"./Pretrain/Critic/{dataset_name}/{specific_dataset}/args/", exist_ok=True)
     filepath = f"./Pretrain/Critic/{dataset_name}/{specific_dataset}/args/hyperparameters.json"
-    
+    """
+    args_dir = PRETRAIN_DIR / "Critic" / dataset_name / specific_dataset / "args"
+    args_dir.mkdir(parents=True, exist_ok=True)
+    filepath = args_dir / "hyperparameters.json"
+
     def convert_to_json_serializable(obj):
         """Recursively convert objects to JSON-serializable types"""
         if isinstance(obj, np.ndarray):
@@ -149,8 +151,13 @@ def save_critic(model, dataset_name, specific_dataset, step):
     model.eval()
     name = get_CriticName(dataset_name, specific_dataset)
     net_dict = model.state_dict()
+    """
     os.makedirs(f'./Pretrain/Critic/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
     save_path = f'./Pretrain/Critic/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl'
+    """
+    models_dir = PRETRAIN_DIR / "Critic" / dataset_name / specific_dataset / "Models"
+    models_dir.mkdir(parents=True, exist_ok=True)
+    save_path = models_dir / f"{name}_Critic_{step}.pkl"
     #print("Exists:", os.path.isfile(save_path), "Size:", os.path.getsize(save_path) if os.path.isfile(save_path) else None)
     torch.save(net_dict, save_path)
     print(f"critic model save to {name}.pkl")
@@ -159,11 +166,17 @@ def save_to_finetuning(critic_net, dataset_name, specific_dataset):
     critic_net.eval()
     net_dict = critic_net.state_dict()
     name = getName(dataset_name, specific_dataset)
+    """
     os.makedirs(f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
     save_path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(0)}.pkl'
+    """
+    ft_models_dir = FINETUNE_DIR / "Critics" / dataset_name / specific_dataset / "Models"
+    ft_models_dir.mkdir(parents=True, exist_ok=True)
+    save_path = ft_models_dir / f"{name}_Critic_0.pkl"
     torch.save(net_dict, save_path)
     print(f"critic model save to {save_path}")
 
+"""
 def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str] = None):
     name = getName(dataset_name, specific_dataset)
     os.makedirs(f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/', exist_ok=True)
@@ -171,20 +184,46 @@ def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str
     with open(savepath, 'wb') as f:
         pickle.dump(stats, f)
     print(f"saved stats to {savepath}")
+"""
 
+def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str] = None):
+    name = getName(dataset_name, specific_dataset)
+    ft_stats_dir = FINETUNE_DIR / "Critics" / dataset_name / specific_dataset / "Stats"
+    ft_stats_dir.mkdir(parents=True, exist_ok=True)
+    savepath = ft_stats_dir / f"{name}_Critic_stats_0.pkl"
+    with open(savepath, "wb") as f:
+        pickle.dump(stats, f)
+    print(f"saved stats to {savepath}")
+
+"""
 def get_critic_model(dataset_name, specific_dataset, step):
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
     name = get_CriticName(dataset_name, specific_dataset)
     path = f'./Pretrain/Critic/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl'
     model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
     return model_state_dict, obs_dim
+"""
+def get_critic_model(dataset_name, specific_dataset, step):
+    _, obs_dim, _ = get_env(dataset_name, specific_dataset)
+    name = get_CriticName(dataset_name, specific_dataset)
+    path = PRETRAIN_DIR / "Critic" / dataset_name / specific_dataset / "Models" / f"{name}_Critic_{step}.pkl"
+    model_state_dict = torch.load(path, weights_only=True, map_location="cpu")
+    return model_state_dict, obs_dim
 
+"""
 def get_critic_stats(dataset_name, specific_dataset):
     name = get_CriticName(dataset_name, specific_dataset)
     path = f'./Pretrain/Critic/{dataset_name}/{specific_dataset}/Stats/{name}_Critic_stats.pkl'
     with open(path, 'rb') as f:
         stats = pickle.load(f)
     return stats 
+"""
+def get_critic_stats(dataset_name, specific_dataset):
+    name = get_CriticName(dataset_name, specific_dataset)
+    path = PRETRAIN_DIR / "Critic" / dataset_name / specific_dataset / "Stats" / f"{name}_Critic_stats.pkl"
+    with open(path, "rb") as f:
+        stats = pickle.load(f)
+    return stats
 
 class CriticDataset(Dataset):
     def __init__(self, sigma: float, dataset_name: str, specific_dataset: str, trajs: List[TrajectoryDict], goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
@@ -226,7 +265,7 @@ class CriticDataset(Dataset):
            
         self.transitions = transitions
         self.save_stats(dataset_name, specific_dataset)
-    
+    """
     def save_stats(self, dataset_name, specific_dataset):
         name = get_CriticName(dataset_name, specific_dataset)
         stats_name =  str(name) + f'_Critic_stats.pkl'
@@ -235,6 +274,16 @@ class CriticDataset(Dataset):
         savepath = os.path.join(stats_dir, stats_name)
         with open(savepath, 'wb') as f:
               pickle.dump(self.stats, f)
+        print(f"saved stats to {savepath}")
+    """
+    def save_stats(self, dataset_name, specific_dataset):
+        name = get_CriticName(dataset_name, specific_dataset)
+        stats_name =  str(name) + f'_Critic_stats.pkl'
+        stats_dir = PRETRAIN_DIR / "Critic" / dataset_name / specific_dataset / "Stats"
+        stats_dir.mkdir(parents=True, exist_ok=True)
+        savepath = stats_dir / stats_name
+        with open(savepath, "wb") as f:
+            pickle.dump(self.stats, f)
         print(f"saved stats to {savepath}")
 
     def __len__(self):

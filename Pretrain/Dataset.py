@@ -1,8 +1,6 @@
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-os.chdir(project_root)
+from pathlib import Path
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PRETRAIN_DIR = PROJECT_ROOT / "Pretrain"
 import numpy as np
 import minari
 from sympy.core import I
@@ -455,8 +453,9 @@ class PlannerDataset(Dataset):
                 
         
         self.save_stats(dataset_name, specific_dataset)
-
+    """
     def save_stats(self, dataset_name, specific_dataset):
+     
         stats_name =  str(self.planner_name) + '_stats.pkl'
         stats_dir = f'./Pretrain/Planners/{dataset_name}/{specific_dataset}/Stats/'
         os.makedirs(stats_dir, exist_ok=True)
@@ -464,6 +463,16 @@ class PlannerDataset(Dataset):
         with open(savepath, 'wb') as f:
               pickle.dump(self.stats, f)
         print(f"saved stats to {savepath}")
+     """
+
+    def save_stats(self, dataset_name, specific_dataset):
+       stats_dir = PRETRAIN_DIR / "Planners" / dataset_name / specific_dataset / "Stats"
+       stats_dir.mkdir(parents=True, exist_ok=True)
+       stats_name = str(self.planner_name) + "_stats.pkl"
+       savepath = stats_dir / stats_name
+       with open(savepath, "wb") as f:
+          pickle.dump(self.stats, f)
+       print(f"saved stats to {savepath}")
  
 
     def __len__(self):
@@ -532,6 +541,7 @@ class PlannerDataset_debug(Dataset):
 """
 
 class Planner_Processor():
+     """
      def __init__(self, dataset_name, specific_dataset):
           Planner_name = get_PlannerName(dataset_name, specific_dataset)
           stats_name = Planner_name + '_stats.pkl'  # Remove .pt replacement since Planner_name doesn't have .pt
@@ -545,6 +555,16 @@ class Planner_Processor():
 
           with open(stats_path, 'rb') as f:
               self.stats = pickle.load(f)
+     """
+     def __init__(self, dataset_name, specific_dataset):
+          stats_dir = PRETRAIN_DIR / "Planners" / dataset_name / specific_dataset / "Stats"
+          planner_name = get_PlannerName(dataset_name, specific_dataset)
+          stats_name = str(planner_name) + "_stats.pkl"
+          stats_path = stats_dir / stats_name
+          if not stats_path.exists():
+               raise FileNotFoundError(f"Stats file not found: {stats_path}")
+          with open(stats_path, "rb") as f:
+               self.stats = pickle.load(f)
     
      def preprocess(self, obs):
           obs = self.stats.norm_obs(obs)
