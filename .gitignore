@@ -1,3 +1,26 @@
-# Only ignore git directory itself and .venv310 (contains files >100MB that GitHub rejects)
-.git/
-.venv310/
+## OS / editor junk
+.DS_Store
+.DS_Store?
+._*
+.idea/
+
+## Python
+__pycache__/
+*.py[cod]
+*.pyd
+.Python
+
+## Virtual environments
+.venv/
+.venv*/
+venv/
+
+## Jupyter
+.ipynb_checkpoints/
+
+## Secrets / local configs
+.env
+
+## VS Code (keep settings if you want them versioned)
+.vscode/
+!.vscode/settings.json
