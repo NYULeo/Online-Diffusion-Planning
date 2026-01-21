@@ -4,7 +4,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Pretrain.Critic.train_critic import train_critic
 from Pretrain.utils import set_seed
 from Pretrain.Dataset import get_dataset
-
+import numpy as np
 
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
@@ -22,7 +22,7 @@ if __name__ == '__main__':  # pragma: no cover
                  horizon = 32, 
                  lr = 5e-5, 
                  tau = 0.01,
-                 goal = None,
+                 goal = np.array([[4.5, -3.0]], dtype = np.float32),
                  target_reward = 1.0,
                  trajs = trajs)
     print('training complete')
