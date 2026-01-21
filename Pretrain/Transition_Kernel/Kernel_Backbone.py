@@ -1,13 +1,14 @@
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-os.chdir(project_root)
+from pathlib import Path
+PROJECT_ROOT = Path(__file__).resolve().parents[2]  # Online-Diffusion-Planning/
+PRETRAIN_DIR = PROJECT_ROOT / "Pretrain"
+FINETUNE_DIR = PROJECT_ROOT / "Finetuning"
 import torch
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
-from Dataset import KitchenDataset, PointMazeDataset
+from Pretrain.Dataset import KitchenDataset, PointMazeDataset
 from .Kernel_Net import  RobustTransitionKernel
 from sympy import factorint
 import pickle
@@ -65,11 +66,16 @@ def getName(env_name, specific_env):
 def save_kernel_hyperparameters(dataset_name, batch_size, num_steps, lr, 
                                 obs_dim, act_dim, kernel_name, optimizer, kernel_net, 
                                 ensemble_size, λ_reg, specific_dataset: Optional[str] = None):
-  
+    
    
+    """
     os.makedirs(f"./Pretrain/Transition_Kernel/{kernel_name}/args/", exist_ok=True)
     filepath = f"./Pretrain/Transition_Kernel/{kernel_name}/args/hyperparameters.json"
-    
+    """
+    args_dir = PRETRAIN_DIR / "Transition_Kernel" / kernel_name / "args"
+    args_dir.mkdir(parents=True, exist_ok=True)
+    filepath = args_dir / "hyperparameters.json"
+
     def convert_to_json_serializable(obj):
         """Recursively convert objects to JSON-serializable types"""
         if isinstance(obj, np.ndarray):
@@ -162,8 +168,13 @@ def compute_log_prob(model, s, a, s_next):
 def save_model(kernel_net, kernel_name, num_steps, ensemble_idx):
     kernel_net.eval()
     net_dict = kernel_net.state_dict()
+    """
     os.makedirs(f'./Pretrain/Transition_Kernel/{kernel_name}/Models/{num_steps}', exist_ok=True)
     save_path = f'./Pretrain/Transition_Kernel/{kernel_name}/Models/{num_steps}/{kernel_name}_{num_steps}_{ensemble_idx}.pkl'
+    """
+    models_dir = PRETRAIN_DIR / "Transition_Kernel" / kernel_name / "Models" / str(num_steps)
+    models_dir.mkdir(parents=True, exist_ok=True)
+    save_path = models_dir / f"{kernel_name}_{num_steps}_{ensemble_idx}.pkl"
     torch.save(net_dict, save_path)
     print(f"Kernel model save to {kernel_name}_{num_steps}_{ensemble_idx}.pkl")
 
@@ -171,15 +182,24 @@ def save_to_finetuning(kernel_net, dataset_name, ensemble_idx, specific_dataset:
     kernel_net.eval()
     net_dict = kernel_net.state_dict()
     name = getName(dataset_name, specific_dataset)
+    """
     if(specific_dataset is None):
         os.makedirs(f'./Finetuning/Kernels/{dataset_name}/Models/{str(0)}', exist_ok=True)
         save_path = f'./Finetuning/Kernels/{dataset_name}/Models/{str(0)}/{name}_Kernel_{str(ensemble_idx)}.pkl'
     else:
         os.makedirs(f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(0)}', exist_ok=True)
         save_path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(0)}/{name}_Kernel_{str(ensemble_idx)}.pkl'
+    """
+    if specific_dataset is None:
+         ft_models_dir = FINETUNE_DIR / "Kernels" / dataset_name / "Models" / "0"
+    else:
+         ft_models_dir = FINETUNE_DIR / "Kernels" / dataset_name / specific_dataset / "Models" / "0"
+    ft_models_dir.mkdir(parents=True, exist_ok=True)
+    save_path = ft_models_dir / f"{name}_Kernel_{ensemble_idx}.pkl"
     torch.save(net_dict, save_path)
     print(f"kernel model save to {save_path}")
 
+"""
 def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str] = None):
     name = getName(dataset_name, specific_dataset)
     if(specific_dataset is None):
@@ -191,7 +211,20 @@ def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str
     with open(savepath, 'wb') as f:
         pickle.dump(stats, f)
     print(f"saved stats to {savepath}")
+"""
 
+def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str] = None):
+    name = getName(dataset_name, specific_dataset)
+    if specific_dataset is None:
+        ft_stats_dir = FINETUNE_DIR / "Kernels" / dataset_name / "Stats"
+    else:
+        ft_stats_dir = FINETUNE_DIR / "Kernels" / dataset_name / specific_dataset / "Stats"
+    ft_stats_dir.mkdir(parents=True, exist_ok=True)
+    savepath = ft_stats_dir / f"{name}_Kernel_stats_0.pkl"
+    with open(savepath, "wb") as f:
+        pickle.dump(stats, f)
+    print(f"saved stats to {savepath}")
+   
 def count_files_in_folder(folder_path):
     """
     Count the number of files in a specific folder.
@@ -216,12 +249,24 @@ def count_files_in_folder(folder_path):
         print(f"Permission denied to access '{folder_path}'.")
         return 0
 
+"""
 def load_model(kernel_name, num_steps, ensemble_idx):
     load_path = f'./Pretrain/Transition_Kernel/{kernel_name}/Models/{num_steps}/{kernel_name}_{num_steps}_{ensemble_idx}.pkl'
     #state_dict = torch.load(load_path, map_location='cpu')
     state_dict = torch.load(load_path, weights_only=True)
     return state_dict
-
+"""
+def load_model(kernel_name, num_steps, ensemble_idx):
+    load_path = (
+        PRETRAIN_DIR
+        / "Transition_Kernel"
+        / kernel_name
+        / "Models"
+        / str(num_steps)
+        / f"{kernel_name}_{num_steps}_{ensemble_idx}.pkl"
+    )
+    state_dict = torch.load(load_path, weights_only=True)
+    return state_dict
 
 def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None):
     if(dataset_name == 'kitchen'):
@@ -281,7 +326,7 @@ class KernelDataset(Dataset):
                 data.append((s_t, a_t, s_tp1))
          self.data = data
          self.save_stats(kernel_name)
-    
+    """
     def save_stats(self, kernel_name):
         stats_name =  str(kernel_name) + '_stats.pkl'
         stats_dir = f'./Pretrain/Transition_Kernel/{kernel_name}/Stats/'
@@ -290,6 +335,15 @@ class KernelDataset(Dataset):
         with open(savepath, 'wb') as f:
               pickle.dump(self.stats, f)
         print(f"saved stats to {savepath}")
+    """
+    def save_stats(self, kernel_name):
+       stats_name = f"{kernel_name}_stats.pkl"
+       stats_dir = PRETRAIN_DIR / "Transition_Kernel" / kernel_name / "Stats"
+       stats_dir.mkdir(parents=True, exist_ok=True)
+       savepath = stats_dir / stats_name
+       with open(savepath, "wb") as f:
+            pickle.dump(self.stats, f)
+       print(f"saved stats to {savepath}")
 
     def __len__(self):
         return len(self.data)
@@ -304,9 +358,14 @@ class KernelDataset(Dataset):
 
 class test_dataset(Dataset):
     def __init__(self, trajs, kernel_name):
+        """
         stats_path = f'./Pretrain/Transition_Kernel/{kernel_name}/Stats/{kernel_name}_stats.pkl'
         with open(stats_path, 'rb') as f:
               self.stats = pickle.load(f)
+        """
+        stats_path = PRETRAIN_DIR / "Transition_Kernel" / kernel_name / "Stats" / f"{kernel_name}_stats.pkl"
+        with open(stats_path, "rb") as f:
+               self.stats = pickle.load(f)
         transitions = []
         for traj in trajs:
             obs = np.asarray(traj['observations'])      
@@ -579,18 +638,28 @@ def test_kernel(dataset_name, specific_dataset: str = None,
 
 def get_pretrained_kernel(dataset_name, checkpoints, specific_dataset: Optional[str] = None):
        _, name, obs_dim, act_dim  =  Train_Dataset(dataset_name, specific_dataset)
+       """
        path = f'./Pretrain/Transition_Kernel/{name}/Models/{checkpoints}'
        file_count = count_files_in_folder(path)
+       """
+       path = PRETRAIN_DIR / "Transition_Kernel" / name / "Models" / str(checkpoints)
+       file_count = count_files_in_folder(str(path))
        kernel_state_dicts = []
        for i in range(file_count):
            kernel_state_dicts.append(load_model(name, checkpoints, i))
        return kernel_state_dicts, obs_dim, act_dim, name
 
 def get_pretrained_kernel_stats(kernel_name):
+    """
      stats_path = f'./Pretrain/Transition_Kernel/{kernel_name}/Stats/{kernel_name}_stats.pkl'
      with open(stats_path, 'rb') as f:
         stats = pickle.load(f)
      return stats
+    """
+    stats_path = PRETRAIN_DIR / "Transition_Kernel" / kernel_name / "Stats" / f"{kernel_name}_stats.pkl"
+    with open(stats_path, "rb") as f:
+          stats = pickle.load(f)
+    return stats
 
 
 
