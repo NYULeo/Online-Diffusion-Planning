@@ -2,7 +2,7 @@ import os
 import sys
 from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]  # Online-Diffusion-Planning/
-sys.path.insert(0, str(REPO_ROOT))
+os.chdir(REPO_ROOT)
 #project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 #os.chdir(project_root)
 from Pretrain.Transition_Kernel.Kernel_Backbone import train_kernel, test_kernel
