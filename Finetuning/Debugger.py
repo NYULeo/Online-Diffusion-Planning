@@ -612,7 +612,7 @@ def plot_reward_heatmap_large(
     plt.show()
 
 
-"""
+
 if __name__ == '__main__':
     # Example usage
     step = 200
@@ -624,7 +624,7 @@ if __name__ == '__main__':
          step += 200
     print('Done')
     
-"""
+
 
 
 """

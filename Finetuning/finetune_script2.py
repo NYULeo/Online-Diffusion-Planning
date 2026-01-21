@@ -156,9 +156,9 @@ if __name__ == "__main__":
                           batch_size = 256, 
                           num_steps = 200, 
                           lr = 3e-4, 
-                          sigma = 7.0, 
+                          sigma = 10.0, 
                           target_reward = 1.0, 
-                          train_goal = np.array([[-2.5, -2.5]]),
+                          train_goal = np.array([[4.5, -3.0]]),
                           rollout_goal = np.array([[6, 1]]))
     
     TrainKernelConfig = Train_Kernel_Config(

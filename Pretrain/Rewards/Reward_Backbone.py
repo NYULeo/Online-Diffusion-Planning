@@ -155,19 +155,18 @@ def save_reward_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma,
     print(f"Reward pretraining hyperparameters saved to {filepath}", flush=True)
 
 
-"""
 def reward_filter(obs, rews, goal):
     #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
     for i in range(1, len(obs)):
         goal_coord = np.floor(obs[i][:2]) 
-
-        #goal_coord = np.round(goal_coord, 1) 
-        dist = np.linalg.norm(goal_coord - goal) 
+        #goal_coord = np.asarray(goal_coord, dtype=np.float32).reshape(-1)  
+        dist = np.linalg.norm(goal_coord - goal[0]) 
         if (dist < 0.5):
             rews[i-1] = 1
         else:
             rews[i-1] = 0
     return rews
+
 """
 def reward_filter(obs, rews, goal):
     #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
@@ -180,7 +179,7 @@ def reward_filter(obs, rews, goal):
         else:
             rews[i-1] = 0
     return rews
-    
+"""
 def save_to_finetuning(reward_net, dataset_name, specific_dataset: Optional[str] = None):
     reward_net.eval()
     net_dict = reward_net.state_dict()
