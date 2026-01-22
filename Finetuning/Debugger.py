@@ -624,12 +624,12 @@ def plot_reward_heatmap_large(
 
 if __name__ == '__main__':
     # Example usage
-    step = 200
-    while(step <= 1000):
+    step = 500
+    while(step <= 2000):
          np.random.seed(0)
          random.seed(0)
          plot_reward_heatmap_large(step)
-         step += 200
+         step += 500
     print('Done')
     
 
