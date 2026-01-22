@@ -621,7 +621,7 @@ def plot_reward_heatmap_large(
     plt.close(fig)
 
 
-
+"""
 if __name__ == '__main__':
     # Example usage
     step = 200
@@ -631,7 +631,18 @@ if __name__ == '__main__':
          heatmap(step)
          step += 200
     print('Done')
-    
+"""
+data = get_dataset('pointmaze', 'medium')
+trajs = data.get_trajectories()
+count = 0
+for traj in trajs:
+    for obs in traj['observations']:
+        if(np.allclose(obs[:2], np.array([2.5, -2.5]), atol = 0.5)):
+            count += 1
+print(count)
+
+
+
 
 
 
