@@ -620,7 +620,7 @@ def plot_reward_heatmap_large(
     print(f"Saved heatmap to {save_path}")
     plt.close(fig)
 
-"""
+
 
 if __name__ == '__main__':
     # Example usage
@@ -631,15 +631,6 @@ if __name__ == '__main__':
          plot_reward_heatmap_large(step)
          step += 200
     print('Done')
-"""
-count = 0
-data = get_dataset('pointmaze', 'large')
-trajs = data.get_trajectories()
-for traj in trajs:
-    for obs in traj['observations']:
-        if(np.allclose(obs[:2], np.array([4.0, 3.0]), atol = 0.5)):
-            count += 1
-print(count)
 
 
 
