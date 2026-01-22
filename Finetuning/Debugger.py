@@ -500,6 +500,7 @@ def plot_reward_heatmap_large(
     resolution=128,
     batch_size=8192,
 ):
+    import os
     import numpy as np
     import matplotlib.pyplot as plt
     import minari
@@ -609,15 +610,22 @@ def plot_reward_heatmap_large(
     ax.set_title(f"Reward Heatmap (Step {step})")
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.show()
+
+    # Save to repo-root reward_map/
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    reward_dir = os.path.join(project_root, "reward_map")
+    os.makedirs(reward_dir, exist_ok=True)
+    save_path = os.path.join(reward_dir, f"reward_heatmap_large_step_{step}.png")
+    fig.savefig(save_path, dpi=150, bbox_inches="tight")
+    print(f"Saved heatmap to {save_path}")
+    plt.close(fig)
 
 
 
 if __name__ == '__main__':
     # Example usage
     step = 200
-    
-    while(step <= 200):
+    while(step <= 1000):
          np.random.seed(0)
          random.seed(0)
          plot_reward_heatmap_large(step)
