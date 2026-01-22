@@ -11,7 +11,7 @@ if __name__ == '__main__':
     train_reward(
     dataset_name = 'pointmaze',
     batch_size = 256, 
-    num_steps = 200, 
+    num_steps = 1000, 
     save_freq = 200,  
     lr = 1e-4,
     sigma = 10.0,
