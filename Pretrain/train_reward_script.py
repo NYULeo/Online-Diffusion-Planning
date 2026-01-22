@@ -10,10 +10,10 @@ if __name__ == '__main__':
     train_reward(
     dataset_name = 'pointmaze',
     batch_size = 256, 
-    num_steps = 2000, 
-    save_freq = 500,  
+    num_steps = 200, 
+    save_freq = 200,  
     lr = 1e-4,
     sigma = 7.0,
     target_reward = 1.0,
     specific_dataset='medium',
-    goal = np.array([[2.5, -2.5]], dtype = np.float32))
+    goal = np.array([[-2.5, -2.5]], dtype = np.float32))
