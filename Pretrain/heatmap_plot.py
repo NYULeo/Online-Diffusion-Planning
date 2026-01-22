@@ -44,7 +44,7 @@ def plot_critic_heatmap(STEP, agg_method='max', highlight_negatives=True):
     print(f'Plotting the 2D heatmap for checkpoint: {STEP}')
     
     # ================== Load Environment ==================
-    dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
+    dataset = minari.load_dataset('D4RL/pointmaze/large-v2', download=True)
     env = dataset.recover_environment().unwrapped  # Unwrap to access maze attribute
 
     # ================== Extract All Unique Goals from Dataset ==================
@@ -112,8 +112,8 @@ def plot_critic_heatmap(STEP, agg_method='max', highlight_negatives=True):
     start_pos = default_start
 
     # ================== Load Critic Model ==================
-    model_state_dict, obs_dim = get_critic_model('pointmaze', 'medium', STEP)
-    stats = get_critic_stats('pointmaze', 'medium')
+    model_state_dict, obs_dim = get_critic_model('pointmaze', 'large', STEP)
+    stats = get_critic_stats('pointmaze', 'large')
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     obs_dim = obs_dim - 2
     critic = Critic(obs_dim).to(device)
@@ -744,11 +744,11 @@ def plot_reward_heatmap(STEP, agg_method='max', highlight_negatives=True):
 
 if __name__ == '__main__':
     # Example usage
-    step = 500
-    while(step <= 2000):
+    step = 2000
+    while(step <= 10000):
          np.random.seed(0)
          random.seed(0)
-         plot_reward_heatmap(step, agg_method='mean', highlight_negatives = True)
-         step += 500
+         plot_critic_heatmap(step, agg_method='mean', highlight_negatives = True)
+         step += 2000
     print('Done')
 

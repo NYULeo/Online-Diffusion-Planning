@@ -363,10 +363,10 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
 
     #prepare training
-    """
+    
     if(dataset_name == 'pointmaze'):
         obs_dim = obs_dim - 2
-    """
+    
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True))
     critic = Critic(obs_dim).to(device)
     critic.train()
