@@ -53,7 +53,7 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
     print(f'Ploting the heatmap for checkpoint: {STEP}')
     
     # ================== Load Environment ==================
-    dataset = minari.load_dataset('D4RL/pointmaze/large-v2', download=True)
+    dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
     env = dataset.recover_environment().unwrapped  # Unwrap to access maze attribute
 
     # ================== Extract All Unique Goals from Dataset ==================
@@ -128,7 +128,7 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
     start_pos = default_start
 
     # ================== Load Reward Model ==================
-    state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', STEP, 'large')
+    state_dict, obs_dim, act_dim, name = get_pretrained_reward('pointmaze', STEP, 'medium')
     model = SimpleReward(obs_dim, act_dim)
     model.load_state_dict(state_dict)
     model.eval()
@@ -624,12 +624,12 @@ def plot_reward_heatmap_large(
 
 if __name__ == '__main__':
     # Example usage
-    step = 500
-    while(step <= 2000):
+    step = 200
+    while(step <= 1000):
          np.random.seed(0)
          random.seed(0)
          heatmap(step)
-         step += 500
+         step += 200
     print('Done')
     
 
