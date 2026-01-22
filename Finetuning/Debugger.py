@@ -628,7 +628,7 @@ if __name__ == '__main__':
     while(step <= 2000):
          np.random.seed(0)
          random.seed(0)
-         heatmap(step)
+         plot_reward_heatmap_large(step)
          step += 500
     print('Done')
 
