@@ -16,4 +16,4 @@ if __name__ == '__main__':
     sigma = 10.0,
     target_reward = 1.0,
     specific_dataset='large',
-    goal = np.array([[4.0, -3.0]], dtype = np.float32))
+    goal = np.array([[4.0, 3.0]], dtype = np.float32))
