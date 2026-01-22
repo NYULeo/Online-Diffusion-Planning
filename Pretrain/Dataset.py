@@ -616,6 +616,7 @@ class PlannerDataset_Rollout(Dataset):
 
 
 
+
 #env, d_s, d_a = get_env('antmaze', 'medium_play')
 #data = PlannerDataset('antmaze', 'medium_play', 40, d_s, d_a)
 """
@@ -752,3 +753,4 @@ def visualize_clusters(vectors, assignments, cluster_centers, title_prefix=""):
 visualize_clusters(vectors, assignments, stats['cluster_centers'], "Kitchen Rewards: ")
 
 """
+

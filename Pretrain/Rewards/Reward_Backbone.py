@@ -562,4 +562,3 @@ def grad_norm(s, a, reward_net):
      
      return pred, grad_norm_avg
 '''
-
