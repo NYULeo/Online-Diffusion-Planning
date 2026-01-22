@@ -22,7 +22,7 @@ if __name__ == '__main__':  # pragma: no cover
                  horizon = 32, 
                  lr = 5e-5, 
                  tau = 0.01,
-                 goal = np.array([[4.5, -3.0]], dtype = np.float32),
+                 goal = np.array([[4.5, 3.0]], dtype = np.float32),
                  target_reward = 1.0,
                  trajs = trajs)
     print('training complete')
