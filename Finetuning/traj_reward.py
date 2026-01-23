@@ -72,8 +72,8 @@ class TotalReward(nn.Module):
         total = torch.tensor([0.0], device = self.config.device, requires_grad = True)
         for i in range(len(self.kernels)):
             mu, log_std = self.kernels[i](s, a)
-            #lp = self.kernels[i].log_prob(s_next, mu, log_std)
-            lp = self.kernels[i].prob(s_next, mu, log_std)
+            lp = self.kernels[i].log_prob(s_next, mu, log_std)
+            #lp = self.kernels[i].prob(s_next, mu, log_std)
             total = total + lp 
         avg = total / len(self.kernels)
         x =  self.config.min_log_prob - avg
