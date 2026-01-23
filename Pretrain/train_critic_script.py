@@ -17,7 +17,7 @@ if __name__ == '__main__':  # pragma: no cover
                  specific_dataset = specific_env, 
                  sigma = 10.0, 
                  batch_size = 512, 
-                 num_steps = 10000, 
+                 num_steps = 1000, 
                  gamma = 1.0, 
                  horizon = 32, 
                  lr = 5e-5, 

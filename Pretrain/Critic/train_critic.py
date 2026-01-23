@@ -416,7 +416,7 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
                tgt_param.data.mul_(1 - tau)
                tgt_param.data.add_(tau * param.data)
         
-           if(k % 2000 == 0):
+           if(k % 200 == 0):
                 target_critic.eval()
                 save_critic(target_critic, dataset_name, specific_dataset, k)
                 print(f"Checkpoint saved at step {k}")
