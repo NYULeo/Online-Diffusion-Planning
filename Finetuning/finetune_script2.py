@@ -165,7 +165,7 @@ if __name__ == "__main__":
     
     TrainKernelConfig = Train_Kernel_Config(
                             batch_size = 256, 
-                            num_steps = 30000,
+                            num_steps = 1000,
                             lr = 3e-4,
                             ensemble_size = 10,
                             num_hidden_layers = 5,
