@@ -756,7 +756,7 @@ if __name__ == '__main__':
     while(step <= 1000):
          np.random.seed(0)
          random.seed(0)
-         plot_critic_heatmap_large(step)
+         plot_reward_heatmap_large(step)
          step += 200
     print('Done')
 
