@@ -128,6 +128,7 @@ def set_seed(seed: int):
     torch.backends.cudnn.benchmark = False
 
 
+
 #finetune_lr = 1e-05,
 
 if __name__ == "__main__":
@@ -144,7 +145,7 @@ if __name__ == "__main__":
     """
     
     env_name = 'pointmaze'
-    specific_env = 'medium'
+    specific_env = 'large'
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32)
     #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
     RWConfig = RewardConfig(
@@ -154,26 +155,27 @@ if __name__ == "__main__":
     
     TrainRewardConfig = Train_Reward_Config(
                           batch_size = 256, 
-                          num_steps = 200, 
-                          lr = 3e-4, 
+                          num_steps = 600, 
+                          lr = 1e-4, 
                           sigma = 10.0, 
                           target_reward = 1.0, 
-                          train_goal = np.array([[4.5, -3.0]]),
-                          rollout_goal = np.array([[6, 1]]))
+                          train_goal = np.array([[4.5, 3.0]]),
+                          rollout_goal = np.array([[1, 10]]),
+                          rollout_start_cells = np.array([[7, 1], [5, 4], [1, 1], [7, 10], [3, 4]]))
     
     TrainKernelConfig = Train_Kernel_Config(
                             batch_size = 256, 
-                            num_steps = 1000,
+                            num_steps = 30000,
                             lr = 3e-4,
                             ensemble_size = 10,
-                            num_hidden_layers = 2,
+                            num_hidden_layers = 5,
                             λ_reg = 1e-3)
     
     TrainCriticConfig = Train_Critic_Config(
                             batch_size = 256,
-                            num_steps= 3000,
-                            lr = 1e-5,
-                            tau = 0.005,
+                            num_steps= 2000,
+                            lr = 5e-5,
+                            tau = 0.01,
                             gamma = 1.0)
     
     FTConfig = FinetuningConfig(
@@ -203,7 +205,7 @@ if __name__ == "__main__":
         reward_scaling_factor = 50,
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
-        rollout_length = 2000,  # or your desired value
+        rollout_length = 10000,  # or your desired value
         rollout_num_envs = 1, 
         train_reward_config = TrainRewardConfig,
         train_kernel_config = TrainKernelConfig,
@@ -211,6 +213,7 @@ if __name__ == "__main__":
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
+
 
 
 

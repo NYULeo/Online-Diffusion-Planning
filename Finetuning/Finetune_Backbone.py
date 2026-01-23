@@ -36,6 +36,7 @@ class Train_Reward_Config:
     target_reward: Optional[float] = None
     train_goal: np.ndarray = None
     rollout_goal: np.ndarray = None
+    rollout_start_cells: np.ndarray = None
 
 @dataclass
 class Train_Kernel_Config:
@@ -378,6 +379,7 @@ class OnlineFinetuner():
                                          num_envs = self.config.rollout_num_envs, 
                                          goal_cell = self.config.train_reward_config.rollout_goal,
                                          device = self.device,
+                                         start_cells = self.config.train_reward_config.rollout_start_cells,
                                          seed_base = seed_base)  
             self.accelerator.wait_for_everyone()                    
             

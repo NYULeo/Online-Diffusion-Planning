@@ -802,7 +802,7 @@ def get_current_state(s0, env_name):
     else:
         return s0['observation']
 
-def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs=8, goal_cell: Optional[np.ndarray] = None, device: torch.device = None, seed_base: int = 0):
+def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs=8, goal_cell = None, start_cells = None, device: torch.device = None, seed_base: int = 0):
      #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
      #print(f"Running {num_envs} environments in parallel")
      if device is None:
@@ -843,8 +843,9 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
      
      # <<< MODIFIED: Unique env reset seeds per process to prevent identical trajectories across GPUs
      reset_seeds = list(range(seed_base, seed_base + num_envs))
+     
+     """
      if(goal_cell is not None):
-         """
          maze = env.unwrapped.maze  # Access the internal Maze object
          maze_map = maze.maze_map
          rows, cols = len(maze_map), len(maze_map[0])
@@ -854,12 +855,12 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
                  if maze_map[row][col] != 1:  # 1 = wall; others are free/open
                        free_cells.append(np.array([row, col]))
          free_cells = np.array(free_cells)
-         """
-         """
+         
+         
          free_cells = np.array([[6,6], [1,1], [1,6], [3,2], [5,4], [3,4], [4,1], [4,6], [2,4], [2,1]])
          selected_indices = np.random.choice(len(free_cells), size=4, replace=False)
          selected_free_cells = free_cells[selected_indices]
-         """
+         
          selected_free_cells = np.array([[6,6], [5,4], [2,4], [2,1]])
          start_cells = []
          for i in range(len(selected_free_cells)):
@@ -870,7 +871,7 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
          start_cells = np.array(start_cells)
      else:
          start_cells = [None]
-     
+     """
      total_steps = 0
      for start_cell in start_cells:
        # Reset all environments
