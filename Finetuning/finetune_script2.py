@@ -150,7 +150,7 @@ if __name__ == "__main__":
     #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
     RWConfig = RewardConfig(
                beta = 1.0, 
-               min_log_prob = 5.0, 
+               min_log_prob = 4.5, 
                explore = False) 
     
     TrainRewardConfig = Train_Reward_Config(
