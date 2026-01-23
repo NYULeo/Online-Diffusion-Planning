@@ -21,6 +21,6 @@ if __name__ == '__main__':  # pragma: no cover
         trajs = pickle.load(f)
     #train_kernel(dataset_name = 'kitchen', batch_size = 256, lr = 1e-4, num_steps =  50000, ensemble_size=10, λ_reg=1e-3)
     #train_kernel(dataset_name = 'pointmaze', specific_dataset ='medium', batch_size = 256, lr = 3e-4, num_steps = 50000, ensemble_size=10, λ_reg=1e-3)
-    train_kernel(dataset_name = dataset, specific_dataset = specific_dataset, batch_size = 256, lr = 3e-4, num_steps = 30000, save_freq = 3000, ensemble_size = 10, hidden_layers = 5, λ_reg = 1e-3)
+    train_kernel(dataset_name = dataset, specific_dataset = specific_dataset, batch_size = 256, lr = 3e-4, num_steps = 10000, save_freq = 2000, ensemble_size = 10, hidden_layers = 5, λ_reg = 1e-3)
     test_kernel(dataset_name = dataset, specific_dataset = specific_dataset,
-                trajs = trajs, save_freq = 3000, num_steps = 30000, hidden_layers = 5, ensemble_size = 10)
+                trajs = trajs, save_freq = 2000, num_steps = 10000, hidden_layers = 5, ensemble_size = 10)

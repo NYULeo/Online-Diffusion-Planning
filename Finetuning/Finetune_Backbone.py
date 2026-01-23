@@ -308,6 +308,7 @@ class OnlineFinetuner():
             print(f"Rollout Episode Length: {self.config.rollout_length}")
             print(f"Rollout Number of Environments: {self.config.rollout_num_envs}")
             print(f"Rollout Goal Cell: {self.config.train_reward_config.rollout_goal}")
+            print(f"Rollout Start Cells: {self.config.train_reward_config.rollout_start_cells.tolist()}")
             print(f"Critic: {self.config.critic}")
             print(f"Rollout Episode Length: {self.config.rollout_length}")
             if(self.config.critic):
