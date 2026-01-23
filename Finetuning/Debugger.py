@@ -752,12 +752,12 @@ def plot_critic_heatmap_large(
 
 if __name__ == '__main__':
     # Example usage
-    step = 2000
-    while(step <= 10000):
+    step = 200
+    while(step <= 1000):
          np.random.seed(0)
          random.seed(0)
          plot_critic_heatmap_large(step)
-         step += 2000
+         step += 200
     print('Done')
 
 
