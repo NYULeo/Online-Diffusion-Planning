@@ -341,7 +341,7 @@ class RewardDataset(Dataset):
             obs = traj['observations']      
             acts = traj['actions']
             rews = traj['rewards']
-            rews = spare_reward_prcocessor(rews)
+            #rews = spare_reward_prcocessor(rews)
             if(not np.all(np.isin(rews, allowed_values))):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
             if( goal is not None):
@@ -410,7 +410,7 @@ class CriticDataset(Dataset):
         for traj in trajs:
             obs = traj['observations']      
             rews = traj['rewards']
-            rews = spare_reward_prcocessor(rews)
+            #rews = spare_reward_prcocessor(rews)
             if(not np.all(np.isin(rews, allowed_values))):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
             if( goal is not None):

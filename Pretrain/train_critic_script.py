@@ -15,7 +15,7 @@ if __name__ == '__main__':  # pragma: no cover
     #trajs = get_trajs(env_name, specific_env, 0)
     train_critic(dataset_name = env_name, 
                  specific_dataset = specific_env, 
-                 sigma = 10.0, 
+                 sigma = 5.0, 
                  batch_size = 512, 
                  num_steps = 2000, 
                  gamma = 1.0, 

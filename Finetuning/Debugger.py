@@ -40,7 +40,8 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-from Pretrain.Critic.train_critic import get_critic_model, get_critic_stats
+#from Pretrain.Critic.train_critic import get_critic_model, get_critic_stats
+from Finetuning.utils import get_critic_model, get_critic_stats, get_reward_model, get_reward_stats
 from Pretrain.Critic.nets import Critic
 # Assuming project_root, MATPLOTLIB_AVAILABLE, get_pretrained_reward, etc., are defined elsewhere
 
@@ -507,8 +508,6 @@ def plot_reward_heatmap_large(
     import matplotlib.pyplot as plt
     import minari
     import torch
-    from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
-    from Pretrain.Rewards.nets import SimpleReward
 
     dataset = minari.load_dataset(dataset_id, download=True)
     env = dataset.recover_environment().unwrapped
@@ -526,11 +525,11 @@ def plot_reward_heatmap_large(
     X, Y = np.meshgrid(x, y, indexing="xy")
 
     # Reward model
-    state_dict, obs_dim, act_dim, name = get_pretrained_reward("pointmaze", step, "large")
+    model_state_dict, obs_dim, act_dim  = get_reward_model('pointmaze', 'large', step)
     model = SimpleReward(obs_dim, act_dim)
-    model.load_state_dict(state_dict)
+    model.load_state_dict(model_state_dict)
     model.eval()
-    stats = get_pretrained_reward_stats(name)
+    stats = get_reward_stats('pointmaze', 'large', step)
 
     # Single goal (from env)
     obs_dict, _ = env.reset(seed=0)
@@ -633,8 +632,6 @@ def plot_critic_heatmap_large(
     import matplotlib.pyplot as plt
     import minari
     import torch
-    from Pretrain.Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
-    from Pretrain.Rewards.nets import SimpleReward
 
     dataset = minari.load_dataset(dataset_id, download=True)
     env = dataset.recover_environment().unwrapped
@@ -654,11 +651,11 @@ def plot_critic_heatmap_large(
     # Reward model
     #state_dict, obs_dim, act_dim, name = get_pretrained_reward("pointmaze", step, "large")
     model_state_dict, obs_dim = get_critic_model('pointmaze', 'large', step)
-    obs_dim = obs_dim - 2
+    #obs_dim = obs_dim - 2
     model = Critic(obs_dim)
     model.load_state_dict(model_state_dict)
     model.eval()
-    stats = get_critic_stats('pointmaze', 'large')
+    stats = get_critic_stats('pointmaze', 'large', step)
 
     # Single goal (from env)
     obs_dict, _ = env.reset(seed=0)
@@ -752,12 +749,12 @@ def plot_critic_heatmap_large(
 
 if __name__ == '__main__':
     # Example usage
-    step = 200
-    while(step <= 1000):
+    step = 0
+    while(step <= 140):
          np.random.seed(0)
          random.seed(0)
          plot_reward_heatmap_large(step)
-         step += 200
+         step += 10
     print('Done')
 
 
