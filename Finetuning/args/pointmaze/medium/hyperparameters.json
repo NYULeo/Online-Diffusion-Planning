@@ -86,7 +86,14 @@
                 6,
                 1
             ]
-        ]
+        ],
+        "rollout_start_cells": 
+          [
+            [6,6], 
+            [5,4], 
+            [2,4], 
+            [2,1]
+          ]
     },
     "kernel_training": {
         "batch_size": 256,
