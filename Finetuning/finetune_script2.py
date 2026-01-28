@@ -137,13 +137,13 @@ if __name__ == "__main__":
     # 
     # replace the reward and backbone initialisations with
     # loading of your pretrained models (e.g. via torch.load).
-    """
+    
     FTConfig = load_finetuning_args('pointmaze', 'medium')
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-    """
     
+    """
     env_name = 'pointmaze'
     specific_env = 'large'
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32)
@@ -174,7 +174,7 @@ if __name__ == "__main__":
     TrainCriticConfig = Train_Critic_Config(
                             batch_size = 256,
                             num_steps= 2000,
-                            lr = 5e-5,
+                            lr = 1e-5,
                             tau = 0.01,
                             gamma = 1.0)
     
@@ -213,6 +213,7 @@ if __name__ == "__main__":
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
+    """
 
 
 

@@ -499,7 +499,7 @@ def heatmap(STEP, agg_method='max', highlight_negatives=True):
 
 def plot_reward_heatmap_large(
     step=200,
-    dataset_id="D4RL/pointmaze/large-v2",
+    dataset_id="D4RL/pointmaze/medium-v2",
     resolution=128,
     batch_size=8192,
 ):
@@ -525,11 +525,11 @@ def plot_reward_heatmap_large(
     X, Y = np.meshgrid(x, y, indexing="xy")
 
     # Reward model
-    model_state_dict, obs_dim, act_dim  = get_reward_model('pointmaze', 'large', step)
+    model_state_dict, obs_dim, act_dim  = get_reward_model('pointmaze', 'medium', step)
     model = SimpleReward(obs_dim, act_dim)
     model.load_state_dict(model_state_dict)
     model.eval()
-    stats = get_reward_stats('pointmaze', 'large', step)
+    stats = get_reward_stats('pointmaze', 'medium', step)
 
     # Single goal (from env)
     obs_dict, _ = env.reset(seed=0)
@@ -623,7 +623,7 @@ def plot_reward_heatmap_large(
 
 def plot_critic_heatmap_large(
     step=200,
-    dataset_id="D4RL/pointmaze/large-v2",
+    dataset_id="D4RL/pointmaze/medium-v2",
     resolution=128,
     batch_size=8192,
 ):
@@ -650,12 +650,12 @@ def plot_critic_heatmap_large(
 
     # Reward model
     #state_dict, obs_dim, act_dim, name = get_pretrained_reward("pointmaze", step, "large")
-    model_state_dict, obs_dim = get_critic_model('pointmaze', 'large', step)
+    model_state_dict, obs_dim = get_critic_model('pointmaze', 'medium', step)
     #obs_dim = obs_dim - 2
     model = Critic(obs_dim)
     model.load_state_dict(model_state_dict)
     model.eval()
-    stats = get_critic_stats('pointmaze', 'large', step)
+    stats = get_critic_stats('pointmaze', 'medium', step)
 
     # Single goal (from env)
     obs_dict, _ = env.reset(seed=0)
@@ -750,10 +750,10 @@ def plot_critic_heatmap_large(
 if __name__ == '__main__':
     # Example usage
     step = 0
-    while(step <= 140):
+    while(step <= 0):
          np.random.seed(0)
          random.seed(0)
-         plot_reward_heatmap_large(step)
+         plot_critic_heatmap_large(step)
          step += 10
     print('Done')
 
