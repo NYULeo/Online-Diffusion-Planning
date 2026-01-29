@@ -154,10 +154,10 @@ if __name__ == "__main__":
     TrainRewardConfig = Train_Reward_Config(
                           batch_size = 256, 
                           num_steps = 200, 
-                          lr = 3e-4, 
+                          lr = 1e-4, 
                           sigma = 7.0, 
                           target_reward = 1.0, 
-                          train_goal = np.array([[2.5, 2.5]]),
+                          train_goal = np.array([[-2.5, -2.5]]),
                           rollout_goal = np.array([[6, 1]]),
                           rollout_start_cells = np.array([[6,6], [5,4], [2,4], [2,1]]))
       
@@ -171,7 +171,7 @@ if __name__ == "__main__":
     
     TrainCriticConfig = Train_Critic_Config(
                             batch_size = 256,
-                            num_steps= 3000,
+                            num_steps= 2000,
                             lr = 1e-5,
                             tau = 0.005,
                             gamma = 1.0)

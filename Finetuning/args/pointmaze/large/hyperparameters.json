@@ -1,7 +1,7 @@
 {
     "env_details": {
         "dataset_name": "pointmaze",
-        "specific_dataset": "medium"
+        "specific_dataset": "large"
     },
     "pretrained_models": {
         "planner_checkpoint": 0,
@@ -14,7 +14,7 @@
         "d_s": 4,
         "d_a": 2,
         "dataset_name": "pointmaze",
-        "specific_dataset": "medium",
+        "specific_dataset": "large",
         "backbone_name": "transformer",
         "eta": 0.8,
         "diffusion_steps": 50,
@@ -35,12 +35,12 @@
     },
     "reward_config": {
         "beta": 1.0,
-        "min_log_prob": 5.0,
+        "min_log_prob": 4.5,
         "explore": false,
         "gamma": 0.0,
         "d_s": 4,
         "d_a": 2,
-        "num_hidden_layers_kernel": 2,
+        "num_hidden_layers_kernel": 5,
         "critic_d_s": 2,
         "delta": "tensor(0.6931, device='cuda:0')"
     },
@@ -62,49 +62,53 @@
         "Entropy_Scaling_Factor": 0.5
     },
     "exploration_hyperparameters": {
-        "rollout_length": 4000,
+        "rollout_length": 10000,
         "rollout_num_envs": 1,
         "rollout_goal": [
             [
-                6,
-                1
+                1,
+                10
             ]
         ]
     },
     "reward_training": {
         "batch_size": 256,
-        "num_steps": 200,
-        "lr": 0.0003,
-        "sigma": 7.0,
+        "num_steps": 600,
+        "lr": 0.0001,
+        "sigma": 10.0,
         "target_reward": 1.0,
         "train_goal": [
             [
-                2.5,
-                2.5
+                4.5,
+                3.0
             ]
         ],
         "rollout_goal": [
             [
-                6,
-                1
+                1,
+                10
             ]
         ],
         "rollout_start_cells": [
             [
-                6,
-                6
+                7,
+                1
             ],
             [
                 5,
                 4
             ],
             [
-                2,
-                4
+                1,
+                1
             ],
             [
-                2,
-                1
+                7,
+                10
+            ],
+            [
+                3,
+                4
             ]
         ]
     },
@@ -113,19 +117,19 @@
         "num_steps": 1000,
         "lr": 0.0003,
         "ensemble_size": 10,
-        "num_hidden_layers": 2,
+        "num_hidden_layers": 5,
         "\u03bb_reg": 0.001
     },
     "critic_training": {
         "batch_size": 256,
-        "num_steps": 3000,
-        "lr": 1e-05,
-        "tau": 0.005,
+        "num_steps": 2000,
+        "lr": 5e-05,
+        "tau": 0.01,
         "gamma": 1.0
     },
     "device_info": {
         "device": "cuda",
         "num_gpus": 4,
-        "gpu_name": "NVIDIA A100-PCIE-40GB"
+        "gpu_name": "Quadro RTX 6000"
     }
 }
