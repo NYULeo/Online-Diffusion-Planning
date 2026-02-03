@@ -1252,7 +1252,7 @@ def critic_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_neg
 if __name__ == '__main__':
     # Example usage
     step = 0
-    while(step <= 30):
+    while(step <= 0):
          np.random.seed(0)
          random.seed(0)
          #plot_reward_heatmap_large(step)

@@ -44,7 +44,7 @@ def plot_critic_heatmap(STEP, agg_method='max', highlight_negatives=True):
     print(f'Plotting the 2D heatmap for checkpoint: {STEP}')
     
     # ================== Load Environment ==================
-    dataset = minari.load_dataset('D4RL/pointmaze/large-v2', download=True)
+    dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download=True)
     env = dataset.recover_environment().unwrapped  # Unwrap to access maze attribute
 
     # ================== Extract All Unique Goals from Dataset ==================
@@ -112,8 +112,8 @@ def plot_critic_heatmap(STEP, agg_method='max', highlight_negatives=True):
     start_pos = default_start
 
     # ================== Load Critic Model ==================
-    model_state_dict, obs_dim = get_critic_model('pointmaze', 'large', STEP)
-    stats = get_critic_stats('pointmaze', 'large')
+    model_state_dict, obs_dim = get_critic_model('pointmaze', 'medium', STEP)
+    stats = get_critic_stats('pointmaze', 'medium')
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #obs_dim = obs_dim - 2
     critic = Critic(obs_dim).to(device)
@@ -126,6 +126,7 @@ def plot_critic_heatmap(STEP, agg_method='max', highlight_negatives=True):
     
     # Extract only position statistics (first 2 dimensions) and mean velocities
     # For 2D-only visualization, we use mean velocities from training
+    """
     if len(stats.obs_mean) == 2:
         # Stats are already 2D (from training with [:,:2] slice)
         pos_mean = stats.obs_mean
@@ -137,7 +138,9 @@ def plot_critic_heatmap(STEP, agg_method='max', highlight_negatives=True):
         pos_mean = stats.obs_mean[:2] if len(stats.obs_mean) >= 2 else np.array([0.0, 0.0])
         pos_std = stats.obs_std[:2] if len(stats.obs_std) >= 2 else np.array([1.0, 1.0])
         print(f"Warning: Stats have {len(stats.obs_mean)} dims, extracting first 2")
-
+    """
+    pos_mean =  stats.obs_mean
+    pos_std = stats.obs_std
     # ================== Create Grid ==================
     x = np.linspace(grid_min[0], grid_max[0], RESOLUTION)
     y = np.linspace(grid_min[1], grid_max[1], RESOLUTION)
@@ -156,7 +159,9 @@ def plot_critic_heatmap(STEP, agg_method='max', highlight_negatives=True):
         # Create 2D observations: [x, y] only
         obs_base = np.stack([
             X.ravel(),
-            Y.ravel()
+            Y.ravel(),
+            np.zeros(RESOLUTION**2),
+            np.zeros(RESOLUTION**2)
         ], axis=1).astype(np.float32)
         
         
@@ -171,6 +176,7 @@ def plot_critic_heatmap(STEP, agg_method='max', highlight_negatives=True):
 
             # Differentiable normalization
             obs_norm = (batch_obs - obs_mean_t) / obs_std_t
+            print()
 
             r = critic(obs_norm.to(device))  # [B]
             reward_map_goal[start:end] = r.detach().cpu().numpy()
@@ -744,11 +750,11 @@ def plot_reward_heatmap(STEP, agg_method='max', highlight_negatives=True):
 
 if __name__ == '__main__':
     # Example usage
-    step = 2000
-    while(step <= 10000):
+    step = 200
+    while(step <= 2000):
          np.random.seed(0)
          random.seed(0)
-         plot_reward_heatmap(step, agg_method='mean', highlight_negatives = True)
-         step += 2000
+         plot_critic_heatmap(step, agg_method='mean', highlight_negatives = True)
+         step += 200
     print('Done')
 
