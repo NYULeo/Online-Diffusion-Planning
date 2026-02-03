@@ -172,8 +172,6 @@ def save_critic(model, dataset_name, specific_dataset, step):
 
 def get_critic_model(dataset_name, specific_dataset, step):
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
-    if(dataset_name == 'pointmaze'):
-        obs_dim = obs_dim - 2
     name = getName(dataset_name, specific_dataset)
     path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl'
     model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
@@ -391,10 +389,12 @@ class RewardDataset(Dataset):
 class CriticDataset(Dataset):
     def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, step: int, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
         # ----- gather raw obs/actions to fit stats -----
+        """
         if(dataset_name == 'pointmaze'):
             trajs = copy.deepcopy(trajs) 
             for traj in trajs:
                 traj['observations'] = traj['observations'][:,:2]
+        """
         obs_all = []
         for traj in trajs:
             obs_all.append(traj['observations'])
@@ -553,8 +553,6 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
     #get information
     dataset = CriticDataset(trajs, sigma, dataset_name, specific_dataset, step, goal, target_reward, horizon, gamma)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
-    if(dataset_name == 'pointmaze'):
-        obs_dim = obs_dim - 2
    
     #prepare training
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True))

@@ -199,7 +199,7 @@ class PointMazeDataset():
                         break
               
               if(len(actions) < 10):
-                  continue
+                    continue
               else: 
                     trajectory = {
                         'observations': observations,

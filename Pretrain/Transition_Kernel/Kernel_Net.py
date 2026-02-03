@@ -175,7 +175,6 @@ class RobustTransitionKernel(nn.Module):
         return -nll  
     """
    
-    
     def log_prob(self, s_next, mu, log_std):
         # Compute log prob (not negative) — useful for testing / diagnostics
         var = torch.exp(2 * log_std) + self.noise_floor

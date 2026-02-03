@@ -108,10 +108,13 @@ def test_rollout_fit_for_model(traj, dataset_name=None, specific_dataset=None,
             
             # Compute critic value for current state
             # For pointmaze, critic uses only first 2 dimensions
+            """
             if dataset_name == 'pointmaze':
                 s_critic = s[:2]
             else:
                 s_critic = s
+            """
+            s_critic = s
             s_norm_critic = critic_stats.norm_obs(s_critic)
             s_critic_tensor = torch.tensor(s_norm_critic, dtype=torch.float32, device=device).unsqueeze(0)
             v = critic_net(s_critic_tensor)
@@ -144,10 +147,13 @@ def test_rollout_fit_for_model(traj, dataset_name=None, specific_dataset=None,
         # Compute critic value for the last state (if not already computed)
         if num_states > num_transitions:
             s_final = observations[num_states - 1]
+            """
             if dataset_name == 'pointmaze':
                 s_final_critic = s_final[:2]
             else:
                 s_final_critic = s_final
+            """
+            s_final_critic = s_final
             s_final_norm_critic = critic_stats.norm_obs(s_final_critic)
             s_final_critic_tensor = torch.tensor(s_final_norm_critic, dtype=torch.float32, device=device).unsqueeze(0)
             v_final = critic_net(s_final_critic_tensor)
@@ -188,7 +194,7 @@ def save_trajs(trajs, env_name, specific_env):
          pickle.dump(trajs, f)
     print(f"trajectories saved")
 
-def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None, base_seed: int = 0):
+def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None, base_seed: int = 0, continual_rollout = False):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}, episode_length: {episode_length}")
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
@@ -219,7 +225,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
         s0 = env.reset(seed = base_seed, options={"goal_cell": goal_cell, "reset_cell": start_cell})
      else:
         s0 = env.reset(seed = base_seed)
-     """
+     
      if(env_name == 'antmaze'):
           current_state = np.concatenate([
                s0[0]['observation'],
@@ -227,22 +233,38 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
            ])
      else:
          current_state = s0[0]['observation']
-     """
+     
      current_state = get_current_state(s0[0], env_name)
      frames = []
      observations = []
      actions = []
      rewards = []
+     Temp = []
      for i in range(episode_length):
-           current_state_norm = planner_processor.preprocess(current_state)
-           
-           
-           #x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
-           x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
-           action = x[0, d_s:(d_s+d_a)].copy()
-           obs, reward, terminated, truncated, info = env.step(action)
-           if(render):
-                frames.append(env.render())
+           if(continual_rollout):
+                if(len(Temp) == 0):
+                     current_state_norm = planner_processor.preprocess(current_state)
+                     #x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
+                     x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                     for k in range(len(x)):
+                         Temp.append(x[k, d_s:(d_s+d_a)].copy())
+                     action = Temp[0]
+                     Temp = Temp[1:]
+                else:
+                     action = Temp[0]
+                     Temp = Temp[1:]
+
+                obs, reward, terminated, truncated, info = env.step(action)
+                if(render):
+                      frames.append(env.render())
+           else:
+                current_state_norm = planner_processor.preprocess(current_state)
+                #x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
+                x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                action = x[0, d_s:(d_s+d_a)].copy()
+                obs, reward, terminated, truncated, info = env.step(action)
+                if(render):
+                      frames.append(env.render())
                 
            current_state = get_current_state(obs.copy(), env_name)
            observations.append(current_state.copy())
@@ -256,6 +278,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      print(len(rewards))
      print(sum(rewards))
      env.close()
+     
      traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(spare_reward_prcocessor(rewards))}
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      #print(test_rollout_fit_for_model(traj, env_name, specific_env, checkpoint_steps, checkpoint_steps, checkpoint_steps, device=None))
@@ -272,20 +295,21 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      #print(get_normalized_score([traj]))
 
 
-
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
     set_seed(0)
     horizon = 32
     env_name = 'pointmaze'
-    specific_train_dataset = 'large'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, checkpoint_steps = 40, render = True,  goal_cell = np.array([1, 10], dtype = int), start_cell = np.array([3, 4], dtype = int))
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True, base_seed = 0)
+    specific_train_dataset = 'medium'
+    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([1, 6], dtype = int), base_seed = 0, continual_rollout = False)
+    
+    
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 600, num_karras = 0, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True, base_seed = 0, continual_rollout = True)
+    
     #150, 8
     #50, 3
     #rollout_parallel(env_name, specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_step = 0, goal_cell = None, num_envs = 4, seed_base = 0)
 
-   
 """
     checkpoint = 0
     while(checkpoint < 450):

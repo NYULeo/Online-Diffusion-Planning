@@ -13,7 +13,7 @@ if __name__ == '__main__':
     num_steps = 600, 
     save_freq = 200,  
     lr = 1e-4,
-    sigma = 5.0,
+    sigma = 7.0,
     target_reward = 1.0,
-    specific_dataset='large',
-    goal = np.array([[4.5, 3.0]], dtype = np.float32))
+    specific_dataset='medium',
+    goal = np.array([[-2.5, -2.5]], dtype = np.float32))

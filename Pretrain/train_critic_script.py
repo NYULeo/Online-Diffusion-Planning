@@ -13,6 +13,7 @@ if __name__ == '__main__':  # pragma: no cover
     data = get_dataset(env_name, specific_env)
     trajs = data.get_trajectories()
     #trajs = get_trajs(env_name, specific_env, 0)
+    """
     train_critic(dataset_name = env_name, 
                  specific_dataset = specific_env, 
                  sigma = 5.0, 
@@ -25,8 +26,25 @@ if __name__ == '__main__':  # pragma: no cover
                  goal = np.array([[4.5, 3.0]], dtype = np.float32),
                  target_reward = 1.0,
                  trajs = trajs)
+    """
+    train_critic(dataset_name = env_name, 
+                 specific_dataset = specific_env, 
+                 sigma = 7.0, 
+                 batch_size = 512, 
+                 num_steps = 2000, 
+                 gamma = 1.0, 
+                 horizon = 32, 
+                 lr = 5e-5, 
+                 tau = 0.01,
+                 goal = np.array([[-2.5, -2.5]], dtype = np.float32),
+                 target_reward = 1.0,
+                 trajs = trajs)
     print('training complete')
     
+
+
+
+
     """
     trajs = data.get_trajectories()
     step = 2000

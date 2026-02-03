@@ -88,9 +88,11 @@ class CriticDataset(Dataset):
     def __init__(self, sigma: float, dataset_name: str, specific_dataset: str, trajs: List[TrajectoryDict], goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
         
         obs_all = []
+        """
         if(dataset_name == 'pointmaze'):
            for traj in trajs:
                 traj['observations'] = traj['observations'][:,:2]
+        """
         
         for traj in trajs:
             obs_all.append(traj['observations'])
@@ -164,9 +166,11 @@ class CriticDataset(Dataset):
 class Critic_Test_Dataset(Dataset):
     def __init__(self, sigma: float, dataset_name: str, specific_dataset: str, trajs, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
         # ----- gather raw obs/actions to fit stats -----
+        """
         if(dataset_name == 'pointmaze'):
            for traj in trajs:
                 traj['observations'] = traj['observations'][:,:2]
+        """
         
         self.stats = get_critic_stats(dataset_name, specific_dataset)
         allowed_values = [0, 1]
@@ -211,8 +215,7 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
 
     #prepare training
-    if(dataset_name == 'pointmaze'):
-        obs_dim = obs_dim - 2
+    
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True))
     critic = Critic(obs_dim).to(device)
     critic.train()
@@ -262,8 +265,10 @@ def test_critic(dataset_name: str, specific_dataset: str, checkpoint_step, sigma
     batch_size = 100
     dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True)
     model_state_dict, obs_dim = get_critic_model(dataset_name, specific_dataset, checkpoint_step)
+    """
     if(dataset_name == 'pointmaze'):
         obs_dim = obs_dim - 2
+    """
     model = Critic(obs_dim).to(device)
     model.load_state_dict(model_state_dict)
     model.eval()

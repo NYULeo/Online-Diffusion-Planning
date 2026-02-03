@@ -153,7 +153,7 @@ if __name__ == "__main__":
     
     TrainRewardConfig = Train_Reward_Config(
                           batch_size = 256, 
-                          num_steps = 200, 
+                          num_steps = 600, 
                           lr = 1e-4, 
                           sigma = 7.0, 
                           target_reward = 1.0, 
