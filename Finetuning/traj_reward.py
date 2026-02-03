@@ -241,7 +241,7 @@ class TotalReward_Critic(nn.Module):
         self.critic = Critic(critic_obs_dim).to(self.config.device)
         self.critic.load_state_dict(critic_state_dict)
         self.critic.eval()
-        print(critic_state_dict)
+        print(critic_obs_dim)
         exit()
 
         kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
