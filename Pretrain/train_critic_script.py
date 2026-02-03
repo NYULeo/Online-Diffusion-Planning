@@ -9,7 +9,7 @@ import numpy as np
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     env_name = 'pointmaze'
-    specific_env = 'large'
+    specific_env = 'medium'
     data = get_dataset(env_name, specific_env)
     trajs = data.get_trajectories()
     #trajs = get_trajs(env_name, specific_env, 0)
