@@ -691,6 +691,8 @@ def plot_critic_heatmap_large(
         [
             X.ravel(),
             Y.ravel(),
+            np.zeros(resolution**2),
+            np.zeros(resolution**2)
         ],
         axis=1,
     ).astype(np.float32)
@@ -882,6 +884,7 @@ def critic_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_neg
     model.load_state_dict(model_state_dict)
     model.eval()
     stats = get_critic_stats(env_name, specific_env, step)
+   
 
     # ================== Create Grid ==================
     x = np.linspace(grid_min[0], grid_max[0], RESOLUTION)
@@ -925,6 +928,8 @@ def critic_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_neg
         obs_base = np.stack([
             X.ravel(),
             Y.ravel(),
+            np.zeros(RESOLUTION**2),
+            np.zeros(RESOLUTION**2)
         ], axis=1).astype(np.float32)
     
         reward_map_goal = np.full(RESOLUTION**2, -1e10, dtype=np.float32)
@@ -1247,14 +1252,13 @@ def critic_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_neg
 if __name__ == '__main__':
     # Example usage
     step = 0
-    while(step <= 60):
+    while(step <= 30):
          np.random.seed(0)
          random.seed(0)
          #plot_reward_heatmap_large(step)
+         #reward_heatmap(step, 'pointmaze', 'medium')
          #critic_heatmap(step, 'pointmaze', 'medium')
-         #plot_critic_heatmap_large(step)
-         reward_heatmap(step, 'pointmaze', 'medium')
-         critic_heatmap(step, 'pointmaze', 'medium')
+         plot_critic_heatmap_large(step)
          step += 10
     print('Done')
 

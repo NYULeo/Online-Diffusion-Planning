@@ -748,7 +748,7 @@ if __name__ == '__main__':
     while(step <= 10000):
          np.random.seed(0)
          random.seed(0)
-         plot_critic_heatmap(step, agg_method='mean', highlight_negatives = True)
+         plot_reward_heatmap(step, agg_method='mean', highlight_negatives = True)
          step += 2000
     print('Done')
 

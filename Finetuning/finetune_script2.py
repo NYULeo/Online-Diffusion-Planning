@@ -185,7 +185,7 @@ if __name__ == "__main__":
         reward_model_checkpoint = 0,
         kernel_model_checkpoint = 0,
         critic_model_checkpoint = 0,
-        critic = True,
+        critic = False,
         kernel = True,
         buffer_size = 5500,
         finetune_steps = 3000,
