@@ -171,7 +171,7 @@ if __name__ == "__main__":
     
     TrainCriticConfig = Train_Critic_Config(
                             batch_size = 256,
-                            num_steps= 2000,
+                            num_steps= 3000,
                             lr = 1e-5,
                             tau = 0.005,
                             gamma = 1.0)

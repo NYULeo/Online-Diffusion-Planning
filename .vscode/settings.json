@@ -3,5 +3,12 @@
     "python.linting.pylintEnabled": false,
     "python.linting.flake8Enabled": false,
     "python.linting.mypyEnabled": false,
-    "python.analysis.ignore": ["**/Finetuning/acc_adjoint_matching.py"]
+    "python.analysis.ignore": ["**/Finetuning/acc_adjoint_matching.py"],
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/.venv/lib/python3.10/site-packages"
+    ],
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.diagnosticMode": "workspace"
 }

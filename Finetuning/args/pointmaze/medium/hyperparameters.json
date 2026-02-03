@@ -74,13 +74,13 @@
     "reward_training": {
         "batch_size": 256,
         "num_steps": 200,
-        "lr": 0.0003,
+        "lr": 0.0001,
         "sigma": 7.0,
         "target_reward": 1.0,
         "train_goal": [
             [
-                2.5,
-                2.5
+                -2.5,
+                -2.5
             ]
         ],
         "rollout_goal": [
@@ -118,7 +118,7 @@
     },
     "critic_training": {
         "batch_size": 256,
-        "num_steps": 3000,
+        "num_steps": 2000,
         "lr": 1e-05,
         "tau": 0.005,
         "gamma": 1.0
@@ -126,6 +126,6 @@
     "device_info": {
         "device": "cuda",
         "num_gpus": 4,
-        "gpu_name": "NVIDIA A100-PCIE-40GB"
+        "gpu_name": "Quadro RTX 6000"
     }
 }

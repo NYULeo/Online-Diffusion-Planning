@@ -16,9 +16,11 @@ if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     dataset = 'pointmaze'
     specific_dataset = 'medium'
+    """
     path = REPO_ROOT / "Finetuning" / "Rollouts" / dataset / specific_dataset / "Generated_trajs_Info_0.pkl"
     with open(path, "rb") as f:
         trajs = pickle.load(f)
+    """
     #train_kernel(dataset_name = 'kitchen', batch_size = 256, lr = 1e-4, num_steps =  50000, ensemble_size=10, λ_reg=1e-3)
     #train_kernel(dataset_name = 'pointmaze', specific_dataset ='medium', batch_size = 256, lr = 3e-4, num_steps = 50000, ensemble_size=10, λ_reg=1e-3)
     train_kernel(dataset_name = dataset, 
@@ -30,7 +32,7 @@ if __name__ == '__main__':  # pragma: no cover
                  ensemble_size = 10, 
                  hidden_layers = 2, 
                  λ_reg = 1e-3)
-
+    """
     test_kernel(dataset_name = dataset, 
                 specific_dataset = specific_dataset,
                 trajs = trajs, 
@@ -38,3 +40,4 @@ if __name__ == '__main__':  # pragma: no cover
                 num_steps = 1000, 
                 hidden_layers = 2, 
                 ensemble_size = 10)
+    """
