@@ -8,7 +8,7 @@ import torch.nn as nn
 
 
 
-
+"""
 class Critic(nn.Module):
     def __init__(self, obs_dim, hidden = 32):
         super().__init__()
@@ -27,3 +27,4 @@ class Critic(nn.Module):
     def forward(self, obs):
         #return self.net([obs, act]).squeeze(-1) * self.scale
         return self.net(obs).squeeze(-1)
+"""

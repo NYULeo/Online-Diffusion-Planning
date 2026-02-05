@@ -39,7 +39,12 @@ if __name__ == '__main__':  # pragma: no cover
     specific_env = 'medium'
     data = get_dataset(env_name, specific_env)
     trajs = data.get_trajectories()
-    #trajs = get_trajs(env_name, specific_env, 0)
+    """
+    half_trajs_1 = trajs[:len(trajs)//2]
+    trajs = get_trajs(env_name, specific_env, 0)
+    half_trajs_2 = trajs[len(trajs)//2:]
+    trajs = half_trajs_1 + half_trajs_2
+    """
     
     
     """
@@ -84,6 +89,7 @@ if __name__ == '__main__':  # pragma: no cover
      """
      #medium
     
+
     train_critic(dataset_name = env_name, 
                  specific_dataset = specific_env, 
                  sigma = 7.0, 
@@ -99,6 +105,11 @@ if __name__ == '__main__':  # pragma: no cover
     
     print('training complete')
     
+    
+
+
+
+
     """
     train_critic(dataset_name = env_name, 
                  specific_dataset = specific_env, 

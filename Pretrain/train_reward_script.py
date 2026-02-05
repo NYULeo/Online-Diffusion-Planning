@@ -14,6 +14,6 @@ if __name__ == '__main__':
     save_freq = 200,  
     lr = 1e-4,
     sigma = 7.0,
-    target_reward = 10.0,
+    target_reward = 1.0,
     specific_dataset='medium',
     goal = np.array([[-2.5, -2.5]], dtype = np.float32))

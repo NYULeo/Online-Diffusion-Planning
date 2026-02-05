@@ -320,14 +320,23 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
+    #set_seed(0)
+    #score = rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 210, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([5, 4], dtype = int), base_seed = 0, continual_rollout = False)
+    
+    
     average = 0.0
     for i in range(10):
         set_seed(i)
-        score = rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 200, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([4, 4], dtype = int), base_seed = 0, continual_rollout = False)
+        score = rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 210, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([4, 4], dtype = int), base_seed = 0, continual_rollout = False)
         average += score
-    
     average = average / 10
     print(average)
+    
+    
+    
+    
+    
+
     """
     trajs, score, total_steps = rollout_parallel(env_name, 
                      specific_train_dataset, 
