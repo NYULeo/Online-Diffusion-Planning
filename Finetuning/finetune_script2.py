@@ -170,9 +170,9 @@ if __name__ == "__main__":
                             λ_reg = 1e-3)
     
     TrainCriticConfig = Train_Critic_Config(
-                            batch_size = 256,
-                            num_steps= 3000,
-                            lr = 1e-5,
+                            batch_size = 128,
+                            num_steps= 5000,
+                            lr = 1e-05,
                             tau = 0.005,
                             gamma = 1.0)
     
@@ -185,7 +185,7 @@ if __name__ == "__main__":
         reward_model_checkpoint = 0,
         kernel_model_checkpoint = 0,
         critic_model_checkpoint = 0,
-        critic = False,
+        critic = True,
         kernel = True,
         buffer_size = 5500,
         finetune_steps = 3000,

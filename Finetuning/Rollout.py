@@ -21,6 +21,8 @@ from Pretrain.Dataset import get_dataset
 from typing import Optional
 from utils import get_normalized_score, rollout_parallel, get_current_state
 
+def feasibility_check(generated_state, new_state):
+    return np.linalg.norm(generated_state - new_state)
 
 
 def test_rollout_fit_for_model(traj, dataset_name=None, specific_dataset=None, 
@@ -187,9 +189,9 @@ def set_seed(seed=0):
     # Set environment variable for additional reproducibility
     os.environ['PYTHONHASHSEED'] = str(seed)
 
-def save_trajs(trajs, env_name, specific_env):
+def save_trajs(trajs, env_name, specific_env, step):
     os.makedirs(f'./Finetuning/Rollouts/{env_name}/{specific_env}/', exist_ok=True)
-    save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info.pkl'
+    save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info_{str(step)}.pkl'
     with open(save_path, 'wb') as f:
          pickle.dump(trajs, f)
     print(f"trajectories saved")
@@ -239,20 +241,28 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      observations = []
      actions = []
      rewards = []
-     Temp = []
+     Temp_acts = []
+     Temp_states = []
+     generated_state = None
+     violation_scores = []
      for i in range(episode_length):
            if(continual_rollout):
-                if(len(Temp) == 0):
+                if(len(Temp_acts) == 0):
                      current_state_norm = planner_processor.preprocess(current_state)
                      #x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
                      x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                      for k in range(len(x)):
-                         Temp.append(x[k, d_s:(d_s+d_a)].copy())
-                     action = Temp[0]
-                     Temp = Temp[1:]
+                         Temp_acts.append(x[k, d_s:(d_s+d_a)].copy())
+                     for k in range(1, len(x)):
+                         Temp_states.append(x[k, :d_s].copy())
+                
+                action = Temp_acts[0]
+                Temp_acts = Temp_acts[1:]
+                if(len(Temp_states)> 0):
+                    generated_state = Temp_states[0]
+                    Temp_states = Temp_states[1:]
                 else:
-                     action = Temp[0]
-                     Temp = Temp[1:]
+                    generated_state = None
 
                 obs, reward, terminated, truncated, info = env.step(action)
                 if(render):
@@ -262,11 +272,15 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
                 #x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
                 x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                 action = x[0, d_s:(d_s+d_a)].copy()
+                generated_state = x[1, :d_s].copy()
                 obs, reward, terminated, truncated, info = env.step(action)
                 if(render):
                       frames.append(env.render())
-                
+           
+           
            current_state = get_current_state(obs.copy(), env_name)
+           if(generated_state is not None):
+                violation_scores.append(feasibility_check(generated_state, current_state.copy()))
            observations.append(current_state.copy())
            actions.append(action.copy())
            rewards.append(reward)
@@ -275,11 +289,16 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
            if(terminated or truncated):
                 print(f"Episode {i} terminated or truncated")
                 break
-     print(len(rewards))
-     print(sum(rewards))
+     
      env.close()
+     """
+     if(len(violation_scores) > 0):
+         print(np.mean(violation_scores))
+         print(np.var(violation_scores))
+    """
      
      traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(spare_reward_prcocessor(rewards))}
+     
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      #print(test_rollout_fit_for_model(traj, env_name, specific_env, checkpoint_steps, checkpoint_steps, checkpoint_steps, device=None))
      
@@ -291,21 +310,45 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      with open('Generated_trajectory.pkl', 'wb') as f:
                 pickle.dump(traj_info, f)
      """
-     
+     return get_normalized_score([traj])
      #print(get_normalized_score([traj]))
 
 
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
-    set_seed(0)
+    
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
-    rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 20, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([1, 6], dtype = int), base_seed = 0, continual_rollout = False)
+    average = 0.0
+    for i in range(10):
+        set_seed(i)
+        score = rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 200, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([4, 4], dtype = int), base_seed = 0, continual_rollout = False)
+        average += score
     
-    
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 600, num_karras = 0, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True, base_seed = 0, continual_rollout = True)
-    
+    average = average / 10
+    print(average)
+    """
+    trajs, score, total_steps = rollout_parallel(env_name, 
+                     specific_train_dataset, 
+                     horizon = 32, 
+                     steps_T = 50, 
+                     num_karras = 3, 
+                     eta = 0.8, 
+                     episode_length = 1000, 
+                     checkpoint_step = 0, 
+                     num_envs = 8, 
+                     goal_cell = np.array([6, 1], dtype = int),
+                     start_cells = np.array([[6,6], [5,4], [2,4], [2,1]]),
+                     seed_base = 0)
+    save_trajs(trajs, env_name, specific_train_dataset, 0)
+    """
+    """
+    for i in range(10):
+        set_seed(0)
+        rollout(env_name, specific_train_dataset, horizon, steps_T = 600, num_karras = 0, eta = 0.8, episode_length = 1000, checkpoint_steps = 150, render = True, base_seed = i, continual_rollout = True)
+    """
+
     #150, 8
     #50, 3
     #rollout_parallel(env_name, specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_step = 0, goal_cell = None, num_envs = 4, seed_base = 0)

@@ -1,7 +1,7 @@
 {
     "env_details": {
         "dataset_name": "pointmaze",
-        "specific_dataset": "large",
+        "specific_dataset": "medium",
         "obs_dim": 2
     },
     "model_architecture": {
@@ -9,7 +9,7 @@
         "obs_dim": 2
     },
     "training_hyperparameters": {
-        "num_steps": 55000,
+        "num_steps": 5000,
         "batch_size": 128,
         "lr": 1e-05,
         "optimizer": {
@@ -28,8 +28,8 @@
         "target_reward": 1.0,
         "goal": [
             [
-                -4.0,
-                -3.0
+                -2.5,
+                -2.5
             ]
         ]
     }

@@ -46,6 +46,7 @@ from Pretrain.Critic.nets import Critic
 from Pretrain.Dataset import get_env
 # Assuming project_root, MATPLOTLIB_AVAILABLE, get_pretrained_reward, etc., are defined elsewhere
 
+
 def reward_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_negatives=True):
     # ================== Configuration ==================
     RESOLUTION = 256           # Grid resolution (256x256 is fast and looks good)
@@ -517,262 +518,6 @@ def reward_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_neg
         np.save(npy_path, reward_map)
         print(f"Reward map saved as numpy array to {npy_path}")
 
-
-
-def plot_reward_heatmap_large(
-    step=200,
-    dataset_id="D4RL/pointmaze/medium-v2",
-    resolution=128,
-    batch_size=8192,
-):
-    import os
-    import numpy as np
-    import matplotlib.pyplot as plt
-    import minari
-    import torch
-
-    dataset = minari.load_dataset(dataset_id, download=True)
-    env = dataset.recover_environment().unwrapped
-
-    # Full maze bounds
-    H = env.maze.map_length
-    W = env.maze.map_width
-    cell = env.maze.maze_size_scaling
-    grid_min = np.array([-W / 2 * cell, -H / 2 * cell], dtype=np.float32)
-    grid_max = np.array([ W / 2 * cell,  H / 2 * cell], dtype=np.float32)
-
-    # Grid
-    x = np.linspace(grid_min[0], grid_max[0], resolution)
-    y = np.linspace(grid_min[1], grid_max[1], resolution)
-    X, Y = np.meshgrid(x, y, indexing="xy")
-
-    # Reward model
-    model_state_dict, obs_dim, act_dim  = get_reward_model('pointmaze', 'medium', step)
-    model = SimpleReward(obs_dim, act_dim)
-    model.load_state_dict(model_state_dict)
-    model.eval()
-    stats = get_reward_stats('pointmaze', 'medium', step)
-
-    # Single goal (from env)
-    obs_dict, _ = env.reset(seed=0)
-    goal = env.generate_target_goal()
-    goal = np.array(goal[:2], dtype=np.float32)
-    
-    
-
-    obs_base = np.stack(
-        [
-            X.ravel(),
-            Y.ravel(),
-            np.zeros(resolution**2),
-            np.zeros(resolution**2),
-        ],
-        axis=1,
-    ).astype(np.float32)
-
-    reward_map = np.full(resolution**2, -1e10, dtype=np.float32)
-
-    obs_mean_t = torch.as_tensor(stats.obs_mean, dtype=torch.float32)
-    obs_std_t = torch.as_tensor(
-        np.maximum(stats.obs_std, getattr(stats, "std_floor", 1e-3)),
-        dtype=torch.float32,
-    )
-
-    with torch.no_grad():
-        for start in range(0, len(obs_base), batch_size):
-            end = min(start + batch_size, len(obs_base))
-            batch_obs = torch.from_numpy(obs_base[start:end]).float()
-            act_rep = torch.zeros((end - start, 2), dtype=torch.float32)
-
-            obs_norm = (batch_obs - obs_mean_t) / obs_std_t
-            r = model(obs_norm, act_rep)
-            reward_map[start:end] = r.cpu().numpy()
-
-    reward_map = reward_map.reshape(resolution, resolution)
-
-    # Plot
-    fig, ax = plt.subplots(figsize=(10, 7))
-    im = ax.imshow(
-        reward_map,
-        extent=[grid_min[0], grid_max[0], grid_min[1], grid_max[1]],
-        origin="lower",
-        cmap="coolwarm",
-        interpolation="bilinear",
-    )
-    plt.colorbar(im, ax=ax, label="Reward", shrink=0.8)
-
-    pad = 1.0
-    xmin, xmax = (-W/2 + pad) * cell, (W/2 - pad) * cell
-    ymin, ymax = (-H/2 + pad) * cell, (H/2 - pad) * cell
-    ax.set_xlim(xmin, xmax)
-    ax.set_ylim(ymin, ymax)
-
-    # Draw walls
-    maze_map = env.maze.maze_map
-    for row in range(H):
-        for col in range(W):
-            if row == 0 or row == H - 1 or col == 0 or col == W - 1:
-                continue
-            if maze_map[row][col] == 1:
-                x0 = (col - W / 2.0 + 0.5) * cell
-                y0 = (H / 2.0 - row - 0.5) * cell
-                half = cell / 2.0
-                square = np.array(
-                    [
-                        [x0 - half, y0 - half],
-                        [x0 + half, y0 - half],
-                        [x0 + half, y0 + half],
-                        [x0 - half, y0 + half],
-                        [x0 - half, y0 - half],
-                    ]
-                )
-                ax.plot(square[:, 0], square[:, 1], "k-", linewidth=1)
-
-    ax.set_aspect("equal")
-    ax.set_xlabel("X position")
-    ax.set_ylabel("Y position")
-    ax.set_title(f"Reward Heatmap (Step {step})")
-    ax.grid(True, alpha=0.3)
-    plt.tight_layout()
-
-    # Save to repo-root reward_map/
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    reward_dir = os.path.join(project_root, "reward_map")
-    os.makedirs(reward_dir, exist_ok=True)
-    save_path = os.path.join(reward_dir, f"reward_heatmap_large_step_{step}.png")
-    fig.savefig(save_path, dpi=150, bbox_inches="tight")
-    print(f"Saved heatmap to {save_path}")
-    plt.close(fig)
-
-
-def plot_critic_heatmap_large(
-    step=200,
-    dataset_id="D4RL/pointmaze/medium-v2",
-    resolution=128,
-    batch_size=8192,
-):
-    import os
-    import numpy as np
-    import matplotlib.pyplot as plt
-    import minari
-    import torch
-
-    dataset = minari.load_dataset(dataset_id, download=True)
-    env = dataset.recover_environment().unwrapped
-
-    # Full maze bounds
-    H = env.maze.map_length
-    W = env.maze.map_width
-    cell = env.maze.maze_size_scaling
-    grid_min = np.array([-W / 2 * cell, -H / 2 * cell], dtype=np.float32)
-    grid_max = np.array([ W / 2 * cell,  H / 2 * cell], dtype=np.float32)
-
-    # Grid
-    x = np.linspace(grid_min[0], grid_max[0], resolution)
-    y = np.linspace(grid_min[1], grid_max[1], resolution)
-    X, Y = np.meshgrid(x, y, indexing="xy")
-
-    # Reward model
-    #state_dict, obs_dim, act_dim, name = get_pretrained_reward("pointmaze", step, "large")
-    model_state_dict, obs_dim = get_critic_model('pointmaze', 'medium', step)
-    #obs_dim = obs_dim - 2
-    model = Critic(obs_dim)
-    model.load_state_dict(model_state_dict)
-    model.eval()
-    stats = get_critic_stats('pointmaze', 'medium', step)
-
-    # Single goal (from env)
-    obs_dict, _ = env.reset(seed=0)
-    goal = env.generate_target_goal()
-    goal = np.array(goal[:2], dtype=np.float32)
-
-    # Evaluate reward at zero action
-    obs_base = np.stack(
-        [
-            X.ravel(),
-            Y.ravel(),
-            np.zeros(resolution**2),
-            np.zeros(resolution**2)
-        ],
-        axis=1,
-    ).astype(np.float32)
-
-    reward_map = np.full(resolution**2, -1e10, dtype=np.float32)
-
-    obs_mean_t = torch.as_tensor(stats.obs_mean, dtype=torch.float32)
-    obs_std_t = torch.as_tensor(
-        np.maximum(stats.obs_std, getattr(stats, "std_floor", 1e-3)),
-        dtype=torch.float32,
-    )
-
-    with torch.no_grad():
-        for start in range(0, len(obs_base), batch_size):
-            end = min(start + batch_size, len(obs_base))
-            batch_obs = torch.from_numpy(obs_base[start:end]).float()
-            act_rep = torch.zeros((end - start, 2), dtype=torch.float32)
-
-            obs_norm = (batch_obs - obs_mean_t) / obs_std_t
-            r = model(obs_norm)
-            reward_map[start:end] = r.cpu().numpy()
-
-    reward_map = reward_map.reshape(resolution, resolution)
-
-    # Plot
-    fig, ax = plt.subplots(figsize=(10, 7))
-    im = ax.imshow(
-        reward_map,
-        extent=[grid_min[0], grid_max[0], grid_min[1], grid_max[1]],
-        origin="lower",
-        cmap="coolwarm",
-        interpolation="bilinear",
-    )
-    plt.colorbar(im, ax=ax, label="Reward", shrink=0.8)
-
-    pad = 1.0
-    xmin, xmax = (-W/2 + pad) * cell, (W/2 - pad) * cell
-    ymin, ymax = (-H/2 + pad) * cell, (H/2 - pad) * cell
-    ax.set_xlim(xmin, xmax)
-    ax.set_ylim(ymin, ymax)
-
-    # Draw walls
-    maze_map = env.maze.maze_map
-    for row in range(H):
-        for col in range(W):
-            if row == 0 or row == H - 1 or col == 0 or col == W - 1:
-                continue
-            if maze_map[row][col] == 1:
-                x0 = (col - W / 2.0 + 0.5) * cell
-                y0 = (H / 2.0 - row - 0.5) * cell
-                half = cell / 2.0
-                square = np.array(
-                    [
-                        [x0 - half, y0 - half],
-                        [x0 + half, y0 - half],
-                        [x0 + half, y0 + half],
-                        [x0 - half, y0 + half],
-                        [x0 - half, y0 - half],
-                    ]
-                )
-                ax.plot(square[:, 0], square[:, 1], "k-", linewidth=1)
-
-    ax.set_aspect("equal")
-    ax.set_xlabel("X position")
-    ax.set_ylabel("Y position")
-    ax.set_title(f"Reward Heatmap (Step {step})")
-    ax.grid(True, alpha=0.3)
-    plt.tight_layout()
-
-    # Save to repo-root reward_map/
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    reward_dir = os.path.join(project_root, "critic_map")
-    os.makedirs(reward_dir, exist_ok=True)
-    save_path = os.path.join(reward_dir, f"critic_heatmap_large_step_{step}.png")
-    fig.savefig(save_path, dpi=150, bbox_inches="tight")
-    print(f"Saved heatmap to {save_path}")
-    plt.close(fig)
-
-
-
 def critic_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_negatives=True):
     # ================== Configuration ==================
     RESOLUTION = 256           # Grid resolution (256x256 is fast and looks good)
@@ -880,6 +625,7 @@ def critic_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_neg
     """
 
     model_state_dict, obs_dim = get_critic_model(env_name, specific_env, step)
+    #obs_dim = obs_dim -2
     model = Critic(obs_dim)
     model.load_state_dict(model_state_dict)
     model.eval()
@@ -917,20 +663,22 @@ def critic_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_neg
     for goal_idx, goal in enumerate(GOALS):
         print(f"Processing goal {goal_idx+1}/{len(GOALS)}: [{goal[0]:.2f}, {goal[1]:.2f}]")
     
-        """
+        
         obs_base = np.stack([
             X.ravel(),
             Y.ravel(),
-            np.full(RESOLUTION**2, goal[0]),
-            np.full(RESOLUTION**2, goal[1])
         ], axis=1).astype(np.float32)
+        
+
         """
+        vx0, vy0 = float(stats.obs_mean[2]), float(stats.obs_mean[3])
         obs_base = np.stack([
             X.ravel(),
             Y.ravel(),
-            np.zeros(RESOLUTION**2),
-            np.zeros(RESOLUTION**2)
+            np.full(RESOLUTION**2, vx0, dtype=np.float32),
+            np.full(RESOLUTION**2, vy0, dtype=np.float32)
         ], axis=1).astype(np.float32)
+        """
     
         reward_map_goal = np.full(RESOLUTION**2, -1e10, dtype=np.float32)
        
@@ -1249,19 +997,293 @@ def critic_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_neg
         print(f"Reward map saved as numpy array to {npy_path}")
 
 
+def plot_reward_heatmap(
+    step=200,
+    env_name = 'pointmaze',
+    specific_env = 'medium',
+    resolution=128,
+    batch_size=8192,
+):
+    import os
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import minari
+    import torch
+    
+    """
+    dataset = minari.load_dataset(dataset_id, download=True)
+    env = dataset.recover_environment().unwrapped
+    """
+    env, _, _ = get_env(env_name, specific_env)
+    env = env.unwrapped
+
+    # Full maze bounds
+    H = env.maze.map_length
+    W = env.maze.map_width
+    cell = env.maze.maze_size_scaling
+    grid_min = np.array([-W / 2 * cell, -H / 2 * cell], dtype=np.float32)
+    grid_max = np.array([ W / 2 * cell,  H / 2 * cell], dtype=np.float32)
+
+    # Grid
+    x = np.linspace(grid_min[0], grid_max[0], resolution)
+    y = np.linspace(grid_min[1], grid_max[1], resolution)
+    X, Y = np.meshgrid(x, y, indexing="xy")
+
+    # Reward model
+    model_state_dict, obs_dim, act_dim  = get_reward_model(env_name, specific_env, step)
+    model = SimpleReward(obs_dim, act_dim)
+    model.load_state_dict(model_state_dict)
+    model.eval()
+    stats = get_reward_stats(env_name, specific_env, step)
+
+    # Single goal (from env)
+    obs_dict, _ = env.reset(seed=0)
+    goal = env.generate_target_goal()
+    goal = np.array(goal[:2], dtype=np.float32)
+    
+    
+
+    obs_base = np.stack(
+        [
+            X.ravel(),
+            Y.ravel(),
+            np.full(resolution**2, goal[0]),
+            np.full(resolution**2, goal[1])
+         ],
+        axis=1,
+    ).astype(np.float32)
+
+    reward_map = np.full(resolution**2, -1e10, dtype=np.float32)
+
+    obs_mean_t = torch.as_tensor(stats.obs_mean, dtype=torch.float32)
+    obs_std_t = torch.as_tensor(
+        np.maximum(stats.obs_std, getattr(stats, "std_floor", 1e-3)),
+        dtype=torch.float32,
+    )
+
+    with torch.no_grad():
+        for start in range(0, len(obs_base), batch_size):
+            end = min(start + batch_size, len(obs_base))
+            batch_obs = torch.from_numpy(obs_base[start:end]).float()
+            act_rep = torch.zeros((end - start, 2), dtype=torch.float32)
+
+            obs_norm = (batch_obs - obs_mean_t) / obs_std_t
+            r = model(obs_norm, act_rep)
+            reward_map[start:end] = r.cpu().numpy()
+
+    reward_map = reward_map.reshape(resolution, resolution)
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(10, 7))
+    im = ax.imshow(
+        reward_map,
+        extent=[grid_min[0], grid_max[0], grid_min[1], grid_max[1]],
+        origin="lower",
+        cmap="coolwarm",
+        interpolation="bilinear",
+    )
+    plt.colorbar(im, ax=ax, label="Reward", shrink=0.8)
+
+    pad = 1.0
+    xmin, xmax = (-W/2 + pad) * cell, (W/2 - pad) * cell
+    ymin, ymax = (-H/2 + pad) * cell, (H/2 - pad) * cell
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+
+    # Draw walls
+    maze_map = env.maze.maze_map
+    for row in range(H):
+        for col in range(W):
+            if row == 0 or row == H - 1 or col == 0 or col == W - 1:
+                continue
+            if maze_map[row][col] == 1:
+                x0 = (col - W / 2.0 + 0.5) * cell
+                y0 = (H / 2.0 - row - 0.5) * cell
+                half = cell / 2.0
+                square = np.array(
+                    [
+                        [x0 - half, y0 - half],
+                        [x0 + half, y0 - half],
+                        [x0 + half, y0 + half],
+                        [x0 - half, y0 + half],
+                        [x0 - half, y0 - half],
+                    ]
+                )
+                ax.plot(square[:, 0], square[:, 1], "k-", linewidth=1)
+
+    ax.set_aspect("equal")
+    ax.set_xlabel("X position")
+    ax.set_ylabel("Y position")
+    ax.set_title(f"Reward Heatmap (Step {step})")
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    # Save to repo-root reward_map/
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    reward_dir = os.path.join(project_root, "reward_map")
+    os.makedirs(reward_dir, exist_ok=True)
+    save_path = os.path.join(reward_dir, f"reward_heatmap_large_step_{step}.png")
+    fig.savefig(save_path, dpi=150, bbox_inches="tight")
+    print(f"Saved heatmap to {save_path}")
+    plt.close(fig)
+
+def plot_critic_heatmap(
+    step=200,
+    env_name = 'pointmaze',
+    specific_env = 'medium',
+    resolution=128,
+    batch_size=8192,
+):
+    import os
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import minari
+    import torch
+   
+    """
+    dataset = minari.load_dataset(dataset_id, download=True)
+    env = dataset.recover_environment().unwrapped
+    """
+    env, _, _ = get_env(env_name, specific_env)
+    env = env.unwrapped
+
+    # Full maze bounds
+    H = env.maze.map_length
+    W = env.maze.map_width
+    cell = env.maze.maze_size_scaling
+    grid_min = np.array([-W / 2 * cell, -H / 2 * cell], dtype=np.float32)
+    grid_max = np.array([ W / 2 * cell,  H / 2 * cell], dtype=np.float32)
+
+    # Grid
+    x = np.linspace(grid_min[0], grid_max[0], resolution)
+    y = np.linspace(grid_min[1], grid_max[1], resolution)
+    X, Y = np.meshgrid(x, y, indexing="xy")
+
+    # Reward model
+    #state_dict, obs_dim, act_dim, name = get_pretrained_reward("pointmaze", step, "large")
+    model_state_dict, obs_dim = get_critic_model(env_name, specific_env, step)
+    #obs_dim = obs_dim - 2
+    model = Critic(obs_dim)
+    model.load_state_dict(model_state_dict)
+    model.eval()
+    stats = get_critic_stats(env_name, specific_env, step)
+
+    # Single goal (from env)
+    obs_dict, _ = env.reset(seed=0)
+    goal = env.generate_target_goal()
+    goal = np.array(goal[:2], dtype=np.float32)
+
+    # Evaluate reward at zero action
+    """
+    vx0, vy0 = float(stats.obs_mean[2]), float(stats.obs_mean[3])
+    obs_base = np.stack([
+            X.ravel(),
+            Y.ravel(),
+            np.full(resolution**2, vx0, dtype=np.float32),
+            np.full(resolution**2, vy0, dtype=np.float32)
+    ], axis=1).astype(np.float32)
+    """
+
+
+    obs_base = np.stack([
+            X.ravel(),
+            Y.ravel()
+    ], axis=1).astype(np.float32)
+
+    reward_map = np.full(resolution**2, -1e10, dtype=np.float32)
+
+    obs_mean_t = torch.as_tensor(stats.obs_mean, dtype=torch.float32)
+    obs_std_t = torch.as_tensor(
+        np.maximum(stats.obs_std, getattr(stats, "std_floor", 1e-3)),
+        dtype=torch.float32,
+    )
+
+    with torch.no_grad():
+        for start in range(0, len(obs_base), batch_size):
+            end = min(start + batch_size, len(obs_base))
+            batch_obs = torch.from_numpy(obs_base[start:end]).float()
+            act_rep = torch.zeros((end - start, 2), dtype=torch.float32)
+
+            obs_norm = (batch_obs - obs_mean_t) / obs_std_t
+            r = model(obs_norm)
+            reward_map[start:end] = r.cpu().numpy()
+
+    reward_map = reward_map.reshape(resolution, resolution)
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(10, 7))
+    im = ax.imshow(
+        reward_map,
+        extent=[grid_min[0], grid_max[0], grid_min[1], grid_max[1]],
+        origin="lower",
+        cmap="coolwarm",
+        interpolation="bilinear",
+    )
+    plt.colorbar(im, ax=ax, label="Reward", shrink=0.8)
+
+    pad = 1.0
+    xmin, xmax = (-W/2 + pad) * cell, (W/2 - pad) * cell
+    ymin, ymax = (-H/2 + pad) * cell, (H/2 - pad) * cell
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+
+    # Draw walls
+    maze_map = env.maze.maze_map
+    for row in range(H):
+        for col in range(W):
+            if row == 0 or row == H - 1 or col == 0 or col == W - 1:
+                continue
+            if maze_map[row][col] == 1:
+                x0 = (col - W / 2.0 + 0.5) * cell
+                y0 = (H / 2.0 - row - 0.5) * cell
+                half = cell / 2.0
+                square = np.array(
+                    [
+                        [x0 - half, y0 - half],
+                        [x0 + half, y0 - half],
+                        [x0 + half, y0 + half],
+                        [x0 - half, y0 + half],
+                        [x0 - half, y0 - half],
+                    ]
+                )
+                ax.plot(square[:, 0], square[:, 1], "k-", linewidth=1)
+
+    ax.set_aspect("equal")
+    ax.set_xlabel("X position")
+    ax.set_ylabel("Y position")
+    ax.set_title(f"Reward Heatmap (Step {step})")
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    # Save to repo-root reward_map/
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    reward_dir = os.path.join(project_root, "critic_map")
+    os.makedirs(reward_dir, exist_ok=True)
+    save_path = os.path.join(reward_dir, f"critic_heatmap_large_step_{step}.png")
+    fig.savefig(save_path, dpi=150, bbox_inches="tight")
+    print(f"Saved heatmap to {save_path}")
+    plt.close(fig)
+
+
 if __name__ == '__main__':
     # Example usage
     step = 0
+    env_name = 'pointmaze'
+    specific_env = 'medium'
     while(step <= 0):
          np.random.seed(0)
          random.seed(0)
-         #plot_reward_heatmap_large(step)
-         #reward_heatmap(step, 'pointmaze', 'medium')
-         #critic_heatmap(step, 'pointmaze', 'medium')
-         plot_critic_heatmap_large(step)
+         critic_heatmap(step, env_name, specific_env)
+         plot_critic_heatmap(step, env_name, specific_env)
+         #plot_reward_heatmap(step, env_name, specific_env)
+         #reward_heatmap(step, env_name, specific_env)
+
          step += 10
     print('Done')
 
+
+#reward_heatmap(step, 'pointmaze', 'medium')
+#critic_heatmap(step, 'pointmaze', 'medium')
 
 
 

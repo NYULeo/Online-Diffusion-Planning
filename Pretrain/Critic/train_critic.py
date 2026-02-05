@@ -5,6 +5,7 @@ import pickle
 from typing import Optional, List
 
 import numpy as np
+from sympy.integrals.meijerint import _rewrite_single
 import torch
 import torch.optim as optim
 from scipy.ndimage import gaussian_filter1d
@@ -131,6 +132,7 @@ def get_CriticName(env_name, specific_env):
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
+"""
 def reward_filter(obs, rews, goal):
     #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
     target_goals = goal
@@ -142,10 +144,27 @@ def reward_filter(obs, rews, goal):
         else:
             rews[i-1] = 0
     return rews
+"""
 
+
+def reward_filter(obs, rews, goal):
+    #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
+    for i in range(1, len(obs)):
+        pos = obs[i][:2] 
+        g = np.asarray(goal, dtype=np.float32).reshape(-1)
+        #goal_coord = np.asarray(goal_coord, dtype=np.float32).reshape(-1)  
+        dist = np.linalg.norm(pos - g) 
+        if (dist < 0.5):
+            rews[i-1] = 1
+        else:
+            rews[i-1] = 0
+    return rews
+
+"""
 def obs_filter(obs):
     obs = obs[:, 2]
     return obs
+"""
 
 def save_critic(model, dataset_name, specific_dataset, step):
     model.eval()
@@ -229,12 +248,13 @@ class CriticDataset(Dataset):
     def __init__(self, sigma: float, dataset_name: str, specific_dataset: str, trajs: List[TrajectoryDict], goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
         
         obs_all = []
-        """
+        
+        
         if(dataset_name == 'pointmaze'):
            trajs = copy.deepcopy(trajs)
            for traj in trajs:
                 traj['observations'] = traj['observations'][:,:2]
-        """
+        
         
         for traj in trajs:
             obs_all.append(traj['observations'])
@@ -252,11 +272,13 @@ class CriticDataset(Dataset):
             rews = traj['rewards']
             if( goal is not None):
                 rews = reward_filter(obs, rews, goal)
+            
             if(not np.all(np.isin(rews, allowed_values))):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
             rews = gaussian_filter1d(rews, sigma)
+            
             if(len(obs) > horizon):
                rews = self.reward_processor(rews, horizon, gamma)
                for t in range(len(obs)-horizon):
@@ -267,6 +289,7 @@ class CriticDataset(Dataset):
            
         self.transitions = transitions
         self.save_stats(dataset_name, specific_dataset)
+        
     """
     def save_stats(self, dataset_name, specific_dataset):
         name = get_CriticName(dataset_name, specific_dataset)
@@ -318,12 +341,12 @@ class CriticDataset(Dataset):
 class Critic_Test_Dataset(Dataset):
     def __init__(self, sigma: float, dataset_name: str, specific_dataset: str, trajs, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
         # ----- gather raw obs/actions to fit stats -----
-        """
+    
         if(dataset_name == 'pointmaze'):
            trajs = copy.deepcopy(trajs)
            for traj in trajs:
                 traj['observations'] = traj['observations'][:,:2]
-        """
+        
         
         self.stats = get_critic_stats(dataset_name, specific_dataset)
         allowed_values = [0, 1]
@@ -367,7 +390,7 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
 
     #prepare training
-    
+    obs_dim = obs_dim - 2
     
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True))
     critic = Critic(obs_dim).to(device)
@@ -418,7 +441,7 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
                tgt_param.data.mul_(1 - tau)
                tgt_param.data.add_(tau * param.data)
         
-           if(k % 200 == 0):
+           if(k % 5000 == 0):
                 target_critic.eval()
                 save_critic(target_critic, dataset_name, specific_dataset, k)
                 print(f"Checkpoint saved at step {k}")
@@ -434,10 +457,9 @@ def test_critic(dataset_name: str, specific_dataset: str, checkpoint_step, sigma
     batch_size = 100
     dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True)
     model_state_dict, obs_dim = get_critic_model(dataset_name, specific_dataset, checkpoint_step)
-    """
     if(dataset_name == 'pointmaze'):
         obs_dim = obs_dim - 2
-    """
+    
     model = Critic(obs_dim).to(device)
     model.load_state_dict(model_state_dict)
     model.eval()
