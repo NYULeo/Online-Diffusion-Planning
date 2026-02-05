@@ -32,6 +32,7 @@ if __name__ == '__main__':  # pragma: no cover
                  ensemble_size = 10, 
                  hidden_layers = 2, 
                  λ_reg = 1e-3)
+    """
     trajs = get_trajs(dataset, specific_dataset, 0)
     test_kernel(dataset_name = dataset, 
                 specific_dataset = specific_dataset,
@@ -40,4 +41,5 @@ if __name__ == '__main__':  # pragma: no cover
                 num_steps = 1000, 
                 hidden_layers = 2, 
                 ensemble_size = 10)
+    """
     
