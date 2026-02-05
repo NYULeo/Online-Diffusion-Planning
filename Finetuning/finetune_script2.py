@@ -156,7 +156,7 @@ if __name__ == "__main__":
                           num_steps = 600, 
                           lr = 1e-4, 
                           sigma = 7.0, 
-                          target_reward = 10.0, 
+                          target_reward = 1.0, 
                           train_goal = np.array([[-2.5, -2.5]]),
                           rollout_goal = np.array([[6, 1]]),
                           rollout_start_cells = np.array([[6,6], [5,4], [2,4], [2,1]]))
