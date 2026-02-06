@@ -662,14 +662,14 @@ def critic_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_neg
     for goal_idx, goal in enumerate(GOALS):
         print(f"Processing goal {goal_idx+1}/{len(GOALS)}: [{goal[0]:.2f}, {goal[1]:.2f}]")
     
-        """
+        
         obs_base = np.stack([
             X.ravel(),
             Y.ravel(),
         ], axis=1).astype(np.float32)
-        """
-
         
+
+        """
         vx0, vy0 = float(stats.obs_mean[2]), float(stats.obs_mean[3])
         obs_base = np.stack([
             X.ravel(),
@@ -677,7 +677,7 @@ def critic_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_neg
             np.full(RESOLUTION**2, vx0, dtype=np.float32),
             np.full(RESOLUTION**2, vy0, dtype=np.float32)
         ], axis=1).astype(np.float32)
-        
+        """
     
         reward_map_goal = np.full(RESOLUTION**2, -1e10, dtype=np.float32)
        
@@ -995,7 +995,6 @@ def critic_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_neg
         np.save(npy_path, reward_map)
         print(f"Reward map saved as numpy array to {npy_path}")
 
-
 def plot_reward_heatmap(
     step=200,
     env_name = 'pointmaze',
@@ -1171,7 +1170,7 @@ def plot_critic_heatmap(
     goal = np.array(goal[:2], dtype=np.float32)
 
     # Evaluate reward at zero action
-    
+    """
     vx0, vy0 = float(stats.obs_mean[2]), float(stats.obs_mean[3])
     obs_base = np.stack([
             X.ravel(),
@@ -1179,14 +1178,14 @@ def plot_critic_heatmap(
             np.full(resolution**2, vx0, dtype=np.float32),
             np.full(resolution**2, vy0, dtype=np.float32)
     ], axis=1).astype(np.float32)
-    
-
     """
+
+    
     obs_base = np.stack([
             X.ravel(),
             Y.ravel()
     ], axis=1).astype(np.float32)
-    """
+    
 
     reward_map = np.full(resolution**2, -1e10, dtype=np.float32)
 
@@ -1271,10 +1270,10 @@ if __name__ == '__main__':
     while(step <= 0):
          np.random.seed(0)
          random.seed(0)
-         critic_heatmap(step, env_name, specific_env)
-         plot_critic_heatmap(step, env_name, specific_env)
-         #plot_reward_heatmap(step, env_name, specific_env)
-         #reward_heatmap(step, env_name, specific_env)
+         #critic_heatmap(step, env_name, specific_env)
+         #plot_critic_heatmap(step, env_name, specific_env)
+         plot_reward_heatmap(step, env_name, specific_env)
+         reward_heatmap(step, env_name, specific_env)
 
          step += 10
     print('Done')
