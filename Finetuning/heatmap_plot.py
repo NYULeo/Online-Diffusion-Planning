@@ -1264,16 +1264,16 @@ def plot_critic_heatmap(
 
 if __name__ == '__main__':
     # Example usage
-    step = 0
+    step = 10
     env_name = 'pointmaze'
     specific_env = 'medium'
-    while(step <= 0):
+    while(step <= 10):
          np.random.seed(0)
          random.seed(0)
-         #critic_heatmap(step, env_name, specific_env)
-         #plot_critic_heatmap(step, env_name, specific_env)
-         plot_reward_heatmap(step, env_name, specific_env)
-         reward_heatmap(step, env_name, specific_env)
+         critic_heatmap(step, env_name, specific_env)
+         plot_critic_heatmap(step, env_name, specific_env)
+         #plot_reward_heatmap(step, env_name, specific_env)
+         #reward_heatmap(step, env_name, specific_env)
 
          step += 10
     print('Done')

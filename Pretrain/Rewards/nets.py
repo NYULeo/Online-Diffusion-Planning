@@ -529,6 +529,9 @@ class SimpleReward(nn.Module):
         return self.net(x).squeeze(-1)
 
 
+
+
+
 """
 class SimpleReward(nn.Module):
     def __init__(self, obs_dim, act_dim, hidden=32):
@@ -556,8 +559,8 @@ class SimpleReward(nn.Module):
         #return self.net(x).squeeze(-1) * self.scale
         return self.net(x).squeeze(-1)
 
-"""
 
+"""
 
 
 
