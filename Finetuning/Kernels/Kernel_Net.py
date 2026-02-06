@@ -38,7 +38,7 @@ class TransitionKernel(nn.Module):
 
 
 
-
+"""
 class RobustTransitionKernel(nn.Module):
     def __init__(self, obs_dim, act_dim, min_log_std = -6.0, max_log_std = 4.0, noise_floor = 1e-2):
         super().__init__()
@@ -89,7 +89,7 @@ class RobustTransitionKernel(nn.Module):
         lp = lp - 0.5 * (D * math.log(2 * math.pi) + 2 * log_std.sum(dim=-1))
         return lp  # tensor of shape batch
     
-    """
+    
     def log_prob(self, s_next, mu, log_std):
         var_pred = torch.exp(2 * log_std)
         var = var_pred + self.noise_floor

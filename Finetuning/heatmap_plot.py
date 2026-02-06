@@ -1159,6 +1159,7 @@ def plot_critic_heatmap(
     #state_dict, obs_dim, act_dim, name = get_pretrained_reward("pointmaze", step, "large")
     model_state_dict, obs_dim = get_critic_model(env_name, specific_env, step)
     #obs_dim = obs_dim - 2
+    print(obs_dim)
     model = Critic(obs_dim)
     model.load_state_dict(model_state_dict)
     model.eval()
@@ -1264,10 +1265,10 @@ def plot_critic_heatmap(
 
 if __name__ == '__main__':
     # Example usage
-    step = 10
+    step = 0
     env_name = 'pointmaze'
     specific_env = 'medium'
-    while(step <= 10):
+    while(step <= 0):
          np.random.seed(0)
          random.seed(0)
          critic_heatmap(step, env_name, specific_env)

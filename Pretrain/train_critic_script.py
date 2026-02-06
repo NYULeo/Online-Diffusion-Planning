@@ -39,19 +39,21 @@ if __name__ == '__main__':  # pragma: no cover
     specific_env = 'medium'
     data = get_dataset(env_name, specific_env)
     trajs = data.get_trajectories()
+
     """
     half_trajs_1 = trajs[:len(trajs)//2]
-    trajs = get_trajs(env_name, specific_env, 0)
+    trajs = get_trajs(env_name, specific_env, 30)
     half_trajs_2 = trajs[len(trajs)//2:]
     trajs = half_trajs_1 + half_trajs_2
     """
+    #trajs = get_trajs(env_name, specific_env, 80)
     
     
     """
     #large
     train_critic(dataset_name = env_name, 
                  specific_dataset = specific_env, 
-                 sigma = 2.0, 
+                 sigma = 20.0, 
                  batch_size = 128, 
                  num_steps = 5000, 
                  gamma = 0.99, 
@@ -62,6 +64,7 @@ if __name__ == '__main__':  # pragma: no cover
                  target_reward = 1.0,
                  trajs = trajs)
      
+    
     train_critic(dataset_name = env_name, 
                  specific_dataset = specific_env, 
                  sigma = 7.0, 
@@ -89,13 +92,13 @@ if __name__ == '__main__':  # pragma: no cover
      """
      #medium
     
-
+    
     train_critic(dataset_name = env_name, 
                  specific_dataset = specific_env, 
                  sigma = 7.0, 
-                 batch_size = 128, 
-                 num_steps = 5000, 
-                 gamma = 1.0, 
+                 batch_size = 256, 
+                 num_steps = 3000, 
+                 gamma = 0.99, 
                  horizon = 32, 
                  lr = 1e-05, 
                  tau = 0.005,

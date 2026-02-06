@@ -276,7 +276,7 @@ class RewardDataset(Dataset):
             act_list.append(acts[:L])
         obs_all = np.concatenate(obs_list, axis=0)  # [N, d_s]
         
-        allowed_values = [0,1]
+        allowed_values = [0.0, 1.0]
         #get stats
         self.stats = SAStats()
         self.stats.obs_mean = obs_all.mean(axis=0)

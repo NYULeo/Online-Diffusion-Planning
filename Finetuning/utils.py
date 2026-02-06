@@ -48,9 +48,9 @@ def spare_reward_prcocessor(rewards):
     new_rewards = [0]*len(rewards)
     for i in range(len(rewards)):
         if(i in Temp):
-            new_rewards[i] = 1
+            new_rewards[i] = 1.0
         else:
-            new_rewards[i] = 0
+            new_rewards[i] = 0.0
     return np.array(new_rewards, dtype = np.float64) 
 
 def reward_filter(obs, rews, goal):
@@ -61,9 +61,9 @@ def reward_filter(obs, rews, goal):
         #goal_coord = np.asarray(goal_coord, dtype=np.float32).reshape(-1)  
         dist = np.linalg.norm(pos - g) 
         if (dist < 0.5):
-            rews[i-1] = 1
+            rews[i-1] = 1.0
         else:
-            rews[i-1] = 0
+            rews[i-1] = 0.0
     return rews
 
 def save_reward_model(reward_net, dataset_name, specific_dataset, step):
@@ -337,7 +337,7 @@ class RewardDataset(Dataset):
         self.stats = SAStats()
         self.stats.obs_mean = obs_all.mean(axis=0)
         self.stats.obs_std = obs_all.std(axis=0)+ 1e-8
-        allowed_values = [0,1]
+        allowed_values = [0.0, 1.0]
 
         transitions = []
         for traj in trajs:
@@ -408,7 +408,7 @@ class CriticDataset(Dataset):
         self.stats = SAStats()
         self.stats.obs_mean = obs_all.mean(axis=0)
         self.stats.obs_std = obs_all.std(axis=0)+ 1e-8
-        allowed_values = [0,1]
+        allowed_values = [0.0, 1.0]
 
         transitions = []
         for traj in trajs:
@@ -422,12 +422,13 @@ class CriticDataset(Dataset):
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
             rews = gaussian_filter1d(rews, sigma)
-            rews = self.reward_processor(rews, horizon, gamma)
-            for t in range(len(obs)-horizon):
-                obs_t = self.stats.norm_obs(obs[t])
-                r_t   = rews[t]
-                obs_next_t = self.stats.norm_obs(obs[t + horizon])
-                transitions.append((obs_t, r_t, obs_next_t))
+            if(len(obs) > horizon):
+               rews = self.reward_processor(rews, horizon, gamma)
+               for t in range(len(obs)-horizon):
+                   obs_t = self.stats.norm_obs(obs[t])
+                   r_t   = rews[t]
+                   obs_next_t = self.stats.norm_obs(obs[min(t+horizon, len(obs)-1)])
+                   transitions.append((obs_t, r_t, obs_next_t))
 
         self.transitions = transitions
         self.save_stats(dataset_name, specific_dataset, step)
