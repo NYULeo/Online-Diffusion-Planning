@@ -260,12 +260,14 @@ def get_critic_stats(dataset_name, specific_dataset):
 class CriticDataset(Dataset):
     def __init__(self, sigma: float, dataset_name: str, specific_dataset: str, trajs: List[TrajectoryDict], goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
         
-        obs_all = []
+        
+        
         if(dataset_name == 'pointmaze'):
            trajs = copy.deepcopy(trajs)
            for traj in trajs:
                 traj['observations'] = traj['observations'][:,:2]
-    
+        
+        obs_all = []
         for traj in trajs:
             obs_all.append(traj['observations'])
         obs_all = np.concatenate(obs_all, axis = 0)
@@ -399,8 +401,10 @@ def train_critic(dataset_name: str, specific_dataset: str, sigma: float, batch_s
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
 
     #prepare training
+    
     if(dataset_name == 'pointmaze'):
           obs_dim = obs_dim - 2
+    
     
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True))
     critic = Critic(obs_dim).to(device)

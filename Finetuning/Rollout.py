@@ -321,7 +321,7 @@ if __name__ == "__main__":
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
     set_seed(0)
-    score = rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, checkpoint_steps = 30, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([5, 4], dtype = int), base_seed = 0, continual_rollout = False)
+    #score = rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, checkpoint_steps = 30, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([5, 4], dtype = int), base_seed = 0, continual_rollout = False)
     
     """
     average = 0.0
@@ -338,21 +338,21 @@ if __name__ == "__main__":
     
     
 
-    """
+    
     trajs, score, total_steps = rollout_parallel(env_name, 
                      specific_train_dataset, 
                      horizon = 32, 
                      steps_T = 50, 
                      num_karras = 3, 
                      eta = 0.8, 
-                     episode_length = 1000, 
+                     episode_length = 2000, 
                      checkpoint_step = 0, 
                      num_envs = 8, 
                      goal_cell = np.array([6, 1], dtype = int),
                      start_cells = np.array([[6,6], [5,4], [2,4], [2,1]]),
                      seed_base = 0)
     save_trajs(trajs, env_name, specific_train_dataset, 0)
-    """
+    
     """
     for i in range(10):
         set_seed(0)

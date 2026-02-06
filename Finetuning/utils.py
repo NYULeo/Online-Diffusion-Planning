@@ -174,8 +174,10 @@ def save_critic(model, dataset_name, specific_dataset, step):
 def get_critic_model(dataset_name, specific_dataset, step):
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
     
+    
     if(dataset_name == 'pointmaze'):
          obs_dim = obs_dim - 2
+    
     
     name = getName(dataset_name, specific_dataset)
     path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl'
