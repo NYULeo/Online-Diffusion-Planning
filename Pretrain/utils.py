@@ -98,4 +98,21 @@ def compare_models_state_dict(model1, model2, tolerance=1e-6):
 
 
 
+def ema_smooth(rewards, alpha = 0.99):
+   
+    rewards = np.asarray(rewards)
+    assert rewards.ndim == 1, "rewards must be 1D (length T)"
+    assert 0.0 < alpha < 1.0, "alpha must be in (0, 1)"
+
+    beta = 1.0 - alpha
+    rewards_smooth = np.zeros_like(rewards)
+
+    # Initialize EMA with the first reward
+    rewards_smooth[0] = rewards[0]
+    for t in range(1, len(rewards)):
+        rewards_smooth[t] = alpha * rewards_smooth[t - 1] + beta * rewards[t]
+
+    return rewards_smooth
+
+
 

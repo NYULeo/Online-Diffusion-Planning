@@ -42,12 +42,12 @@ import matplotlib.pyplot as plt
 import os
 #from Pretrain.Critic.train_critic import get_critic_model, get_critic_stats
 from Finetuning.utils import get_critic_model, get_critic_stats, get_reward_model, get_reward_stats
-from Pretrain.Critic.nets import Critic
+from Pretrain.Critic.nets import Critic, CriticEnsemble
 from Pretrain.Dataset import get_env
 # Assuming project_root, MATPLOTLIB_AVAILABLE, get_pretrained_reward, etc., are defined elsewhere
 
 
-def reward_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_negatives=True):
+def reward_heatmap(STEP, env_name, specific_env, hidden_layers, hidden_dim, agg_method='max', highlight_negatives=True):
     # ================== Configuration ==================
     RESOLUTION = 256           # Grid resolution (256x256 is fast and looks good)
     BATCH_SIZE = 16384              # Batch size for efficient processing
@@ -157,7 +157,7 @@ def reward_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_neg
     stats = get_pretrained_reward_stats(name)
     """
     state_dict, obs_dim, act_dim = get_reward_model(env_name, specific_env, step)
-    model = SimpleReward(obs_dim, act_dim)
+    model = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers)
     model.load_state_dict(state_dict)
     model.eval()
     stats = get_reward_stats(env_name, specific_env, step)
@@ -517,7 +517,7 @@ def reward_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_neg
         np.save(npy_path, reward_map)
         print(f"Reward map saved as numpy array to {npy_path}")
 
-def critic_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_negatives=True):
+def critic_heatmap(STEP, env_name, specific_env, hidden_layers, hidden_dim, num_heads = 5, agg_method='max', highlight_negatives=True):
     # ================== Configuration ==================
     RESOLUTION = 256           # Grid resolution (256x256 is fast and looks good)
     BATCH_SIZE = 16384              # Batch size for efficient processing
@@ -625,7 +625,8 @@ def critic_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_neg
 
     model_state_dict, obs_dim = get_critic_model(env_name, specific_env, step)
     #obs_dim = obs_dim -2
-    model = Critic(obs_dim)
+    model = Critic(obs_dim, hidden_dim, hidden_layers)
+    #model = CriticEnsemble(obs_dim, hidden_dim, hidden_layers, num_heads=num_heads)
     model.load_state_dict(model_state_dict)
     model.eval()
     stats = get_critic_stats(env_name, specific_env, step)
@@ -662,14 +663,14 @@ def critic_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_neg
     for goal_idx, goal in enumerate(GOALS):
         print(f"Processing goal {goal_idx+1}/{len(GOALS)}: [{goal[0]:.2f}, {goal[1]:.2f}]")
     
-        
+        """
         obs_base = np.stack([
             X.ravel(),
             Y.ravel(),
         ], axis=1).astype(np.float32)
-        
-
         """
+
+        
         vx0, vy0 = float(stats.obs_mean[2]), float(stats.obs_mean[3])
         obs_base = np.stack([
             X.ravel(),
@@ -677,7 +678,7 @@ def critic_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_neg
             np.full(RESOLUTION**2, vx0, dtype=np.float32),
             np.full(RESOLUTION**2, vy0, dtype=np.float32)
         ], axis=1).astype(np.float32)
-        """
+        
     
         reward_map_goal = np.full(RESOLUTION**2, -1e10, dtype=np.float32)
        
@@ -996,11 +997,13 @@ def critic_heatmap(STEP, env_name, specific_env, agg_method='max', highlight_neg
         print(f"Reward map saved as numpy array to {npy_path}")
 
 def plot_reward_heatmap(
-    step=200,
+    step = 200,
     env_name = 'pointmaze',
     specific_env = 'medium',
-    resolution=128,
-    batch_size=8192,
+    hidden_layers = 2,
+    hidden_dim = 128,
+    resolution = 128,
+    batch_size = 8192,
 ):
     import os
     import numpy as np
@@ -1029,7 +1032,7 @@ def plot_reward_heatmap(
 
     # Reward model
     model_state_dict, obs_dim, act_dim  = get_reward_model(env_name, specific_env, step)
-    model = SimpleReward(obs_dim, act_dim)
+    model = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers)
     model.load_state_dict(model_state_dict)
     model.eval()
     stats = get_reward_stats(env_name, specific_env, step)
@@ -1127,6 +1130,8 @@ def plot_critic_heatmap(
     step=200,
     env_name = 'pointmaze',
     specific_env = 'medium',
+    hidden_layers = 2,
+    hidden_dim = 128,
     resolution=128,
     batch_size=8192,
 ):
@@ -1160,7 +1165,7 @@ def plot_critic_heatmap(
     model_state_dict, obs_dim = get_critic_model(env_name, specific_env, step)
     #obs_dim = obs_dim - 2
     print(obs_dim)
-    model = Critic(obs_dim)
+    model = Critic(obs_dim, hidden_dim, hidden_layers)
     model.load_state_dict(model_state_dict)
     model.eval()
     stats = get_critic_stats(env_name, specific_env, step)
@@ -1171,7 +1176,7 @@ def plot_critic_heatmap(
     goal = np.array(goal[:2], dtype=np.float32)
 
     # Evaluate reward at zero action
-    """
+    
     vx0, vy0 = float(stats.obs_mean[2]), float(stats.obs_mean[3])
     obs_base = np.stack([
             X.ravel(),
@@ -1179,13 +1184,14 @@ def plot_critic_heatmap(
             np.full(resolution**2, vx0, dtype=np.float32),
             np.full(resolution**2, vy0, dtype=np.float32)
     ], axis=1).astype(np.float32)
-    """
-
     
+
+    """
     obs_base = np.stack([
             X.ravel(),
             Y.ravel()
     ], axis=1).astype(np.float32)
+    """
     
 
     reward_map = np.full(resolution**2, -1e10, dtype=np.float32)
@@ -1263,18 +1269,25 @@ def plot_critic_heatmap(
     plt.close(fig)
 
 
+
 if __name__ == '__main__':
     # Example usage
     step = 0
     env_name = 'pointmaze'
-    specific_env = 'medium'
+    specific_env = 'large'
+    hidden_layers_reward = 2
+    hidden_dim_reward = 128
+    hidden_layers_critic = 3
+    hidden_dim_critic = 128
+    num_heads_critic = 5
     while(step <= 0):
          np.random.seed(0)
          random.seed(0)
-         critic_heatmap(step, env_name, specific_env)
-         plot_critic_heatmap(step, env_name, specific_env)
-         #plot_reward_heatmap(step, env_name, specific_env)
-         #reward_heatmap(step, env_name, specific_env)
+         critic_heatmap(step, env_name, specific_env, hidden_layers_critic, hidden_dim_critic)
+         #critic_heatmap(step, env_name, specific_env, hidden_layers_critic, hidden_dim_critic, num_heads_critic)
+         plot_critic_heatmap(step, env_name, specific_env, hidden_layers_critic, hidden_dim_critic)
+         plot_reward_heatmap(step, env_name, specific_env, hidden_layers_reward, hidden_dim_reward)
+         reward_heatmap(step, env_name, specific_env, hidden_layers_reward, hidden_dim_reward)
 
          step += 10
     print('Done')

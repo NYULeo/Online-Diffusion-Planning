@@ -173,12 +173,10 @@ def save_critic(model, dataset_name, specific_dataset, step):
 
 def get_critic_model(dataset_name, specific_dataset, step):
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
-    
-    
+    """
     if(dataset_name == 'pointmaze'):
          obs_dim = obs_dim - 2
-    
-    
+    """
     name = getName(dataset_name, specific_dataset)
     path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl'
     model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
@@ -392,7 +390,7 @@ class RewardDataset(Dataset):
             if(rews[t] == 1):
                  rews[t] = target_reward
         return rews
-
+"""
 class CriticDataset(Dataset):
     def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, step: int, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
         # ----- gather raw obs/actions to fit stats -----
@@ -470,14 +468,14 @@ class CriticDataset(Dataset):
                 R += (gamma**(i-t))*rews[i]
             new_rews.append(R)
         return new_rews
-
-def train_reward(trajs: List[TrajectoryDict], dataset_name: str, batch_size, num_steps, lr, sigma, step, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None):
+"""
+def train_reward(trajs: List[TrajectoryDict], dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, lr, sigma, step, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
     print(f"Training reward approximator for {dataset_name}_{specific_dataset} Dataset") 
     dataset = RewardDataset(trajs, sigma, dataset_name, specific_dataset, step, goal, target_reward)
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
-    reward_net = SimpleReward(obs_dim, act_dim).to(device)
+    reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
     optimizer = optim.AdamW(reward_net.parameters(), lr = lr, weight_decay = 1e-4)
     total_loss = 0
     counter = 0
@@ -500,7 +498,7 @@ def train_reward(trajs: List[TrajectoryDict], dataset_name: str, batch_size, num
            
 def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str,
                  batch_size=256, lr=1e-3, num_steps=10000,
-                 ensemble_size=10, λ_reg=1e-3, num_hidden_layers=2, step: int = 0):
+                 ensemble_size=10, λ_reg=1e-3, num_hidden_layers=2, hidden_dim=256, step: int = 0):
     # Prepare dataset / dataloader
     print(f"Training kernel for {dataset_name}_{specific_dataset}")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -510,7 +508,7 @@ def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
     loader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
                               pin_memory=True, num_workers=8))
     # Create ensemble of models
-    ensemble = [RobustTransitionKernel(obs_dim, act_dim, num_hidden_layers).to(device) for _ in range(ensemble_size)]
+    ensemble = [RobustTransitionKernel(obs_dim, act_dim, num_hidden_layers, hidden_dim).to(device) for _ in range(ensemble_size)]
     optimizers = [optim.Adam(m.parameters(), lr, weight_decay=1e-5) for m in ensemble]
     total_loss = 0.0
     for k in range(1, num_steps + 1):
@@ -554,20 +552,103 @@ def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
          save_kernel_model(ckpt, dataset_name, specific_dataset, step, idx)
     print(f"Kernel model saved")
 
-def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, step: int, goal = None, target_reward = 1.0):
+
+class CriticDataset(Dataset):
+    def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, step: int, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
+        # ----- gather raw obs/actions to fit stats -----
+        """
+        if(dataset_name == 'pointmaze'):
+            trajs = copy.deepcopy(trajs) 
+            for traj in trajs:
+                traj['observations'] = traj['observations'][:,:2]
+        """
+        
+        obs_all = []
+        for traj in trajs:
+            obs_all.append(traj['observations'])
+        obs_all = np.concatenate(obs_all, axis = 0)
+        
+        #get stats
+        self.stats = SAStats()
+        self.stats.obs_mean = obs_all.mean(axis=0)
+        self.stats.obs_std = obs_all.std(axis=0)+ 1e-8
+        allowed_values = [0.0, 1.0]
+
+        transitions = []
+        for traj in trajs:
+            obs = traj['observations']      
+            rews = traj['rewards']
+            rews = spare_reward_prcocessor(rews)
+            if(not np.all(np.isin(rews, allowed_values))):
+                raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
+            if( goal is not None):
+                rews = reward_filter(obs, rews, goal)
+            if(target_reward is not None):
+                rews = self.boost_signal(target_reward, rews)
+            rews = gaussian_filter1d(rews, sigma)
+            if(len(obs) > horizon):
+               rews = self.reward_processor(rews, horizon, gamma)
+               for t in range(len(obs)-horizon):
+                   obs_t = self.stats.norm_obs(obs[t])
+                   r_t   = rews[t]
+                   obs_next_t = self.stats.norm_obs(obs[min(t+horizon, len(obs)-1)])
+                   transitions.append((obs_t, r_t, obs_next_t))
+
+        self.transitions = transitions
+        self.save_stats(dataset_name, specific_dataset, step)
+    
+    def save_stats(self, dataset_name, specific_dataset, step):
+        name = getName(dataset_name, specific_dataset)
+        stats_name =  str(name) + f'_Critic_stats_{str(step)}.pkl'
+        stats_dir = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/'
+        os.makedirs(stats_dir, exist_ok=True)
+        savepath = os.path.join(stats_dir, stats_name)
+        with open(savepath, 'wb') as f:
+              pickle.dump(self.stats, f)
+        print(f"saved stats to {savepath}")
+
+    def __len__(self):
+        return len(self.transitions)
+
+    def __getitem__(self, idx):
+        s, r, s_next = self.transitions[idx]
+        return (
+            torch.tensor(s, dtype=torch.float32),
+            torch.tensor(r, dtype=torch.float32),
+            torch.tensor(s_next, dtype=torch.float32),
+        )
+    
+    def boost_signal(self, target_reward, rews):
+        for t in range(len(rews)):
+            if(rews[t] == 1):
+                 rews[t] = target_reward
+        return rews
+    
+    def reward_processor(self, rews, horizon, gamma):
+        new_rews = []
+        for t in range(len(rews)):
+            R = 0.0
+            for i in range(t, min(t + horizon, len(rews))):
+                R += (gamma**(i-t))*rews[i]
+            new_rews.append(R)
+        return new_rews
+
+def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, step: int, goal = None, target_reward = 1.0):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     #get information
     dataset = CriticDataset(trajs, sigma, dataset_name, specific_dataset, step, goal, target_reward, horizon, gamma)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
     
+    """
     if(dataset_name == 'pointmaze'):
          obs_dim = obs_dim - 2
+    """
     #prepare training
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True))
-    critic = Critic(obs_dim).to(device)
+    critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
     critic.train()
-    target_critic = Critic(obs_dim).to(device)
+    target_critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
     target_critic.load_state_dict(critic.state_dict())
     target_critic.eval()
     optimizer = optim.Adam(critic.parameters(), lr = lr)
@@ -599,6 +680,8 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
     target_critic.eval()
     save_critic(target_critic, dataset_name, specific_dataset, step)
     print(f"critic model saved")
+
+
 
 class PlannerDataset(Dataset):
     def __init__(self, trajs: List[TrajectoryDict], horizon: int, dataset_name: str, specific_dataset: str):
@@ -809,7 +892,13 @@ def get_current_state(s0, env_name):
     else:
         return s0['observation']
 
-def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs=8, goal_cell = None, start_cells = None, device: torch.device = None, seed_base: int = 0):
+def load_hyperparameters(filepath: str) -> Dict:
+    with open(filepath, 'r') as f:
+        hyperparams = json.load(f)
+    return hyperparams
+
+
+def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs = 8, goal_cell = None, start_cells = None, device: torch.device = None, seed_base: int = 0):
      #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
      #print(f"Running {num_envs} environments in parallel")
      if device is None:
@@ -957,12 +1046,229 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
           score = get_normalized_score(trajs, expert_score)
      else:
           score = get_normalized_score(trajs)
-     save_trajs(trajs, env_name, specific_env, checkpoint_step)
+     #save_trajs(trajs, env_name, specific_env, checkpoint_step)
      #print(f"Average Normalized Score: {score:.2f}")
      return trajs, score, total_steps
 
-def load_hyperparameters(filepath: str) -> Dict:
-    with open(filepath, 'r') as f:
-        hyperparams = json.load(f)
-    return hyperparams
+
+def rollout_parallel2(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs = 8, goal_cell = None, start_cells = None, device: torch.device = None, seed_base: int = 0, continual_rollout = False, chunk_size = 5):
+     #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
+     #print(f"Running {num_envs} environments in parallel")
+     if device is None:
+          device = "cuda" if torch.cuda.is_available() else "cpu"
+     trajs = []
+     #print(f"Using device {device}")
+     
+     # Uses Accelerate's RANK env var (automatically set in DDP)
+     rank = int(os.environ.get("RANK", 0))
+     np.random.seed(12345 + rank + seed_base)
+     torch.manual_seed(12345 + rank + seed_base)
+     
+     # Create environment factory function
+     _, d_s, d_a = get_env(env_name, specific_env)
+     def make_env():
+         env, _, _ = get_env(env_name, specific_env)
+         return env
+     
+     # Create vectorized environment
+     vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
+     #maze = env.unwrapped.maze  # Access the internal Maze object
+     #maze_map = maze.maze_map
+     #rows, cols = len(maze_map), len(maze_map[0])
+    
+     # Get Planner
+     state_dict = get_planner(env_name, specific_env, checkpoint_step)
+     if env_name == 'kitchen':
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+     elif env_name == 'pointmaze':
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+     else:
+         raise ValueError(f"Invalid Environment: {env_name}")
+     model.load_state_dict(state_dict)
+     model.eval()
+     
+     # Get Processor
+     planner_processor = Planner_Processor(env_name, specific_env)
+     
+     # <<< MODIFIED: Unique env reset seeds per process to prevent identical trajectories across GPUs
+     reset_seeds = list(range(seed_base, seed_base + num_envs))
+     
+     """
+     if(goal_cell is not None):
+         maze = env.unwrapped.maze  # Access the internal Maze object
+         maze_map = maze.maze_map
+         rows, cols = len(maze_map), len(maze_map[0])
+         free_cells = []
+         for row in range(rows):
+             for col in range(cols):
+                 if maze_map[row][col] != 1:  # 1 = wall; others are free/open
+                       free_cells.append(np.array([row, col]))
+         free_cells = np.array(free_cells)
+         
+         
+         free_cells = np.array([[6,6], [1,1], [1,6], [3,2], [5,4], [3,4], [4,1], [4,6], [2,4], [2,1]])
+         selected_indices = np.random.choice(len(free_cells), size=4, replace=False)
+         selected_free_cells = free_cells[selected_indices]
+         
+         selected_free_cells = np.array([[6,6], [5,4], [2,4], [2,1]])
+         start_cells = []
+         for i in range(len(selected_free_cells)):
+             if(np.array_equal(selected_free_cells[i], goal_cell)):
+                 continue
+             else:
+                 start_cells.append(selected_free_cells[i].copy())
+         start_cells = np.array(start_cells)
+     else:
+         start_cells = [None]
+     """
+     total_steps = 0
+     for start_cell in start_cells:
+       # Reset all environments
+       #seeds = list(range(num_envs)) 
+       opt = {}
+       if goal_cell is not None:
+             opt["goal_cell"] = goal_cell.copy()
+       else:
+             opt['goal_cell'] = None
+       if start_cell is not None:
+             opt["reset_cell"] = start_cell.copy()
+       else:
+             opt['reset_cell'] = None
+       s0_vec = vec_env.reset(seed = reset_seeds, options=[opt for _ in range(num_envs)])
+       current_states = s0_vec[0]['observation']
+     
+       # Store trajectories for each environment
+       all_rewards = [0.0 for _ in range(num_envs)]
+       done_envs = [False for _ in range(num_envs)]
+       observations = [[] for _ in range(num_envs)]
+       acts = [[] for _ in range(num_envs)]
+       rewards = [[] for _ in range(num_envs)]
+       Temp_acts = [[] for _ in range(num_envs)]
+       for env_idx in range(num_envs):
+          observations[env_idx].append(current_states[env_idx].copy())
+     
+       for i in range(episode_length):
+          actions = np.zeros((num_envs, d_a))
+         
+          # Generate actions for each environment
+          for env_idx in range(num_envs):
+             if done_envs[env_idx]:
+                 continue
+             if(continual_rollout):
+                if(len(Temp_acts[env_idx]) == 0):
+                    current_state = current_states[env_idx]
+                    current_state_norm = planner_processor.preprocess(current_state)
+                    x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                    for k in range(len(x)):
+                         Temp_acts[env_idx].append(x[k, d_s:(d_s+d_a)].copy())
+                    
+                actions[env_idx] = Temp_acts[env_idx][0].copy()
+                Temp_acts[env_idx] = Temp_acts[env_idx][1:].copy()
+             else:
+                current_state = current_states[env_idx]
+                current_state_norm = planner_processor.preprocess(current_state)
+                x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                action = x[0, d_s:(d_s+d_a)].copy()
+                actions[env_idx] = action
+         
+          # Step all environments at once
+          obs_vec, rewards_vec, terminated_vec, truncated_vec, info_vec = vec_env.step(actions)
+         
+          # Update trajectories
+          for env_idx in range(num_envs):
+             if done_envs[env_idx]:
+                 continue
+             
+             observations[env_idx].append(obs_vec['observation'][env_idx].copy())
+             acts[env_idx].append(actions[env_idx].copy())
+             rewards[env_idx].append(rewards_vec[env_idx])
+             all_rewards[env_idx] += rewards_vec[env_idx]
+             
+             current_states[env_idx] = obs_vec['observation'][env_idx].copy()
+             
+             if terminated_vec[env_idx] or truncated_vec[env_idx]:
+                 done_envs[env_idx] = True
+                 #print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
+         
+        
+          # Check if all environments are done
+          if all(done_envs):
+             #print("All environments completed!")
+             break
+     
+       # Find the trajectory with the maximum reward
+       for env_idx in range(num_envs):
+          total_steps += (len(observations[env_idx]) - 1)
+          trajs.append({
+              'observations': np.asarray(observations[env_idx].copy()),
+              'actions': np.asarray(acts[env_idx].copy()),
+              'rewards': np.asarray(spare_reward_prcocessor(rewards[env_idx].copy()))
+          })
+        
+     vec_env.close()
+     valid, success_rate = checktrajs(trajs)
+     print(f"valid: {valid}, success rate: {success_rate:.2f}")
+     if(goal_cell is None):
+          expert_score = get_expert_score(env_name)
+          score = get_normalized_score(trajs, expert_score)
+     else:
+          score = get_normalized_score(trajs)
+     #save_trajs(trajs, env_name, specific_env, checkpoint_step)
+     #print(f"Average Normalized Score: {score:.2f}")
+     return trajs, score, total_steps
+
+
+import math
+from dataclasses import dataclass
+@dataclass
+class AlphaSchedulerConfig:
+    alpha_start: float
+    alpha_end: float
+    total_steps: int
+    decay: bool = True
+   
+   
+class AlphaScheduler:
+    def __init__(self, config: AlphaSchedulerConfig):
+        self.alpha_start = config.alpha_start
+        self.alpha_end = config.alpha_end
+        self.total_steps = config.total_steps
+        self.decay_rate = self.total_steps / 10.0
+        self.current_step = 1
+        self.current_alpha = self.alpha_start
+        self.decay = config.decay
+    
+    def step_alpha(self):
+        if self.decay:
+           if self.current_step > self.total_steps:
+              self.current_alpha = self.alpha_end
+           else:
+              alpha = self.alpha_end + (self.alpha_start - self.alpha_end) * math.exp(-self.current_step / self.decay_rate)
+              self.current_alpha = max(alpha, self.alpha_end)
+              self.current_step += 1
+        else:
+           self.current_alpha = self.alpha_start
+
+    def get_alpha(self):
+        return self.current_alpha
+    
+
+
+def checktrajs(trajs):
+    success = 0
+    for i in range(len(trajs)):
+        Dict = {1: 0, 0: 0}
+        for j in range(len(trajs[i]['rewards'])):
+            if(trajs[i]['rewards'][j] not in Dict.keys()):
+                Dict[int(trajs[i]['rewards'][j])] = 1
+            else:
+                Dict[int(trajs[i]['rewards'][j])] += 1
+        if(1 in Dict.keys()):
+           if(Dict[1] > 1):
+              return False, 0
+        if(len(list(Dict.keys())) > 2):
+            return False, 0
+        success += Dict[1]
+    success_rate = success / len(trajs)
+    return True, success_rate
 

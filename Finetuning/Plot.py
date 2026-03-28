@@ -106,7 +106,7 @@ data = [
     [101439, 30.65],
     [103841, 31.42],
 ]
-print(data[27])
+
 data = [
     [5561, 8.55],
     [8877, 14.13],
@@ -193,3 +193,9 @@ plot_lines(
     ylabel='Normalized Score'
 )
 """
+"""Count training windows for horizon 32 vs 70 on pointmaze large."""
+
+
+
+
+

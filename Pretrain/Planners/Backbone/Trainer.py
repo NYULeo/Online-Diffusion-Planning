@@ -31,8 +31,8 @@ class SDETrainer:
         update_ema_every = 2,
         step_start_ema = 1000,
         gradient_accumulate_every=2,
-        ema_decay=0.999,
-        save_freq= 100000,
+        ema_decay=0.9999,
+        save_freq= 500000,
         log_freq = 10,
         s: float = 0.008,                  # cosine offset
         weight_type: str = 'sigma2',         # {"one", "sigma2", "beta"}
@@ -256,7 +256,7 @@ class SDETrainer:
                 total_loss = 0
             
             if ((self.step % self.save_freq == 0) and (self.step!=0)):
-                self.save(self.step)
+                #self.save(self.step)
                 self.loss_tracker.save_logs(f"{self.model_name}_logs.pkl")
                 self.loss_tracker.plot_loss_curve(
                       save_path=f"./plots/{self.model_name}_loss_curve.png",
@@ -318,8 +318,8 @@ class SDETrainer:
         B, H, D = x0.shape
         mask = torch.zeros((B, H, D), dtype = torch.float32, device = self.device)
         y = torch.zeros((B, H, D), dtype = torch.float32, device = self.device)
-        mask[:, 0, :self.Dimension] = 1
-        y[:, 0, :self.Dimension] = conditions.clone()
+        mask[:, 0, :self.state_dim] = 1
+        y[:, 0, :self.state_dim] = conditions.clone()
 
         # 1) sample time t ~ U(eps, 1 - eps), per sample (shape: (B,))
         t = torch.rand(B, device=self.device) * (1.0 - 2*self.eps) + self.eps

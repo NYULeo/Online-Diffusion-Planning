@@ -15,6 +15,7 @@ import torch
 from torch.utils.data import Dataset
 import pickle
 from Pretrain.utils import SAStats
+#from utils import SAStats
 import os
 from typing import Optional
 
@@ -229,11 +230,11 @@ class PointMazeDataset():
      def get_env(self, render_mode):
           gym.register_envs(gymnasium_robotics)
           if(self.name == 'medium'):
-              env = gym.make('PointMaze_Medium-v3', max_episode_steps = 1000, render_mode = render_mode, continuing_task=False)
+              env = gym.make('PointMaze_Medium-v3', max_episode_steps = 8000, render_mode = render_mode, continuing_task=False)
           elif(self.name == 'large'):
-              env = gym.make('PointMaze_Large-v3', max_episode_steps = 1000, render_mode = render_mode, continuing_task=False)
+              env = gym.make('PointMaze_Large-v3', max_episode_steps = 8000, render_mode = render_mode, continuing_task=False)
           elif(self.name == 'umaze'):
-              env = gym.make('PointMaze_Umaze-v3', max_episode_steps = 1000, render_mode = render_mode, continuing_task=False)
+              env = gym.make('PointMaze_Umaze-v3', max_episode_steps = 8000, render_mode = render_mode, continuing_task=False)
           else:
               raise ValueError(f'Invalid dataset name')
           return env
@@ -273,7 +274,7 @@ class AntMazeDataset():
           for episode in self.dataset.iterate_episodes():
               observations = episode.observations['observation']
               positions = episode.observations['achieved_goal']
-              observations = np.concatenate([observations, positions], axis = 1)
+              observations = np.concatenate([positions, observations], axis = 1)
               actions = episode.actions
               rewards = episode.rewards
               terminated = episode.terminations
@@ -753,4 +754,7 @@ def visualize_clusters(vectors, assignments, cluster_centers, title_prefix=""):
 visualize_clusters(vectors, assignments, stats['cluster_centers'], "Kitchen Rewards: ")
 
 """
+
+"""Count training windows for horizon 32 vs 70 on pointmaze large."""
+
 

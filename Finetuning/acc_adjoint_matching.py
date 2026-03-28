@@ -11,7 +11,7 @@ from Pretrain.Planners.Backbone.Dit import DiT1d
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, karras_beta_schedule, clip_actions, save_planner, get_planner, getName
+from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, karras_beta_schedule, clip_actions, save_planner, get_planner, getName, AlphaScheduler, AlphaSchedulerConfig
 from Pretrain.Planners.Backbone.utils import cosine_alpha_sigma, cosine_beta, compute_dot_alpha_beta, get_pretrained_planner
 import numpy as np
 from Pretrain.Dataset import get_PlannerName
@@ -57,7 +57,9 @@ class Acc_AdjointMatchingConfig:
     per_round_steps: int = 100
     lam: float = 0.01
     eta_lam: float = 0.001
+    batch_per_sample: int = 3
     reward_scaling_factor: float = 100000
+    alpha_scheduler_config: Optional[AlphaSchedulerConfig] = None
     update_lambda_every = 3
     update_kernel: bool = False
     MaxEnt: bool = False
@@ -107,6 +109,7 @@ class Acc_AdjointMatchingFineTuner:
         self.set_new_score_net()
         self.set_ema_model()
         self.set_optimizer_and_scheduler()
+        self.set_alpha_scheduler()
         self.set_lambda()
         self.set_reward_tracker()
         self.Initial_Conds = []
@@ -152,19 +155,23 @@ class Acc_AdjointMatchingFineTuner:
         lam_tensor = broadcast(lam_tensor, from_process=0)
         self.Lam.set_lam(lam_tensor.item())
 
-    def set_optimizer_and_scheduler(self, new_lr=None, new_steps=None):
-          # Use provided values or fall back to config defaults
+    def set_optimizer_and_scheduler(self, new_lr=None, new_alpha=None, new_steps=None):
+         # Use provided values or fall back to config defaults
          lr = new_lr if new_lr is not None else self.config.finetune_lr
          steps = new_steps if new_steps is not None else self.config.finetune_total_steps
-    
-          # Create new optimizer
+        
+         # Create new optimizer
          self.optimizer = torch.optim.Adam(
              self.new_score_net.parameters(), lr=lr, weight_decay = 1e-2)
          self.optimizer.zero_grad()
          # Create new scheduler
          self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer, steps)
-    
+        
+         
+    def set_alpha_scheduler(self):
+        self.alpha_scheduler = AlphaScheduler(config=self.config.alpha_scheduler_config)
+
     def set_old_score_net(self, planner_checkpoint: int):
         state_dict = get_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
         #state_dict = get_pretrained_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
@@ -415,7 +422,10 @@ class Acc_AdjointMatchingFineTuner:
        
         if(reward_std == 0.0):
             reward_std = 1.0
-        a0 =  (-1 * (self.config.reward_scaling_factor/reward_std) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * (-1) * EntGrad)
+        #current_lr = self.optimizer.param_groups[0]['lr']
+        alpha = self.alpha_scheduler.get_alpha()
+        a0 =  (-1 * ((self.config.reward_scaling_factor/alpha)/reward_std) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * (-1) * EntGrad)
+        
         #max_norm = 5.0
         #a0 =   a0 * torch.clamp(max_norm / torch.norm(a0), max=1.0)
         #print(f"a0: {a0.norm().item()}")
@@ -474,7 +484,7 @@ class Acc_AdjointMatchingFineTuner:
             for s0 in local_s0:
                 s0 = s0.to (self.device)
                 #Mutiple Ones
-                for i in range(3):
+                for i in range(self.config.batch_per_sample):
                    with self.accelerator.autocast():
                        traj, reward = self.sample_Traj_karras(s0, base_reward_model) 
                    #print(f"Reward: {reward.item()}")
@@ -559,6 +569,7 @@ class Acc_AdjointMatchingFineTuner:
         self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
         self.optimizer.step()
         self.scheduler.step()
+        self.alpha_scheduler.step_alpha()
         
 
          # 6. Logging: gather detached metrics
@@ -645,11 +656,13 @@ class Acc_AdjointMatchingFineTuner:
                          print(f"round: {round}, step: {step}, total reward {total_reward}")
                          print(f"round: {round}, step: {step}, reward {pure_reward }")
                          print(f"round: {round}, step: {step}, constraint {total_C}")
+                         print(f"round: {round}, step: {step}, alpha {self.alpha_scheduler.get_alpha()}")
                     else:
                          print(f"round: {round}, step: {step}, loss {total_loss / self.config.log_freq}")
                          print(f"round: {round}, step: {step}, total reward {total_reward / self.config.log_freq}")
                          print(f"round: {round}, step: {step}, reward {pure_reward / self.config.log_freq}")
                          print(f"round: {round}, step: {step}, constraint {total_C / self.config.log_freq}")
+                         print(f"round: {round}, step: {step}, alpha {self.alpha_scheduler.get_alpha()}")
                     total_loss = 0.0
                     total_reward = 0.0
                     pure_reward = 0.0

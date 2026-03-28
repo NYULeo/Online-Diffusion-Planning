@@ -477,7 +477,7 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
 
 def train_kernel(dataset_name, specific_dataset: str = None,
                  batch_size=256, lr=1e-3, num_steps=10000, save_freq = 200,
-                 ensemble_size=10, hidden_layers = 2, λ_reg=1e-3):
+                 ensemble_size=10, hidden_layers = 2, hidden_dim = 256, λ_reg=1e-3):
     # Prepare dataset / dataloader
     if specific_dataset is None:
         print(f"Training kernel for {dataset_name}")
@@ -492,7 +492,7 @@ def train_kernel(dataset_name, specific_dataset: str = None,
                               pin_memory=True, num_workers=8))
 
     # Create ensemble of models
-    ensemble = [RobustTransitionKernel(obs_dim, act_dim, hidden_layers).to(device) for _ in range(ensemble_size)]
+    ensemble = [RobustTransitionKernel(obs_dim, act_dim, hidden_layers, hidden_dim).to(device) for _ in range(ensemble_size)]
     optimizers = [optim.Adam(m.parameters(), lr, weight_decay=1e-5) for m in ensemble]
 
 
@@ -580,7 +580,7 @@ def train_kernel(dataset_name, specific_dataset: str = None,
 
 def test_kernel(dataset_name, specific_dataset: str = None,
                 trajs: list = None,
-                save_freq: int = 50, num_steps: int = 500, hidden_layers = 2, ensemble_size = 3):
+                save_freq: int = 50, num_steps: int = 500, hidden_layers = 2, hidden_dim = 256, ensemble_size = 3):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Using device:", device)
 
@@ -598,7 +598,7 @@ def test_kernel(dataset_name, specific_dataset: str = None,
         ensemble = []
         for idx in range(ensemble_size):
             state_dict = load_model(kernel_name, step, idx)
-            m = RobustTransitionKernel(obs_dim, act_dim, hidden_layers).to(device)
+            m = RobustTransitionKernel(obs_dim, act_dim, hidden_layers, hidden_dim).to(device)
             m.load_state_dict(state_dict)
             m.eval()
             ensemble.append(m)

@@ -1,3 +1,4 @@
+from math import inf
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -19,11 +20,33 @@ import gymnasium as gym
 import gymnasium_robotics
 from Pretrain.Dataset import get_dataset
 from typing import Optional
-from utils import get_normalized_score, rollout_parallel, get_current_state
+from utils import get_normalized_score, rollout_parallel2, get_current_state, get_trajs, spare_reward_prcocessor
 
 def feasibility_check(generated_state, new_state):
     return np.linalg.norm(generated_state - new_state)
 
+def render(dataset_name, specific_dataset, traj, goal_cell, start_cell):
+     env, _, _ = get_env(dataset_name, specific_dataset, render_mode = 'rgb_array')
+     #env = gym.make("antmaze-medium-v0") 
+     obs0 = traj["observations"][0]
+
+     env.reset(seed=0, options = {'goal_cell': goal_cell, 'reset_cell': start_cell})  # optional fixed seed for determinism
+
+    
+     frames = []
+     rewards = []
+     for i in range(len(traj['actions'])):
+          action = traj['actions'][i]
+            #action = np.clip(action, -1.0, 1.0)
+          _, reward, terminated, truncated, _ = env.step(action)
+          rewards.append(reward)
+          frames.append(env.render())
+          if terminated or truncated:
+               break
+     #print(rewards)
+     #print(len(frames))
+     media.write_video("demo2.mp4", frames, fps=50)
+     env.close()
 
 def test_rollout_fit_for_model(traj, dataset_name=None, specific_dataset=None, 
                                 reward_checkpoint=0, kernel_checkpoint=0, 
@@ -196,7 +219,7 @@ def save_trajs(trajs, env_name, specific_env, step):
          pickle.dump(trajs, f)
     print(f"trajectories saved")
 
-def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None, base_seed: int = 0, continual_rollout = False):
+def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None, base_seed: int = 0, continual_rollout = False, chunk_size = 5):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}, episode_length: {episode_length}")
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
@@ -251,9 +274,9 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
                      current_state_norm = planner_processor.preprocess(current_state)
                      #x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
                      x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
-                     for k in range(len(x)):
+                     for k in range(min(chunk_size, len(x))):
                          Temp_acts.append(x[k, d_s:(d_s+d_a)].copy())
-                     for k in range(1, len(x)):
+                     for k in range(1, min(chunk_size, len(x))):
                          Temp_states.append(x[k, :d_s].copy())
                 
                 action = Temp_acts[0]
@@ -291,11 +314,13 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
                 break
      
      env.close()
+
+     
      """
      if(len(violation_scores) > 0):
          print(np.mean(violation_scores))
          print(np.var(violation_scores))
-    """
+     """
      
      traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(spare_reward_prcocessor(rewards))}
      
@@ -310,48 +335,163 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      with open('Generated_trajectory.pkl', 'wb') as f:
                 pickle.dump(traj_info, f)
      """
+     print(sum(traj['rewards']))
      return get_normalized_score([traj])
+     #return len(traj['rewards'])
      #print(get_normalized_score([traj]))
+"""
+def model_rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, checkpoint_steps, train_goal: Optional[np.ndarray] = None, rollout_goal: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None):
+     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
+     print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}")
+     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
+     device = "cuda" if torch.cuda.is_available() else "cpu"
+     print(f"Using device {device}")
+     
+     env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array')
+    
+    # Create environment factory function
+     state_dict = get_planner(env_name, specific_env, checkpoint_steps)
+     if( env_name == 'kitchen'):
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     elif (env_name == 'pointmaze'):
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     elif(env_name == 'antmaze'):
+           model = DiT1d(in_dim = (d_s), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     else:
+          raise ValueError(f"Invalid Environment: {env_name}")
+     model.load_state_dict(state_dict)
+     model.eval()
 
-
+     #get Processor
+     planner_processor = Planner_Processor(env_name, specific_env)
+     
+     if(rollout_goal is not None):
+        s0 = env.reset(seed = 0, options={"goal_cell": rollout_goal, 'reset_cell': start_cell})
+     else:
+        s0 = env.reset(seed = 0)
+     
+     if(env_name == 'antmaze'):
+          current_state = np.concatenate([
+               s0[0]['observation'],
+               s0[0]['achieved_goal']
+           ])
+     else:
+         current_state = s0[0]['observation']
+     
+     actions = []
+     states = []
+     count = 0
+     states.append(current_state.copy())
+     reached = False
+     while True:
+            current_state_norm = planner_processor.preprocess(current_state)
+            x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+            for i in range(1, len(x)):
+                states.append(x[i, :d_s].copy())
+                if(np.linalg.norm(train_goal - x[i, :2].copy()) <= 0.5):
+                     reached = True
+                     break
+            for i in range(len(x)-1):
+                actions.append(x[i, d_s:(d_s+d_a)].copy())
+            current_state = x[-1, :d_s].copy()
+            count += 1
+            if(reached):
+                print('reached')
+                break
+            if(count == 1000):
+                print('not reached')
+                break
+            
+     traj = {'observations': np.asarray(states), 'actions': np.asarray(actions)}
+     return traj
+     
+     #reset
+"""
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
     
-    horizon = 32
+    horizon = 70
     env_name = 'pointmaze'
-    specific_train_dataset = 'medium'
-    set_seed(0)
-    #score = rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, checkpoint_steps = 30, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([5, 4], dtype = int), base_seed = 0, continual_rollout = False)
+    specific_train_dataset = 'large'
+    set_seed(1)
     
+    rollout(env_name, 
+            specific_train_dataset, horizon, 
+            steps_T = 50, 
+            num_karras = 3, 
+            eta = 0.8, 
+            episode_length = 3000, 
+            checkpoint_steps = 0, 
+            render = True,  
+            goal_cell = np.array([7, 10], dtype = int), 
+            start_cell = np.array([3, 10], dtype = int), 
+            base_seed = 1, 
+            continual_rollout = True,
+            chunk_size = 10)
+    
+    #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True, base_seed = 0, continual_rollout = True, chunk_size = 3)
+    #traj = model_rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, checkpoint_steps = 210, train_goal = np.array([-2.5, -2.5], dtype = np.float32), rollout_goal = np.array([6, 1], dtype = int), start_cell = np.array([4, 4], dtype = int))
+    #print(traj['observations'])
+    #render(env_name, specific_train_dataset, traj, goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([4, 4], dtype = int))
     """
     average = 0.0
-    for i in range(10):
+    for i in range(1, 10):
         set_seed(i)
-        score = rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 210, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([4, 4], dtype = int), base_seed = 0, continual_rollout = False)
+        score = rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 60, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([6, 5], dtype = int), base_seed = 0, continual_rollout = False)
         average += score
     average = average / 10
     print(average)
     """
-    
-    
-    
-    
+    #score = rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 50, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([1, 5], dtype = int), base_seed = 0, continual_rollout = False)
+ 
     
 
     
-    trajs, score, total_steps = rollout_parallel(env_name, 
+    
+    
+    """
+    trajs, score, total_steps = rollout_parallel2(env_name, 
                      specific_train_dataset, 
                      horizon = 32, 
                      steps_T = 50, 
                      num_karras = 3, 
                      eta = 0.8, 
-                     episode_length = 2000, 
+                     episode_length = 4000, 
                      checkpoint_step = 0, 
                      num_envs = 8, 
-                     goal_cell = np.array([6, 1], dtype = int),
-                     start_cells = np.array([[6,6], [5,4], [2,4], [2,1]]),
-                     seed_base = 0)
+                     goal_cell = np.array([[7, 1]]),
+                     start_cells = np.array([[3, 6], [1, 10], [5, 8], [3, 10], [7, 6], [3, 4]]),
+                     seed_base = 0, 
+                     continual_rollout = True)
     save_trajs(trajs, env_name, specific_train_dataset, 0)
+    """
+
+    """
+    from Finetuning.utils import get_trajs
+    from Finetuning.utils import train_critic
+    trajs = get_trajs(env_name, specific_train_dataset, 100)
+    train_critic(trajs = trajs, 
+                 dataset_name = env_name, 
+                 specific_dataset = specific_train_dataset, 
+                 sigma = 7.0, 
+                 batch_size = 128, 
+                 num_steps = 5000, 
+                 gamma = 0.99, 
+                 horizon = 32, 
+                 lr = 1e-05, 
+                 tau = 0.005, 
+                 step = 0, 
+                 goal = np.array([[-2.5, -2.5]], dtype = np.float32), 
+                 target_reward = 1.0)
+    """
+    
+    
+   
+
+
+
+
+
     
     """
     for i in range(10):

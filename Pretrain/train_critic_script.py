@@ -13,6 +13,7 @@ from Pretrain.Critic.train_critic import test_critic
 
 
 
+
 def get_trajs(env_name: str, specific_env: str, step: int):
     path = (
         REPO_ROOT
@@ -36,80 +37,118 @@ def get_trajs(env_name: str, specific_env: str, step: int):
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     env_name = 'pointmaze'
-    specific_env = 'medium'
+    specific_env = 'large'
     data = get_dataset(env_name, specific_env)
     trajs = data.get_trajectories()
-
-    
-    half_trajs_1 = trajs[:int(len(trajs)*0.2)]
-    trajs = get_trajs(env_name, specific_env, 50)
-    half_trajs_2 = trajs[int(len(trajs)*0.2):]
-    trajs = half_trajs_1 + half_trajs_2
-    
-    #trajs = get_trajs(env_name, specific_env, 30)
-    
-    
-    
     """
+    half_trajs_1 = trajs[:int(len(trajs)*0.1)]
+    trajs = get_trajs(env_name, specific_env, 90)
+    half_trajs_2 = trajs[int(len(trajs)*0.1):]
+    print(len(half_trajs_1))
+    print(len(half_trajs_2))
+    trajs = half_trajs_1 + half_trajs_2
+    """
+    
+    #trajs = get_trajs(env_name, specific_env, 0)
+    
+    #trajs = trajs_1[:24] + trajs_2[:24]
+    
+    #new_trajs = trajs[:8] + trajs_0[:8]  
+    
+    
+    
+    
+    
+    
+   
+    
+
+    """
+    for i in range(len(trajs)):
+       print(sum(trajs[i]['rewards']))
+       print(len(trajs[i]['rewards']))
+    exit()
+    """
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     #large
-    train_critic(dataset_name = env_name, 
+    train_critic(dataset_name = env_name,
                  specific_dataset = specific_env, 
-                 sigma = 15.0, 
-                 batch_size = 128, 
-                 num_steps = 5000, 
-                 gamma = 1.0, 
-                 horizon = 32, 
-                 lr = 1e-05, 
+                 hidden_layers = 3,
+                 hidden_dim = 128,
+                 batch_size = 512, 
+                 num_steps = 10000, 
+                 gamma = 0.99, 
+                 horizon = 10, 
+                 lr = 3e-05, 
                  tau = 0.005,
                  goal = np.array([[4.0, -3.0]], dtype = np.float32),
-                 target_reward = 10.0,
+                 sigma = None,
+                 alpha = 0.999,
+                 #alpha = None,
+                 target_reward = 25.0,
                  trajs = trajs)
     
-
-    train_critic(dataset_name = env_name, 
-                 specific_dataset = specific_env, 
-                 sigma = 7.0, 
-                 batch_size = 128, 
-                 num_steps = 55000, 
-                 gamma = 1.0, 
-                 horizon = 32, 
-                 lr = 1e-05, 
-                 tau = 0.005,
-                 goal = np.array([[-4.0, -3.0]], dtype = np.float32),
-                 target_reward = 1.0,
-                 trajs = trajs)
-    """
-
+    
     """
     test_critic(dataset_name = env_name, 
                 specific_dataset = specific_env, 
-                checkpoint_step = 100000, 
-                sigma = 7.0, 
+                hidden_layers = 3, 
+                hidden_dim = 256,
+                checkpoint_step = 4000, 
+                sigma = 300.0, 
                 gamma = 0.99, 
-                horizon = 32, 
-                goal =  np.array([[-2.5, -2.5]], dtype = np.float32),
-                target_reward = 1.0, 
+                horizon = 70, 
+                goal =  np.array([[4.0, -3.0]], dtype = np.float32),
+                target_reward = 10.0, 
                 trajs = trajs)
      """
-     #medium
     
     
+    #medium
+    """
     train_critic(dataset_name = env_name, 
                  specific_dataset = specific_env, 
                  sigma = 7.0, 
                  batch_size = 256, 
-                 num_steps = 3000, 
-                 gamma = 0.99, 
+                 num_steps = 5000, 
+                 gamma = 0.95, 
                  horizon = 32, 
                  lr = 1e-05, 
                  tau = 0.005,
                  goal = np.array([[-2.5, -2.5]], dtype = np.float32),
-                 target_reward = 1.0,
+                 target_reward = 20.0,
                  trajs = trajs)
-    
     print('training complete')
+   
     
+    test_critic(dataset_name = env_name, 
+                specific_dataset = specific_env, 
+                checkpoint_step = 5000, 
+                sigma = 7.0, 
+                gamma = 0.95, 
+                horizon = 32, 
+                goal =  np.array([[-2.5, -2.5]], dtype = np.float32),
+                target_reward = 20.0, 
+                trajs = trajs)
+    """
     
+
+
+
+
 
 
 

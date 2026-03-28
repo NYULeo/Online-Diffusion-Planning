@@ -15,7 +15,7 @@ from Finetuning.utils import get_trajs
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     dataset = 'pointmaze'
-    specific_dataset = 'medium'
+    specific_dataset = 'large'
     """
     path = REPO_ROOT / "Finetuning" / "Rollouts" / dataset / specific_dataset / "Generated_trajs_Info_0.pkl"
     with open(path, "rb") as f:
@@ -28,18 +28,22 @@ if __name__ == '__main__':  # pragma: no cover
                  batch_size = 256, 
                  lr = 3e-4, 
                  num_steps = 1000, 
-                 save_freq = 200, 
+                 save_freq = 500, 
                  ensemble_size = 10, 
                  hidden_layers = 2, 
+                 hidden_dim = 256,
                  λ_reg = 1e-3)
-    """
-    trajs = get_trajs(dataset, specific_dataset, 0)
+    
+    path = REPO_ROOT / "Finetuning" / "Rollouts" / dataset / specific_dataset / "Generated_trajs_Info_0.pkl"
+    with open(path, "rb") as f:
+          trajs = pickle.load(f)
     test_kernel(dataset_name = dataset, 
                 specific_dataset = specific_dataset,
                 trajs = trajs, 
-                save_freq = 200, 
+                save_freq = 500, 
                 num_steps = 1000, 
                 hidden_layers = 2, 
+                hidden_dim = 256,
                 ensemble_size = 10)
-    """
+    
     

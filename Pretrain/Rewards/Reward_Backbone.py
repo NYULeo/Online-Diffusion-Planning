@@ -11,7 +11,7 @@ from torch.utils.data import Dataset, DataLoader
 import torch
 import torch.optim as optim
 import numpy as np
-from Pretrain.utils import set_seed, SAStats
+from Pretrain.utils import set_seed, SAStats, ema_smooth
 import torch.nn as nn
 import pickle
 from Pretrain.Rewards.nets import Reward, MLPNetwork, ScalarReward, SimpleReward
@@ -69,7 +69,7 @@ def getName(env_name, specific_env):
          raise ValueError(f"Invalid environment name: {env_name}")
 
 
-def save_reward_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, 
+def save_reward_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, alpha, 
                                   obs_dim, act_dim, reward_name, optimizer, reward_net, filepath: Optional[str] = None, 
                                   specific_dataset: Optional[str] = None, target_reward: Optional[float] = None,
                                   goal: Optional[np.array] = None):
@@ -139,7 +139,8 @@ def save_reward_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma,
             'optimizer': optimizer_params,
         },
         'reward_processing': {
-            'sigma': sigma,
+            'sigma': float(sigma) if sigma is not None else None,
+            'alpha': float(alpha) if alpha is not None else None,
             'target_reward': target_reward,
             'goal': convert_to_json_serializable(goal),
         }
@@ -265,7 +266,7 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None):
          
 
 class RewardDataset(Dataset):
-    def __init__(self, trajs, sigma, reward_name, target_reward: Optional[float] = None, goal: Optional[np.array] = None):
+    def __init__(self, trajs, reward_name, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, goal: Optional[np.array] = None):
             
         # ----- gather raw obs/actions to fit stats -----
         obs_list, act_list = [], []
@@ -295,8 +296,10 @@ class RewardDataset(Dataset):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
-            
-            rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate = 200/sigma)
+            if(sigma is not None):
+                rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate = 200/sigma)
+            elif(alpha is not None):
+                rews = ema_smooth(rews, alpha)
             for t in range(len(acts)):
                 obs_t = self.stats.norm_obs(obs[t])
                 a_t   = acts[t]
@@ -335,13 +338,13 @@ class RewardDataset(Dataset):
             torch.tensor(r, dtype=torch.float32),
         )
     
-def train_reward(dataset_name: str, batch_size, num_steps, save_freq, lr, sigma, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None):
+def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, save_freq, lr, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
     print(f"Training reward approximator for {dataset_name} Dataset") 
-    dataset = RewardDataset(trajs, sigma, reward_name, target_reward, goal)
+    dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward, goal)
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
-    reward_net = SimpleReward(obs_dim, act_dim).to(device)
+    reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
     optimizer = optim.AdamW(reward_net.parameters(), lr = lr, weight_decay = 1e-4)
     if(check_specifc_dataset(dataset_name)):
         SD = specific_dataset
@@ -353,6 +356,7 @@ def train_reward(dataset_name: str, batch_size, num_steps, save_freq, lr, sigma,
         num_steps, 
         lr, 
         sigma,
+        alpha,
         obs_dim,
         act_dim, 
         reward_name, 
@@ -382,20 +386,21 @@ def train_reward(dataset_name: str, batch_size, num_steps, save_freq, lr, sigma,
            total_loss += loss.item()
            step += 1
 
-           if step % 100 == 0:
-              avg_loss = total_loss / 100
+           if step % 1000 == 0:
+              avg_loss = total_loss / 1000
               print(f"Step {step}, loss {avg_loss:.4f}")
               total_loss = 0
-
+           """
            if step % save_freq == 0:
               checkpoint = copy.deepcopy(reward_net)
               save_model(checkpoint, reward_name, step)
+           """
     save_to_finetuning(reward_net, dataset_name, SD)
     stats = get_pretrained_reward_stats(reward_name)
     save_stats_to_finetuning(stats, dataset_name, SD)
 
 class test_dataset(Dataset):
-    def __init__(self, trajs, sigma, Reward_name, target_reward: Optional[float] = None, goal: Optional[np.array] = None):
+    def __init__(self, trajs, Reward_name, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, goal: Optional[np.array] = None):
         self.stats = get_pretrained_reward_stats(Reward_name)
         transitions = []
         allowed_values = [0,1]
@@ -409,7 +414,10 @@ class test_dataset(Dataset):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
-            rews = gaussian_filter1d(rews, sigma, mode = 'nearest', truncate = 200/sigma)
+            if(sigma is not None):
+                rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate = 200/sigma)
+            elif(alpha is not None):
+                rews = ema_smooth(rews, alpha)
             for t in range(len(acts)):
                 obs_t = self.stats.norm_obs(obs[t])
                 a_t   = acts[t]
@@ -435,18 +443,18 @@ class test_dataset(Dataset):
             torch.tensor(r, dtype=torch.float32),
         )
         
-def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: float = 3, target_reward: Optional[float] = None, goal: Optional[np.array] = None, save_freq: int = 50, num_steps: int = 500):
+def test_Model(dataset_name, hidden_layers: int, hidden_dim: int,specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, goal: Optional[np.array] = None, save_freq: int = 50, num_steps: int = 500):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device {device}")
     print(f"Testing the reward model for {dataset_name} Dataset")
-    print(f"Target reward: {target_reward}, Sigma: {sigma}")
+    print(f"Target reward: {target_reward}, Sigma: {sigma}, Alpha: {alpha}")
 
     if(trajs is None): 
         train_Trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
-        dataset = RewardDataset(train_Trajs, sigma, reward_name, target_reward, goal)
+        dataset = RewardDataset(train_Trajs, reward_name, sigma, alpha, target_reward, goal)
     else:
         _, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
-        dataset = test_dataset(trajs, sigma, reward_name, target_reward, goal)
+        dataset = test_dataset(trajs, reward_name, sigma, alpha, target_reward, goal)
     print(f"Testing the reward model on {len(dataset)} samples")
     a = factorint(len(dataset))
     batch_size = int(np.min(list(a.keys())))
@@ -454,7 +462,7 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
     num = save_freq
     while num <= num_steps:
          state_dict = load_model(reward_name, num)
-         reward_net = SimpleReward(obs_dim, act_dim).to(device)
+         reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
          #reward_net = DeepScaledReward(obs_dim, act_dim).to(device)
          #reward_net = Reward(obs_dim, act_dim).to(device)
          #reward_net = MLPNetwork(input_dim = obs_dim + act_dim, out_dim = 1, hidden_dims = [200, 200, 200, 200], act_fn = 'swish', out_act_fn = 'identity').to(device)

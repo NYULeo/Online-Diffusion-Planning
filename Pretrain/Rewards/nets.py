@@ -487,27 +487,10 @@ class EnsembleModel(nn.Module):
 """
 
 
+
+
+
 """
-class SimpleReward(nn.Module):
-    def __init__(self, obs_dim, act_dim, hidden=32):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(obs_dim + act_dim, hidden), 
-            nn.Linear(hidden, hidden), 
-            nn.Linear(hidden, 1),
-            nn.ReLU()                              
-        )
-        #self.scale = nn.Parameter(torch.tensor(5.0))
-
-    def forward(self, obs, act):
-        x = torch.cat([obs, act], dim=-1)
-        #return self.net(x).squeeze(-1) * self.scale
-        return self.net(x).squeeze(-1)
-"""
-
-
-
-
 class SimpleReward(nn.Module):
     def __init__(self, obs_dim, act_dim, hidden=32):
         super().__init__()
@@ -527,8 +510,58 @@ class SimpleReward(nn.Module):
         x = torch.cat([obs, act], dim=-1)
         #return self.net(x).squeeze(-1) * self.scale
         return self.net(x).squeeze(-1)
+"""
 
 
+class SimpleReward(nn.Module):
+    def __init__(self, obs_dim, act_dim, hidden_dim, hidden_layers):
+        super().__init__()
+        layers = []
+        layers.extend([
+            nn.Linear(obs_dim + act_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.SiLU(),
+        ])
+        for _ in range(hidden_layers):
+            layers.extend([
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.LayerNorm(hidden_dim),
+                nn.SiLU(),
+            ])
+        layers.extend([nn.Linear(hidden_dim, 1), nn.ReLU()])
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, obs, act):
+        x = torch.cat([obs, act], dim=-1)
+        return self.net(x).squeeze(-1)
+
+
+
+
+"""
+class SimpleReward(nn.Module):
+    def __init__(self, obs_dim, act_dim, hidden = 128):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(obs_dim + act_dim, hidden),
+            nn.LayerNorm(hidden),
+            nn.SiLU(),
+            nn.Linear(hidden, hidden), 
+            nn.LayerNorm(hidden),
+            nn.SiLU(),
+            nn.Linear(hidden, hidden), 
+            nn.LayerNorm(hidden),
+            nn.SiLU(),
+            nn.Linear(hidden, 1),
+            nn.ReLU()                              
+        )
+        #self.scale = nn.Parameter(torch.tensor(5.0))
+
+    def forward(self, obs, act):
+        x = torch.cat([obs, act], dim=-1)
+        #return self.net(x).squeeze(-1) * self.scale
+        return self.net(x).squeeze(-1)
+"""
 
 
 
