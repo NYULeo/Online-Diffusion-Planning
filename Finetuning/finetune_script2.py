@@ -202,6 +202,7 @@ def load_finetuning_args(env_name: str, specific_env: str, base_path: str = None
         karras_percent=finetuning_hyperparams.get('karras_percent', 0.05),
         Loss_Clip_percent=finetuning_hyperparams.get('Loss_Clip_percent', 0.75),
         finetune_batch_size=finetuning_hyperparams.get('finetune_batch_size', 8),
+        finetune_batch_per_sample=finetuning_hyperparams.get('finetune_batch_per_sample', 3),
         finetune_lr=finetuning_hyperparams.get('finetune_lr', 2e-5),
         initial_lam=finetuning_hyperparams.get('initial_lam', 0.05),
         eta_lam=finetuning_hyperparams.get('eta_lam', 0.5),
