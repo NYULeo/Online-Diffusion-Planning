@@ -1,0 +1,32 @@
+{
+    "env_details": {
+        "dataset_name": "pointmaze",
+        "specific_dataset": "large",
+        "obs_dim": 4,
+        "act_dim": 2,
+        "kernel_name": "2DMaze_Kernel_large"
+    },
+    "model_architecture": {
+        "model_type": "RobustTransitionKernel",
+        "obs_dim": 4,
+        "act_dim": 2,
+        "min_log_std": -6.0,
+        "max_log_std": 4.0,
+        "noise_floor": 0.01
+    },
+    "training_hyperparameters": {
+        "num_steps": 5000,
+        "batch_size": 256,
+        "lr": 0.0003,
+        "optimizer": {
+            "type": "Adam",
+            "lr": 0.0003,
+            "weight_decay": 1e-05
+        },
+        "save_freq": 2000
+    },
+    "ensemble_config": {
+        "ensemble_size": 10,
+        "\u03bb_reg": 0.001
+    }
+}

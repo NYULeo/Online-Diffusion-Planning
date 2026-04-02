@@ -9,23 +9,24 @@
         "obs_dim": 4
     },
     "training_hyperparameters": {
-        "num_steps": 5000,
-        "batch_size": 128,
-        "lr": 1e-05,
+        "num_steps": 10000,
+        "batch_size": 512,
+        "lr": 3e-05,
         "optimizer": {
             "type": "Adam",
-            "lr": 1e-05,
+            "lr": 3e-05,
             "weight_decay": 0
         }
     },
     "critic_config": {
-        "gamma": 1.0,
-        "horizon": 32,
+        "gamma": 0.99,
+        "horizon": 10,
         "tau": 0.005
     },
     "reward_processing": {
-        "sigma": 15.0,
-        "target_reward": 10.0,
+        "sigma": null,
+        "alpha": 0.999,
+        "target_reward": 25.0,
         "goal": [
             [
                 4.0,

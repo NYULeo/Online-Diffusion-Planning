@@ -13,7 +13,7 @@
     },
     "training_hyperparameters": {
         "num_steps": 1000,
-        "batch_size": 256,
+        "batch_size": 512,
         "lr": 0.0001,
         "optimizer": {
             "type": "AdamW",
@@ -22,12 +22,13 @@
         }
     },
     "reward_processing": {
-        "sigma": 10.0,
-        "target_reward": 1.0,
+        "sigma": null,
+        "alpha": 0.999,
+        "target_reward": 25.0,
         "goal": [
             [
-                4.5,
-                3.0
+                4.0,
+                -3.0
             ]
         ]
     }
