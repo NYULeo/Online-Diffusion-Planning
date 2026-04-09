@@ -580,7 +580,26 @@ def getName(env_name, specific_env):
                return 'AntMaze_Umaze'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
+     elif(env_name == 'cube'):
+         if specific_env == 'single-play':
+             return 'Cube_SinglePlay'
+         elif specific_env == 'single-noisy':
+            return 'Cube_SingleNoisy'
+         elif specific_env == 'double-play':
+            return 'Cube_DoublePlay'
+         elif specific_env == 'double-noisy':
+            return 'Cube_DoubleNoisy'
+         elif specific_env == 'triple-play':
+            return 'Cube_TriplePlay'
+         elif specific_env == 'triple-noisy':
+            return 'Cube_TripleNoisy'
+         elif specific_env == 'quadruple-play':
+            return 'Cube_QuadruplePlay'
+         elif specific_env == 'quadruple-noisy':
+            return 'Cube_QuadrupleNoisy'
+         else:
+            raise ValueError(f"Invalid cube dataset name: {specific_env}")
      else:
-         raise ValueError(f"Invalid environment name: {env_name}")
+           raise ValueError(f"Invalid environment name: {env_name}")
 
 

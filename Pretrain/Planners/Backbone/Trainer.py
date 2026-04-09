@@ -32,12 +32,12 @@ class SDETrainer:
         step_start_ema = 1000,
         gradient_accumulate_every=2,
         ema_decay=0.9999,
-        save_freq= 500000,
+        save_freq= 200000,
         log_freq = 10,
         s: float = 0.008,                  # cosine offset
         weight_type: str = 'sigma2',         # {"one", "sigma2", "beta"}
         eps: float = 1e-5,               # clamp for t, ᾱ stability
-        stride: Optional[int] = 0
+        stride: Optional[int] = 1
     ):
         self.device = device
         self.dataset_name = dataset_name
@@ -256,7 +256,7 @@ class SDETrainer:
                 total_loss = 0
             
             if ((self.step % self.save_freq == 0) and (self.step!=0)):
-                #self.save(self.step)
+                self.save(self.step)
                 self.loss_tracker.save_logs(f"{self.model_name}_logs.pkl")
                 self.loss_tracker.plot_loss_curve(
                       save_path=f"./plots/{self.model_name}_loss_curve.png",

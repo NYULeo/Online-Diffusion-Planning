@@ -65,125 +65,6 @@ def plot_lines(data_list, labels=None, colors=None, markers=None,
 # Or manually create from the extracted values (x-axis divided by 100):
 # Each round has 2400 env steps, divided by 100 = 24
 
-data = [
-    [5561, 8.55],
-    [8877, 14.13],
-    [12110, 14.33],
-    [14599, 30.54],
-    [17081, 30.62],
-    [19564, 30.62],
-    [22016, 31.16],
-    [24499, 30.71],
-    [26965, 30.92],
-    [29433, 30.81],
-    [32002, 30.33],
-    [34444, 31.12],
-    [36877, 31.29],
-    [39344, 30.74],
-    [42054, 23.86],
-    [45744, 19.73],
-    [48200, 30.81],
-    [52314, 16.07],
-    [54736, 31.43],
-    [57189, 30.83],
-    [59634, 31.06],
-    [62102, 30.79],
-    [64554, 31.08],
-    [67007, 31.03],
-    [69466, 31.05],
-    [71923, 31.07],
-    [74395, 30.92],
-    [76868, 30.91],
-    [79321, 31.11],
-    [81786, 31.00],
-    [84244, 31.07],
-    [86683, 31.24],
-    [89110, 31.37],
-    [91563, 31.15],
-    [94015, 31.16],
-    [96487, 30.92],
-    [98950, 31.02],
-    [101439, 30.65],
-    [103841, 31.42],
-]
-
-data = [
-    [5561, 8.55],
-    [8877, 14.13],
-    [12110, 14.33],
-    [14599, 30.54],
-    [17081, 30.62],
-    [19564, 30.62],
-    [22016, 31.16],
-    [24499, 30.71],
-    [26965, 30.92],
-    [29433, 30.81],
-    [32002, 30.33],
-    [34444, 31.12],
-    [36877, 31.29],
-    [39344, 30.74],
-    [48200, 30.81],
-    [54736, 31.43],
-    [57189, 30.83],
-    [59634, 31.06],
-    [62102, 30.79],
-    [64554, 31.08],
-    [67007, 31.03],
-    [69466, 31.05],
-    [71923, 31.07],
-    [74395, 30.92],
-    [76868, 30.91],
-    [79321, 31.11],
-    [81786, 31.00],
-    [84244, 31.07],
-    [86683, 31.24],
-    [89110, 31.37],
-    [91563, 31.15],
-    [94015, 31.16],
-    [96487, 30.92],
-    [98950, 31.02],
-    [101439, 30.65],
-    [103841, 31.42],
-]
-
-data = [
-    [55, 8.55],
-    [88, 14.13],
-    [121, 14.33],
-    [145, 30.54],
-    [170, 30.62],
-    [195, 30.62],
-    [220, 31.16],
-    [244, 30.71],
-    [269, 30.92],
-    [294, 30.81],
-    [320, 30.33],
-    [344, 31.12],
-    [368, 31.29],
-    [393, 30.74],
-    [482, 30.81],
-    [547, 31.43],
-    [571, 30.83],
-    [596, 31.06],
-    [621, 30.79],
-    [645, 31.08],
-    [670, 31.03],
-    [694, 31.05],
-    [719, 31.07],
-    [743, 30.92],
-    [768, 30.91],
-    [793, 31.11],
-    [817, 31.00],
-    [842, 31.07],
-    [866, 31.24],
-    [891, 31.37],
-    [915, 31.15],
-    [940, 31.16],
-    [964, 30.92],
-    [989, 31.02],
-    [1014, 30.65],
-    [1038, 31.42],
-]
 """
 plot_lines(
     [data],
@@ -195,7 +76,118 @@ plot_lines(
 """
 """Count training windows for horizon 32 vs 70 on pointmaze large."""
 
+import os
+import numpy as np
+import ogbench as og
+import mediapy as media
 
 
+"""
+dataset_name = "cube-single-play-v0"
+env, train_dataset, val_dataset = og.make_env_and_datasets(dataset_name, render_mode = 'rgb_array')
+episode_obs = []
+episode_acts = []
+last_start = 0
+
+for i in range(len(train_dataset['observations'])):
+    if( train_dataset['terminals'][i] == 1):
+          episode_obs.append(train_dataset['observations'][last_start:i])
+          episode_acts.append(train_dataset['actions'][last_start:i])
+          last_start = i+1
+          
+episode_obs = np.array(episode_obs)
+episode_acts = np.array(episode_acts)
+"""
+
+
+dataset_name = "cube-single-play-v0"
+env, train_dataset, val_dataset = og.make_env_and_datasets(dataset_name, render_mode='rgb_array')
+
+
+
+
+# 1. Get the 5 official target positions
+target_positions = []
+for task_id in range(1, 6):
+    obs, info = env.reset(options={"task_id": task_id})
+    goal_cube_pos = info['goal'][15:18]   # cube position only
+    target_positions.append(goal_cube_pos)
+target_positions = np.array(target_positions)    # shape: (5, 3)
+
+success_threshold = 0.05   # official-style tolerance (5 cm)
+
+print(target_positions)
+# 2. Split the flat dataset into long play episodes (your code, fixed)
+episode_obs = []
+last_start = 0
+
+for i in range(len(train_dataset['observations'])):
+    if train_dataset['terminals'][i] == 1 or i == len(train_dataset['observations']) - 1:
+        obs_slice = train_dataset['observations'][last_start:i+1]   # include terminal
+        act_slice = train_dataset['actions'][last_start:i]
+        episode_obs.append(np.array(obs_slice))
+        last_start = i + 1
+
+print(f"Found {len(episode_obs)} long play episodes (~1000 steps each)")
+
+# 3. Extract goal-reaching sub-trajectories
+goal_reaching_trajs = []        # list of (obs, act, goal) tuples
+min_dist_stats = []
+
+for ep_idx, ep_obs in enumerate(episode_obs):          # ep_obs: (T, 28)
+    cube_pos = ep_obs[:, 15:18]                        # all cube positions in episode
+    
+    for t in range(1, len(ep_obs)):                    # start from t=1
+        current_pos = cube_pos[t]
+        distances = np.linalg.norm(target_positions - current_pos, axis=1)
+        min_dist = distances.min()
+        closest_goal_id = int(np.argmin(distances))
         
+        if min_dist < success_threshold:
+            # Found a successful placement at step t
+            # Take the trajectory segment that led to this placement
+            # (you can choose how long: e.g. last 100 steps, or from last pick)
+            segment_obs = ep_obs[max(0, t-100):t+1]     # last 100 steps → success (adjust as needed)
+            segment_act = train_dataset['actions'][max(0, t-100):t]
+            
+            goal_vector = target_positions[closest_goal_id]   # or full 28-dim goal from env
+            
+            goal_reaching_trajs.append({
+                'observations': segment_obs,
+                'actions': segment_act,
+                'goal': goal_vector,
+                'goal_id': closest_goal_id,
+                'achieved_dist': min_dist
+            })
+            
+            min_dist_stats.append(min_dist)
+            break   # optional: take only the first success per episode
+
+print(f"Extracted {len(goal_reaching_trajs)} goal-reaching trajectories")
+print(f"Average distance to goal at success: {np.mean(min_dist_stats):.4f} m")
+
+print(goal_reaching_trajs[0]['goal'])
+
+
+
+
+
+
+"""
+
+frames = []
+obs, info = env.reset(seed=123)  # may not exactly match logged init state
+
+for a in episode_acts[0]:
+    obs, reward, terminated, truncated, info = env.step(a)
+    print(reward)
+    frame = env.render()
+    if frame is not None:
+        frames.append(frame)
+    if terminated or truncated:
+        break
+
+media.write_video("demo.mp4", frames, fps=50)
+"""
+
 

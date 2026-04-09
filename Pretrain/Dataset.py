@@ -57,6 +57,8 @@ def get_dataset(name: str, specific_name: str):
             return PointMazeDataset(specific_name)
        elif(name == 'antmaze'): 
             return AntMazeDataset(specific_name)
+       elif(name == 'cube'):
+            return CubeDataset(specific_name)
        else:
             raise ValueError(f"Invalid Dataset name: {name}")     
 
@@ -338,6 +340,61 @@ class AntMazeDataset():
      def get_total_steps(self):
           return self.dataset.total_steps
 
+class CubeDataset():
+     def __init__(self, name: str):
+          self.name = name
+          name_to_id = {
+                    "single-play": "cube-single-play-v0",
+                    "single-noisy": "cube-single-noisy-v0",
+                    "double-play": "cube-double-play-v0",
+                    "double-noisy": "cube-double-noisy-v0",
+                    "triple-play": "cube-triple-play-v0",
+                    "triple-noisy": "cube-triple-noisy-v0",
+                    "quadruple-play": "cube-quadruple-play-v0",
+                    "quadruple-noisy": "cube-quadruple-noisy-v0"
+          }
+          if name not in name_to_id:
+                raise ValueError(f"Invalid Dataset name: {name}")
+          self.dataset_id = name_to_id[name]
+          self.env, self.dataset, self.eval_dataset = ogbench.make_env_and_datasets(
+                self.dataset_id, render_mode="rgb_array"
+          )
+
+     def get_trajectories(self):
+          trajectories = []
+          last_start = 0
+          #N = len(self.dataset['observations'])
+          for i in range(len(self.dataset['observations'])):
+               if self.dataset['terminals'][i] == 1 or i == len(self.dataset['observations']) - 1:
+                   obs_slice = self.dataset['observations'][last_start:i+1]   # include terminal
+                   act_slice = self.dataset['actions'][last_start:i+1]
+                   
+                   # keep same shape convention used elsewhere: len(obs) = len(act) + 1
+                   if len(act_slice) < 10:
+                         last_start = i + 1
+                         continue
+
+                   trajectory = {
+                        'observations': obs_slice,
+                        'actions': act_slice,
+                    }
+
+                   trajectories.append(trajectory)
+                   last_start = i + 1
+          
+          return trajectories
+     
+     def get_state_dim(self):
+        return int(self.dataset["observations"].shape[-1])
+    
+     def get_action_dim(self):
+        return int(self.dataset["actions"].shape[-1])
+
+     def get_env(self, render_mode):
+        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
+        return env
+
+
 
 #-------------------------------------------------------------------------------------#
 #---------------------------------- Planner Dataset ----------------------------------#
@@ -384,8 +441,27 @@ def get_PlannerName(env_name, specific_env):
                return 'AntMaze_Umaze_Planner'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
+     elif(env_name == 'cube'):
+         if specific_env == 'single-play':
+              return 'Cube_SinglePlay_Planner'
+         elif specific_env == 'single-noisy':
+              return 'Cube_SingleNoisy_Planner'
+         elif specific_env == 'double-play':
+              return 'Cube_DoublePlay_Planner'
+         elif specific_env == 'double-noisy':
+              return 'Cube_DoubleNoisy_Planner'
+         elif specific_env == 'triple-play':
+              return 'Cube_TriplePlay_Planner'
+         elif specific_env == 'triple-noisy':
+              return 'Cube_TripleNoisy_Planner'
+         elif specific_env == 'quadruple-play':
+              return 'Cube_QuadruplePlay_Planner'
+         elif specific_env == 'quadruple-noisy':
+              return 'Cube_QuadrupleNoisy_Planner'
+         else:
+              raise ValueError(f"Invalid cube dataset name: {specific_env}")
      else:
-         raise ValueError(f"Invalid environment name: '{env_name}")
+         raise ValueError(f"Invalid environment name: {env_name}")
 
 class PlannerDataset(Dataset):
     def __init__(self, dataset_name, specific_dataset, horizon, state_dim, action_dim, stride: Optional[int] = 1):
