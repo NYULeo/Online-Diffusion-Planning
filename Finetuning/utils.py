@@ -263,6 +263,24 @@ def getName(env_name, specific_env):
                return 'AntMaze_Umaze'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
+     
+     elif(env_name == 'cube'):
+          if specific_env == 'single-play':
+                return 'Cube_SinglePlay'
+          elif specific_env == 'single-noisy':
+                return 'Cube_SingleNoisy'
+          elif specific_env == 'double-play':
+                return 'Cube_DoublePlay'
+          elif specific_env == 'double-noisy':
+                return 'Cube_DoubleNoisy'
+          elif specific_env == 'triple-play':
+                return 'Cube_TriplePlay'
+          elif specific_env == 'triple-noisy':
+                return 'Cube_TripleNoisy'
+          elif specific_env == 'quadruple-play':
+                return 'Cube_QuadruplePlay'
+          elif specific_env == 'quadruple-noisy':
+                return 'Cube_QuadrupleNoisy'
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
@@ -882,7 +900,7 @@ def get_expert_score(dataset_name):
          return score
     else:
          return None
-
+"""
 def get_current_state(s0, env_name):
     if(env_name == 'antmaze'):
         return np.concatenate([
@@ -891,6 +909,17 @@ def get_current_state(s0, env_name):
            ])
     else:
         return s0['observation']
+"""
+
+def get_current_state(s0, env_name):
+    if env_name == 'antmaze':
+        return np.concatenate([
+            s0['observation'],
+            s0['achieved_goal']
+        ])
+    if isinstance(s0, dict):
+        return s0['observation']
+    return s0
 
 def load_hyperparameters(filepath: str) -> Dict:
     with open(filepath, 'r') as f:
@@ -1051,7 +1080,7 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
      return trajs, score, total_steps
 
 
-def rollout_parallel2(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs = 8, goal_cell = None, start_cells = None, device: torch.device = None, seed_base: int = 0, continual_rollout = False, chunk_size = 5):
+def rollout_parallel2(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs = 8, goal_cell: Optional[np.ndarray] = None, start_cells: Optional[List[np.ndarray]] = None, task_id: Optional[int] = None, device: torch.device = None, seed_base: int = 0, continual_rollout = False, chunk_size = 5):
      #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
      #print(f"Running {num_envs} environments in parallel")
      if device is None:
@@ -1081,6 +1110,10 @@ def rollout_parallel2(env_name, specific_env, horizon = 32, steps_T = 50, num_ka
      if env_name == 'kitchen':
          model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
      elif env_name == 'pointmaze':
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+     elif(env_name == 'antmaze'):
+           model = DiT1d(in_dim = d_s, emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     elif env_name == 'cube':
          model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
      else:
          raise ValueError(f"Invalid Environment: {env_name}")
@@ -1134,7 +1167,7 @@ def rollout_parallel2(env_name, specific_env, horizon = 32, steps_T = 50, num_ka
              opt["reset_cell"] = start_cell.copy()
        else:
              opt['reset_cell'] = None
-       s0_vec = vec_env.reset(seed = reset_seeds, options=[opt for _ in range(num_envs)])
+       s0_vec = vec_env.reset(seed = reset_seeds, task_id = task_id, options=[opt for _ in range(num_envs)])
        current_states = s0_vec[0]['observation']
      
        # Store trajectories for each environment

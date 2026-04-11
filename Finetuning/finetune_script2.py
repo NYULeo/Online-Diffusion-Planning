@@ -240,14 +240,14 @@ if __name__ == "__main__":
     # 
     # replace the reward and backbone initialisations with
     # loading of your pretrained models (e.g. via torch.load).
-    """
+    
     FTConfig = load_finetuning_args('pointmaze', 'medium')
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
+    
+    
     """
-    
-    
     env_name = 'pointmaze'
     specific_env = 'medium'
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = True)
@@ -332,7 +332,7 @@ if __name__ == "__main__":
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-    
+    """
     
     
 
@@ -424,5 +424,89 @@ if __name__ == "__main__":
     OnlineFinetuner.finetune_planner()
    """
 
+"""
+    env_name = 'cube'
+    specific_env = 'single-play'
+    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = True)
+    AMConfig = Acc_AdjointMatchingConfig(horizon = 32)
+
+    #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
+    RWConfig = RewardConfig(
+               beta = 1.0, 
+               min_log_prob = 5.0, 
+               critic_gamma = 1.0,
+               explore = False) 
+
+    
+    TrainRewardConfig = Train_Reward_Config(
+                          hidden_layers = 1,
+                          hidden_dim = 32,
+                          batch_size = 256, 
+                          num_steps = 400, 
+                          lr = 1e-4, 
+                          sigma = 7.0, 
+                          target_reward = 20.0, 
+                          train_goal = np.array([[-2.5, -2.5]], dtype = np.float32),
+                          rollout_goal = np.array([[6, 1]]),
+                          rollout_start_cells = np.array([[6,6], [5,4], [2,4], [2,1]]))
+      
+    TrainKernelConfig = Train_Kernel_Config(
+                            batch_size = 256, 
+                            num_steps = 1000,
+                            lr = 3e-4,
+                            ensemble_size = 10,
+                            num_hidden_layers = 2,
+                            hidden_dim = 256,
+                            λ_reg = 1e-3)
+    
+    TrainCriticConfig = Train_Critic_Config(
+                            hidden_layers = 1,
+                            hidden_dim = 128,
+                            batch_size = 256,
+                            num_steps = 5000,
+                            lr = 1e-05,
+                            tau = 0.005,
+                            gamma = 0.95,
+                            data_conservation = True)
+    
 
 
+    FTConfig = FinetuningConfig(
+        AMConfig = AMConfig, 
+        RewardConfig = RWConfig, 
+        AlphaConfig = AlphaConfig,
+        dataset_name = env_name,
+        specific_dataset = specific_env,
+        planner_checkpoint = 0,
+        reward_model_checkpoint = 0,
+        kernel_model_checkpoint = 0,
+        critic_model_checkpoint = 0,
+        critic = True,
+        kernel = True,
+        buffer_size = 5500,
+        finetune_steps = 300,
+        finetune_rounds = 30,
+        diffusion_steps = 50,
+        karras_percent = 0.05,
+        Loss_Clip_percent = 0.75,
+        finetune_batch_size = 12,
+        finetune_batch_per_sample = 6,
+        finetune_lr = 2e-05,
+        initial_lam = 0.05,
+        eta_lam = 0.5,
+        gradient_accumulate_every = 1,
+        update_lambda_every = 1,
+        reward_scaling_factor = 50,
+        MaxEnt = False,
+        Entropy_Scaling_Factor = 0.5,
+        rollout_length = 4000,  # or your desired value
+        rollout_num_envs = 1, 
+        continual_rollout = True,
+        num_rollout_processes = 4,
+        train_reward_config = TrainRewardConfig,
+        train_kernel_config = TrainKernelConfig,
+        train_critic_config = TrainCriticConfig) 
+    set_seed(1)
+    OnlineFinetuner = OnlineFinetuner(FTConfig)
+    OnlineFinetuner.finetune_planner()
+   """

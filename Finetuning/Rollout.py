@@ -219,7 +219,7 @@ def save_trajs(trajs, env_name, specific_env, step):
          pickle.dump(trajs, f)
     print(f"trajectories saved")
 
-def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None, base_seed: int = 0, continual_rollout = False, chunk_size = 5):
+def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None, task_id: Optional[int] = None, base_seed: int = 0, continual_rollout = False, chunk_size = 5):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}, episode_length: {episode_length}")
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
@@ -236,6 +236,8 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
      elif(env_name == 'antmaze'):
            model = DiT1d(in_dim = (d_s), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     elif(env_name == 'cube'):
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
      else:
           raise ValueError(f"Invalid Environment: {env_name}")
      model.load_state_dict(state_dict)
@@ -246,11 +248,14 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
 
      #reset
      #s0 = env.reset(seed = 0, options={"goal_cell": goal_cell, "reset_cell": reset_cell})
+     if(env_name == 'cube'):
+        s0 = env.reset(seed = base_seed, options = {"task_id": task_id})
      if(goal_cell is not None):
-        s0 = env.reset(seed = base_seed, options={"goal_cell": goal_cell, "reset_cell": start_cell})
+        s0 = env.reset(seed = base_seed, options = {"goal_cell": goal_cell, "reset_cell": start_cell})
      else:
         s0 = env.reset(seed = base_seed)
      
+     """
      if(env_name == 'antmaze'):
           current_state = np.concatenate([
                s0[0]['observation'],
@@ -258,7 +263,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
            ])
      else:
          current_state = s0[0]['observation']
-     
+     """
      current_state = get_current_state(s0[0], env_name)
      frames = []
      observations = []
@@ -409,7 +414,7 @@ def model_rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, che
 """
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
-    
+    """
     horizon = 70
     env_name = 'pointmaze'
     specific_train_dataset = 'large'
@@ -423,12 +428,12 @@ if __name__ == "__main__":
             episode_length = 3000, 
             checkpoint_steps = 0, 
             render = True,  
+            base_seed = 1, 
             goal_cell = np.array([7, 10], dtype = int), 
             start_cell = np.array([3, 10], dtype = int), 
-            base_seed = 1, 
             continual_rollout = True,
             chunk_size = 10)
-    
+    """
     #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True, base_seed = 0, continual_rollout = True, chunk_size = 3)
     #traj = model_rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, checkpoint_steps = 210, train_goal = np.array([-2.5, -2.5], dtype = np.float32), rollout_goal = np.array([6, 1], dtype = int), start_cell = np.array([4, 4], dtype = int))
     #print(traj['observations'])
@@ -443,47 +448,31 @@ if __name__ == "__main__":
     print(average)
     """
     #score = rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 50, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([1, 5], dtype = int), base_seed = 0, continual_rollout = False)
- 
+    
+
+    horizon = 32
+    env_name = 'cube'
+    specific_train_dataset = 'double-play'
+    set_seed(1)
+    
+    rollout(env_name, 
+            specific_train_dataset, horizon, 
+            steps_T = 200, 
+            num_karras = 8, 
+            eta = 0.8, 
+            episode_length = 3000, 
+            checkpoint_steps = 0, 
+            render = True,  
+            task_id = 1,
+            base_seed = 1, 
+            continual_rollout = True,
+            chunk_size = 10)
     
 
     
     
     
-    """
-    trajs, score, total_steps = rollout_parallel2(env_name, 
-                     specific_train_dataset, 
-                     horizon = 32, 
-                     steps_T = 50, 
-                     num_karras = 3, 
-                     eta = 0.8, 
-                     episode_length = 4000, 
-                     checkpoint_step = 0, 
-                     num_envs = 8, 
-                     goal_cell = np.array([[7, 1]]),
-                     start_cells = np.array([[3, 6], [1, 10], [5, 8], [3, 10], [7, 6], [3, 4]]),
-                     seed_base = 0, 
-                     continual_rollout = True)
-    save_trajs(trajs, env_name, specific_train_dataset, 0)
-    """
 
-    """
-    from Finetuning.utils import get_trajs
-    from Finetuning.utils import train_critic
-    trajs = get_trajs(env_name, specific_train_dataset, 100)
-    train_critic(trajs = trajs, 
-                 dataset_name = env_name, 
-                 specific_dataset = specific_train_dataset, 
-                 sigma = 7.0, 
-                 batch_size = 128, 
-                 num_steps = 5000, 
-                 gamma = 0.99, 
-                 horizon = 32, 
-                 lr = 1e-05, 
-                 tau = 0.005, 
-                 step = 0, 
-                 goal = np.array([[-2.5, -2.5]], dtype = np.float32), 
-                 target_reward = 1.0)
-    """
     
     
    
@@ -513,21 +502,4 @@ if __name__ == "__main__":
     
 
 
-
-"""
-env, d_s, d_a = get_env('pointmaze', 'medium')
-
-maze = env.unwrapped.maze  # Access the internal Maze object
-maze_map = maze.maze_map
-rows, cols = len(maze_map), len(maze_map[0])
-    
-# Find all free cells (not walls)
-free_cells = []
-for row in range(rows):
-    for col in range(cols):
-        if maze_map[row][col] != 1:  # 1 = wall; others are free/open
-               free_cells.append(np.array([row, col]))
-free_cells = np.array(free_cells)
-print(free_cells)
-"""
 
