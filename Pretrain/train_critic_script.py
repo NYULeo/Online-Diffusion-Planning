@@ -35,28 +35,28 @@ def get_trajs(env_name: str, specific_env: str, step: int):
 
 
 if __name__ == '__main__':  # pragma: no cover
+    """
     set_seed(1)
-    env_name = 'pointmaze'
-    specific_env = 'large'
-    data = get_dataset(env_name, specific_env)
+    env_name = 'cube'
+    specific_env = 'single-play'
+    data = get_dataset(env_name, specific_env, task_id = 1)
     trajs = data.get_trajectories()
-    """
-    half_trajs_1 = trajs[:int(len(trajs)*0.1)]
-    trajs = get_trajs(env_name, specific_env, 90)
-    half_trajs_2 = trajs[int(len(trajs)*0.1):]
-    print(len(half_trajs_1))
-    print(len(half_trajs_2))
-    trajs = half_trajs_1 + half_trajs_2
-    """
-    
-    #trajs = get_trajs(env_name, specific_env, 0)
-    
-    #trajs = trajs_1[:24] + trajs_2[:24]
-    
-    #new_trajs = trajs[:8] + trajs_0[:8]  
-    
-    
-    
+    train_critic(dataset_name = env_name,
+                 specific_dataset = specific_env, 
+                 hidden_layers = 3,
+                 hidden_dim = 128,
+                 batch_size = 512, 
+                 num_steps = 10000, 
+                 gamma = 0.99, 
+                 horizon = 10, 
+                 lr = 3e-05, 
+                 tau = 0.005,
+                 sigma = None,
+                 alpha = 0.999,
+                 #alpha = None,
+                 target_reward = 25.0,
+                 trajs = trajs)
+   """
     
     
     
@@ -84,6 +84,11 @@ if __name__ == '__main__':  # pragma: no cover
     
     
     #large
+    set_seed(1)
+    env_name = 'pointmaze'
+    specific_env = 'large'
+    data = get_dataset(env_name, specific_env)
+    trajs = data.get_trajectories()
     train_critic(dataset_name = env_name,
                  specific_dataset = specific_env, 
                  hidden_layers = 3,
@@ -96,8 +101,8 @@ if __name__ == '__main__':  # pragma: no cover
                  tau = 0.005,
                  goal = np.array([[4.0, -3.0]], dtype = np.float32),
                  sigma = None,
-                 alpha = 0.999,
-                 #alpha = None,
+                 #alpha = 0.999,
+                 alpha = None,
                  target_reward = 25.0,
                  trajs = trajs)
     

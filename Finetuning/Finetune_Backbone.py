@@ -40,9 +40,10 @@ class Train_Reward_Config:
     lr: float = 2e-4
     sigma: float = 7.0
     target_reward: Optional[float] = None
-    train_goal: np.ndarray = None
-    rollout_goal: np.ndarray = None
-    rollout_start_cells: np.ndarray = None
+    train_goal: Optional[np.ndarray] = None
+    task_id: Optional[int] = None
+    rollout_goal: Optional[np.ndarray] = None
+    rollout_start_cells: Optional[np.ndarray] = None
 
 @dataclass
 class Train_Kernel_Config:

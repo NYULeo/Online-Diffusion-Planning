@@ -14,13 +14,10 @@ from Finetuning.utils import get_trajs
 
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
+    """
     dataset = 'pointmaze'
     specific_dataset = 'large'
-    """
-    path = REPO_ROOT / "Finetuning" / "Rollouts" / dataset / specific_dataset / "Generated_trajs_Info_0.pkl"
-    with open(path, "rb") as f:
-        trajs = pickle.load(f)
-    """
+    
     #train_kernel(dataset_name = 'kitchen', batch_size = 256, lr = 1e-4, num_steps =  50000, ensemble_size=10, λ_reg=1e-3)
     #train_kernel(dataset_name = 'pointmaze', specific_dataset ='medium', batch_size = 256, lr = 3e-4, num_steps = 50000, ensemble_size=10, λ_reg=1e-3)
     train_kernel(dataset_name = dataset, 
@@ -33,7 +30,23 @@ if __name__ == '__main__':  # pragma: no cover
                  hidden_layers = 2, 
                  hidden_dim = 256,
                  λ_reg = 1e-3)
-    
+    """
+    dataset = 'cube'
+    specific_dataset = 'single'
+    train_kernel(dataset_name = dataset, 
+                 specific_dataset = specific_dataset, 
+                 batch_size = 256, 
+                 lr = 3e-4, 
+                 num_steps = 5000, 
+                 save_freq = 1000, 
+                 ensemble_size = 10, 
+                 hidden_layers = 2, 
+                 hidden_dim = 256,
+                 λ_reg = 1e-3)
+
+
+
+    """
     path = REPO_ROOT / "Finetuning" / "Rollouts" / dataset / specific_dataset / "Generated_trajs_Info_0.pkl"
     with open(path, "rb") as f:
           trajs = pickle.load(f)
@@ -45,5 +58,6 @@ if __name__ == '__main__':  # pragma: no cover
                 hidden_layers = 2, 
                 hidden_dim = 256,
                 ensemble_size = 10)
+    """
     
     

@@ -143,6 +143,25 @@ def get_CriticName(env_name, specific_env):
               return 'PointMaze_Unmaze_Critic.pt'
          else:
               raise ValueError(f"Invalid specific environment: {specific_env}")
+     elif(env_name == 'cube'):
+         if specific_env == 'single-play':
+              return 'Cube_SinglePlay_Critic.pt'
+         elif specific_env == 'single-noisy':
+             return 'Cube_SingleNoisy_Critic.pt'
+         elif specific_env == 'double-play':
+             return 'Cube_DoublePlay_Critic.pt'
+         elif specific_env == 'double-noisy':
+             return 'Cube_DoubleNoisy_Critic.pt'
+         elif specific_env == 'triple-play':
+             return 'Cube_TriplePlay_Critic.pt'
+         elif specific_env == 'triple-noisy':
+             return 'Cube_TripleNoisy_Critic.pt'
+         elif specific_env == 'quadruple-play':
+             return 'Cube_QuadruplePlay_Critic.pt'
+         elif specific_env == 'quadruple-noisy':
+             return 'Cube_QuadrupleNoisy_Critic.pt'
+         else:
+             raise ValueError(f"Invalid cube dataset name: {specific_env}")
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 

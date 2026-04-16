@@ -8,7 +8,7 @@ import torch
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
-from Pretrain.Dataset import KitchenDataset, PointMazeDataset
+from Pretrain.Dataset import KitchenDataset, PointMazeDataset, CubeDataset
 from .Kernel_Net import  RobustTransitionKernel
 from sympy import factorint
 import pickle
@@ -22,8 +22,8 @@ import json
 def check_specifc_dataset(dataset_name):
     if(dataset_name == 'kitchen'):
          return False
-    elif(dataset_name == 'pointmaze'):
-         return True
+    elif dataset_name in ['pointmaze', 'cube']:
+        return True
 
 def getName(env_name, specific_env):
      if(env_name == 'kitchen'):
@@ -60,6 +60,17 @@ def getName(env_name, specific_env):
                return 'AntMaze_Umaze'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
+     elif(env_name == 'cube'):
+          if specific_env == 'single':
+               return 'Cube_Single'
+          elif specific_env == 'double':
+               return 'Cube_Double'
+          elif specific_env == 'triple':
+               return 'Cube_Triple'
+          elif specific_env == 'quadruple':
+               return 'Cube_Quadruple'
+          else:
+               raise ValueError(f"Invalid cube dataset name: {specific_env}")
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
@@ -297,6 +308,37 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None):
          act_dim = data.get_action_dim()
          trajs = data.get_trajectories()
          return trajs, name, obs_dim, act_dim
+     
+    elif(dataset_name == 'cube'):
+        if(specific_dataset is None): 
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+        elif(specific_dataset == 'single'):
+             data_1 = CubeDataset('single-play')
+             data_2 = CubeDataset('single-noisy')
+             name = 'Cube_Kernel_single'
+        elif(specific_dataset == 'double'):
+             data_1 = CubeDataset('double-play')
+             data_2 = CubeDataset('double-noisy')
+             name = 'Cube_Kernel_double'
+        elif(specific_dataset == 'triple'):
+             data_1 = CubeDataset('triple-play')
+             data_2 = CubeDataset('triple-noisy')
+             name = 'Cube_Kernel_triple'
+        elif(specific_dataset == 'quadruple'):
+             data_1 = CubeDataset('quadruple-play')
+             data_2 = CubeDataset('quadruple-noisy')
+             name = 'Cube_Kernel_quadruple'
+        else: 
+            raise ValueError(f"Invalid dataset name: {specific_dataset}")
+        trajs = data_1.get_trajectories() + data_2.get_trajectories()
+        obs_dim = data_1.get_state_dim()
+        act_dim = data_1.get_action_dim()
+        return trajs, name, obs_dim, act_dim
+    else:
+        raise ValueError(f"Invalid Dataset Name: {dataset_name}")   
+             
+       
+             
 
 # Build (s, a, s') transitions from your offline trajectories
 class KernelDataset(Dataset):
@@ -319,7 +361,8 @@ class KernelDataset(Dataset):
          for traj in trajectories:
             obs = np.asarray(traj['observations'])
             acts = np.asarray(traj['actions'])
-            for t in range(len(acts)):
+            L = min(len(acts), len(obs) - 1)
+            for t in range(L):
                 s_t = self.stats.norm_obs(obs[t])
                 a_t   = acts[t]
                 s_tp1 = self.stats.norm_obs(obs[t+1])

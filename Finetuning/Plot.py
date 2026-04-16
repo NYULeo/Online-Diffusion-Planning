@@ -111,12 +111,13 @@ target_positions = []
 for task_id in range(1, 6):
     obs, info = env.reset(options={"task_id": task_id})
     goal_cube_pos = info['goal'][15:18]   # cube position only
+    goal_xyzs = env.unwrapped.task_infos[task_id - 1]["goal_xyzs"]
     target_positions.append(goal_cube_pos)
 target_positions = np.array(target_positions)    # shape: (5, 3)
 
 success_threshold = 0.05   # official-style tolerance (5 cm)
 
-print(target_positions)
+
 # 2. Split the flat dataset into long play episodes (your code, fixed)
 episode_obs = []
 last_start = 0
@@ -124,12 +125,16 @@ last_start = 0
 for i in range(len(train_dataset['observations'])):
     if train_dataset['terminals'][i] == 1 or i == len(train_dataset['observations']) - 1:
         obs_slice = train_dataset['observations'][last_start:i+1]   # include terminal
-        act_slice = train_dataset['actions'][last_start:i]
+        act_slice = train_dataset['actions'][last_start:i+1]
         episode_obs.append(np.array(obs_slice))
         last_start = i + 1
+        if(i != len(train_dataset['observations']) - 1 and ( np.array_equal(train_dataset['next_observations'][i], train_dataset['observations'][i+1]))):
+            print('wrong')
+            exit()
 
 print(f"Found {len(episode_obs)} long play episodes (~1000 steps each)")
 
+exit()
 # 3. Extract goal-reaching sub-trajectories
 goal_reaching_trajs = []        # list of (obs, act, goal) tuples
 min_dist_stats = []

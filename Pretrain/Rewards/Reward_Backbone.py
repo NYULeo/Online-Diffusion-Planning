@@ -5,19 +5,24 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(project_root)
 from typing import Optional
-from Dataset import KitchenDataset, PointMazeDataset, get_dataset, get_env
+from Dataset import KitchenDataset, PointMazeDataset, get_dataset, get_env, CubeDataset
 import random
 from torch.utils.data import Dataset, DataLoader
 import torch
 import torch.optim as optim
 import numpy as np
-from Pretrain.utils import set_seed, SAStats, ema_smooth
+try:
+    from Pretrain.utils import set_seed, SAStats, ema_smooth, cycle
+except ModuleNotFoundError:
+    from utils import set_seed, SAStats, ema_smooth, cycle
 import torch.nn as nn
 import pickle
-from Pretrain.Rewards.nets import Reward, MLPNetwork, ScalarReward, SimpleReward
+try:
+    from Pretrain.Rewards.nets import Reward, MLPNetwork, ScalarReward, SimpleReward
+except ModuleNotFoundError:
+    from Rewards.nets import Reward, MLPNetwork, ScalarReward, SimpleReward
 import os
 from scipy.ndimage import gaussian_filter1d, convolve
-from Pretrain.utils import cycle
 import copy
 from sympy import Predicate, factorint
 import torch.nn.functional as F
@@ -28,6 +33,8 @@ def check_specifc_dataset(dataset_name):
     if(dataset_name == 'kitchen'):
          return False
     elif(dataset_name == 'pointmaze'):
+         return True
+    elif(dataset_name == 'cube'):
          return True
 
 def getName(env_name, specific_env):
@@ -65,6 +72,17 @@ def getName(env_name, specific_env):
                return 'AntMaze_Umaze'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
+     elif(env_name == 'cube'):
+         if specific_env == 'single':
+              return 'Cube_Single'
+         elif specific_env == 'double':
+              return 'Cube_Double'
+         elif specific_env == 'triple':
+              return 'Cube_Triple'
+         elif specific_env == 'quadruple':
+              return 'Cube_Quadruple'
+         else:
+              raise ValueError(f"Invalid cube dataset name: {specific_env}")
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
@@ -230,8 +248,8 @@ def load_model(reward_name, num_steps):
     state_dict = torch.load(load_path, weights_only=True, map_location='cpu')
     return state_dict
 
-def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None):
-    from Dataset import KitchenDataset, PointMazeDataset
+def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
+    from Dataset import KitchenDataset, PointMazeDataset, CubeDataset
     if(dataset_name == 'kitchen'):
          data_1 = KitchenDataset('complete')
          data_2 = KitchenDataset('partial')
@@ -261,6 +279,29 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None):
          act_dim = data.get_action_dim()
          trajs = data.get_trajectories()
          return trajs, name, obs_dim, act_dim
+
+    elif(dataset_name == 'cube'):
+         if(specific_dataset is None): 
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+         elif(specific_dataset == 'single'):
+             data_1 = CubeDataset('single-play', task_id)
+             data_2 = CubeDataset('single-noisy', task_id)
+             name = 'Cube_Reward_single'
+         elif(specific_dataset == 'double'):
+             data_1 = CubeDataset('double-play', task_id)
+             data_2 = CubeDataset('double-noisy', task_id)
+             name = 'Cube_Reward_double'
+         elif(specific_dataset == 'triple'):
+             data_1 = CubeDataset('triple-play', task_id)
+             data_2 = CubeDataset('triple-noisy', task_id)
+             name = 'Cube_Reward_triple'
+         else: 
+              raise ValueError(f"Invalid dataset name: {specific_dataset}")
+         obs_dim = data_1.get_state_dim()
+         act_dim = data_1.get_action_dim()
+         trajs = data_1.get_trajectories() + data_2.get_trajectories()
+         return trajs, name, obs_dim, act_dim
+
     else:
          raise ValueError(f"Invalid dataset name: {dataset_name}")
          
@@ -338,9 +379,9 @@ class RewardDataset(Dataset):
             torch.tensor(r, dtype=torch.float32),
         )
     
-def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, save_freq, lr, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None):
+def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, save_freq, lr, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
+    trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id)
     print(f"Training reward approximator for {dataset_name} Dataset") 
     dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward, goal)
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
@@ -390,11 +431,11 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
               avg_loss = total_loss / 1000
               print(f"Step {step}, loss {avg_loss:.4f}")
               total_loss = 0
-           """
+        
            if step % save_freq == 0:
               checkpoint = copy.deepcopy(reward_net)
               save_model(checkpoint, reward_name, step)
-           """
+           
     save_to_finetuning(reward_net, dataset_name, SD)
     stats = get_pretrained_reward_stats(reward_name)
     save_stats_to_finetuning(stats, dataset_name, SD)
@@ -443,14 +484,14 @@ class test_dataset(Dataset):
             torch.tensor(r, dtype=torch.float32),
         )
         
-def test_Model(dataset_name, hidden_layers: int, hidden_dim: int,specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, goal: Optional[np.array] = None, save_freq: int = 50, num_steps: int = 500):
+def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None, save_freq: int = 50, num_steps: int = 500):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device {device}")
     print(f"Testing the reward model for {dataset_name} Dataset")
     print(f"Target reward: {target_reward}, Sigma: {sigma}, Alpha: {alpha}")
 
     if(trajs is None): 
-        train_Trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
+        train_Trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id)
         dataset = RewardDataset(train_Trajs, reward_name, sigma, alpha, target_reward, goal)
     else:
         _, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
