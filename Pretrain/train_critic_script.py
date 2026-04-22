@@ -101,8 +101,8 @@ if __name__ == '__main__':  # pragma: no cover
                  tau = 0.005,
                  goal = np.array([[4.0, -3.0]], dtype = np.float32),
                  sigma = None,
-                 #alpha = 0.999,
-                 alpha = None,
+                 alpha = 0.999,
+                 #alpha = None,
                  target_reward = 25.0,
                  trajs = trajs)
     

@@ -12,9 +12,9 @@ import torch
 import torch.optim as optim
 import numpy as np
 try:
-    from Pretrain.utils import set_seed, SAStats, ema_smooth, cycle
+    from Pretrain.utils import set_seed, SAStats, ema_smooth, cycle, check_device
 except ModuleNotFoundError:
-    from utils import set_seed, SAStats, ema_smooth, cycle
+    from utils import set_seed, SAStats, ema_smooth, cycle, check_device
 import torch.nn as nn
 import pickle
 try:
@@ -380,7 +380,8 @@ class RewardDataset(Dataset):
         )
     
 def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, save_freq, lr, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = check_device()
     trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id)
     print(f"Training reward approximator for {dataset_name} Dataset") 
     dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward, goal)
@@ -485,7 +486,8 @@ class test_dataset(Dataset):
         )
         
 def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None, save_freq: int = 50, num_steps: int = 500):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = check_device()
     print(f"Using device {device}")
     print(f"Testing the reward model for {dataset_name} Dataset")
     print(f"Target reward: {target_reward}, Sigma: {sigma}, Alpha: {alpha}")

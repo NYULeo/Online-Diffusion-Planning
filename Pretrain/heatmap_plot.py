@@ -375,7 +375,7 @@ def plot_critic_heatmap(STEP, agg_method='max', highlight_negatives=True):
         plt.tight_layout()
         
         # Ensure we save to the project root directory
-        reward_dir = os.path.join(project_root, "reward_map")
+        reward_dir = os.path.join(project_root, "critic_map")
         os.makedirs(reward_dir, exist_ok=True)
         save_path = os.path.join(reward_dir, OUTPUT_FILE) if not os.path.isabs(OUTPUT_FILE) else OUTPUT_FILE
         plt.savefig(save_path, dpi=150, bbox_inches='tight')
@@ -750,8 +750,8 @@ def plot_reward_heatmap(STEP, agg_method='max', highlight_negatives=True):
 
 if __name__ == '__main__':
     # Example usage
-    step = 200
-    while(step <= 2000):
+    step = 10
+    while(step <= 10):
          np.random.seed(0)
          random.seed(0)
          plot_critic_heatmap(step, agg_method='mean', highlight_negatives = True)

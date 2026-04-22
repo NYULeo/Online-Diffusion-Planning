@@ -20,7 +20,7 @@ if __name__ == '__main__':
     goal = np.array([[-2.5, -2.5]], dtype = np.float32))
 """
 
-"""
+
 if __name__ == '__main__':
     set_seed(1)
     train_reward(
@@ -37,8 +37,10 @@ if __name__ == '__main__':
     target_reward = 25.0,
     specific_dataset = 'large',
     goal = np.array([[4.0, -3.0]], dtype = np.float32))
-"""
 
+
+
+"""
 if __name__ == '__main__':
     set_seed(1)
     train_reward(
@@ -56,7 +58,7 @@ if __name__ == '__main__':
         task_id = 1
     )
 
-
+"""
 
 
 

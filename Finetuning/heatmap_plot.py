@@ -988,7 +988,7 @@ def critic_heatmap(STEP, env_name, specific_env, hidden_layers, hidden_dim, num_
         
     else:
         print("Skipping plotting due to matplotlib import error.")
-        print(f"Reward map statistics:")
+        print(f"Critic map statistics:")
         print(f"  Min: {reward_map.min():.4f}, Max: {reward_map.max():.4f}, Mean: {reward_map.mean():.4f}")
         print(f"  Shape: {reward_map.shape}")
         # Save raw data as numpy array instead
@@ -1111,9 +1111,10 @@ def plot_reward_heatmap(
                 ax.plot(square[:, 0], square[:, 1], "k-", linewidth=1)
 
     ax.set_aspect("equal")
-    ax.set_xlabel("X position")
-    ax.set_ylabel("Y position")
-    ax.set_title(f"Reward Heatmap (Step {step})")
+    #ax.set_xlabel("X position")
+    #ax.set_ylabel("Y position")
+    #ax.set_title(f"Reward Heatmap (Step {step})")
+    ax.set_title(f"Reward Heatmap")
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
 
@@ -1253,9 +1254,9 @@ def plot_critic_heatmap(
                 ax.plot(square[:, 0], square[:, 1], "k-", linewidth=1)
 
     ax.set_aspect("equal")
-    ax.set_xlabel("X position")
-    ax.set_ylabel("Y position")
-    ax.set_title(f"Reward Heatmap (Step {step})")
+    #ax.set_xlabel("X position")
+    #ax.set_ylabel("Y position")
+    ax.set_title(f"Critic Heatmap")
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
 

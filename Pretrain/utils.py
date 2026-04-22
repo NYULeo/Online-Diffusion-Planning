@@ -116,3 +116,14 @@ def ema_smooth(rewards, alpha = 0.99):
 
 
 
+def check_device():
+    if torch.backends.mps.is_available():
+        device = torch.device("mps")
+        print("✅ Using M3 GPU (MPS backend)")
+    elif torch.cuda.is_available():
+        device = torch.device("cuda")
+        print("✅ Using NVIDIA CUDA GPU")
+    else:
+        device = torch.device("cpu")
+        print("⚠️  Falling back to CPU (no GPU acceleration)")
+    return device 

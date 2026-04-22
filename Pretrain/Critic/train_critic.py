@@ -11,7 +11,7 @@ import torch.optim as optim
 from scipy.ndimage import gaussian_filter1d
 from torch.utils.data import Dataset, DataLoader
 
-from Finetuning.utils import TrajectoryDict, get_trajs, getName
+from Finetuning.utils import TrajectoryDict, get_trajs, getName, check_device
 from Pretrain.Dataset import get_dataset, get_env
 from Pretrain.utils import set_seed, SAStats, cycle, ema_smooth
 from Pretrain.Critic.nets import Critic, CriticEnsemble
@@ -127,39 +127,39 @@ def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, 
 def get_CriticName(env_name, specific_env):
      if(env_name == 'kitchen'):
           if(specific_env == 'complete'):
-               return 'Kitchen_High_Critic.pt'
+               return 'Kitchen_High'
           elif(specific_env == 'partial'):
-               return 'Kitchen_Medium_Critic.pt'
+               return 'Kitchen_Medium'
           elif(specific_env == 'mixed'):
-               return 'Kitchen_Mixed_Critic.pt'
+               return 'Kitchen_Mixed'
           else:
                raise ValueError(f"Invalid specific environment: {specific_env}")
      elif(env_name == 'pointmaze'):
          if(specific_env == 'large'):
-              return 'PointMaze_Large_Critic.pt'
+              return 'PointMaze_Large'
          elif(specific_env == 'medium'):
-              return 'PointMaze_Medium_Critic.pt'
+              return 'PointMaze_Medium'
          elif(specific_env == 'unmaze'):
-              return 'PointMaze_Unmaze_Critic.pt'
+              return 'PointMaze_Unmaze'
          else:
               raise ValueError(f"Invalid specific environment: {specific_env}")
      elif(env_name == 'cube'):
          if specific_env == 'single-play':
-              return 'Cube_SinglePlay_Critic.pt'
+              return 'Cube_SinglePlay'
          elif specific_env == 'single-noisy':
-             return 'Cube_SingleNoisy_Critic.pt'
+             return 'Cube_SingleNoisy'
          elif specific_env == 'double-play':
-             return 'Cube_DoublePlay_Critic.pt'
+             return 'Cube_DoublePlay'
          elif specific_env == 'double-noisy':
-             return 'Cube_DoubleNoisy_Critic.pt'
+             return 'Cube_DoubleNoisy'
          elif specific_env == 'triple-play':
-             return 'Cube_TriplePlay_Critic.pt'
+             return 'Cube_TriplePlay'
          elif specific_env == 'triple-noisy':
-             return 'Cube_TripleNoisy_Critic.pt'
+             return 'Cube_TripleNoisy'
          elif specific_env == 'quadruple-play':
-             return 'Cube_QuadruplePlay_Critic.pt'
+             return 'Cube_QuadruplePlay'
          elif specific_env == 'quadruple-noisy':
-             return 'Cube_QuadrupleNoisy_Critic.pt'
+             return 'Cube_QuadrupleNoisy'
          else:
              raise ValueError(f"Invalid cube dataset name: {specific_env}")
      else:
@@ -428,7 +428,8 @@ class CriticDataset(Dataset):
         return new_rews
 
 def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, gamma, horizon, lr, tau, goal, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward = 1.0, trajs: List[TrajectoryDict] = None):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = check_device()
     dataset = CriticDataset(dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma, sigma, alpha)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
 

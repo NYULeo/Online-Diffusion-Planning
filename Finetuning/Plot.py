@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 
 
 
+
 def plot_lines(data_list, labels=None, colors=None, markers=None, 
                xlabel='X', ylabel='Y', title='Plot', 
                save_path=None, xlim=None, ylim=None):
@@ -104,7 +105,7 @@ dataset_name = "cube-single-play-v0"
 env, train_dataset, val_dataset = og.make_env_and_datasets(dataset_name, render_mode='rgb_array')
 
 
-
+"""
 
 # 1. Get the 5 official target positions
 target_positions = []
@@ -134,7 +135,7 @@ for i in range(len(train_dataset['observations'])):
 
 print(f"Found {len(episode_obs)} long play episodes (~1000 steps each)")
 
-exit()
+
 # 3. Extract goal-reaching sub-trajectories
 goal_reaching_trajs = []        # list of (obs, act, goal) tuples
 min_dist_stats = []
@@ -174,7 +175,7 @@ print(f"Average distance to goal at success: {np.mean(min_dist_stats):.4f} m")
 print(goal_reaching_trajs[0]['goal'])
 
 
-
+"""
 
 
 
@@ -195,4 +196,80 @@ for a in episode_acts[0]:
 media.write_video("demo.mp4", frames, fps=50)
 """
 
+
+
+
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+
+# Set style
+sns.set_style("whitegrid")
+plt.rcParams['figure.figsize'] = (11, 6.5)
+
+# Generate x values (same density as your plot)
+x = np.linspace(1, 30, 30)
+
+
+normalized_scores = [
+    14.88,  # Round 1
+    21.06,  # Round 2
+    24.54,  # Round 3
+    24.69,  # Round 4
+    31.67,  # Round 5
+    31.69,  # Round 6
+    31.52,  # Round 7
+    32.32,  # Round 8
+    33.20,  # Round 9
+    32.97,  # Round 10
+    32.40,  # Round 11
+    32.28,  # Round 12
+    33.94,  # Round 13
+    33.68,  # Round 14
+    34.04,  # Round 15
+    34.14,  # Round 16
+    33.14,  # Round 17
+    33.02,  # Round 18
+    40.94,  # Round 19
+    44.28,  # Round 20
+    45.37,  # Round 21
+    46.57,  # Round 22
+    47.47,  # Round 23
+    47.92,  # Round 24
+    48.17,  # Round 25
+    48.21,  # Round 26
+    48.25,  # Round 27
+    48.30,  # Round 28
+    48.30,  # Round 29
+    48.32   # Round 30
+]
+import torch
+print(torch.backends.mps.is_available())   # Should be True
+print(torch.backends.mps.is_built())       # Should be True
+exit()
+fig, ax = plt.subplots()
+ax.plot(x, normalized_scores, color='#C44E9B', linewidth=3.2, marker='o', markersize=8, markeredgecolor='white', markeredgewidth=0.8, label='Our Method', zorder=5)
+#ax.fill_between(x, y1 - error1, y1 + error1, color='#C44E9B', alpha=0.22)
+#ax.plot(x, y2, color='#4A90E2', linewidth=3.2, marker='s', markersize=8, markeredgecolor='white', markeredgewidth=0.8, label='Series 2', zorder=5)
+#ax.fill_between(x, y2 - error2, y2 + error2, color='#4A90E2', alpha=0.25)
+
+indices = np.linspace(18, len(x)-6, 10, dtype=int)
+#ax.scatter(x[indices], y2[indices], color='#4A90E2', s=85, marker='s', edgecolor='white', linewidth=0.6, zorder=6)        # squares
+#ax.scatter(x[indices+2], y2[indices+2], color='#4A90E2', s=95, marker='^', edgecolor='white', linewidth=0.6, zorder=6)        # triangles  (fixed!)
+#ax.scatter(x[indices+5], y2[indices+5], color='#4A90E2', s=100, marker='*', edgecolor='white', linewidth=0.5, zorder=6)        # stars
+
+# Vertical gray shaded region
+#ax.axvspan(0.82, 1.18, color='gray', alpha=0.12, zorder=1)
+
+# Labels and limits
+ax.set_xlim(1, 30)
+ax.set_ylim(0, 50)
+ax.set_xlabel('X axis')
+ax.set_ylabel('Y axis')
+
+# Legend
+ax.legend(loc='upper right', frameon=True)
+
+plt.tight_layout()
+plt.show()
 

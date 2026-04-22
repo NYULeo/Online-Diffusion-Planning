@@ -16,7 +16,11 @@ import os
 from typing import Optional
 import math
 import copy
-from Pretrain.utils import SAStats, cycle
+
+try:
+    from Pretrain.utils import SAStats, cycle, check_device
+except ModuleNotFoundError:
+    from utils import SAStats, cycle, check_device
 import json
 
 def check_specifc_dataset(dataset_name):
@@ -526,7 +530,8 @@ def train_kernel(dataset_name, specific_dataset: str = None,
         print(f"Training kernel for {dataset_name}")
     else:
         print(f"Training kernel for {dataset_name}_{specific_dataset}")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = check_device()
     print("Using device:", device)
 
     trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
@@ -624,7 +629,8 @@ def train_kernel(dataset_name, specific_dataset: str = None,
 def test_kernel(dataset_name, specific_dataset: str = None,
                 trajs: list = None,
                 save_freq: int = 50, num_steps: int = 500, hidden_layers = 2, hidden_dim = 256, ensemble_size = 3):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = check_device()
     print("Using device:", device)
 
     train_trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)

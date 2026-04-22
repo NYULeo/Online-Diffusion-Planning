@@ -436,25 +436,25 @@ if __name__ == "__main__":
             chunk_size = 10)
     """
 
-    """
+    
     horizon = 32
     env_name = 'kitchen'
     specific_train_dataset = 'partial'
-    set_seed(1)
+    set_seed(2)
     
     rollout(env_name, 
             specific_train_dataset, 
             horizon, 
-            steps_T = 100, 
-            num_karras = 100, 
+            steps_T = 500, 
+            num_karras = 25, 
             eta = 0.8, 
             episode_length = 3000, 
-            checkpoint_steps = 0, 
+            checkpoint_steps = 40, 
             render = True,  
             base_seed = 1, 
             continual_rollout = True,
             chunk_size = 10)
-    """
+    
 
     #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True, base_seed = 0, continual_rollout = True, chunk_size = 3)
     #traj = model_rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, checkpoint_steps = 210, train_goal = np.array([-2.5, -2.5], dtype = np.float32), rollout_goal = np.array([6, 1], dtype = int), start_cell = np.array([4, 4], dtype = int))
@@ -471,7 +471,7 @@ if __name__ == "__main__":
     """
     #score = rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 50, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([1, 5], dtype = int), base_seed = 0, continual_rollout = False)
     
-    
+    """
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
@@ -489,7 +489,7 @@ if __name__ == "__main__":
             base_seed = 1, 
             continual_rollout = True,
             chunk_size = 10)
-    
+    """
     
 
     

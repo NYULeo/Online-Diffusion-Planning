@@ -240,14 +240,14 @@ if __name__ == "__main__":
     # 
     # replace the reward and backbone initialisations with
     # loading of your pretrained models (e.g. via torch.load).
-    
+    """
     FTConfig = load_finetuning_args('pointmaze', 'medium')
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-    
-    
     """
+    
+    
     env_name = 'pointmaze'
     specific_env = 'medium'
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = True)
@@ -313,7 +313,7 @@ if __name__ == "__main__":
         karras_percent = 0.05,
         Loss_Clip_percent = 0.75,
         finetune_batch_size = 12,
-        finetune_batch_per_sample = 6,
+        finetune_batch_per_sample = 2,
         finetune_lr = 2e-05,
         initial_lam = 0.05,
         eta_lam = 0.5,
@@ -332,7 +332,7 @@ if __name__ == "__main__":
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-    """
+    
     
     
 
@@ -424,7 +424,7 @@ if __name__ == "__main__":
     OnlineFinetuner.finetune_planner()
    """
 
-
+    """
     env_name = 'cube'
     specific_env = 'single-play'
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = True)
@@ -509,4 +509,4 @@ if __name__ == "__main__":
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-
+    """
