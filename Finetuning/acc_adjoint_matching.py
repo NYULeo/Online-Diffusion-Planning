@@ -398,7 +398,7 @@ class Acc_AdjointMatchingFineTuner:
         reward = reward_model.predict(X[-1].squeeze(0).to(self.device), self.Lam.get_lam())
         return torch.stack(X).to(self.device), reward
 
-    """
+    
     def make_a(self, X, reward_model: TotalReward, reward_std: float):
         base_old_score_net = self.accelerator.unwrap_model(self.old_score_net)
         for p in base_old_score_net.parameters():
@@ -457,8 +457,8 @@ class Acc_AdjointMatchingFineTuner:
         torch.cuda.empty_cache()
         gc.collect()
         return a, reward
-    """
     
+    """
     def make_a(self, X, reward_model: TotalReward, reward_std: float):
         base_old_score_net = self.accelerator.unwrap_model(self.old_score_net)
         for p in base_old_score_net.parameters():
@@ -518,7 +518,7 @@ class Acc_AdjointMatchingFineTuner:
         torch.cuda.empty_cache()
         gc.collect()
         return a, reward
-
+    """
     def adjoint_matching_loss(
         self,
         traj_x: List[torch.Tensor],

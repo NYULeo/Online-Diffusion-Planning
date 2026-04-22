@@ -454,7 +454,8 @@ class OnlineFinetuner():
                     self.PlannerDataset, 
                     self.config.finetune_batch_size, 
                     pin_memory = True, 
-                    num_workers = (os.cpu_count() // 2), 
+                    #num_workers = (os.cpu_count() // 2), 
+                    num_workers = 0,
                     shuffle = True, 
                     drop_last = True)
             
