@@ -397,7 +397,8 @@ class Acc_AdjointMatchingFineTuner:
         self.new_score_net.train()
         reward = reward_model.predict(X[-1].squeeze(0).to(self.device), self.Lam.get_lam())
         return torch.stack(X).to(self.device), reward
-        
+
+    """
     def make_a(self, X, reward_model: TotalReward, reward_std: float):
         base_old_score_net = self.accelerator.unwrap_model(self.old_score_net)
         for p in base_old_score_net.parameters():
@@ -456,7 +457,68 @@ class Acc_AdjointMatchingFineTuner:
         torch.cuda.empty_cache()
         gc.collect()
         return a, reward
-           
+    """
+    
+    def make_a(self, X, reward_model: TotalReward, reward_std: float):
+        base_old_score_net = self.accelerator.unwrap_model(self.old_score_net)
+        for p in base_old_score_net.parameters():
+            p.requires_grad_(True)
+
+        X = [x.to(self.device) if x.device != self.device else x for x in X]
+        steps_T = len(X)
+        X_reversed = X[::-1]
+        a = []
+        T = X_reversed[0]
+        T_squeezed = T.squeeze(0).to(self.device)
+        
+        reward, gradient = reward_model(T_squeezed, self.Lam.get_lam())
+        
+        if self.config.MaxEnt:
+            score = self.old_score_net(T, torch.tensor(0.0, device=self.device).unsqueeze(0))
+            EntGrad = -score.detach()
+        else:
+            EntGrad = torch.zeros_like(gradient).unsqueeze(0).to(self.device)
+
+        alpha = self.alpha_scheduler.get_alpha()
+        a0 = (-1 * ((self.config.reward_scaling_factor / alpha) / reward_std) * gradient).unsqueeze(0).to(self.device) \
+             + (self.config.Entropy_Scaling_Factor * (-1) * EntGrad)
+        
+        a.append(a0)
+
+        t_asc_reversed = torch.flip(self.t_asc, dims=[0]).to(self.device)
+        k_reversed = torch.flip(self.k, dims=[0]).to(self.device)
+
+        for i in range(steps_T - 1):
+            dt = (t_asc_reversed[i] - t_asc_reversed[i + 1])
+            T = X_reversed[i].to(self.device)
+            T.requires_grad_(True)
+            current_a = a[i].to(self.device)
+
+            # Use jvp with minimal graph
+            _, jvp_out = jvp(
+                lambda x, t: self.old_score_net(x, t),
+                (T, t_asc_reversed[i].unsqueeze(0)),
+                (current_a, torch.zeros_like(t_asc_reversed[i].unsqueeze(0)).to(self.device)),
+                create_graph=False
+            )
+            Jov_a = jvp_out.to(self.device)
+
+            new_a = current_a + dt * ((k_reversed[i] * current_a) + (2 * k_reversed[i] * Jov_a))
+            new_a = new_a.detach().clone().to(self.device)
+            a.append(new_a)
+
+            # Cleanup inside loop
+            torch.cuda.empty_cache()
+            gc.collect()
+
+        a.reverse()
+        for p in base_old_score_net.parameters():
+            p.requires_grad_(False)
+
+        torch.cuda.empty_cache()
+        gc.collect()
+        return a, reward
+
     def adjoint_matching_loss(
         self,
         traj_x: List[torch.Tensor],
