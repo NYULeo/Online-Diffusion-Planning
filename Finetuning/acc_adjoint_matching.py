@@ -30,7 +30,7 @@ except ImportError:
     raise ImportError("accelerate is required but not installed. Run: pip install accelerate")
 from accelerate.utils import broadcast
 import pickle
-
+import gc
 
 @dataclass
 class Acc_AdjointMatchingConfig:
@@ -92,6 +92,7 @@ class Acc_AdjointMatchingFineTuner:
        
         self.config = AMConfig
         self.accelerator = accelerator
+        torch.set_grad_enabled(True)
         self.device = self.accelerator.device
         rank = self.accelerator.process_index
         torch.backends.cudnn.deterministic=True
@@ -452,6 +453,8 @@ class Acc_AdjointMatchingFineTuner:
         a.reverse()
         for p in base_old_score_net.parameters():
               p.requires_grad_(False)
+        torch.cuda.empty_cache()
+        gc.collect()
         return a, reward
            
     def adjoint_matching_loss(
@@ -545,6 +548,8 @@ class Acc_AdjointMatchingFineTuner:
             
             local_loss = torch.stack(local_loss_tensors).mean()
             local_rewards = torch.stack(local_rewards).mean()
+            torch.cuda.empty_cache()
+            gc.collect()
         #else:
             #local_loss = torch.tensor(0.0, device = self.device, requires_grad = True)
             #local_rewards = torch.tensor(0.0, device = self.device, requires_grad = False)
@@ -626,7 +631,8 @@ class Acc_AdjointMatchingFineTuner:
              for cond in conds:
                  self.Initial_Conds.append(cond[:2].detach().cpu().numpy().copy())
              """
-             
+             torch.cuda.empty_cache()
+             gc.collect()
              self.accelerator.wait_for_everyone()
              
              if self.accelerator.is_main_process:

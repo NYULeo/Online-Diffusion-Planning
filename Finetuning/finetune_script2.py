@@ -16,6 +16,8 @@ import torch
 import json
 import os
 from pathlib import Path
+torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.deterministic = True
 
 """
 def load_finetuning_args(env_name: str, specific_env: str, base_path: str = None) -> FinetuningConfig:
