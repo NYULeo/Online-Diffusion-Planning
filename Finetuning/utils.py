@@ -1167,7 +1167,10 @@ def rollout_parallel2(env_name, specific_env, horizon = 32, steps_T = 50, num_ka
              opt["reset_cell"] = start_cell.copy()
        else:
              opt['reset_cell'] = None
-       s0_vec = vec_env.reset(seed = reset_seeds, task_id = task_id, options=[opt for _ in range(num_envs)])
+       if(task_id is not None):
+            s0_vec = vec_env.reset(seed = reset_seeds, task_id = task_id, options=[opt for _ in range(num_envs)])
+       else:
+            s0_vec = vec_env.reset(seed = reset_seeds, options=[opt for _ in range(num_envs)])
        current_states = s0_vec[0]['observation']
      
        # Store trajectories for each environment
