@@ -431,12 +431,31 @@ if __name__ == "__main__":
             render = True,  
             base_seed = 1, 
             goal_cell = np.array([6, 1], dtype = int), 
-            start_cell = np.array([6, 6], dtype = int), 
+            start_cell = np.array([1, 6], dtype = int), 
             continual_rollout = True,
             chunk_size = 10)
     """
-
+    """
+    horizon = 70
+    env_name = 'pointmaze'
+    specific_train_dataset = 'large'
+    set_seed(1)
     
+    rollout(env_name, 
+            specific_train_dataset, horizon, 
+            steps_T = 200, 
+            num_karras = 10, 
+            eta = 0.8, 
+            episode_length = 3000, 
+            checkpoint_steps = 0, 
+            render = True,  
+            base_seed = 1, 
+            goal_cell = np.array([7, 10], dtype = int), 
+            start_cell = np.array([1, 1], dtype = int), 
+            continual_rollout = True,
+            chunk_size = 10)
+    """
+    """
     horizon = 32
     env_name = 'kitchen'
     specific_train_dataset = 'partial'
@@ -454,7 +473,7 @@ if __name__ == "__main__":
             base_seed = 1, 
             continual_rollout = True,
             chunk_size = 10)
-    
+    """
 
     #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True, base_seed = 0, continual_rollout = True, chunk_size = 3)
     #traj = model_rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, checkpoint_steps = 210, train_goal = np.array([-2.5, -2.5], dtype = np.float32), rollout_goal = np.array([6, 1], dtype = int), start_cell = np.array([4, 4], dtype = int))
@@ -471,16 +490,16 @@ if __name__ == "__main__":
     """
     #score = rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 50, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([1, 5], dtype = int), base_seed = 0, continual_rollout = False)
     
-    """
+    
     horizon = 32
     env_name = 'cube'
-    specific_train_dataset = 'single-play'
-    set_seed(1)
+    specific_train_dataset = 'double-play'
+    set_seed(10)
     
     rollout(env_name, 
             specific_train_dataset, horizon, 
-            steps_T = 50, 
-            num_karras = 3, 
+            steps_T = 200, 
+            num_karras = 10, 
             eta = 0.8, 
             episode_length = 3000, 
             checkpoint_steps = 0, 
@@ -488,8 +507,8 @@ if __name__ == "__main__":
             task_id = 1,
             base_seed = 1, 
             continual_rollout = True,
-            chunk_size = 10)
-    """
+            chunk_size = 32)
+    
     
 
     

@@ -30,7 +30,7 @@ except ImportError:
     raise ImportError("accelerate is required but not installed. Run: pip install accelerate")
 from accelerate.utils import broadcast
 import pickle
-
+import gc
 
 @dataclass
 class Acc_AdjointMatchingConfig:
