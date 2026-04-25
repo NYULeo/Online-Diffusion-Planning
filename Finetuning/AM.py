@@ -15,9 +15,10 @@ from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDatase
 from Pretrain.Planners.Backbone.utils import cosine_alpha_sigma, cosine_beta, compute_dot_alpha_beta, get_pretrained_planner
 import numpy as np
 from Pretrain.Dataset import get_PlannerName
-from typing import Optional
+from typing import Optional, Union
 from torch import Tensor
-from Finetuning.traj_reward import RewardConfig, TotalReward
+#from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
+from Finetuning.comp_reward import RewardConfig, TotalReward, TotalReward_Critic
 from torch.utils.data import DataLoader
 from Pretrain.Planners.Backbone.UNet import TemporalUnet
 from Pretrain.Dataset import get_env
@@ -116,7 +117,7 @@ class Acc_AdjointMatchingFineTuner:
         self.Initial_Conds = []
     
 
-    def Accelerate_Prepare(self, dataloader: DataLoader, reward_model: TotalReward, round: int):
+    def Accelerate_Prepare(self, dataloader: DataLoader, reward_model: Union[TotalReward, TotalReward_Critic], round: int):
          if round == 1:
               self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model = self.accelerator.prepare(self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model)
          else:
@@ -311,7 +312,7 @@ class Acc_AdjointMatchingFineTuner:
     @torch.no_grad()
     def sample_Traj(self,
         s0: torch.Tensor,
-        reward_model: TotalReward
+        reward_model: Union[TotalReward, TotalReward_Critic]
         ) ->  torch.Tensor:
         self.new_score_net.eval()
 
@@ -354,7 +355,7 @@ class Acc_AdjointMatchingFineTuner:
     
     @torch.no_grad()
     def sample_Traj_karras(self,
-        s0: torch.Tensor, reward_model: TotalReward
+        s0: torch.Tensor, reward_model: Union[TotalReward, TotalReward_Critic]
         ) ->  torch.Tensor:
         self.new_score_net.eval()
 
@@ -399,7 +400,7 @@ class Acc_AdjointMatchingFineTuner:
         return torch.stack(X).to(self.device), reward
 
     
-    def make_a(self, X, reward_model: TotalReward, reward_std: float):
+    def make_a(self, X, reward_model: Union[TotalReward, TotalReward_Critic], reward_std: float):
         base_old_score_net = self.accelerator.unwrap_model(self.old_score_net)
         for p in base_old_score_net.parameters():
               p.requires_grad_(True)
@@ -493,7 +494,7 @@ class Acc_AdjointMatchingFineTuner:
             loss = loss + term
         return loss / len(traj_x)
 
-    def step(self, s0_batch: torch.Tensor, reward_model: TotalReward) -> Tuple[float, float, float]:
+    def step(self, s0_batch: torch.Tensor, reward_model: Union[TotalReward, TotalReward_Critic]) -> Tuple[float, float, float]:
         # 1. Split batch across processes
         base_reward_model = self.accelerator.unwrap_model(reward_model)
         with self.accelerator.split_between_processes(s0_batch) as local_s0:
@@ -638,7 +639,7 @@ class Acc_AdjointMatchingFineTuner:
 
 
     
-    def finetune_planner(self, dataloader: DataLoader, reward_model: TotalReward, round: int, old_score_net: Optional[DiT1d] = None):
+    def finetune_planner(self, dataloader: DataLoader, reward_model: Union[TotalReward, TotalReward_Critic], round: int, old_score_net: Optional[DiT1d] = None):
         if old_score_net is not None:
             self.reset_old_score_net(old_score_net)
             self.set_new_score_net()
