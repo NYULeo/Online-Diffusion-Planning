@@ -663,7 +663,9 @@ class Acc_AdjointMatchingFineTuner:
                     # Per-s0 reward spread (subjective to this initial state group only)
                     if len(s0_rewards) > 0:
                         s0_rewards_tensor = torch.stack(s0_rewards)
-                        reward_std_s0 = max(float(torch.std(s0_rewards_tensor, unbiased=False).item()), 1e-8)
+                        reward_std_s0 = float(
+                              (torch.max(s0_rewards_tensor).item() - torch.min(s0_rewards_tensor).item()) + 1e-8
+                        )
                     else:
                         reward_std_s0 = 0.0
                 
@@ -776,7 +778,7 @@ class Acc_AdjointMatchingFineTuner:
         #total_var_reward = 0.0
 
        
-        #conds = next(dataloader)
+        
         while step < self.config.per_round_steps:
              conds = next(dataloader)
              #loss, avg_reward, avg_C = self.step(conds, reward_model)
