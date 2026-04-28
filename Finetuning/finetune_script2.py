@@ -260,7 +260,7 @@ if __name__ == "__main__":
     #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
     RWConfig = RewardConfig(
                beta = 1.0, 
-               max_mahalanobis_score = 1.0,
+               max_mahalanobis_score = 1.5,
                critic_gamma = 1.0,
                explore = False) 
 
@@ -314,7 +314,7 @@ if __name__ == "__main__":
         finetune_steps = 300,
         finetune_rounds = 30,
         diffusion_steps = 50,
-        karras_percent = 0.05,
+        karras_percent = 0.1,
         Loss_Clip_percent = 0.75,
         finetune_batch_size = 12,
         finetune_batch_per_sample = 6,
