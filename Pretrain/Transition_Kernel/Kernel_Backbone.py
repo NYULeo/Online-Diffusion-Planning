@@ -741,8 +741,8 @@ def compute_total_mahalanobis_score(kernels: List[RobustTransitionKernel], s, a,
     mus = []
     log_stds = []
     
-    with torch.no_grad():   # Important for efficiency during inference
-        for kernel in kernels:
+  
+    for kernel in kernels:
             mu, log_std = kernel(s, a)          # (B, obs_dim)
             mus.append(mu)
             log_stds.append(log_std)
