@@ -494,7 +494,7 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
-    set_seed(7)
+    set_seed(3)
     
     rollout(env_name, 
             specific_train_dataset, horizon, 
@@ -502,12 +502,12 @@ if __name__ == "__main__":
             num_karras = 3, 
             eta = 0.8, 
             episode_length = 3000, 
-            checkpoint_steps = 70, 
+            checkpoint_steps = 60, 
             render = True,  
             base_seed = 1, 
             goal_cell = np.array([6, 1], dtype = int), 
-            start_cell = np.array([5, 4], dtype = int), 
-            continual_rollout = True,
+            start_cell = np.array([4, 4], dtype = int), 
+            continual_rollout = False,
             chunk_size = 32)
     
 

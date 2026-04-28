@@ -506,7 +506,7 @@ class TotalReward_Mahalanobis(nn.Module):
         D2 = compute_total_mahalanobis_score(self.kernels, s, a, s_next)
         tau = self.config.max_mahalanobis_score   # should be your calibrated τ (e.g. 95th percentile)
         # Normalized deviation
-        normalized = (D2 - tau)         # <0 → good, >0 → bad
+        normalized = (D2/tau - 1)         # <0 → good, >0 → bad
          # Soft ReLU style
         return F.softplus(normalized, beta=self.config.beta)
 
@@ -700,7 +700,7 @@ class TotalReward_Critic_Mahalanobis(nn.Module):
         D2 = compute_total_mahalanobis_score(self.kernels, s, a, s_next)
         tau = self.config.max_mahalanobis_score   # should be your calibrated τ (e.g. 95th percentile)
         # Normalized deviation
-        normalized = (D2 - tau)         # <0 → good, >0 → bad
+        normalized = (D2/tau - 1)         # <0 → good, >0 → bad
          # Soft ReLU style
         return F.softplus(normalized, beta=self.config.beta)
 

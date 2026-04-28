@@ -799,7 +799,7 @@ def compute_total_mahalanobis_score(kernels: list, s, a, s_next):
     
     # 5. Squared Mahalanobis Distance (Total Score)
     residual = s_next - mu_total
-    residual = torch.clamp(residual, -10.0, 10.0)   # stability
+    #residual = torch.clamp(residual, -10.0, 10.0)   # stability
     
     D2_total = ((residual ** 2) / var_total).sum(dim=-1)   # (B,)
     
