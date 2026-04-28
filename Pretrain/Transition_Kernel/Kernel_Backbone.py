@@ -640,7 +640,7 @@ def test_kernel(dataset_name, specific_dataset: str = None,
     else:
         dataset = test_dataset(trajs, kernel_name)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True, pin_memory=True, num_workers=8)
-
+    
     # For each saved checkpoint / ensemble member
     step = save_freq
     while step <= num_steps:
@@ -671,7 +671,7 @@ def test_kernel(dataset_name, specific_dataset: str = None,
             
             count += 1
             
-            if(count == 1000):
+            if(count == 10000):
                 break
             
 
@@ -721,17 +721,14 @@ def get_pretrained_kernel_stats(kernel_name):
           stats = pickle.load(f)
     return stats
 
-
+"""
 def compute_total_mahalanobis_score(
     kernels: List[RobustTransitionKernel],
     s: torch.Tensor,
     a: torch.Tensor,
     s_next: torch.Tensor,
 ) -> torch.Tensor:
-    """
-    Efficient + fully differentiable version.
-    Gradients will flow correctly through D² → softplus → loss.
-    """
+    
     K = len(kernels)
     device = s.device
 
@@ -770,4 +767,37 @@ def compute_total_mahalanobis_score(
 
     D2_total = ((residual ** 2) / var_total).sum(dim=-1)            # (B,)
 
+    return D2_total
+"""
+
+def compute_total_mahalanobis_score(kernels: list, s, a, s_next):
+    mus = []
+    log_stds = []
+    for kernel in kernels:
+            mu, log_std = kernel(s, a)          # (B, obs_dim)
+            mus.append(mu)
+            log_stds.append(log_std)
+    # Stack -> (K, B, obs_dim)
+    mus = torch.stack(mus, dim=0)
+    log_stds = torch.stack(log_stds, dim=0)
+    
+    # 1. Total mean
+    mu_total = mus.mean(dim=0)                    # (B, obs_dim)
+    
+    # 2. Aleatoric variance (average predicted variance)
+    var_aleatoric = (torch.exp(2 * log_stds) + kernels[0].noise_floor).mean(dim=0)
+    
+    # 3. Epistemic variance (disagreement of means)
+    var_epistemic = mus.var(dim=0, unbiased=False)   # population variance (common in MBRL)
+    
+    # 4. Total variance
+    var_total = var_aleatoric + var_epistemic
+    var_total = torch.clamp(var_total, min=1e-8)
+    
+    # 5. Squared Mahalanobis Distance (Total Score)
+    residual = s_next - mu_total
+    residual = torch.clamp(residual, -10.0, 10.0)   # stability
+    
+    D2_total = ((residual ** 2) / var_total).sum(dim=-1)   # (B,)
+    
     return D2_total
