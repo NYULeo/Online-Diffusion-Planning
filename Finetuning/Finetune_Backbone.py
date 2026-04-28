@@ -476,6 +476,7 @@ class OnlineFinetuner():
 
             if self.accelerator.is_main_process:
                   print(f"Starting Rollout")
+                  print(f"Max Mahalanobis Score: {self.config.RewardConfig.max_mahalanobis_score}")
             
             num_rollout_procs = self.config.num_rollout_processes
             do_rollout = (num_rollout_procs is None) or (rank < num_rollout_procs)
@@ -600,6 +601,7 @@ class OnlineFinetuner():
             self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             if self.config.RewardConfig.max_mahalanobis_score < threshold: 
                self.config.RewardConfig.max_mahalanobis_score = threshold
+            
             #self.config.critic_model_checkpoint = 0
             self.set_reward_model(self.device)
             

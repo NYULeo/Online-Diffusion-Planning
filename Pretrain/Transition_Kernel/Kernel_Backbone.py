@@ -655,6 +655,7 @@ def test_kernel(dataset_name, specific_dataset: str = None,
 
         # Compute log-probs over dataset
         all_D2_total = []
+        #all_D_total = []
         count = 0
         #worst = (None, float("inf"), None)  # (idx, log_prob, (s, a, s_next))
         for i, (s, a, s_next) in enumerate(dataloader):
@@ -665,10 +666,16 @@ def test_kernel(dataset_name, specific_dataset: str = None,
             #compute total mahalanobis distance
             with torch.no_grad():
                 D2_total = compute_total_mahalanobis_score(ensemble, s, a, s_next)
+                """
+                Temp = []
+                for m in ensemble:
+                    D = m.computeD(s, a, s_next).detach().cpu().numpy()
+                    Temp.append(D)
+                """
+            #D = np.mean(Temp, axis = 0)
             D2 = D2_total.detach().cpu().numpy()
             all_D2_total.extend(D2)
-
-            
+            #all_D_total.extend(D)
             count += 1
             
             
@@ -676,6 +683,7 @@ def test_kernel(dataset_name, specific_dataset: str = None,
 
             #if lp_mean < worst[1]:
              #   worst = (i, lp_mean, (s.cpu().numpy(), a.cpu().numpy(), s_next.cpu().numpy()))
+        
         all_D2_total = np.array(all_D2_total)
         mean_D2_total = float(all_D2_total.mean())
         min_D2_total = float(all_D2_total.min())
@@ -688,8 +696,6 @@ def test_kernel(dataset_name, specific_dataset: str = None,
         print(f"max_D2_total = {max_D2_total:.4f}")
         print(f"variance_D2_total = {var_D2_total:.4f}")
         print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
-        #print("Worst transition index", worst[0], "lp", worst[1])
-        #print("Corresponding s, a, s_next:", worst[2])
         step += save_freq
 
 

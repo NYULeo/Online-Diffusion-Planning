@@ -200,5 +200,13 @@ class RobustTransitionKernel(nn.Module):
         # Squared Mahalanobis (diagonal covariance)
         D2 = ((residual ** 2) / var).sum(dim=-1)   # sum over state dimensions
         return D2
+    
+    def computeD(self, s, a, s_next):
+        mu, log_std = self.forward(s, a) 
+        var = torch.exp(2 * log_std) + self.noise_floor
+        var = torch.clamp(var, min=1e-8)  # Prevent log(0)
+        D = s_next.size(-1)
+        Temp = 0.5 * (D * math.log(2 * math.pi) + 2 * log_std.sum(dim=-1))
+        return Temp
 
     
