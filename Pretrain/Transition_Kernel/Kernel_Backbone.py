@@ -629,7 +629,7 @@ def train_kernel(dataset_name, specific_dataset: str = None,
 
 def test_kernel(dataset_name, specific_dataset: str = None,
                 trajs: list = None,
-                save_freq: int = 50, num_steps: int = 500, hidden_layers = 2, hidden_dim = 256, ensemble_size = 3, quantile = 0.95):
+                save_freq: int = 50, num_steps: int = 500, hidden_layers = 2, hidden_dim = 256, ensemble_size = 3, quantile = 0.98):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #device = check_device()
     print("Using device:", device)
