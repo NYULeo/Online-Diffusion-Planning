@@ -567,7 +567,7 @@ def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
         total_loss += avg_loss
     
 
-    new_loader = DataLoader(dataset, batch_size=1, shuffle=True, pin_memory=True, num_workers=8)
+    new_loader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=True, num_workers=8)
     threshold = compute_threshold(ensemble, new_loader, quantile)
     for idx, m in enumerate(ensemble):
          ckpt = copy.deepcopy(m).cpu()
