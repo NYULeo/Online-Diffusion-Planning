@@ -19,6 +19,7 @@ from typing import List
 from utils import TrajectoryDict, rollout_parallel, get_planner, rollout_parallel2, save_planner, train_reward, train_kernel, train_critic, save_trajs, AlphaSchedulerConfig, checktrajs
 from Pretrain.Dataset import get_env
 from torch.utils.data import DataLoader, DistributedSampler
+from accelerate.utils import broadcast
 import torch
 import copy
 import os
@@ -538,8 +539,7 @@ class OnlineFinetuner():
                  print(f"Average Normalized Score: {avg_score:.2f}")
             self.accelerator.wait_for_everyone()  
            
-            threshold = float(self.config.RewardConfig.max_mahalanobis_score)
-            threshold_tensor = torch.tensor([threshold], device=self.device, dtype=torch.float32)
+            threshold_tensor = torch.tensor(0.0, device=self.accelerator.device)
             if self.accelerator.is_main_process:
                   print(f"Starting Reward Training")
                   train_reward(self.Train_Buffer, 
@@ -568,7 +568,7 @@ class OnlineFinetuner():
                              hidden_dim = self.config.train_kernel_config.hidden_dim,
                              step = ((step+1) * self.config.AMConfig.per_round_steps),
                              quantile = self.config.RewardConfig.quantile)
-                      threshold_tensor.fill_(threshold)
+                      threshold_tensor = torch.tensor(threshold, device = self.accelerator.device, dtype = torch.float32)
                   if self.config.critic:
                       print(f"Starting Critic Training")
                       #save_trajs(critic_buffer, self.config.dataset_name, self.config.specific_dataset, ((step+1) * self.config.AMConfig.per_round_steps))
@@ -590,8 +590,7 @@ class OnlineFinetuner():
                                    target_reward = self.config.train_reward_config.target_reward)
                     
             self.accelerator.wait_for_everyone()
-            if self.accelerator.num_processes > 1:
-                  torch.distributed.broadcast(threshold_tensor, src=0)
+            threshold_tensor = broadcast(threshold_tensor, from_process=0)
             threshold = threshold_tensor.item()
             #set the new total reward model
             self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)

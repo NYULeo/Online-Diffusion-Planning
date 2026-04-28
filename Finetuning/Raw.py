@@ -13,8 +13,10 @@ from collections import deque
 import gymnasium as gym
 import gymnasium_robotics  # registers the envs
 import numpy as np
+import torch
 
-
+a = torch.tensor(5)
+print(a)
 
 
 
