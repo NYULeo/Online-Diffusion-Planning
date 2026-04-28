@@ -4,6 +4,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]  # Online-Diffusion-Planning/
 PRETRAIN_DIR = PROJECT_ROOT / "Pretrain"
 FINETUNE_DIR = PROJECT_ROOT / "Finetuning"
+from scipy.stats import median_abs_deviation
 import torch
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
@@ -13,7 +14,7 @@ from .Kernel_Net import  RobustTransitionKernel
 from sympy import factorint
 import pickle
 import os
-from typing import Optional
+from typing import Optional, List
 import math
 import copy
 
@@ -628,9 +629,9 @@ def train_kernel(dataset_name, specific_dataset: str = None,
 
 def test_kernel(dataset_name, specific_dataset: str = None,
                 trajs: list = None,
-                save_freq: int = 50, num_steps: int = 500, hidden_layers = 2, hidden_dim = 256, ensemble_size = 3):
-    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    device = check_device()
+                save_freq: int = 50, num_steps: int = 500, hidden_layers = 2, hidden_dim = 256, ensemble_size = 3, quantile = 0.95):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #device = check_device()
     print("Using device:", device)
 
     train_trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
@@ -653,7 +654,7 @@ def test_kernel(dataset_name, specific_dataset: str = None,
             ensemble.append(m)
 
         # Compute log-probs over dataset
-        all_lp = []
+        all_D2_total = []
         count = 0
         #worst = (None, float("inf"), None)  # (idx, log_prob, (s, a, s_next))
         for i, (s, a, s_next) in enumerate(dataloader):
@@ -661,25 +662,34 @@ def test_kernel(dataset_name, specific_dataset: str = None,
             a = a.to(device)
             s_next = s_next.to(device)
 
-            # For each ensemble member, compute log_prob
-            lps = []
-            for m in ensemble:
-                mu, log_std = m(s, a)
-                lp = m.log_prob(s_next, mu, log_std).item()
-                lps.append(lp)
-            # You can take mean, or min over ensemble.
-            lp_mean = sum(lps) / len(lps)
-            all_lp.append(lp_mean)
+            #compute total mahalanobis distance
+            D2_total = compute_total_mahalanobis_score(ensemble, s, a, s_next)
+
+            all_D2_total.append(D2_total)
+
+            
             count += 1
+            """
             if(count == 1000):
                 break
+            """
 
             #if lp_mean < worst[1]:
              #   worst = (i, lp_mean, (s.cpu().numpy(), a.cpu().numpy(), s_next.cpu().numpy()))
 
-        mean_lp = float(np.mean(all_lp))
-        min_lp = float(np.min(all_lp))
-        print(f"Checkpoint {step}: mean_log_prob = {mean_lp:.4f}, min_log_prob = {min_lp:.4f}")
+        mean_D2_total = float(np.mean(all_D2_total))
+        min_D2_total = float(np.min(all_D2_total))
+        max_D2_total = float(np.max(all_D2_total))
+        var_D2_total = float(np.var(all_D2_total))
+        median_D2_total = float(np.median(all_D2_total))
+        tau = np.quantile(all_D2_total, quantile)
+        print(f"Checkpoint {step}")
+        print(f"mean_D2_total = {mean_D2_total:.4f}")
+        print(f"min_D2_total = {min_D2_total:.4f}")
+        print(f"max_D2_total = {max_D2_total:.4f}")
+        print(f"variance_D2_total = {var_D2_total:.4f}")
+        print(f"median_D2_total = {median_D2_total:.4f}")
+        print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
         #print("Worst transition index", worst[0], "lp", worst[1])
         #print("Corresponding s, a, s_next:", worst[2])
         step += save_freq
@@ -713,8 +723,54 @@ def get_pretrained_kernel_stats(kernel_name):
 
 
 
-
-
+def compute_total_mahalanobis_score(kernels: List[RobustTransitionKernel], s, a, s_next):
+    """
+    Compute squared Mahalanobis distance using Total Predictive Variance
+    (aleatoric + epistemic).
+    
+    Args:
+        kernels: list of RobustTransitionKernel models (ensemble)
+        s, a, s_next: tensors of shape (batch_size, dim) or (batch_size, ...)
+    
+    Returns:
+        D2_total: tensor of shape (batch_size,)  ← lower = more feasible
+    """
+    device = s.device
+    K = len(kernels)
+    
+    mus = []
+    log_stds = []
+    
+    with torch.no_grad():   # Important for efficiency during inference
+        for kernel in kernels:
+            mu, log_std = kernel(s, a)          # (B, obs_dim)
+            mus.append(mu)
+            log_stds.append(log_std)
+    
+    # Stack -> (K, B, obs_dim)
+    mus = torch.stack(mus, dim=0)
+    log_stds = torch.stack(log_stds, dim=0)
+    
+    # 1. Total mean
+    mu_total = mus.mean(dim=0)                    # (B, obs_dim)
+    
+    # 2. Aleatoric variance (average predicted variance)
+    var_aleatoric = (torch.exp(2 * log_stds) + kernels[0].noise_floor).mean(dim=0)
+    
+    # 3. Epistemic variance (disagreement of means)
+    var_epistemic = mus.var(dim=0, unbiased=False)   # population variance (common in MBRL)
+    
+    # 4. Total variance
+    var_total = var_aleatoric + var_epistemic
+    var_total = torch.clamp(var_total, min=1e-8)
+    
+    # 5. Squared Mahalanobis Distance (Total Score)
+    residual = s_next - mu_total
+    residual = torch.clamp(residual, -10.0, 10.0)   # stability
+    
+    D2_total = ((residual ** 2) / var_total).sum(dim=-1)   # (B,)
+    
+    return D2_total
 
 
 

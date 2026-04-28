@@ -15,11 +15,11 @@ import pickle
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     #trajs = get_trajs('pointmaze', 'medium', step = 0)
-    test_kernel(dataset_name = 'cube', 
-                specific_dataset = 'single', 
+    test_kernel(dataset_name = 'pointmaze', 
+                specific_dataset = 'medium', 
                 trajs = None, 
-                save_freq = 1000, 
-                num_steps = 5000, 
+                save_freq = 50000, 
+                num_steps = 50000, 
                 hidden_layers = 2, 
                 hidden_dim = 256, 
                 ensemble_size = 10)

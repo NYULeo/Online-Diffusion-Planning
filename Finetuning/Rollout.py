@@ -492,25 +492,44 @@ if __name__ == "__main__":
     
     
     horizon = 32
-    env_name = 'cube'
-    specific_train_dataset = 'double-play'
-    set_seed(10)
+    env_name = 'pointmaze'
+    specific_train_dataset = 'medium'
+    set_seed(1)
     
     rollout(env_name, 
             specific_train_dataset, horizon, 
-            steps_T = 200, 
-            num_karras = 10, 
+            steps_T = 50, 
+            num_karras = 3, 
+            eta = 0.8, 
+            episode_length = 3000, 
+            checkpoint_steps = 50, 
+            render = True,  
+            base_seed = 3, 
+            goal_cell = np.array([6, 1], dtype = int), 
+            start_cell = np.array([3, 4], dtype = int), 
+            continual_rollout = False,
+            chunk_size = 1)
+    
+
+    """
+    horizon = 32
+    env_name = 'cube'
+    specific_train_dataset = 'single-play'
+    set_seed(1)
+    
+    rollout(env_name, 
+            specific_train_dataset, horizon, 
+            steps_T = 100, 
+            num_karras = 5, 
             eta = 0.8, 
             episode_length = 3000, 
             checkpoint_steps = 0, 
             render = True,  
-            task_id = 1,
             base_seed = 1, 
+            task_id = 1,
             continual_rollout = True,
             chunk_size = 32)
-    
-    
-
+    """
     
     
     

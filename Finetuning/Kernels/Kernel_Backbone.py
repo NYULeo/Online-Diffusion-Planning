@@ -13,7 +13,7 @@ from .Kernel_Net import  RobustTransitionKernel
 from sympy import factorint
 import pickle
 import os
-from typing import Optional
+from typing import Optional, List
 import math
 import copy
 from utils import SAStats, cycle
@@ -152,8 +152,8 @@ class KernelDataset(Dataset):
         )
 
 class test_dataset(Dataset):
-    def __init__(self, trajs, name, step):
-        stats_path = f'./Finetuning/Kernels/{name}/{step}/Stats/{name}_{step}_stats.pkl'
+    def __init__(self, trajs, dataset_name, specific_dataset, step):
+        stats_path = f'./Kernels/{dataset_name}/{specific_dataset}/Stats/PointMaze_Medium_Kernel_stats_{step}.pkl'
         with open(stats_path, 'rb') as f:
               self.stats = pickle.load(f)
         transitions = []
@@ -351,16 +351,17 @@ def test_kernel(dataset_name, specific_dataset: str = None,
     print("Using device:", device)
 
     train_trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
-    if trajs is None:
-        dataset = test_dataset(train_trajs, kernel_name)
-    else:
-        dataset = test_dataset(trajs, kernel_name)
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, pin_memory=True, num_workers=8)
-
+    
     # For each saved checkpoint / ensemble member
     step = save_freq
     while step <= num_steps:
         # Load ensemble members
+        if trajs is None:
+             dataset = test_dataset(train_trajs, dataset_name, specific_dataset, step)
+        else:
+             dataset = test_dataset(trajs, dataset_name, specific_dataset, step)
+        dataloader = DataLoader(dataset, batch_size=1, shuffle=True, pin_memory=True, num_workers=8)
+
         ensemble = []
         for idx in range(ensemble_size):
             state_dict = load_model(kernel_name, step, idx)
@@ -369,30 +370,28 @@ def test_kernel(dataset_name, specific_dataset: str = None,
             m.eval()
             ensemble.append(m)
 
-        # Compute log-probs over dataset
-        all_lp = []
+        # Compute mahalanobis distance over dataset
+        all_D2_total = []
         #worst = (None, float("inf"), None)  # (idx, log_prob, (s, a, s_next))
         for i, (s, a, s_next) in enumerate(dataloader):
             s = s.to(device)
             a = a.to(device)
             s_next = s_next.to(device)
 
-            # For each ensemble member, compute log_prob
-            lps = []
-            for m in ensemble:
-                mu, log_std = m(s, a)
-                lp = m.log_prob(s_next, mu, log_std).item()
-                lps.append(lp)
-            # You can take mean, or min over ensemble.
-            lp_mean = sum(lps) / len(lps)
-            all_lp.append(lp_mean)
+            # compute total mahalanobis distance
+            D2_total = compute_total_mahalanobis_score(ensemble, s, a, s_next)
+
+            all_D2_total.append(D2_total)
+           
 
             #if lp_mean < worst[1]:
              #   worst = (i, lp_mean, (s.cpu().numpy(), a.cpu().numpy(), s_next.cpu().numpy()))
 
-        mean_lp = float(np.mean(all_lp))
-        min_lp = float(np.min(all_lp))
-        print(f"Checkpoint {step}: mean_log_prob = {mean_lp:.4f}, min_log_prob = {min_lp:.4f}")
+        mean_D2_total = float(np.mean(all_D2_total))
+        min_D2_total = float(np.min(all_D2_total))
+        max_D2_total = float(np.max(all_D2_total))
+        var_D2_total = float(np.var(all_D2_total))
+        print(f"Checkpoint {step}: mean_D2_total = {mean_D2_total:.4f}, min_D2_total= {min_D2_total:.4f}, max_D2_total = {max_D2_total:.4f}, variance_D2_total = {var_D2_total:.4f}")
         #print("Worst transition index", worst[0], "lp", worst[1])
         #print("Corresponding s, a, s_next:", worst[2])
         step += save_freq
@@ -415,6 +414,59 @@ def get_pretrained_kernel_stats(name, step):
         stats = pickle.load(f)
      return stats
 
+
+
+
+
+
+def compute_total_mahalanobis_score(kernels: List[RobustTransitionKernel], s, a, s_next):
+    """
+    Compute squared Mahalanobis distance using Total Predictive Variance
+    (aleatoric + epistemic).
+    
+    Args:
+        kernels: list of RobustTransitionKernel models (ensemble)
+        s, a, s_next: tensors of shape (batch_size, dim) or (batch_size, ...)
+    
+    Returns:
+        D2_total: tensor of shape (batch_size,)  ← lower = more feasible
+    """
+    device = s.device
+    K = len(kernels)
+    
+    mus = []
+    log_stds = []
+    
+    with torch.no_grad():   # Important for efficiency during inference
+        for kernel in kernels:
+            mu, log_std = kernel(s, a)          # (B, obs_dim)
+            mus.append(mu)
+            log_stds.append(log_std)
+    
+    # Stack -> (K, B, obs_dim)
+    mus = torch.stack(mus, dim=0)
+    log_stds = torch.stack(log_stds, dim=0)
+    
+    # 1. Total mean
+    mu_total = mus.mean(dim=0)                    # (B, obs_dim)
+    
+    # 2. Aleatoric variance (average predicted variance)
+    var_aleatoric = (torch.exp(2 * log_stds) + kernels[0].noise_floor).mean(dim=0)
+    
+    # 3. Epistemic variance (disagreement of means)
+    var_epistemic = mus.var(dim=0, unbiased=False)   # population variance (common in MBRL)
+    
+    # 4. Total variance
+    var_total = var_aleatoric + var_epistemic
+    var_total = torch.clamp(var_total, min=1e-8)
+    
+    # 5. Squared Mahalanobis Distance (Total Score)
+    residual = s_next - mu_total
+    residual = torch.clamp(residual, -10.0, 10.0)   # stability
+    
+    D2_total = ((residual ** 2) / var_total).sum(dim=-1)   # (B,)
+    
+    return D2_total
 
 
 

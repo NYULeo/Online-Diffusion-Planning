@@ -598,8 +598,8 @@ class Acc_AdjointMatchingFineTuner:
                for traj in local_trajs:  # each traj local
                     traj_list = [traj[i] for i in range(traj.shape[0])]
                     with self.accelerator.autocast():
-                            adjoint, reward = self.make_a(traj_list, reward_model, reward_std)
-                            loss_tensor = self.adjoint_matching_loss(traj_list, adjoint)
+                        adjoint, reward = self.make_a(traj_list, reward_model, reward_std)
+                        loss_tensor = self.adjoint_matching_loss(traj_list, adjoint)
                     local_loss_tensors.append(loss_tensor)
                     local_rewards.append(reward)
                local_loss = torch.stack(local_loss_tensors).mean()

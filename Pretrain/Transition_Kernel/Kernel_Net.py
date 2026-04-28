@@ -185,3 +185,20 @@ class RobustTransitionKernel(nn.Module):
         lp = lp - 0.5 * (D * math.log(2 * math.pi) + 2 * log_std.sum(dim=-1))
         return lp  # tensor of shape batch
 
+    def mahalanobis_distance_squared(self, s_next, s, a):
+        """
+        Compute squared Mahalanobis distance D² for batch of transitions.
+        Returns tensor of shape (batch_size,)
+        """
+        mu, log_std = self.forward(s, a)          # (batch, obs_dim), (batch, obs_dim)
+        var_pred = torch.exp(2 * log_std)         # predicted variance
+        var = var_pred + self.noise_floor         # same as in your log_prob
+        var = torch.clamp(var, min=1e-8)
+        residual = s_next - mu
+        # Optional: mild clipping for stability (you already do this in NLL)
+        residual = torch.clamp(residual, -10.0, 10.0)
+        # Squared Mahalanobis (diagonal covariance)
+        D2 = ((residual ** 2) / var).sum(dim=-1)   # sum over state dimensions
+        return D2
+
+    

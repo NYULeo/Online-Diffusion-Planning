@@ -38,18 +38,33 @@ class TransitionKernel(nn.Module):
 
 
 
-"""
+
 class RobustTransitionKernel(nn.Module):
-    def __init__(self, obs_dim, act_dim, min_log_std = -6.0, max_log_std = 4.0, noise_floor = 1e-2):
+    def __init__(
+        self,
+        obs_dim,
+        act_dim,
+        num_hidden_layers=2,
+        hidden_dim=256,
+        min_log_std=-6.0,
+        max_log_std=4.0,
+        noise_floor=1e-2,
+    ):
         super().__init__()
-        hidden_dim = 256
-        self.net = nn.Sequential(
-            nn.Linear(obs_dim + act_dim, hidden_dim),
-            nn.LayerNorm(hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU()
-        )
+        assert num_hidden_layers >= 1, "num_hidden_layers must be >= 1"
+
+        layers = []
+        # first layer
+        layers.append(nn.Linear(obs_dim + act_dim, hidden_dim))
+        layers.append(nn.LayerNorm(hidden_dim))
+        layers.append(nn.ReLU())
+
+        # additional hidden layers
+        for _ in range(num_hidden_layers - 1):
+            layers.append(nn.Linear(hidden_dim, hidden_dim))
+            layers.append(nn.ReLU())
+
+        self.net = nn.Sequential(*layers)
         self.mean_head = nn.Linear(hidden_dim, obs_dim)
         self.log_std_head = nn.Linear(hidden_dim, obs_dim)
         self.min_log_std = min_log_std
@@ -57,16 +72,14 @@ class RobustTransitionKernel(nn.Module):
         self.noise_floor = noise_floor
 
     def forward(self, s, a):
-        # s: (..., obs_dim), a: (..., act_dim)
         x = torch.cat([s, a], dim=-1)
         h = self.net(x)
         mu = self.mean_head(h)
         raw_log_std = self.log_std_head(h)
-        # soft floor + clamp on upper side
         log_std = self.min_log_std + F.softplus(raw_log_std - self.min_log_std)
         log_std = torch.clamp(log_std, max=self.max_log_std)
         return mu, log_std
-
+    
     def gaussian_nll(self, s_next, mu, log_std):
         # x, mu: (..., obs_dim); log_std: (..., obs_dim)
         var_pred = torch.exp(2 * log_std)
@@ -78,18 +91,8 @@ class RobustTransitionKernel(nn.Module):
         nll = 0.5 * (torch.log(2 * math.pi * var) + (res ** 2) / var)
         # sum over state dims, but keep batch dims
         return nll.sum(dim=-1).mean()
-   
-    def log_prob(self, s_next, mu, log_std):
-        # Compute log prob (not negative) — useful for testing / diagnostics
-        var = torch.exp(2 * log_std) + self.noise_floor
-        var = torch.clamp(var, min=1e-8)  # Prevent log(0)
-        D = s_next.size(-1)
-        # log prob per dimension
-        lp = -0.5 * (((s_next - mu) ** 2) / var).sum(dim=-1)
-        lp = lp - 0.5 * (D * math.log(2 * math.pi) + 2 * log_std.sum(dim=-1))
-        return lp  # tensor of shape batch
     
-    
+    """
     def log_prob(self, s_next, mu, log_std):
         var_pred = torch.exp(2 * log_std)
         var = var_pred + self.noise_floor
@@ -102,3 +105,31 @@ class RobustTransitionKernel(nn.Module):
         nll = const + 0.5 * log_det + mahal
         return -nll  
     """
+   
+    def log_prob(self, s_next, mu, log_std):
+        # Compute log prob (not negative) — useful for testing / diagnostics
+        var = torch.exp(2 * log_std) + self.noise_floor
+        var = torch.clamp(var, min=1e-8)  # Prevent log(0)
+        D = s_next.size(-1)
+        # log prob per dimension
+        lp = -0.5 * (((s_next - mu) ** 2) / var).sum(dim=-1)
+        lp = lp - 0.5 * (D * math.log(2 * math.pi) + 2 * log_std.sum(dim=-1))
+        return lp  # tensor of shape batch
+
+    def mahalanobis_distance_squared(self, s_next, s, a):
+        """
+        Compute squared Mahalanobis distance D² for batch of transitions.
+        Returns tensor of shape (batch_size,)
+        """
+        mu, log_std = self.forward(s, a)          # (batch, obs_dim), (batch, obs_dim)
+        var_pred = torch.exp(2 * log_std)         # predicted variance
+        var = var_pred + self.noise_floor         # same as in your log_prob
+        var = torch.clamp(var, min=1e-8)
+        residual = s_next - mu
+        # Optional: mild clipping for stability (you already do this in NLL)
+        residual = torch.clamp(residual, -10.0, 10.0)
+        # Squared Mahalanobis (diagonal covariance)
+        D2 = ((residual ** 2) / var).sum(dim=-1)   # sum over state dimensions
+        return D2
+
+    

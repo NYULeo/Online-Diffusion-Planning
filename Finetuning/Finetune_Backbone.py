@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from gymnasium.vector import AsyncVectorEnv
 from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker
 #from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
-from Finetuning.comp_reward import RewardConfig, TotalReward, TotalReward_Critic
+from Finetuning.comp_reward import RewardConfig, TotalReward, TotalReward_Critic, TotalReward_Critic_Mahalanobis, TotalReward_Mahalanobis
 from adjoint_matching import AdjointMatchingFineTuner, AdjointMatchingConfig
 #from acc_adjoint_matching import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
 from AM import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
@@ -258,11 +258,14 @@ class OnlineFinetuner():
     def set_reward_model(self, device):
         if self.config.critic:
             if(self.config.critic_model_checkpoint == 0):
-                self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
+                #self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
+                self.reward_model = TotalReward_Mahalanobis(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
             else:
-                self.reward_model = TotalReward_Critic(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, self.config.critic_model_checkpoint)
+                #self.reward_model = TotalReward_Critic(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, self.config.critic_model_checkpoint)
+                self.reward_model = TotalReward_Critic_Mahalanobis(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, self.config.critic_model_checkpoint)
         else:
-            self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
+            #self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
+            self.reward_model = TotalReward_Mahalanobis(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
     
     def gather_and_sync_trajs_and_buffer(self, local_trajs):
         # Gather local trajectories from all processes
