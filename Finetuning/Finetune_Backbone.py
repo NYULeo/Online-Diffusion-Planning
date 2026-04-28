@@ -590,9 +590,10 @@ class OnlineFinetuner():
                                    target_reward = self.config.train_reward_config.target_reward)
                     
             self.accelerator.wait_for_everyone()
-            stats = torch.tensor([threshold], device = self.accelerator.device)
-            stats = broadcast(stats, from_process=0)
-            threshold = stats.tolist()[0]
+            #stats = torch.tensor([threshold], device = self.accelerator.device)
+            #stats = broadcast(stats, from_process=0)
+            #threshold = stats.tolist()[0]
+            exit()
             #set the new total reward model
             self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             self.config.kernel_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
