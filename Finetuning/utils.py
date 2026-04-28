@@ -1336,8 +1336,9 @@ def compute_threshold(kernels, dataloader):
         #compute total mahalanobis distance
         with torch.no_grad():
             D2_total = compute_total_mahalanobis_score(kernels, s, a, s_next)
-        all_D2_total.append(D2_total)
+        all_D2_total.extend(D2_total.detach().cpu().numpy())
     
+    all_D2_total = np.array(all_D2_total)
     mean_D2_total = float(np.mean(all_D2_total))
     min_D2_total = float(np.min(all_D2_total))
     max_D2_total = float(np.max(all_D2_total))

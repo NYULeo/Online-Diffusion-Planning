@@ -639,7 +639,7 @@ def test_kernel(dataset_name, specific_dataset: str = None,
         dataset = test_dataset(train_trajs, kernel_name)
     else:
         dataset = test_dataset(trajs, kernel_name)
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, pin_memory=True, num_workers=8)
+    dataloader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=True, num_workers=8)
     
     # For each saved checkpoint / ensemble member
     step = save_freq
@@ -665,19 +665,18 @@ def test_kernel(dataset_name, specific_dataset: str = None,
             #compute total mahalanobis distance
             with torch.no_grad():
                 D2_total = compute_total_mahalanobis_score(ensemble, s, a, s_next)
-
-            all_D2_total.append(D2_total)
+            D2 = D2_total.detach().cpu().numpy()
+            all_D2_total.extend(D2)
 
             
             count += 1
             
-            if(count == 10000):
-                break
+            
             
 
             #if lp_mean < worst[1]:
              #   worst = (i, lp_mean, (s.cpu().numpy(), a.cpu().numpy(), s_next.cpu().numpy()))
-
+        all_D2_total = np.array(all_D2_total)
         mean_D2_total = float(np.mean(all_D2_total))
         min_D2_total = float(np.min(all_D2_total))
         max_D2_total = float(np.max(all_D2_total))
