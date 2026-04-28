@@ -663,16 +663,17 @@ def test_kernel(dataset_name, specific_dataset: str = None,
             s_next = s_next.to(device)
 
             #compute total mahalanobis distance
-            D2_total = compute_total_mahalanobis_score(ensemble, s, a, s_next)
+            with torch.no_grad():
+                D2_total = compute_total_mahalanobis_score(ensemble, s, a, s_next)
 
             all_D2_total.append(D2_total)
 
             
             count += 1
-            """
+            
             if(count == 1000):
                 break
-            """
+            
 
             #if lp_mean < worst[1]:
              #   worst = (i, lp_mean, (s.cpu().numpy(), a.cpu().numpy(), s_next.cpu().numpy()))

@@ -260,7 +260,7 @@ if __name__ == "__main__":
     #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
     RWConfig = RewardConfig(
                beta = 1.0, 
-               max_mahalanobis_score = 0.0857,
+               max_mahalanobis_score = 1.0,
                critic_gamma = 1.0,
                explore = False) 
 
