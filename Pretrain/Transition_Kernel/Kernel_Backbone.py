@@ -681,7 +681,7 @@ def test_kernel(dataset_name, specific_dataset: str = None,
         min_D2_total = float(all_D2_total.min())
         max_D2_total = float(all_D2_total.max())
         var_D2_total = float(all_D2_total.var())
-        tau = float(all_D2_total.quantile(quantile))
+        tau = float(np.quantile(all_D2_total, quantile))
         print(f"Checkpoint {step}")
         print(f"mean_D2_total = {mean_D2_total:.4f}")
         print(f"min_D2_total = {min_D2_total:.4f}")
