@@ -25,7 +25,7 @@ class RewardConfig:
     """Configuration for the adjoint matching fine‑tuner."""
     beta: float
     max_mahalanobis_score: float
-    min_log_prob: float
+    #min_log_prob: float
     explore: bool = True
     gamma: float = 0.8
     critic_gamma: float = 0.99
