@@ -517,7 +517,7 @@ def train_reward(trajs: List[TrajectoryDict], dataset_name: str, hidden_layers: 
            
 def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str,
                  batch_size=256, lr=1e-3, num_steps=10000,
-                 ensemble_size=10, λ_reg=1e-3, num_hidden_layers=2, hidden_dim=256, step: int = 0):
+                 ensemble_size=10, λ_reg=1e-3, num_hidden_layers=2, hidden_dim=256, step: int = 0, quantile: float = 0.999):
     # Prepare dataset / dataloader
     print(f"Training kernel for {dataset_name}_{specific_dataset}")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -568,7 +568,7 @@ def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
     
 
     new_loader = DataLoader(dataset, batch_size=1, shuffle=True, pin_memory=True, num_workers=8)
-    threshold = compute_threshold(ensemble, new_loader)
+    threshold = compute_threshold(ensemble, new_loader, quantile)
     for idx, m in enumerate(ensemble):
          ckpt = copy.deepcopy(m).cpu()
          save_kernel_model(ckpt, dataset_name, specific_dataset, step, idx)
@@ -1326,7 +1326,7 @@ def check_device():
     return device 
 
             
-def compute_threshold(kernels, dataloader):
+def compute_threshold(kernels, dataloader, quantile):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     all_D2_total = []
     for i, (s, a, s_next) in enumerate(dataloader):
@@ -1339,15 +1339,15 @@ def compute_threshold(kernels, dataloader):
         all_D2_total.extend(D2_total.detach().cpu().numpy())
     
     all_D2_total = np.array(all_D2_total)
-    mean_D2_total = float(np.mean(all_D2_total))
-    min_D2_total = float(np.min(all_D2_total))
-    max_D2_total = float(np.max(all_D2_total))
-    var_D2_total = float(np.var(all_D2_total))
-    median_D2_total = float(np.median(all_D2_total))
+    mean_D2_total = float(all_D2_total.mean())
+    min_D2_total = float(all_D2_total.min())
+    max_D2_total = float(all_D2_total.max())
+    var_D2_total = float(all_D2_total.var())
+    tau = float(np.quantile(all_D2_total, quantile))
     print(f"mean_D2_total = {mean_D2_total:.4f}")
     print(f"min_D2_total = {min_D2_total:.4f}")
     print(f"max_D2_total = {max_D2_total:.4f}")
     print(f"variance_D2_total = {var_D2_total:.4f}")
-    print(f"median_D2_total = {median_D2_total:.4f}")
-    return max_D2_total
+    print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
+    return tau
     

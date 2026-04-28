@@ -565,7 +565,8 @@ class OnlineFinetuner():
                              λ_reg = self.config.train_kernel_config.λ_reg, 
                              num_hidden_layers = self.config.train_kernel_config.num_hidden_layers,
                              hidden_dim = self.config.train_kernel_config.hidden_dim,
-                             step = ((step+1) * self.config.AMConfig.per_round_steps))
+                             step = ((step+1) * self.config.AMConfig.per_round_steps),
+                             quantile = self.config.RewardConfig.quantile)
                   
                   if self.config.critic:
                       print(f"Starting Critic Training")
