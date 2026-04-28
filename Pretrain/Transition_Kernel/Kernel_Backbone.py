@@ -629,7 +629,7 @@ def train_kernel(dataset_name, specific_dataset: str = None,
 
 def test_kernel(dataset_name, specific_dataset: str = None,
                 trajs: list = None,
-                save_freq: int = 50, num_steps: int = 500, hidden_layers = 2, hidden_dim = 256, ensemble_size = 3, quantile = 0.98):
+                save_freq: int = 50, num_steps: int = 500, hidden_layers = 2, hidden_dim = 256, ensemble_size = 3, quantile = 0.9999):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #device = check_device()
     print("Using device:", device)
@@ -677,12 +677,12 @@ def test_kernel(dataset_name, specific_dataset: str = None,
             #if lp_mean < worst[1]:
              #   worst = (i, lp_mean, (s.cpu().numpy(), a.cpu().numpy(), s_next.cpu().numpy()))
         all_D2_total = np.array(all_D2_total)
-        mean_D2_total = float(np.mean(all_D2_total))
-        min_D2_total = float(np.min(all_D2_total))
-        max_D2_total = float(np.max(all_D2_total))
-        var_D2_total = float(np.var(all_D2_total))
-        median_D2_total = float(np.median(all_D2_total))
-        tau = np.quantile(all_D2_total, quantile)
+        mean_D2_total = float(all_D2_total.mean())
+        min_D2_total = float(all_D2_total.min())
+        max_D2_total = float(all_D2_total.max())
+        var_D2_total = float(all_D2_total.var())
+        median_D2_total = float(all_D2_total.median())
+        tau = float(all_D2_total.quantile(quantile))
         print(f"Checkpoint {step}")
         print(f"mean_D2_total = {mean_D2_total:.4f}")
         print(f"min_D2_total = {min_D2_total:.4f}")
