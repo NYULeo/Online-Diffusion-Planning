@@ -722,56 +722,52 @@ def get_pretrained_kernel_stats(kernel_name):
     return stats
 
 
-
-
-def compute_total_mahalanobis_score(kernels: List[RobustTransitionKernel], s, a, s_next):
+def compute_total_mahalanobis_score(
+    kernels: List[RobustTransitionKernel],
+    s: torch.Tensor,
+    a: torch.Tensor,
+    s_next: torch.Tensor,
+) -> torch.Tensor:
     """
-    Compute squared Mahalanobis distance using Total Predictive Variance
-    (aleatoric + epistemic).
-    
-    Args:
-        kernels: list of RobustTransitionKernel models (ensemble)
-        s, a, s_next: tensors of shape (batch_size, dim) or (batch_size, ...)
-    
-    Returns:
-        D2_total: tensor of shape (batch_size,)  ← lower = more feasible
+    Efficient + fully differentiable version.
+    Gradients will flow correctly through D² → softplus → loss.
     """
-    device = s.device
     K = len(kernels)
-    
-    mus = []
-    log_stds = []
-    
-  
-    for kernel in kernels:
-            mu, log_std = kernel(s, a)          # (B, obs_dim)
+    device = s.device
+
+    # === 1. Vectorized ensemble forward (fastest when gradients are needed) ===
+    # Stack all models into one batched forward
+    def single_model_forward(k: RobustTransitionKernel):
+        return k(s, a)   # returns (mu, log_std)
+
+    # Use vmap (PyTorch ≥ 2.0) if available — this is the most efficient way
+    if hasattr(torch, "vmap"):
+        mus, log_stds = torch.vmap(single_model_forward)(kernels)   # (K, B, dim)
+    else:
+        # Fallback: manual loop (still fast and fully differentiable)
+        mus = []
+        log_stds = []
+        for k in kernels:
+            mu, log_std = k(s, a)
             mus.append(mu)
             log_stds.append(log_std)
-    
-    # Stack -> (K, B, obs_dim)
-    mus = torch.stack(mus, dim=0)
-    log_stds = torch.stack(log_stds, dim=0)
-    
-    # 1. Total mean
-    mu_total = mus.mean(dim=0)                    # (B, obs_dim)
-    
-    # 2. Aleatoric variance (average predicted variance)
+        mus = torch.stack(mus, dim=0)
+        log_stds = torch.stack(log_stds, dim=0)
+
+    # === 2. Total predictive statistics (all in autograd graph) ===
+    mu_total = mus.mean(dim=0)                                      # (B, obs_dim)
+
     var_aleatoric = (torch.exp(2 * log_stds) + kernels[0].noise_floor).mean(dim=0)
-    
-    # 3. Epistemic variance (disagreement of means)
-    var_epistemic = mus.var(dim=0, unbiased=False)   # population variance (common in MBRL)
-    
-    # 4. Total variance
+
+    var_epistemic = mus.var(dim=0, unbiased=False)                  # population variance
+
     var_total = var_aleatoric + var_epistemic
     var_total = torch.clamp(var_total, min=1e-8)
-    
-    # 5. Squared Mahalanobis Distance (Total Score)
+
+    # === 3. Mahalanobis distance (fully differentiable) ===
     residual = s_next - mu_total
-    residual = torch.clamp(residual, -10.0, 10.0)   # stability
-    
-    D2_total = ((residual ** 2) / var_total).sum(dim=-1)   # (B,)
-    
+    residual = torch.clamp(residual, -10.0, 10.0)
+
+    D2_total = ((residual ** 2) / var_total).sum(dim=-1)            # (B,)
+
     return D2_total
-
-
-

@@ -25,7 +25,7 @@ class RewardConfig:
     """Configuration for the adjoint matching fine‑tuner."""
     beta: float
     max_mahalanobis_score: float
-    #min_log_prob: float
+    min_log_prob: Optional[float] = None
     explore: bool = True
     gamma: float = 0.8
     critic_gamma: float = 0.99
@@ -655,7 +655,7 @@ class TotalReward_Critic_Mahalanobis(nn.Module):
             kernel_net.load_state_dict(sd)
             kernel_net.eval()
             self.kernels.append(kernel_net)
-
+      
         self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint)
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
         self.critic_stat = get_critic_stats(dataset_name, specific_dataset, critic_checkpoint)
@@ -848,12 +848,6 @@ class TotalReward_Critic_Mahalanobis(nn.Module):
 
         total_reward = total_reward + lam * self.config.delta
         return total_reward, gradient
-
-
-
-
-
-
 
 
 

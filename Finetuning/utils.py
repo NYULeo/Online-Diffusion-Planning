@@ -26,6 +26,7 @@ from Pretrain.Rewards.nets import SimpleReward
 from torch.utils.data import DataLoader
 import torch.optim as optim
 from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel
+from Pretrain.Transition_Kernel.Kernel_Backbone import compute_total_mahalanobis_score
 from Pretrain.Dataset import KitchenDataset, PointMazeDataset, get_env, Planner_Processor
 from gymnasium.vector import AsyncVectorEnv
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
@@ -564,11 +565,15 @@ def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
 
         avg_loss = sum(losses).item() / ensemble_size
         total_loss += avg_loss
+    
 
+    new_loader = DataLoader(dataset, batch_size=1, shuffle=True, pin_memory=True, num_workers=8)
+    threshold = compute_threshold(ensemble, new_loader)
     for idx, m in enumerate(ensemble):
          ckpt = copy.deepcopy(m).cpu()
          save_kernel_model(ckpt, dataset_name, specific_dataset, step, idx)
     print(f"Kernel model saved")
+    return threshold
 
 
 class CriticDataset(Dataset):
@@ -1289,7 +1294,6 @@ class AlphaScheduler:
         return self.current_alpha
     
 
-
 def checktrajs(trajs):
     success = 0
     for i in range(len(trajs)):
@@ -1308,6 +1312,7 @@ def checktrajs(trajs):
     success_rate = success / len(trajs)
     return True, success_rate
 
+
 def check_device():
     if torch.backends.mps.is_available():
         device = torch.device("mps")
@@ -1319,3 +1324,29 @@ def check_device():
         device = torch.device("cpu")
         print("⚠️  Falling back to CPU (no GPU acceleration)")
     return device 
+
+            
+def compute_threshold(kernels, dataloader):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    all_D2_total = []
+    for i, (s, a, s_next) in enumerate(dataloader):
+        s = s.to(device)
+        a = a.to(device)
+        s_next = s_next.to(device)
+        #compute total mahalanobis distance
+        with torch.no_grad():
+            D2_total = compute_total_mahalanobis_score(kernels, s, a, s_next)
+        all_D2_total.append(D2_total)
+    
+    mean_D2_total = float(np.mean(all_D2_total))
+    min_D2_total = float(np.min(all_D2_total))
+    max_D2_total = float(np.max(all_D2_total))
+    var_D2_total = float(np.var(all_D2_total))
+    median_D2_total = float(np.median(all_D2_total))
+    print(f"mean_D2_total = {mean_D2_total:.4f}")
+    print(f"min_D2_total = {min_D2_total:.4f}")
+    print(f"max_D2_total = {max_D2_total:.4f}")
+    print(f"variance_D2_total = {var_D2_total:.4f}")
+    print(f"median_D2_total = {median_D2_total:.4f}")
+    return max_D2_total
+    

@@ -555,7 +555,7 @@ class OnlineFinetuner():
                              goal = self.config.train_reward_config.train_goal)
                   if self.config.kernel:
                       print(f"Starting Kernel Training")
-                      train_kernel(self.Train_Buffer, 
+                      threshold = train_kernel(self.Train_Buffer, 
                              dataset_name = self.config.dataset_name, 
                              specific_dataset = self.config.specific_dataset,
                              batch_size = self.config.train_kernel_config.batch_size, 
@@ -592,6 +592,7 @@ class OnlineFinetuner():
             self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             self.config.kernel_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
+            self.config.RewardConfig.max_mahalanobis_score = threshold
             #self.config.critic_model_checkpoint = 0
             self.set_reward_model(self.device)
             
