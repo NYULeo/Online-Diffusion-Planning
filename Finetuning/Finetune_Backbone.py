@@ -538,8 +538,8 @@ class OnlineFinetuner():
                  print(f"Total Number of Environment Steps: {total_steps}")
                  print(f"Average Normalized Score: {avg_score:.2f}")
             self.accelerator.wait_for_everyone()  
-           
-            threshold_tensor = torch.tensor(0.0, device=self.accelerator.device)
+            
+            threshold = 0.0
             if self.accelerator.is_main_process:
                   print(f"Starting Reward Training")
                   train_reward(self.Train_Buffer, 
@@ -568,7 +568,7 @@ class OnlineFinetuner():
                              hidden_dim = self.config.train_kernel_config.hidden_dim,
                              step = ((step+1) * self.config.AMConfig.per_round_steps),
                              quantile = self.config.RewardConfig.quantile)
-                      threshold_tensor = torch.tensor(threshold, device = self.accelerator.device, dtype = torch.float32)
+                      
                   if self.config.critic:
                       print(f"Starting Critic Training")
                       #save_trajs(critic_buffer, self.config.dataset_name, self.config.specific_dataset, ((step+1) * self.config.AMConfig.per_round_steps))
@@ -590,8 +590,9 @@ class OnlineFinetuner():
                                    target_reward = self.config.train_reward_config.target_reward)
                     
             self.accelerator.wait_for_everyone()
-            threshold_tensor = broadcast(threshold_tensor, from_process=0)
-            threshold = threshold_tensor.item()
+            stats = torch.tensor([threshold], device = self.accelerator.device)
+            stats = broadcast(stats, from_process=0)
+            threshold = stats.tolist()[0]
             #set the new total reward model
             self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             self.config.kernel_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)

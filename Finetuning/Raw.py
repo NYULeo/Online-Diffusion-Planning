@@ -15,8 +15,13 @@ import gymnasium_robotics  # registers the envs
 import numpy as np
 import torch
 
-a = torch.tensor(5)
-print(a)
+
+
+a = torch.tensor([1]).tolist()
+print(a[0])
+
+
+
 
 
 
