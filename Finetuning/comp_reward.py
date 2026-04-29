@@ -17,6 +17,7 @@ from typing import Optional
 from torch.nn import functional as F
 from dataclasses import dataclass
 import numpy as np
+import math
 
 
 
@@ -102,6 +103,7 @@ class TotalReward(nn.Module):
             mu, log_std = k(s, a)
             lps.append(k.log_prob(s_next, mu, log_std))
         avg = torch.stack(lps, dim=0).mean(dim=0)
+        #avg = torch.logsumexp(lps, dim=0) - math.log(len(self.kernels)) 
         x = self.config.min_log_prob - avg
         return F.softplus(x, beta=self.config.beta)
 
@@ -298,6 +300,7 @@ class TotalReward_Critic(nn.Module):
             mu, log_std = k(s, a)
             lps.append(k.log_prob(s_next, mu, log_std))
         avg = torch.stack(lps, dim=0).mean(dim=0)
+        #avg = torch.logsumexp(lps, dim=0) - math.log(len(self.kernels)) 
         x = self.config.min_log_prob - avg
         return F.softplus(x, beta=self.config.beta)
 
