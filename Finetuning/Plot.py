@@ -243,10 +243,7 @@ normalized_scores = [
     48.30,  # Round 29
     48.32   # Round 30
 ]
-import torch
-print(torch.backends.mps.is_available())   # Should be True
-print(torch.backends.mps.is_built())       # Should be True
-exit()
+
 fig, ax = plt.subplots()
 ax.plot(x, normalized_scores, color='#C44E9B', linewidth=3.2, marker='o', markersize=8, markeredgecolor='white', markeredgewidth=0.8, label='Our Method', zorder=5)
 #ax.fill_between(x, y1 - error1, y1 + error1, color='#C44E9B', alpha=0.22)
