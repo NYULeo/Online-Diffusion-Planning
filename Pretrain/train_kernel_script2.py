@@ -52,9 +52,9 @@ if __name__ == '__main__':  # pragma: no cover
          lr = 1e-4,
          num_steps = 10000,
          save_freq = 5000,
-         ensemble_size = 10,
+         ensemble_size = 20,
          num_modes = 8,
-         num_hidden_layers = 3,
+         num_hidden_layers = 4,
          hidden_dim = 512)
 
 
