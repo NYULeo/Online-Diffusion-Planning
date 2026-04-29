@@ -40,9 +40,9 @@ if __name__ == '__main__':  # pragma: no cover
                 trajs = None,
                 save_freq = 10000,
                 num_steps = 10000,
-                num_hidden_layers = 3,
+                num_hidden_layers = 4,
                 hidden_dim = 512,
-                ensemble_size = 10, 
+                ensemble_size = 20, 
                 num_modes = 8,
                 quantile = 0.95)
 
