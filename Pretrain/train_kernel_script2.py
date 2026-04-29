@@ -50,24 +50,26 @@ if __name__ == '__main__':  # pragma: no cover
          specific_dataset = specific_dataset,
          batch_size = 512,
          lr = 1e-4,
-         num_steps = 40000,
+         num_steps = 50000,
          save_freq = 10000,
-         ensemble_size = 6,
+         ensemble_size = 10,
          num_modes = 5,
          num_hidden_layers = 3,
-         hidden_dim = 384,
-         λ_reg = 1e-3)
+         hidden_dim = 514,
+         λ_reg = 1e-3,
+         noise_floor = 5e-4)
       
     test_kernel_mog(dataset_name = dataset,
                 specific_dataset = specific_dataset,
                 trajs = None,
-                save_freq = 40000,
-                num_steps = 40000,
+                save_freq = 50000,
+                num_steps = 50000,
                 num_hidden_layers = 3,
-                hidden_dim = 384,
-                ensemble_size = 6, 
+                hidden_dim = 514,
+                ensemble_size = 10, 
                 num_modes = 5,
-                quantile = 0.95)
+                quantile = 0.95,
+                noise_floor = 5e-4)
 
 
 

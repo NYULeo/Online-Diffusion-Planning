@@ -544,6 +544,7 @@ def train_mog_kernel(
     num_hidden_layers: int = 3,             # 6~8 recommended for manipulation
     hidden_dim: int = 512,
     λ_reg: float = 2e-3,              # disagreement regularization
+    noise_floor: float = 1e-6,
     device=None
 ):
     if device is None:
@@ -566,7 +567,8 @@ def train_mog_kernel(
             act_dim=act_dim,
             num_modes = num_modes,
             num_hidden_layers = num_hidden_layers,
-            hidden_dim = hidden_dim
+            hidden_dim = hidden_dim, 
+            noise_floor = noise_floor
         ).to(device)
         for _ in range(ensemble_size)
     ]
@@ -830,13 +832,13 @@ def test_kernel(dataset_name, specific_dataset: str = None,
         print(f"min_log_density = {min_log_density:.4f}")
         print(f"max_log_density = {max_log_density:.4f}")
         print(f"std_log_density = {std_log_density:.4f}")
-        print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
+        print(f"τ ({(1-quantile)*100:.0f}th percentile) : {tau:.4f}")
         step += save_freq
 
 
 def test_kernel_mog(dataset_name, specific_dataset: str = None,
                 trajs: list = None,
-                save_freq: int = 50, num_steps: int = 500, num_hidden_layers = 2, hidden_dim = 256, ensemble_size = 3, num_modes = 9, quantile = 0.95):
+                save_freq: int = 50, num_steps: int = 500, num_hidden_layers = 2, hidden_dim = 256, ensemble_size = 3, num_modes = 9, noise_floor = 1e-6, quantile = 0.95):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #device = check_device()
     print("Using device:", device)
@@ -855,7 +857,7 @@ def test_kernel_mog(dataset_name, specific_dataset: str = None,
         ensemble = []
         for idx in range(ensemble_size):
             state_dict = load_model(kernel_name, step, idx)
-            m = MoGTransitionKernel(obs_dim, act_dim, num_modes, num_hidden_layers, hidden_dim).to(device)
+            m = MoGTransitionKernel(obs_dim, act_dim, num_modes, num_hidden_layers, hidden_dim, noise_floor).to(device)
             m.load_state_dict(state_dict)
             m.eval()
             ensemble.append(m)
@@ -907,7 +909,7 @@ def test_kernel_mog(dataset_name, specific_dataset: str = None,
         print(f"min_log_density = {min_log_density:.4f}")
         print(f"max_log_density = {max_log_density:.4f}")
         print(f"std_log_density = {std_log_density:.4f}")
-        print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
+        print(f"τ ({(1-quantile)*100:.0f}th percentile) : {tau:.4f}")
         step += save_freq
 
 
