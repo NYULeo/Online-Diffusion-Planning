@@ -100,7 +100,7 @@ if __name__ == '__main__':  # pragma: no cover
                  lr = 3e-05, 
                  tau = 0.005,
                  goal = np.array([[4.0, -3.0]], dtype = np.float32),
-                 sigma = None,
+                 #sigma = 7.0,
                  alpha = 0.999,
                  #alpha = None,
                  target_reward = 25.0,

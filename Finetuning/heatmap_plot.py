@@ -1287,7 +1287,7 @@ if __name__ == '__main__':
          critic_heatmap(step, env_name, specific_env, hidden_layers_critic, hidden_dim_critic)
          #critic_heatmap(step, env_name, specific_env, hidden_layers_critic, hidden_dim_critic, num_heads_critic)
          plot_critic_heatmap(step, env_name, specific_env, hidden_layers_critic, hidden_dim_critic)
-         plot_reward_heatmap(step, env_name, specific_env, hidden_layers_reward, hidden_dim_reward)
+         #plot_reward_heatmap(step, env_name, specific_env, hidden_layers_reward, hidden_dim_reward)
          reward_heatmap(step, env_name, specific_env, hidden_layers_reward, hidden_dim_reward)
 
          step += 10
