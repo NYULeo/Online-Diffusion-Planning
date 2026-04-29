@@ -54,7 +54,7 @@ if __name__ == '__main__':  # pragma: no cover
          save_freq = 5000,
          ensemble_size = 10,
          num_modes = 8,
-         hidden_layers = 3,
+         num_hidden_layers = 3,
          hidden_dim = 512)
 
 
