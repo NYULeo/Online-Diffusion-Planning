@@ -20,26 +20,29 @@ if __name__ == '__main__':  # pragma: no cover
     #train_kernel(dataset_name = 'pointmaze', specific_dataset ='medium', batch_size = 256, lr = 3e-4, num_steps = 50000, ensemble_size=3, λ_reg=1e-3)
     #train_kernel(dataset_name = 'pointmaze', specific_dataset ='large', batch_size = 256, lr = 3e-4, num_steps = 300000, ensemble_size=3, λ_reg=1e-3)
     dataset = 'cube'
-    specific_dataset = 'single'
+    specific_dataset = 'double'
     train_mog_kernel(
          dataset_name = dataset,
          specific_dataset = specific_dataset,
-         batch_size = 256,
+         batch_size = 512,
          lr = 1e-4,
          num_steps = 50000,
          save_freq = 10000,
-         ensemble_size = 20,
+         ensemble_size = 10,
          num_modes = 8,
-         num_hidden_layers = 4,
-         hidden_dim = 512)
+         num_hidden_layers = 3,
+         hidden_dim = 512,
+         λ_reg = 2e-3,
+         noise_floor = 5e-4)
       
     test_kernel_mog(dataset_name = dataset,
                 specific_dataset = specific_dataset,
                 trajs = None,
                 save_freq = 50000,
                 num_steps = 50000,
-                num_hidden_layers = 4,
+                num_hidden_layers = 3,
                 hidden_dim = 512,
-                ensemble_size = 20, 
+                ensemble_size = 10, 
                 num_modes = 8,
-                quantile = 0.95)
+                quantile = 0.95,
+                noise_floor = 5e-4)
