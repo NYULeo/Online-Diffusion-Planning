@@ -25,7 +25,7 @@ import math
 class RewardConfig:
     """Configuration for the adjoint matching fine‑tuner."""
     beta: float
-    max_mahalanobis_score: float
+    max_mahalanobis_score: Optional[float] = None
     quantile: float = 0.999
     min_log_prob: Optional[float] = None
     explore: bool = True
