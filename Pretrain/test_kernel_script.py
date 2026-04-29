@@ -15,7 +15,7 @@ import pickle
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     #trajs = get_trajs('pointmaze', 'medium', step = 0)
-    """
+    
     test_kernel(dataset_name = 'pointmaze', 
                 specific_dataset = 'medium', 
                 trajs = None, 
@@ -24,7 +24,7 @@ if __name__ == '__main__':  # pragma: no cover
                 hidden_layers = 2, 
                 hidden_dim = 256, 
                 ensemble_size = 10)
-    """
+
     """
     test_kernel(dataset_name = 'cube',
                 specific_dataset = 'single',
@@ -34,6 +34,7 @@ if __name__ == '__main__':  # pragma: no cover
                 hidden_layers = 4,
                 hidden_dim = 256,
                 ensemble_size = 10)
+    """
     """
     test_kernel_mog(dataset_name = 'cube',
                 specific_dataset = 'single',
@@ -45,6 +46,7 @@ if __name__ == '__main__':  # pragma: no cover
                 ensemble_size = 20, 
                 num_modes = 8,
                 quantile = 0.95)
+     """
 
     #test_Model(dataset_name = 'kitchen', save_freq = 2000, num_steps = 300000)
     
