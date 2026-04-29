@@ -258,7 +258,7 @@ class MoGTransitionKernel(nn.Module):
         
         return mu, log_std, weights
 
-    def mog_log_prob(self, s_next: torch.Tensor, mu, log_std, weights):
+    def log_prob(self, s_next: torch.Tensor, mu, log_std, weights):
         """Return positive log probability (log p(s'|s,a)) - Recommended for your use"""
         var = torch.exp(2 * log_std) + self.noise_floor
         var = torch.clamp(var, min=1e-6)
@@ -282,4 +282,4 @@ class MoGTransitionKernel(nn.Module):
 
     def mog_nll(self, s_next: torch.Tensor, mu, log_std, weights):
         """Negative Log Likelihood - for training"""
-        return -self.mog_log_prob(s_next, mu, log_std, weights).mean()
+        return -self.log_prob(s_next, mu, log_std, weights).mean()

@@ -1028,7 +1028,7 @@ def compute_log_density_mog(kernels: List[MoGTransitionKernel], s, a, s_next):
     
     for kernel in kernels:
         mu, log_std, weights = kernel(s, a)
-        lp = kernel.mog_log_prob(s_next, mu, log_std, weights)   # must use this method
+        lp = kernel.log_prob(s_next, mu, log_std, weights)   # must use this method
         all_log_probs.append(lp)
     
     all_log_probs = torch.stack(all_log_probs, dim=0)            # (K_ens, B)
