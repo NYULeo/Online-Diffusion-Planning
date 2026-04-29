@@ -581,7 +581,7 @@ def train_mog_kernel(
         lr,
         obs_dim,
         act_dim,
-        kernel_name + "_MoG",
+        kernel_name,
         optimizers[0],
         ensemble[0],
         ensemble_size,
