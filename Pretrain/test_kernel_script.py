@@ -3,7 +3,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
-from Transition_Kernel.Kernel_Backbone import test_kernel
+from Transition_Kernel.Kernel_Backbone import test_kernel, test_kernel_mog
 from utils import set_seed
 from Finetuning.utils import get_trajs
 import pickle
@@ -25,6 +25,7 @@ if __name__ == '__main__':  # pragma: no cover
                 hidden_dim = 256, 
                 ensemble_size = 10)
     """
+    """
     test_kernel(dataset_name = 'cube',
                 specific_dataset = 'single',
                 trajs = None,
@@ -33,5 +34,17 @@ if __name__ == '__main__':  # pragma: no cover
                 hidden_layers = 4,
                 hidden_dim = 256,
                 ensemble_size = 10)
+    """
+    test_kernel_mog(dataset_name = 'cube',
+                specific_dataset = 'single',
+                trajs = None,
+                save_freq = 20000,
+                num_steps = 20000,
+                num_hidden_layers = 3,
+                hidden_dim = 512,
+                ensemble_size = 10, 
+                num_modes = 8,
+                quantile = 0.95)
+
     #test_Model(dataset_name = 'kitchen', save_freq = 2000, num_steps = 300000)
     

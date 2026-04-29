@@ -522,6 +522,99 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
         num += save_freq
         
 """
+import torch
+import torch.optim as optim
+from torch.utils.data import DataLoader
+import math
+from tqdm import tqdm
+import copy
+from .Kernel_Net import MoGTransitionKernel
+
+def train_mog_kernel(
+    dataset_name: str,
+    specific_dataset: str = None,
+    batch_size: int = 256,
+    lr: float = 1e-4,
+    num_steps: int = 20000,
+    save_freq: int = 2000,
+    ensemble_size: int = 6,           # number of MoG models in ensemble
+    num_modes: int = 8,               # mixture components per model
+    num_hidden_layers: int = 3,
+    hidden_dim: int = 512,
+    device=None
+):
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"using device: {device}")
+    
+    print(f"Training MoG Transition Kernel on {dataset_name} | Device: {device}")
+    
+    # Load dataset
+    trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
+    dataset = KernelDataset(trajs, kernel_name)
+    loader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
+                              pin_memory=True, num_workers=8))
+    
+    # Create ensemble of MoG kernels
+    ensemble = [
+        MoGTransitionKernel(
+            obs_dim=obs_dim,
+            act_dim=act_dim,
+            num_modes=num_modes,
+            num_hidden_layers = num_hidden_layers,
+            hidden_dim=hidden_dim
+        ).to(device)
+        for _ in range(ensemble_size)
+    ]
+    
+    optimizers = [optim.Adam(m.parameters(), lr=lr, weight_decay=1e-5) 
+                  for m in ensemble]
+    
+    step = 0
+    total_loss = 0.0
+    
+    for step in tqdm(range(1, num_steps + 1), desc="Training MoG Kernel"):
+        s, a, s_next = next(loader)
+        s = s.to(device)
+        a = a.to(device)
+        s_next = s_next.to(device)
+        
+        losses = []
+        
+        for model in ensemble:
+            #mu, log_std, weights = model(s, a)
+            loss = model.log_prob(s, a, s_next)
+            losses.append(loss)
+        
+        # Average loss across ensemble for logging
+        avg_loss = sum(losses).item() / ensemble_size
+        total_loss += avg_loss
+        
+        # Backprop each model independently
+        for model, opt, loss in zip(ensemble, optimizers, losses):
+            opt.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+            opt.step()
+        
+        # Logging
+        if step % 500 == 0:
+            print(f"Step {step:6d} | Avg Loss: {total_loss/500:.6f}")
+            total_loss = 0.0
+        
+        # Save checkpoints
+        if step % save_freq == 0 or step == num_steps:
+            for idx, model in enumerate(ensemble):
+                ckpt = copy.deepcopy(model).cpu()
+                save_model(ckpt, f"{kernel_name}_MoG", step, idx)
+            
+            if step == num_steps:
+                for idx, model in enumerate(ensemble):
+                    ckpt = copy.deepcopy(model).cpu()
+                    save_to_finetuning(ckpt, dataset_name, idx, specific_dataset)
+    
+    print("MoG Transition Kernel training completed!")
+    return ensemble
 
 def train_kernel(dataset_name, specific_dataset: str = None,
                  batch_size=256, lr=1e-3, num_steps=10000, save_freq = 200,
@@ -668,26 +761,12 @@ def test_kernel(dataset_name, specific_dataset: str = None,
             with torch.no_grad():
                 D2_total = compute_total_mahalanobis_score(ensemble, s, a, s_next)
                 log_density = compute_log_density(ensemble, s, a, s_next)
-                """
-                Temp = []
-                for m in ensemble:
-                    D = m.computeD(s, a, s_next).detach().cpu().numpy()
-                    Temp.append(D)
-                """
-            #D = np.mean(Temp, axis = 0)
             D2 = D2_total.detach().cpu().numpy()
             log_density = log_density.detach().cpu().numpy()
             all_D2_total.extend(D2)
             all_log_density.extend(log_density)
-
-            #all_D_total.extend(D)
             count += 1
-            
-            
-            
-
-            #if lp_mean < worst[1]:
-             #   worst = (i, lp_mean, (s.cpu().numpy(), a.cpu().numpy(), s_next.cpu().numpy()))
+        
         print('Mahalanobis Distance')
         all_D2_total = np.array(all_D2_total)
         mean_D2_total = float(all_D2_total.mean())
@@ -708,7 +787,7 @@ def test_kernel(dataset_name, specific_dataset: str = None,
         min_log_density = float(all_log_density.min())
         max_log_density = float(all_log_density.max())
         var_log_density = float(all_log_density.var())
-        tau = float(np.quantile(all_log_density, quantile))
+        tau = float(np.quantile(all_log_density, 1 - quantile))
         print(f"Checkpoint {step}")
         print(f"mean_log_density = {mean_log_density:.4f}")
         print(f"min_log_density = {min_log_density:.4f}")
@@ -716,6 +795,84 @@ def test_kernel(dataset_name, specific_dataset: str = None,
         print(f"variance_log_density = {var_log_density:.4f}")
         print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
         step += save_freq
+
+
+def test_kernel_mog(dataset_name, specific_dataset: str = None,
+                trajs: list = None,
+                save_freq: int = 50, num_steps: int = 500, num_hidden_layers = 2, hidden_dim = 256, ensemble_size = 3, num_modes = 9, quantile = 0.95):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #device = check_device()
+    print("Using device:", device)
+
+    train_trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
+    if trajs is None:
+        dataset = test_dataset(train_trajs, kernel_name)
+    else:
+        dataset = test_dataset(trajs, kernel_name)
+    dataloader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=True, num_workers=8)
+    
+    # For each saved checkpoint / ensemble member
+    step = save_freq
+    while step <= num_steps:
+        # Load ensemble members
+        ensemble = []
+        for idx in range(ensemble_size):
+            state_dict = load_model(kernel_name, step, idx)
+            m = MoGTransitionKernel(obs_dim, act_dim, num_modes, num_hidden_layers, hidden_dim).to(device)
+            m.load_state_dict(state_dict)
+            m.eval()
+            ensemble.append(m)
+
+        # Compute log-probs over dataset
+        all_D2_total = []
+        all_log_density = []
+        #all_D_total = []
+        count = 0
+        #worst = (None, float("inf"), None)  # (idx, log_prob, (s, a, s_next))
+        for i, (s, a, s_next) in enumerate(dataloader):
+            s = s.to(device)
+            a = a.to(device)
+            s_next = s_next.to(device)
+
+            #compute total mahalanobis distance
+            with torch.no_grad():
+                D2_total = compute_total_mahalanobis_score_mog(ensemble, s, a, s_next)
+                log_density = compute_log_density_mog(ensemble, s, a, s_next)
+            D2 = D2_total.detach().cpu().numpy()
+            log_density = log_density.detach().cpu().numpy()
+            all_D2_total.extend(D2)
+            all_log_density.extend(log_density)
+            count += 1
+        
+        print('Mahalanobis Distance')
+        all_D2_total = np.array(all_D2_total)
+        mean_D2_total = float(all_D2_total.mean())
+        min_D2_total = float(all_D2_total.min())
+        max_D2_total = float(all_D2_total.max())
+        var_D2_total = float(all_D2_total.var())
+        tau = float(np.quantile(all_D2_total, quantile))
+        print(f"Checkpoint {step}")
+        print(f"mean_D2_total = {mean_D2_total:.4f}")
+        print(f"min_D2_total = {min_D2_total:.4f}")
+        print(f"max_D2_total = {max_D2_total:.4f}")
+        print(f"variance_D2_total = {var_D2_total:.4f}")
+        print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
+        
+        print('Log Density')
+        all_log_density = np.array(all_log_density)
+        mean_log_density = float(all_log_density.mean())
+        min_log_density = float(all_log_density.min())
+        max_log_density = float(all_log_density.max())
+        var_log_density = float(all_log_density.var())
+        tau = float(np.quantile(all_log_density, 1 - quantile))
+        print(f"Checkpoint {step}")
+        print(f"mean_log_density = {mean_log_density:.4f}")
+        print(f"min_log_density = {min_log_density:.4f}")
+        print(f"max_log_density = {max_log_density:.4f}")
+        print(f"variance_log_density = {var_log_density:.4f}")
+        print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
+        step += save_freq
+
 
 
 def get_pretrained_kernel(dataset_name, checkpoints, specific_dataset: Optional[str] = None):
@@ -792,7 +949,7 @@ def compute_total_mahalanobis_score(
     return D2_total
 """
 
-def compute_total_mahalanobis_score(kernels: list, s, a, s_next):
+def compute_total_mahalanobis_score(kernels: List[RobustTransitionKernel], s, a, s_next):
     mus = []
     log_stds = []
     for kernel in kernels:
@@ -802,29 +959,22 @@ def compute_total_mahalanobis_score(kernels: list, s, a, s_next):
     # Stack -> (K, B, obs_dim)
     mus = torch.stack(mus, dim=0)
     log_stds = torch.stack(log_stds, dim=0)
-    
     # 1. Total mean
     mu_total = mus.mean(dim=0)                    # (B, obs_dim)
-    
     # 2. Aleatoric variance (average predicted variance)
     var_aleatoric = (torch.exp(2 * log_stds) + kernels[0].noise_floor).mean(dim=0)
-    
     # 3. Epistemic variance (disagreement of means)
     var_epistemic = mus.var(dim=0, unbiased=False)   # population variance (common in MBRL)
-    
     # 4. Total variance
     var_total = var_aleatoric + var_epistemic
     var_total = torch.clamp(var_total, min=1e-8)
-    
     # 5. Squared Mahalanobis Distance (Total Score)
     residual = s_next - mu_total
     #residual = torch.clamp(residual, -10.0, 10.0)   # stability
-    
     D2_total = ((residual ** 2) / var_total).sum(dim=-1)   # (B,)
-    
     return D2_total
 
-def compute_log_density(kernels: list, s, a, s_next):
+def compute_log_density(kernels: List[RobustTransitionKernel], s, a, s_next):
     log_probs = []
     for kernel in kernels:
         mu, log_std = kernel(s, a)
@@ -835,4 +985,83 @@ def compute_log_density(kernels: list, s, a, s_next):
     log_density = torch.logsumexp(log_probs, dim=0) - math.log(len(kernels)) 
     return log_density
     #return log_probs
+
+def compute_log_density_mog(kernels: List[MoGTransitionKernel], s, a, s_next):
+    log_probs = []
+    for kernel in kernels:
+        lp = kernel.log_prob(s, a, s_next)
+        log_probs.append(lp)
+    #log_probs = torch.stack(log_probs, dim=0).mean(dim = 0)
+    log_probs = torch.stack(log_probs, dim=0)
+    log_density = torch.logsumexp(log_probs, dim=0) - math.log(len(kernels)) 
+    return log_density
+    #return log_probs
+
+def compute_total_mahalanobis_score_mog(
+    kernels: List[MoGTransitionKernel], 
+    s: torch.Tensor, 
+    a: torch.Tensor, 
+    s_next: torch.Tensor
+) -> torch.Tensor:
+    """
+    Compute squared Mahalanobis distance using Total Predictive Variance
+    for Mixture of Gaussians + Ensemble.
     
+    kernels: list of MoGTransitionKernel models
+    Returns: D2_total of shape (B,)
+    """
+    K_ensemble = len(kernels)          # number of models in ensemble
+    device = s.device
+    
+    mu_mixtures = []
+    var_mixtures = []
+    
+    for kernel in kernels:
+        mu, log_std, weights = kernel(s, a)          # mu: (B, num_modes, obs_dim)
+                                                     # log_std: (B, num_modes, obs_dim)
+                                                     # weights: (B, num_modes)
+        
+        # 1. Mixture Mean (weighted average of means)
+        mu_mix = torch.sum(weights.unsqueeze(-1) * mu, dim=1)   # (B, obs_dim)
+        
+        # 2. Mixture Variance using Law of Total Variance
+        var_ale = (torch.exp(2 * log_std) + kernel.noise_floor).unsqueeze(-1)  # (B, K, obs_dim, 1)
+        
+        # Aleatoric part: E[Var]
+        var_ale_mix = torch.sum(weights.unsqueeze(-1) * var_ale, dim=1)       # (B, obs_dim)
+        
+        # Epistemic part: Var[E]
+        residual_modes = mu - mu_mix.unsqueeze(1)                     # (B, K, obs_dim)
+        var_epi_mix = torch.sum(weights.unsqueeze(-1) * (residual_modes ** 2), dim=1)
+        
+        # Total variance for this mixture model
+        var_mix = var_ale_mix + var_epi_mix
+        var_mix = torch.clamp(var_mix, min=1e-6)
+        
+        mu_mixtures.append(mu_mix)
+        var_mixtures.append(var_mix)
+    
+    # Stack across ensemble
+    mu_mixtures = torch.stack(mu_mixtures, dim=0)        # (K_ensemble, B, obs_dim)
+    var_mixtures = torch.stack(var_mixtures, dim=0)      # (K_ensemble, B, obs_dim)
+    
+    # === Ensemble Total Predictive Statistics ===
+    mu_total = mu_mixtures.mean(dim=0)                   # (B, obs_dim)
+    
+    # Aleatoric: average variance across ensemble
+    var_aleatoric = var_mixtures.mean(dim=0)
+    
+    # Epistemic: variance of means across ensemble
+    var_epistemic = mu_mixtures.var(dim=0, unbiased=False)
+    
+    # Total variance
+    var_total = var_aleatoric + var_epistemic
+    var_total = torch.clamp(var_total, min=1e-6)
+    
+    # === Squared Mahalanobis Distance ===
+    residual = s_next - mu_total
+    residual = torch.clamp(residual, -10.0, 10.0)
+    
+    D2_total = ((residual ** 2) / var_total).sum(dim=-1)   # (B,)
+    
+    return D2_total
