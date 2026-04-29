@@ -490,7 +490,7 @@ if __name__ == "__main__":
     """
     #score = rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 50, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([1, 5], dtype = int), base_seed = 0, continual_rollout = False)
     
-    
+    """
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
@@ -509,9 +509,9 @@ if __name__ == "__main__":
             start_cell = np.array([5, 4], dtype = int), 
             continual_rollout = True,
             chunk_size = 10)
-    
-
     """
+
+    
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
@@ -525,11 +525,11 @@ if __name__ == "__main__":
             episode_length = 3000, 
             checkpoint_steps = 0, 
             render = True,  
-            base_seed = 1, 
+            base_seed = 4, 
             task_id = 1,
             continual_rollout = True,
             chunk_size = 32)
-    """
+    
     
     
     
