@@ -10,7 +10,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from Pretrain.Dataset import KitchenDataset, PointMazeDataset, CubeDataset
-from .Kernel_Net import  RobustTransitionKernel
+from .Kernel_Net import  RobustTransitionKernel, MoGTransitionKernel
 from sympy import factorint
 import pickle
 import os
@@ -522,99 +522,133 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
         num += save_freq
         
 """
+
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
-import math
-from tqdm import tqdm
 import copy
-from .Kernel_Net import MoGTransitionKernel
+from itertools import cycle
+from tqdm import tqdm
+
 
 def train_mog_kernel(
     dataset_name: str,
     specific_dataset: str = None,
     batch_size: int = 256,
     lr: float = 1e-4,
-    num_steps: int = 20000,
+    num_steps: int = 25000,
     save_freq: int = 2000,
-    ensemble_size: int = 6,           # number of MoG models in ensemble
-    num_modes: int = 8,               # mixture components per model
-    num_hidden_layers: int = 3,
+    ensemble_size: int = 6,           # 5~8 recommended
+    num_modes: int = 8,               # 6~8 recommended for manipulation
     hidden_dim: int = 512,
+    λ_reg: float = 2e-3,              # disagreement regularization
     device=None
 ):
-    
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"using device: {device}")
-    
-    print(f"Training MoG Transition Kernel on {dataset_name} | Device: {device}")
-    
-    # Load dataset
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    print(f"Training MoG Transition Kernel for {dataset_name}")
+    if specific_dataset:
+        print(f"  Specific dataset: {specific_dataset}")
+
+    # Prepare dataset
     trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
     dataset = KernelDataset(trajs, kernel_name)
     loader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
                               pin_memory=True, num_workers=8))
-    
+
     # Create ensemble of MoG kernels
     ensemble = [
         MoGTransitionKernel(
             obs_dim=obs_dim,
             act_dim=act_dim,
             num_modes=num_modes,
-            num_hidden_layers = num_hidden_layers,
             hidden_dim=hidden_dim
         ).to(device)
         for _ in range(ensemble_size)
     ]
-    
+
     optimizers = [optim.Adam(m.parameters(), lr=lr, weight_decay=1e-5) 
                   for m in ensemble]
-    
+
+    # Save hyperparameters (you may need to adjust this function for MoG)
+    save_kernel_hyperparameters(
+        dataset_name,
+        batch_size,
+        num_steps,
+        lr,
+        obs_dim,
+        act_dim,
+        kernel_name + "_MoG",
+        optimizers[0],
+        ensemble[0],
+        ensemble_size,
+        λ_reg,
+        specific_dataset=specific_dataset
+    )
+
+    SD = specific_dataset if check_specifc_dataset(dataset_name) else None
+
     step = 0
     total_loss = 0.0
-    
+
     for step in tqdm(range(1, num_steps + 1), desc="Training MoG Kernel"):
         s, a, s_next = next(loader)
         s = s.to(device)
         a = a.to(device)
         s_next = s_next.to(device)
-        
+
         losses = []
-        
-        for model in ensemble:
-            #mu, log_std, weights = model(s, a)
-            loss = model.log_prob(s, a, s_next)
+
+        for m in ensemble:
+            mu, log_std, weights = m(s, a)
+            loss = m.mog_nll(s_next, mu, log_std, weights)
+
+            # === Optional: disagreement regularization ===
+            # Average over modes for disagreement calculation
+            mu_mean = mu.mean(dim=1)                    # (B, obs_dim)
+            disagreement = ((mu - mu_mean.unsqueeze(1)) ** 2).mean(dim=1).mean(dim=0)
+            
+            var = torch.exp(2 * log_std) + m.noise_floor
+            penalty = (disagreement / (var.mean(dim=1) + 1e-6)).mean()
+            
+            loss = loss + λ_reg * penalty
             losses.append(loss)
-        
-        # Average loss across ensemble for logging
-        avg_loss = sum(losses).item() / ensemble_size
-        total_loss += avg_loss
-        
-        # Backprop each model independently
-        for model, opt, loss in zip(ensemble, optimizers, losses):
+
+        # Backprop
+        for m, opt, loss in zip(ensemble, optimizers, losses):
             opt.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+            torch.nn.utils.clip_grad_norm_(m.parameters(), max_norm=5.0)
             opt.step()
-        
+
         # Logging
+        avg_loss = sum(loss.item() for loss in losses) / ensemble_size
+        total_loss += avg_loss
+
         if step % 500 == 0:
             print(f"Step {step:6d} | Avg Loss: {total_loss/500:.6f}")
             total_loss = 0.0
-        
+
         # Save checkpoints
         if step % save_freq == 0 or step == num_steps:
-            for idx, model in enumerate(ensemble):
-                ckpt = copy.deepcopy(model).cpu()
+            for idx, m in enumerate(ensemble):
+                ckpt = copy.deepcopy(m).cpu()
                 save_model(ckpt, f"{kernel_name}_MoG", step, idx)
-            
+
             if step == num_steps:
-                for idx, model in enumerate(ensemble):
-                    ckpt = copy.deepcopy(model).cpu()
-                    save_to_finetuning(ckpt, dataset_name, idx, specific_dataset)
-    
+                for idx, m in enumerate(ensemble):
+                    ckpt = copy.deepcopy(m).cpu()
+                    save_to_finetuning(ckpt, dataset_name, idx, SD)
+
+                stats = get_pretrained_kernel_stats(f"{kernel_name}_MoG")
+                save_stats_to_finetuning(stats, dataset_name, SD)
+
     print("MoG Transition Kernel training completed!")
     return ensemble
+
+
+
 
 def train_kernel(dataset_name, specific_dataset: str = None,
                  batch_size=256, lr=1e-3, num_steps=10000, save_freq = 200,
@@ -988,15 +1022,20 @@ def compute_log_density(kernels: List[RobustTransitionKernel], s, a, s_next):
     #return log_probs
 
 def compute_log_density_mog(kernels: List[MoGTransitionKernel], s, a, s_next):
-    log_probs = []
+    """Returns total log p(s'|s,a) under ensemble of MoGs"""
+    all_log_probs = []
+    
     for kernel in kernels:
-        lp = kernel.log_prob(s, a, s_next)
-        log_probs.append(lp)
-    #log_probs = torch.stack(log_probs, dim=0).mean(dim = 0)
-    log_probs = torch.stack(log_probs, dim=0)
-    log_density = torch.logsumexp(log_probs, dim=0) - math.log(len(kernels)) 
+        mu, log_std, weights = kernel(s, a)
+        lp = kernel.mog_log_prob(s_next, mu, log_std, weights)   # must use this method
+        all_log_probs.append(lp)
+    
+    all_log_probs = torch.stack(all_log_probs, dim=0)            # (K_ens, B)
+    
+    # Proper ensemble logsumexp
+    log_density = torch.logsumexp(all_log_probs, dim=0) - math.log(len(kernels))
+    
     return log_density
-    #return log_probs
 
 
 def compute_total_mahalanobis_score_mog(
