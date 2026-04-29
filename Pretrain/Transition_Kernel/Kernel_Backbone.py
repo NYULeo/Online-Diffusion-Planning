@@ -636,14 +636,14 @@ def train_mog_kernel(
         if step % save_freq == 0 or step == num_steps:
             for idx, m in enumerate(ensemble):
                 ckpt = copy.deepcopy(m).cpu()
-                save_model(ckpt, f"{kernel_name}_MoG", step, idx)
+                save_model(ckpt, f"{kernel_name}", step, idx)
 
             if step == num_steps:
                 for idx, m in enumerate(ensemble):
                     ckpt = copy.deepcopy(m).cpu()
                     save_to_finetuning(ckpt, dataset_name, idx, SD)
 
-                stats = get_pretrained_kernel_stats(f"{kernel_name}_MoG")
+                stats = get_pretrained_kernel_stats(f"{kernel_name}")
                 save_stats_to_finetuning(stats, dataset_name, SD)
 
     print("MoG Transition Kernel training completed!")
@@ -848,7 +848,6 @@ def test_kernel_mog(dataset_name, specific_dataset: str = None,
     dataloader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=True, num_workers=8)
     
     # For each saved checkpoint / ensemble member
-    kernel_name = f"{kernel_name}_MoG"
     step = save_freq
     while step <= num_steps:
         # Load ensemble members

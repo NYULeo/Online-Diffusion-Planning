@@ -50,7 +50,7 @@ if __name__ == '__main__':  # pragma: no cover
          specific_dataset = specific_dataset,
          batch_size = 256,
          lr = 1e-4,
-         num_steps = 20000,
+         num_steps = 10000,
          save_freq = 5000,
          ensemble_size = 10,
          num_modes = 8,
