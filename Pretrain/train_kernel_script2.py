@@ -6,7 +6,7 @@ sys.path.insert(0, str(REPO_ROOT))
 os.chdir(REPO_ROOT)
 #project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 #os.chdir(project_root)
-from Pretrain.Transition_Kernel.Kernel_Backbone import train_kernel, test_kernel, train_mog_kernel
+from Pretrain.Transition_Kernel.Kernel_Backbone import train_kernel, test_kernel, train_mog_kernel, test_kernel_mog
 from Pretrain.utils import set_seed
 import pickle
 from Finetuning.utils import get_trajs
@@ -48,14 +48,26 @@ if __name__ == '__main__':  # pragma: no cover
     train_mog_kernel(
          dataset_name = dataset,
          specific_dataset = specific_dataset,
-         batch_size = 256,
+         batch_size = 512,
          lr = 1e-4,
-         num_steps = 50000,
+         num_steps = 40000,
          save_freq = 10000,
-         ensemble_size = 20,
-         num_modes = 8,
-         num_hidden_layers = 4,
-         hidden_dim = 512)
+         ensemble_size = 6,
+         num_modes = 5,
+         num_hidden_layers = 3,
+         hidden_dim = 384,
+         λ_reg = 1e-3)
+      
+    test_kernel_mog(dataset_name = dataset,
+                specific_dataset = specific_dataset,
+                trajs = None,
+                save_freq = 40000,
+                num_steps = 40000,
+                num_hidden_layers = 3,
+                hidden_dim = 384,
+                ensemble_size = 6, 
+                num_modes = 5,
+                quantile = 0.95)
 
 
 
