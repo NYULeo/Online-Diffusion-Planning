@@ -998,71 +998,63 @@ def compute_log_density_mog(kernels: List[MoGTransitionKernel], s, a, s_next):
     return log_density
     #return log_probs
 
+
 def compute_total_mahalanobis_score_mog(
-    kernels: List[MoGTransitionKernel], 
+    kernels: list, 
     s: torch.Tensor, 
     a: torch.Tensor, 
     s_next: torch.Tensor
 ) -> torch.Tensor:
     """
-    Compute squared Mahalanobis distance using Total Predictive Variance
-    for Mixture of Gaussians + Ensemble.
-    
-    kernels: list of MoGTransitionKernel models
-    Returns: D2_total of shape (B,)
+    MoG-compatible Total Mahalanobis Distance.
     """
-    K_ensemble = len(kernels)          # number of models in ensemble
-    device = s.device
+    K_ens = len(kernels)                    # number of ensemble members
+    B = s.shape[0]
     
-    mu_mixtures = []
-    var_mixtures = []
+    mu_list = []
+    var_list = []
     
     for kernel in kernels:
-        mu, log_std, weights = kernel(s, a)          # mu: (B, num_modes, obs_dim)
-                                                     # log_std: (B, num_modes, obs_dim)
-                                                     # weights: (B, num_modes)
+        mu, log_std, weights = kernel(s, a)           # mu: (B, K_modes, obs_dim)
+                                                      # weights: (B, K_modes)
         
-        # 1. Mixture Mean (weighted average of means)
-        mu_mix = torch.sum(weights.unsqueeze(-1) * mu, dim=1)   # (B, obs_dim)
+        K_modes = weights.shape[1]
         
-        # 2. Mixture Variance using Law of Total Variance
-        var_ale = (torch.exp(2 * log_std) + kernel.noise_floor).unsqueeze(-1)  # (B, K, obs_dim, 1)
+        # === Mixture statistics for this model ===
+        # Weighted mean
+        mu_mix = torch.sum(weights.unsqueeze(-1) * mu, dim=1)          # (B, obs_dim)
         
-        # Aleatoric part: E[Var]
-        var_ale_mix = torch.sum(weights.unsqueeze(-1) * var_ale, dim=1)       # (B, obs_dim)
+        # Aleatoric variance: E[Var]
+        var_ale = torch.exp(2 * log_std) + kernel.noise_floor          # (B, K_modes, obs_dim)
+        var_ale_mix = torch.sum(weights.unsqueeze(-1) * var_ale, dim=1)  # (B, obs_dim)
         
-        # Epistemic part: Var[E]
-        residual_modes = mu - mu_mix.unsqueeze(1)                     # (B, K, obs_dim)
-        var_epi_mix = torch.sum(weights.unsqueeze(-1) * (residual_modes ** 2), dim=1)
+        # Epistemic variance: Var[E]
+        mu_centered = mu - mu_mix.unsqueeze(1)                         # (B, K_modes, obs_dim)
+        var_epi_mix = torch.sum(weights.unsqueeze(-1) * (mu_centered ** 2), dim=1)
         
-        # Total variance for this mixture model
         var_mix = var_ale_mix + var_epi_mix
         var_mix = torch.clamp(var_mix, min=1e-6)
         
-        mu_mixtures.append(mu_mix)
-        var_mixtures.append(var_mix)
+        mu_list.append(mu_mix)
+        var_list.append(var_mix)
     
-    # Stack across ensemble
-    mu_mixtures = torch.stack(mu_mixtures, dim=0)        # (K_ensemble, B, obs_dim)
-    var_mixtures = torch.stack(var_mixtures, dim=0)      # (K_ensemble, B, obs_dim)
+    # === Ensemble level ===
+    mu_ensemble = torch.stack(mu_list, dim=0)           # (K_ens, B, obs_dim)
+    var_ensemble = torch.stack(var_list, dim=0)         # (K_ens, B, obs_dim)
     
-    # === Ensemble Total Predictive Statistics ===
-    mu_total = mu_mixtures.mean(dim=0)                   # (B, obs_dim)
+    mu_total = mu_ensemble.mean(dim=0)                  # (B, obs_dim)
     
-    # Aleatoric: average variance across ensemble
-    var_aleatoric = var_mixtures.mean(dim=0)
+    var_aleatoric = var_ensemble.mean(dim=0)
+    var_epistemic = mu_ensemble.var(dim=0, unbiased=False)
     
-    # Epistemic: variance of means across ensemble
-    var_epistemic = mu_mixtures.var(dim=0, unbiased=False)
-    
-    # Total variance
     var_total = var_aleatoric + var_epistemic
     var_total = torch.clamp(var_total, min=1e-6)
     
-    # === Squared Mahalanobis Distance ===
+    # === Mahalanobis ===
     residual = s_next - mu_total
     residual = torch.clamp(residual, -10.0, 10.0)
     
     D2_total = ((residual ** 2) / var_total).sum(dim=-1)   # (B,)
     
     return D2_total
+
