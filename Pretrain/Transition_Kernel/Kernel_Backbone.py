@@ -4,6 +4,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]  # Online-Diffusion-Planning/
 PRETRAIN_DIR = PROJECT_ROOT / "Pretrain"
 FINETUNE_DIR = PROJECT_ROOT / "Finetuning"
+from numpy.matlib import std
 from scipy.stats import median_abs_deviation
 import torch
 import torch.optim as optim
@@ -808,13 +809,13 @@ def test_kernel(dataset_name, specific_dataset: str = None,
         mean_D2_total = float(all_D2_total.mean())
         min_D2_total = float(all_D2_total.min())
         max_D2_total = float(all_D2_total.max())
-        var_D2_total = float(all_D2_total.var())
+        std_D2_total = float(all_D2_total.std())
         tau = float(np.quantile(all_D2_total, quantile))
         print(f"Checkpoint {step}")
         print(f"mean_D2_total = {mean_D2_total:.4f}")
         print(f"min_D2_total = {min_D2_total:.4f}")
         print(f"max_D2_total = {max_D2_total:.4f}")
-        print(f"variance_D2_total = {var_D2_total:.4f}")
+        print(f"std_D2_total = {std_D2_total:.4f}")
         print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
         
         print('Log Density')
@@ -822,13 +823,13 @@ def test_kernel(dataset_name, specific_dataset: str = None,
         mean_log_density = float(all_log_density.mean())
         min_log_density = float(all_log_density.min())
         max_log_density = float(all_log_density.max())
-        var_log_density = float(all_log_density.var())
+        std_log_density = float(all_log_density.std())
         tau = float(np.quantile(all_log_density, 1 - quantile))
         print(f"Checkpoint {step}")
         print(f"mean_log_density = {mean_log_density:.4f}")
         print(f"min_log_density = {min_log_density:.4f}")
         print(f"max_log_density = {max_log_density:.4f}")
-        print(f"variance_log_density = {var_log_density:.4f}")
+        print(f"std_log_density = {std_log_density:.4f}")
         print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
         step += save_freq
 
@@ -885,13 +886,13 @@ def test_kernel_mog(dataset_name, specific_dataset: str = None,
         mean_D2_total = float(all_D2_total.mean())
         min_D2_total = float(all_D2_total.min())
         max_D2_total = float(all_D2_total.max())
-        var_D2_total = float(all_D2_total.var())
+        std_D2_total = float(all_D2_total.std())
         tau = float(np.quantile(all_D2_total, quantile))
         print(f"Checkpoint {step}")
         print(f"mean_D2_total = {mean_D2_total:.4f}")
         print(f"min_D2_total = {min_D2_total:.4f}")
         print(f"max_D2_total = {max_D2_total:.4f}")
-        print(f"variance_D2_total = {var_D2_total:.4f}")
+        print(f"std_D2_total = {std_D2_total:.4f}")
         print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
         
         print('Log Density')
@@ -899,13 +900,13 @@ def test_kernel_mog(dataset_name, specific_dataset: str = None,
         mean_log_density = float(all_log_density.mean())
         min_log_density = float(all_log_density.min())
         max_log_density = float(all_log_density.max())
-        var_log_density = float(all_log_density.var())
+        std_log_density = float(all_log_density.std())
         tau = float(np.quantile(all_log_density, 1 - quantile))
         print(f"Checkpoint {step}")
         print(f"mean_log_density = {mean_log_density:.4f}")
         print(f"min_log_density = {min_log_density:.4f}")
         print(f"max_log_density = {max_log_density:.4f}")
-        print(f"variance_log_density = {var_log_density:.4f}")
+        print(f"std_log_density = {std_log_density:.4f}")
         print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
         step += save_freq
 
