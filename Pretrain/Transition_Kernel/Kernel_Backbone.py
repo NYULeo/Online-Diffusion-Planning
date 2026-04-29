@@ -655,6 +655,7 @@ def test_kernel(dataset_name, specific_dataset: str = None,
 
         # Compute log-probs over dataset
         all_D2_total = []
+        all_log_density = []
         #all_D_total = []
         count = 0
         #worst = (None, float("inf"), None)  # (idx, log_prob, (s, a, s_next))
@@ -666,6 +667,7 @@ def test_kernel(dataset_name, specific_dataset: str = None,
             #compute total mahalanobis distance
             with torch.no_grad():
                 D2_total = compute_total_mahalanobis_score(ensemble, s, a, s_next)
+                log_density = compute_log_density(ensemble, s, a, s_next)
                 """
                 Temp = []
                 for m in ensemble:
@@ -674,7 +676,10 @@ def test_kernel(dataset_name, specific_dataset: str = None,
                 """
             #D = np.mean(Temp, axis = 0)
             D2 = D2_total.detach().cpu().numpy()
+            log_density = log_density.detach().cpu().numpy()
             all_D2_total.extend(D2)
+            all_log_density.extend(log_density)
+
             #all_D_total.extend(D)
             count += 1
             
@@ -683,7 +688,7 @@ def test_kernel(dataset_name, specific_dataset: str = None,
 
             #if lp_mean < worst[1]:
              #   worst = (i, lp_mean, (s.cpu().numpy(), a.cpu().numpy(), s_next.cpu().numpy()))
-        
+        print('Mahalanobis Distance')
         all_D2_total = np.array(all_D2_total)
         mean_D2_total = float(all_D2_total.mean())
         min_D2_total = float(all_D2_total.min())
@@ -695,6 +700,20 @@ def test_kernel(dataset_name, specific_dataset: str = None,
         print(f"min_D2_total = {min_D2_total:.4f}")
         print(f"max_D2_total = {max_D2_total:.4f}")
         print(f"variance_D2_total = {var_D2_total:.4f}")
+        print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
+        
+        print('Log Density')
+        all_log_density = np.array(all_log_density)
+        mean_log_density = float(all_log_density.mean())
+        min_log_density = float(all_log_density.min())
+        max_log_density = float(all_log_density.max())
+        var_log_density = float(all_log_density.var())
+        tau = float(np.quantile(all_log_density, quantile))
+        print(f"Checkpoint {step}")
+        print(f"mean_log_density = {mean_log_density:.4f}")
+        print(f"min_log_density = {min_log_density:.4f}")
+        print(f"max_log_density = {max_log_density:.4f}")
+        print(f"variance_log_density = {var_log_density:.4f}")
         print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
         step += save_freq
 
@@ -804,3 +823,14 @@ def compute_total_mahalanobis_score(kernels: list, s, a, s_next):
     D2_total = ((residual ** 2) / var_total).sum(dim=-1)   # (B,)
     
     return D2_total
+
+def compute_log_density(kernels: list, s, a, s_next):
+    log_probs = []
+    for kernel in kernels:
+        mu, log_std = kernel(s, a)
+        lp = kernel.log_prob(s_next, mu, log_std)
+        log_probs.append(lp)
+    log_probs = torch.stack(log_probs, dim=0)
+    log_density = torch.logsumexp(log_probs, dim=0) - math.log(len(kernels)) 
+    return log_density
+    
