@@ -831,7 +831,7 @@ def compute_log_density(kernels: list, s, a, s_next):
         lp = kernel.log_prob(s_next, mu, log_std)
         log_probs.append(lp)
     log_probs = torch.stack(log_probs, dim=0).mean(dim = 0)
-    log_density = torch.logsumexp(log_probs, dim=0) - math.log(len(kernels)) 
-    return log_density
-    #return log_probs
+    #log_density = torch.logsumexp(log_probs, dim=0) - math.log(len(kernels)) 
+    #return log_density
+    return log_probs
     
