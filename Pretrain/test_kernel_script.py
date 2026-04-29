@@ -28,9 +28,9 @@ if __name__ == '__main__':  # pragma: no cover
     test_kernel(dataset_name = 'cube',
                 specific_dataset = 'single',
                 trajs = None,
-                save_freq = 5000,
-                num_steps = 5000,
-                hidden_layers = 2,
+                save_freq = 10000,
+                num_steps = 10000,
+                hidden_layers = 4,
                 hidden_dim = 256,
                 ensemble_size = 10)
     #test_Model(dataset_name = 'kitchen', save_freq = 2000, num_steps = 300000)

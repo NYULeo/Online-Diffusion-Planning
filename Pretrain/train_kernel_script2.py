@@ -37,10 +37,10 @@ if __name__ == '__main__':  # pragma: no cover
                  specific_dataset = specific_dataset, 
                  batch_size = 256, 
                  lr = 3e-4, 
-                 num_steps = 5000, 
-                 save_freq = 1000, 
+                 num_steps = 10000, 
+                 save_freq = 5000, 
                  ensemble_size = 10, 
-                 hidden_layers = 2, 
+                 hidden_layers = 4, 
                  hidden_dim = 256,
                  λ_reg = 1e-3)
 
