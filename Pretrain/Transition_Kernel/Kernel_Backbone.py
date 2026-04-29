@@ -539,7 +539,8 @@ def train_mog_kernel(
     num_steps: int = 25000,
     save_freq: int = 2000,
     ensemble_size: int = 6,           # 5~8 recommended
-    num_modes: int = 8,               # 6~8 recommended for manipulation
+    num_modes: int = 8,  
+    num_hidden_layers: int = 3,             # 6~8 recommended for manipulation
     hidden_dim: int = 512,
     λ_reg: float = 2e-3,              # disagreement regularization
     device=None
@@ -562,8 +563,9 @@ def train_mog_kernel(
         MoGTransitionKernel(
             obs_dim=obs_dim,
             act_dim=act_dim,
-            num_modes=num_modes,
-            hidden_dim=hidden_dim
+            num_modes = num_modes,
+            num_hidden_layers = num_hidden_layers,
+            hidden_dim = hidden_dim
         ).to(device)
         for _ in range(ensemble_size)
     ]
