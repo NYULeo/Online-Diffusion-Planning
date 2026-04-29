@@ -65,6 +65,7 @@ class Acc_AdjointMatchingConfig:
     update_kernel: bool = False
     MaxEnt: bool = False
     Entropy_Scaling_Factor: float = 0.5
+    clip_max_reward_norm: float = 5.0
 
     save_freq = 10
     save_model_freq = 50
@@ -411,7 +412,9 @@ class Acc_AdjointMatchingFineTuner:
         T = X_reversed[0]
         T_squeezed = T.squeeze(0).to(self.device)
         reward, gradient = reward_model(T_squeezed, self.Lam.get_lam())
-        print(f"Reward Gradeint Norm: {gradient.norm().item()}")
+        grad_norm = torch.norm(gradient, p=2).clamp(min=1e-8)
+        gradient = gradient * (1.0 / grad_norm)
+        #print(f"Reward Gradeint Norm: {gradient.norm().item()}")
         if(self.config.MaxEnt):
             score = self.old_score_net(T, torch.tensor(0.0).unsqueeze(0).to(self.device))
             EntGrad = -1 * score
@@ -427,7 +430,7 @@ class Acc_AdjointMatchingFineTuner:
             reward_std = 1.0
         #current_lr = self.optimizer.param_groups[0]['lr']
         alpha = self.alpha_scheduler.get_alpha()
-        a0 =  (-1 * ((self.config.reward_scaling_factor/alpha)/reward_std) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * (-1) * EntGrad)
+        a0 =  (-1 * ((self.config.reward_scaling_factor/alpha)) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * (-1) * EntGrad)
         
         #max_norm = 5.0
         #a0 =   a0 * torch.clamp(max_norm / torch.norm(a0), max=1.0)
