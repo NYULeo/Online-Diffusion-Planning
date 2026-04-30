@@ -67,7 +67,10 @@ def get_dataset(name: str, specific_name: str, task_id: Optional[int] = None):
        elif(name == 'antmaze'): 
             return AntMazeDataset(specific_name)
        elif(name == 'cube'):
-            return CubeDataset(specific_name, task_id)
+            if(task_id is None):
+                return CubeDataset(specific_name)
+            else:
+                return CubeDataset_Singletask(specific_name, task_id)
        else:
             raise ValueError(f"Invalid Dataset name: {name}")     
 

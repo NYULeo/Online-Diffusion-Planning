@@ -27,6 +27,7 @@ from torch.utils.data import DataLoader
 import torch.optim as optim
 from Pretrain.Transition_Kernel.Kernel_Net import MoGTransitionKernel, RobustTransitionKernel
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_total_mahalanobis_score, compute_log_density_mog, compute_log_density, compute_total_mahalanobis_score_mog
+from Pretrain.Rewards.Reward_Backbone import get_reward_name
 from Pretrain.Dataset import KitchenDataset, PointMazeDataset, get_env, Planner_Processor
 from gymnasium.vector import AsyncVectorEnv
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
@@ -93,22 +94,22 @@ def save_kernel_model(kernel_net, dataset_name, specific_dataset, step, ensemble
     torch.save(net_dict, save_path)
     #print(f"Kernel model save to {name}_{str(step)}_{str(ensemble_idx)}.pkl")
 
-def get_reward_model(dataset_name, specific_dataset, step):
+def get_reward_model(dataset_name, specific_dataset, step, task_id: Optional[int] = None):
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
-    name = getName(dataset_name, specific_dataset)
+    reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     if(check_specific_dataset(dataset_name)):
-         path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{name}_Reward_{str(step)}.pkl'
+         path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{reward_name}_{str(step)}.pkl'
     else:
-        path = f'./Finetuning/Rewards/{dataset_name}/Models/{name}_Reward_{str(step)}.pkl'
+        path = f'./Finetuning/Rewards/{dataset_name}/Models/{reward_name}_{str(step)}.pkl'
     model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
     return model_state_dict, obs_dim, act_dim
 
-def get_reward_stats(dataset_name, specific_dataset, step):
-    name = getName(dataset_name, specific_dataset)
+def get_reward_stats(dataset_name, specific_dataset, step, task_id: Optional[int] = None):
+    reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     if(check_specific_dataset(dataset_name)):
-        path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/{name}_Reward_stats_{str(step)}.pkl'
+        path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/{reward_name}_stats_{str(step)}.pkl'
     else:
-        path = f'./Finetuning/Rewards/{dataset_name}/Stats/{name}_Reward_stats_{str(step)}.pkl'
+        path = f'./Finetuning/Rewards/{dataset_name}/Stats/{reward_name}_stats_{str(step)}.pkl'
     with open(path, 'rb') as f:
         stats = pickle.load(f)
     return stats  

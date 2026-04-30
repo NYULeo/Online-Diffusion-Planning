@@ -124,7 +124,7 @@ def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, 
     print(f"Critic pretraining hyperparameters saved to {filepath}", flush=True)
 
 
-def get_CriticName(env_name, specific_env):
+def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
      if(env_name == 'kitchen'):
           if(specific_env == 'complete'):
                return 'Kitchen_High'
@@ -145,21 +145,21 @@ def get_CriticName(env_name, specific_env):
               raise ValueError(f"Invalid specific environment: {specific_env}")
      elif(env_name == 'cube'):
          if specific_env == 'single-play':
-              return 'Cube_SinglePlay'
+              return f'Cube_SinglePlay_task{task_id}'
          elif specific_env == 'single-noisy':
-             return 'Cube_SingleNoisy'
+             return f'Cube_SingleNoisy_task{task_id}'
          elif specific_env == 'double-play':
-             return 'Cube_DoublePlay'
+             return f'Cube_DoublePlay_task{task_id}'
          elif specific_env == 'double-noisy':
-             return 'Cube_DoubleNoisy'
+             return f'Cube_DoubleNoisy_task{task_id}'
          elif specific_env == 'triple-play':
-             return 'Cube_TriplePlay'
+             return f'Cube_TriplePlay_task{task_id}'
          elif specific_env == 'triple-noisy':
-             return 'Cube_TripleNoisy'
+             return f'Cube_TripleNoisy_task{task_id}'
          elif specific_env == 'quadruple-play':
-             return 'Cube_QuadruplePlay'
+             return f'Cube_QuadruplePlay_task{task_id}'
          elif specific_env == 'quadruple-noisy':
-             return 'Cube_QuadrupleNoisy'
+             return f'Cube_QuadrupleNoisy_task{task_id}'
          else:
              raise ValueError(f"Invalid cube dataset name: {specific_env}")
      else:
@@ -199,9 +199,9 @@ def obs_filter(obs):
     return obs
 """
 
-def save_critic(model, dataset_name, specific_dataset, step):
+def save_critic(model, dataset_name, specific_dataset, step, task_id: Optional[int] = None):
     model.eval()
-    name = get_CriticName(dataset_name, specific_dataset)
+    name = get_CriticName(dataset_name, specific_dataset, task_id)
     net_dict = model.state_dict()
     """
     os.makedirs(f'./Pretrain/Critic/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
@@ -214,10 +214,10 @@ def save_critic(model, dataset_name, specific_dataset, step):
     torch.save(net_dict, save_path)
     print(f"critic model save to {name}.pkl")
 
-def save_to_finetuning(critic_net, dataset_name, specific_dataset):
+def save_to_finetuning(critic_net, dataset_name, specific_dataset, task_id: Optional[int] = None):
     critic_net.eval()
     net_dict = critic_net.state_dict()
-    name = getName(dataset_name, specific_dataset)
+    name = getName(dataset_name, specific_dataset, task_id)
     """
     os.makedirs(f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
     save_path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(0)}.pkl'
@@ -238,11 +238,11 @@ def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str
     print(f"saved stats to {savepath}")
 """
 
-def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str] = None):
-    name = getName(dataset_name, specific_dataset)
+def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
+    name = getName(dataset_name, specific_dataset, task_id)
     ft_stats_dir = FINETUNE_DIR / "Critics" / dataset_name / specific_dataset / "Stats"
     ft_stats_dir.mkdir(parents=True, exist_ok=True)
-    savepath = ft_stats_dir / f"{name}_Critic_stats_0.pkl"
+    savepath = ft_stats_dir / f"{name}_stats_0.pkl"
     with open(savepath, "wb") as f:
         pickle.dump(stats, f)
     print(f"saved stats to {savepath}")
@@ -255,9 +255,9 @@ def get_critic_model(dataset_name, specific_dataset, step):
     model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
     return model_state_dict, obs_dim
 """
-def get_critic_model(dataset_name, specific_dataset, step):
+def get_critic_model(dataset_name, specific_dataset, step, task_id: Optional[int] = None):
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
-    name = get_CriticName(dataset_name, specific_dataset)
+    name = get_CriticName(dataset_name, specific_dataset, task_id)
     path = PRETRAIN_DIR / "Critic" / dataset_name / specific_dataset / "Models" / f"{name}_Critic_{step}.pkl"
     model_state_dict = torch.load(path, weights_only=True, map_location="cpu")
     return model_state_dict, obs_dim
@@ -270,8 +270,8 @@ def get_critic_stats(dataset_name, specific_dataset):
         stats = pickle.load(f)
     return stats 
 """
-def get_critic_stats(dataset_name, specific_dataset):
-    name = get_CriticName(dataset_name, specific_dataset)
+def get_critic_stats(dataset_name, specific_dataset, task_id: Optional[int] = None):
+    name = get_CriticName(dataset_name, specific_dataset, task_id)
     path = PRETRAIN_DIR / "Critic" / dataset_name / specific_dataset / "Stats" / f"{name}_Critic_stats.pkl"
     with open(path, "rb") as f:
         stats = pickle.load(f)
@@ -332,7 +332,7 @@ class Critic_Test_Dataset(Dataset):
         return rews
 
 class CriticDataset(Dataset):
-    def __init__(self, dataset_name: str, specific_dataset: str, trajs: List[TrajectoryDict], goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99, sigma: float = 7.0, alpha: Optional[float] = None):
+    def __init__(self, dataset_name: str, specific_dataset: str, trajs: List[TrajectoryDict], goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99, sigma: float = 7.0, alpha: Optional[float] = None, task_id: Optional[int] = None):
         
         
         """
@@ -376,7 +376,7 @@ class CriticDataset(Dataset):
                    transitions.append((obs_t, r_t, obs_next_t))
            
         self.transitions = transitions
-        self.save_stats(dataset_name, specific_dataset)
+        self.save_stats(dataset_name, specific_dataset, task_id)
         
     """
     def save_stats(self, dataset_name, specific_dataset):
@@ -389,8 +389,8 @@ class CriticDataset(Dataset):
               pickle.dump(self.stats, f)
         print(f"saved stats to {savepath}")
     """
-    def save_stats(self, dataset_name, specific_dataset):
-        name = get_CriticName(dataset_name, specific_dataset)
+    def save_stats(self, dataset_name, specific_dataset, task_id: Optional[int] = None):
+        name = get_CriticName(dataset_name, specific_dataset, task_id)
         stats_name =  str(name) + f'_Critic_stats.pkl'
         stats_dir = PRETRAIN_DIR / "Critic" / dataset_name / specific_dataset / "Stats"
         stats_dir.mkdir(parents=True, exist_ok=True)
@@ -427,10 +427,10 @@ class CriticDataset(Dataset):
             #new_rews.append(np.sum(rews[t:]))
         return new_rews
 
-def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, gamma, horizon, lr, tau, goal, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward = 1.0, trajs: List[TrajectoryDict] = None):
+def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, gamma, horizon, lr, tau, goal, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward = 1.0, trajs: List[TrajectoryDict] = None, task_id: Optional[int] = None):
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = check_device()
-    dataset = CriticDataset(dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma, sigma, alpha)
+    dataset = CriticDataset(dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma, sigma, alpha, task_id)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
 
     """
@@ -500,12 +500,12 @@ def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, h
     print(f"critic model saved")
 
 
-def test_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, checkpoint_step, gamma, horizon, goal = None,  sigma: Optional[float] = None, alpha: Optional[float] = None,  target_reward = 1.0, trajs: Optional[List[TrajectoryDict]] = None):
+def test_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, checkpoint_step, gamma, horizon, goal = None,  sigma: Optional[float] = None, alpha: Optional[float] = None,  target_reward = 1.0, trajs: Optional[List[TrajectoryDict]] = None, task_id: Optional[int] = None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = Critic_Test_Dataset(dataset_name, specific_dataset, trajs, sigma, alpha, goal, target_reward, horizon, gamma)
     batch_size = 100
     dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True)
-    model_state_dict, obs_dim = get_critic_model(dataset_name, specific_dataset, checkpoint_step)
+    model_state_dict, obs_dim = get_critic_model(dataset_name, specific_dataset, checkpoint_step, task_id)
     
     model = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
     model.load_state_dict(model_state_dict)

@@ -49,12 +49,12 @@ class RewardConfig:
     
 
 class TotalReward(nn.Module):
-    def __init__(self, device, config: RewardConfig, dataset_name: str, specific_dataset: str, reward_checkpoint: int, kernel_checkpoint: int):
+    def __init__(self, device, config: RewardConfig, dataset_name: str, specific_dataset: str, reward_checkpoint: int, kernel_checkpoint: int, task_id: Optional[int] = None):
         super().__init__()
         self.config = config
         self.config.device = device
 
-        reward_state_dict, obs_dim, act_dim = get_reward_model(dataset_name, specific_dataset, reward_checkpoint)
+        reward_state_dict, obs_dim, act_dim = get_reward_model(dataset_name, specific_dataset, reward_checkpoint, task_id)
         self.reward_net = SimpleReward(
             obs_dim, act_dim, self.config.hidden_dim_reward, self.config.num_hidden_layers_reward
         ).to(self.config.device)
@@ -82,7 +82,7 @@ class TotalReward(nn.Module):
                  kernel_net.eval()
                  self.kernels.append(kernel_net)
 
-        self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint)
+        self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint, task_id)
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
 
         self.config.d_s = obs_dim
@@ -241,12 +241,12 @@ class TotalReward(nn.Module):
 
 
 class TotalReward_Critic(nn.Module):
-    def __init__(self, device, config: RewardConfig, dataset_name: str, specific_dataset: str, reward_checkpoint: int, kernel_checkpoint: int, critic_checkpoint: int):
+    def __init__(self, device, config: RewardConfig, dataset_name: str, specific_dataset: str, reward_checkpoint: int, kernel_checkpoint: int, critic_checkpoint: int, task_id: Optional[int] = None):
         super().__init__()
         self.config = config
         self.config.device = device
 
-        reward_state_dict, obs_dim, act_dim = get_reward_model(dataset_name, specific_dataset, reward_checkpoint)
+        reward_state_dict, obs_dim, act_dim = get_reward_model(dataset_name, specific_dataset, reward_checkpoint, task_id)
         self.reward_net = SimpleReward(
             obs_dim, act_dim, self.config.hidden_dim_reward, self.config.num_hidden_layers_reward
         ).to(self.config.device)
@@ -281,7 +281,7 @@ class TotalReward_Critic(nn.Module):
                  kernel_net.eval()
                  self.kernels.append(kernel_net)
 
-        self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint)
+        self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint, task_id)
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
         self.critic_stat = get_critic_stats(dataset_name, specific_dataset, critic_checkpoint)
 
@@ -479,12 +479,12 @@ class TotalReward_Critic(nn.Module):
 
 
 class TotalReward_Mahalanobis(nn.Module):
-    def __init__(self, device, config: RewardConfig, dataset_name: str, specific_dataset: str, reward_checkpoint: int, kernel_checkpoint: int):
+    def __init__(self, device, config: RewardConfig, dataset_name: str, specific_dataset: str,  reward_checkpoint: int, kernel_checkpoint: int, task_id: Optional[int] = None):
         super().__init__()
         self.config = config
         self.config.device = device
 
-        reward_state_dict, obs_dim, act_dim = get_reward_model(dataset_name, specific_dataset, reward_checkpoint)
+        reward_state_dict, obs_dim, act_dim = get_reward_model(dataset_name, specific_dataset, reward_checkpoint, task_id)
         self.reward_net = SimpleReward(
             obs_dim, act_dim, self.config.hidden_dim_reward, self.config.num_hidden_layers_reward
         ).to(self.config.device)
@@ -512,7 +512,7 @@ class TotalReward_Mahalanobis(nn.Module):
                  kernel_net.eval()
                  self.kernels.append(kernel_net)
 
-        self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint)
+        self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint, task_id)
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
 
         self.config.d_s = obs_dim
@@ -668,12 +668,12 @@ class TotalReward_Mahalanobis(nn.Module):
         return total_reward, gradient
 
 class TotalReward_Critic_Mahalanobis(nn.Module):
-    def __init__(self, device, config: RewardConfig, dataset_name: str, specific_dataset: str, reward_checkpoint: int, kernel_checkpoint: int, critic_checkpoint: int):
+    def __init__(self, device, config: RewardConfig, dataset_name: str, specific_dataset: str, reward_checkpoint: int, kernel_checkpoint: int, critic_checkpoint: int, task_id: Optional[int] = None):
         super().__init__()
         self.config = config
         self.config.device = device
 
-        reward_state_dict, obs_dim, act_dim = get_reward_model(dataset_name, specific_dataset, reward_checkpoint)
+        reward_state_dict, obs_dim, act_dim = get_reward_model(dataset_name, specific_dataset, reward_checkpoint, task_id)
         self.reward_net = SimpleReward(
             obs_dim, act_dim, self.config.hidden_dim_reward, self.config.num_hidden_layers_reward
         ).to(self.config.device)
@@ -708,7 +708,7 @@ class TotalReward_Critic_Mahalanobis(nn.Module):
                  kernel_net.eval()
                  self.kernels.append(kernel_net)
       
-        self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint)
+        self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint, task_id)
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
         self.critic_stat = get_critic_stats(dataset_name, specific_dataset, critic_checkpoint)
 

@@ -247,6 +247,42 @@ def load_model(reward_name, num_steps):
     state_dict = torch.load(load_path, weights_only=True, map_location='cpu')
     return state_dict
 
+
+def get_reward_name(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
+    if(dataset_name == 'kitchen'):
+         name = 'Kitchen_Reward'
+         return name
+
+    elif(dataset_name == 'pointmaze'):
+         if(specific_dataset is None): 
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+         elif(specific_dataset == 'large'):
+              name = '2DMaze_Reward_large'
+         elif(specific_dataset == 'medium'):
+              name = '2DMaze_Reward_medium'
+         elif(specific_dataset == 'umaze'):
+              name = '2DMaze_Reward_umaze'
+         else: 
+              raise ValueError(f"Invalid dataset name: {specific_dataset}")
+         return name
+
+    elif(dataset_name == 'cube'):
+         if(specific_dataset is None): 
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+         elif(specific_dataset == 'single'):
+             name = f'Cube_Reward_single_task{task_id}'
+         elif(specific_dataset == 'double'):
+             name = f'Cube_Reward_double_task{task_id}'
+         elif(specific_dataset == 'triple'):
+             name = f'Cube_Reward_triple_task{task_id}'
+         else: 
+              raise ValueError(f"Invalid dataset name: {specific_dataset}")
+         return name
+    
+    else:
+         raise ValueError(f"Invalid dataset name: {dataset_name}")
+        
+    
 def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
     from Dataset import KitchenDataset, PointMazeDataset, CubeDataset
     if(dataset_name == 'kitchen'):
