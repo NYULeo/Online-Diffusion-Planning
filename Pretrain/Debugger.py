@@ -61,7 +61,7 @@ except ImportError as e:
     print(f"Warning: matplotlib not available ({e}). Plotting will be skipped.")
     MATPLOTLIB_AVAILABLE = False
     plt = None
-
+import ogbench
 
 
 def plot_function(func, x_range=(-10, 10), num_points=1000, title="Function Plot", xlabel="x", ylabel="f(x)"):
@@ -383,6 +383,55 @@ def get_normalized_score(trajs, env_name, specific_env):
     # Final result
     print(f"Normalized score (pointmaze/medium-v2): {normalized_score:.2f}")
 """
+
+
+"""
+for traj in trajs:
+    Temp = sum(traj['rewards'])
+    if(Temp > 0):
+        print(Temp)
+"""
+
+"""
+import numpy as np
+
+# Assuming you have:
+# env, dataset = ...
+env, dataset, eval_dataset = ogbench.make_env_and_datasets('cube-single-play-v0', render_mode = 'rgb_array')
+terminal_indices = np.where(dataset['terminals'])[0]
+
+for end_idx in terminal_indices[:10]:  # test first few
+    final_obs = dataset['observations'][end_idx]   # or next_observations if available
+    
+    print(f"\nTrajectory ending at {end_idx}:")
+    for task_id in range(1, 6):
+        # Reset env with the specific task/goal
+        _, info = env.reset(options={'task_id': task_id})
+        goal = info['goal']   # optional, for reference
+        
+        # === CRITICAL: Set the environment to the final state ===
+        # CubeEnv inherits set_state from the base class
+        qpos = final_obs['qpos'] if isinstance(final_obs, dict) else final_obs  # adjust based on your obs format
+        # Usually the full state is in privileged info or you need to reconstruct qpos
+        
+        # Simpler & more reliable method:
+        env.unwrapped.set_state(   # or manually set if needed
+            qpos=final_obs.get('qpos', final_obs) if isinstance(final_obs, dict) else final_obs,
+            qvel=np.zeros_like(env.unwrapped.data.qvel)  # approximate
+        )
+        
+        env.unwrapped.post_step()          # ← this updates _success
+        success = env.unwrapped._success   # True if task completed for this goal
+        
+        print(f"  Task {task_id}: success = {success}")
+"""
+
+env, dataset, eval_dataset = ogbench.make_env_and_datasets('cube-single-play-singletask-task1-v0', render_mode = 'rgb_array')
+for i in range(len(dataset['rewards'])):
+    if(dataset['rewards'][i] > -1 and dataset['masks'][i] != 0):
+        print(i)
+         
+
 
 
 

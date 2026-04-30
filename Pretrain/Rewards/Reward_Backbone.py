@@ -5,7 +5,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(project_root)
 from typing import Optional
-from Dataset import KitchenDataset, PointMazeDataset, get_dataset, get_env, CubeDataset
+from Dataset import CubeDataset_Singletask, KitchenDataset, PointMazeDataset, get_dataset, get_env, CubeDataset
 import random
 from torch.utils.data import Dataset, DataLoader
 import torch
@@ -284,17 +284,17 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
          if(specific_dataset is None): 
              raise ValueError(f"Invalid dataset name: {dataset_name}")
          elif(specific_dataset == 'single'):
-             data_1 = CubeDataset('single-play', task_id)
-             data_2 = CubeDataset('single-noisy', task_id)
-             name = 'Cube_Reward_single'
+             data_1 = CubeDataset_Singletask('single-play', task_id)
+             data_2 = CubeDataset_Singletask('single-noisy', task_id)
+             name = f'Cube_Reward_single_task{task_id}'
          elif(specific_dataset == 'double'):
-             data_1 = CubeDataset('double-play', task_id)
-             data_2 = CubeDataset('double-noisy', task_id)
-             name = 'Cube_Reward_double'
+             data_1 = CubeDataset_Singletask('double-play', task_id)
+             data_2 = CubeDataset_Singletask('double-noisy', task_id)
+             name = f'Cube_Reward_double_task{task_id}'
          elif(specific_dataset == 'triple'):
-             data_1 = CubeDataset('triple-play', task_id)
-             data_2 = CubeDataset('triple-noisy', task_id)
-             name = 'Cube_Reward_triple'
+             data_1 = CubeDataset_Singletask('triple-play', task_id)
+             data_2 = CubeDataset_Singletask('triple-noisy', task_id)
+             name = f'Cube_Reward_triple_task{task_id}'
          else: 
               raise ValueError(f"Invalid dataset name: {specific_dataset}")
          obs_dim = data_1.get_state_dim()
