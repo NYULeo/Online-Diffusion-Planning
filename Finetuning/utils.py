@@ -25,8 +25,8 @@ import copy
 from Pretrain.Rewards.nets import SimpleReward
 from torch.utils.data import DataLoader
 import torch.optim as optim
-from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel
-from Pretrain.Transition_Kernel.Kernel_Backbone import compute_total_mahalanobis_score
+from Pretrain.Transition_Kernel.Kernel_Net import MoGTransitionKernel, RobustTransitionKernel
+from Pretrain.Transition_Kernel.Kernel_Backbone import compute_total_mahalanobis_score, compute_log_density_mog, compute_log_density, compute_total_mahalanobis_score_mog
 from Pretrain.Dataset import KitchenDataset, PointMazeDataset, get_env, Planner_Processor
 from gymnasium.vector import AsyncVectorEnv
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
@@ -515,9 +515,9 @@ def train_reward(trajs: List[TrajectoryDict], dataset_name: str, hidden_layers: 
     save_reward_model(reward_net, dataset_name, specific_dataset, step)
     print(f"reward model saved")
            
-def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str,
+def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, constraint_type: str = 'mahalanobis',
                  batch_size=256, lr=1e-3, num_steps=10000,
-                 ensemble_size=10, λ_reg=1e-3, num_hidden_layers=2, hidden_dim=256, step: int = 0, quantile: float = 0.999):
+                 ensemble_size=10, λ_reg=1e-3, num_hidden_layers=2, hidden_dim=256, step: int = 0, quantile: float = 0.95):
     # Prepare dataset / dataloader
     print(f"Training kernel for {dataset_name}_{specific_dataset}")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -568,7 +568,68 @@ def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
     
 
     new_loader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=True, num_workers=8)
-    threshold = compute_threshold(ensemble, new_loader, quantile)
+    if(constraint_type == 'mahalanobis'):
+        threshold = compute_threshold_mahalanobis(ensemble, new_loader, quantile)
+    else:
+        threshold = compute_threshold_log_prob(ensemble, new_loader, quantile)
+    for idx, m in enumerate(ensemble):
+         ckpt = copy.deepcopy(m).cpu()
+         save_kernel_model(ckpt, dataset_name, specific_dataset, step, idx)
+    print(f"Kernel model saved")
+    return threshold
+
+
+def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, constraint_type: str = 'mahalanobis',
+                 batch_size=256, lr=1e-3, num_steps=10000,
+                 ensemble_size=10, λ_reg=1e-3, num_modes: Optional[int] = 8,   num_hidden_layers=2, hidden_dim=256, kernel_noise_floor: Optional[float] = 1e-4, step: int = 0, quantile: float = 0.95):
+    # Prepare dataset / dataloader
+    print(f"Training kernel for {dataset_name}_{specific_dataset}")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #print("Using device:", device)
+    _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+    dataset = KernelDataset(trajs, dataset_name, specific_dataset, step)
+    loader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
+                              pin_memory=True, num_workers=8))
+    # Create ensemble of models
+    ensemble = [MoGTransitionKernel(obs_dim, act_dim, num_modes, num_hidden_layers, hidden_dim, kernel_noise_floor).to(device) for _ in range(ensemble_size)]
+    optimizers = [optim.Adam(m.parameters(), lr, weight_decay=1e-5) for m in ensemble]
+    total_loss = 0.0
+
+    for k in range(1, num_steps + 1):
+        s, a, s_next = next(loader)
+        s = s.to(device)
+        a = a.to(device)
+        s_next = s_next.to(device)
+        # For each model in ensemble, compute loss
+        losses = []
+        mus = []
+        log_stds = []
+        for m in ensemble:
+            mu, log_std, weights = m(s, a)
+            loss = m.mog_nll(s_next, mu, log_std, weights)
+            # === Optional: disagreement regularization ===
+            # Average over modes for disagreement calculation
+            mu_mean = mu.mean(dim=1)                    # (B, obs_dim)
+            disagreement = ((mu - mu_mean.unsqueeze(1)) ** 2).mean(dim=1).mean(dim=0)
+            var = torch.exp(2 * log_std) + m.noise_floor
+            penalty = (disagreement / (var.mean(dim=1) + 1e-6)).mean()
+            loss = loss + λ_reg * penalty
+            losses.append(loss)
+        # Backprop
+        for m, opt, loss in zip(ensemble, optimizers, losses):
+            opt.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(m.parameters(), max_norm=5.0)
+            opt.step()
+        # Logging
+        avg_loss = sum(loss.item() for loss in losses) / ensemble_size
+        total_loss += avg_loss
+
+    new_loader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=True, num_workers=8)
+    if(constraint_type == 'mahalanobis'):
+         threshold = compute_threshold_mahalanobis_mog(ensemble, new_loader, quantile)
+    else:
+         threshold = compute_threshold_log_prob_mog(ensemble, new_loader, quantile)
     for idx, m in enumerate(ensemble):
          ckpt = copy.deepcopy(m).cpu()
          save_kernel_model(ckpt, dataset_name, specific_dataset, step, idx)
@@ -1084,7 +1145,7 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
      #print(f"Average Normalized Score: {score:.2f}")
      return trajs, score, total_steps
 
-
+"""
 def rollout_parallel2(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs = 8, goal_cell: Optional[np.ndarray] = None, start_cells: Optional[List[np.ndarray]] = None, task_id: Optional[int] = None, device: torch.device = None, seed_base: int = 0, continual_rollout = False, chunk_size = 5):
      #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
      #print(f"Running {num_envs} environments in parallel")
@@ -1117,7 +1178,7 @@ def rollout_parallel2(env_name, specific_env, horizon = 32, steps_T = 50, num_ka
      elif env_name == 'pointmaze':
          model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
      elif(env_name == 'antmaze'):
-           model = DiT1d(in_dim = d_s, emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+         model = DiT1d(in_dim = d_s, emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
      elif env_name == 'cube':
          model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
      else:
@@ -1131,133 +1192,333 @@ def rollout_parallel2(env_name, specific_env, horizon = 32, steps_T = 50, num_ka
      # <<< MODIFIED: Unique env reset seeds per process to prevent identical trajectories across GPUs
      reset_seeds = list(range(seed_base, seed_base + num_envs))
      
-     """
-     if(goal_cell is not None):
-         maze = env.unwrapped.maze  # Access the internal Maze object
-         maze_map = maze.maze_map
-         rows, cols = len(maze_map), len(maze_map[0])
-         free_cells = []
-         for row in range(rows):
-             for col in range(cols):
-                 if maze_map[row][col] != 1:  # 1 = wall; others are free/open
-                       free_cells.append(np.array([row, col]))
-         free_cells = np.array(free_cells)
-         
-         
-         free_cells = np.array([[6,6], [1,1], [1,6], [3,2], [5,4], [3,4], [4,1], [4,6], [2,4], [2,1]])
-         selected_indices = np.random.choice(len(free_cells), size=4, replace=False)
-         selected_free_cells = free_cells[selected_indices]
-         
-         selected_free_cells = np.array([[6,6], [5,4], [2,4], [2,1]])
-         start_cells = []
-         for i in range(len(selected_free_cells)):
-             if(np.array_equal(selected_free_cells[i], goal_cell)):
-                 continue
-             else:
-                 start_cells.append(selected_free_cells[i].copy())
-         start_cells = np.array(start_cells)
-     else:
-         start_cells = [None]
-     """
+    
      total_steps = 0
-     for start_cell in start_cells:
-       # Reset all environments
-       #seeds = list(range(num_envs)) 
-       opt = {}
-       if goal_cell is not None:
+     if (start_cells is not None):
+      for start_cell in start_cells:
+         # Reset all environments
+         #seeds = list(range(num_envs)) 
+        opt = {}
+        if goal_cell is not None:
              opt["goal_cell"] = goal_cell.copy()
-       else:
+        else:
              opt['goal_cell'] = None
-       if start_cell is not None:
+        if start_cell is not None:
              opt["reset_cell"] = start_cell.copy()
-       else:
+        else:
              opt['reset_cell'] = None
-       if(task_id is not None):
-            s0_vec = vec_env.reset(seed = reset_seeds, task_id = task_id, options=[opt for _ in range(num_envs)])
-       else:
-            s0_vec = vec_env.reset(seed = reset_seeds, options=[opt for _ in range(num_envs)])
-       current_states = s0_vec[0]['observation']
+        
+        s0_vec = vec_env.reset(seed = reset_seeds, options=[opt for _ in range(num_envs)])
+        current_states = s0_vec[0]['observation']
      
-       # Store trajectories for each environment
-       all_rewards = [0.0 for _ in range(num_envs)]
-       done_envs = [False for _ in range(num_envs)]
-       observations = [[] for _ in range(num_envs)]
-       acts = [[] for _ in range(num_envs)]
-       rewards = [[] for _ in range(num_envs)]
-       Temp_acts = [[] for _ in range(num_envs)]
-       for env_idx in range(num_envs):
-          observations[env_idx].append(current_states[env_idx].copy())
+        # Store trajectories for each environment
+        all_rewards = [0.0 for _ in range(num_envs)]
+        done_envs = [False for _ in range(num_envs)]
+        observations = [[] for _ in range(num_envs)]
+        acts = [[] for _ in range(num_envs)]
+        rewards = [[] for _ in range(num_envs)]
+        Temp_acts = [[] for _ in range(num_envs)]
+        for env_idx in range(num_envs):
+            observations[env_idx].append(current_states[env_idx].copy())
      
-       for i in range(episode_length):
-          actions = np.zeros((num_envs, d_a))
+        for i in range(episode_length):
+            actions = np.zeros((num_envs, d_a))
          
           # Generate actions for each environment
-          for env_idx in range(num_envs):
-             if done_envs[env_idx]:
-                 continue
-             if(continual_rollout):
-                if(len(Temp_acts[env_idx]) == 0):
-                    current_state = current_states[env_idx]
-                    current_state_norm = planner_processor.preprocess(current_state)
-                    x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
-                    for k in range(len(x)):
-                         Temp_acts[env_idx].append(x[k, d_s:(d_s+d_a)].copy())
+            for env_idx in range(num_envs):
+               if done_envs[env_idx]:
+                   continue
+               if(continual_rollout):
+                   if(len(Temp_acts[env_idx]) == 0):
+                      current_state = current_states[env_idx]
+                      current_state_norm = planner_processor.preprocess(current_state)
+                      x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                      for k in range(len(x)):
+                          Temp_acts[env_idx].append(x[k, d_s:(d_s+d_a)].copy())
                     
-                actions[env_idx] = Temp_acts[env_idx][0].copy()
-                Temp_acts[env_idx] = Temp_acts[env_idx][1:].copy()
-             else:
-                current_state = current_states[env_idx]
-                current_state_norm = planner_processor.preprocess(current_state)
-                x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
-                action = x[0, d_s:(d_s+d_a)].copy()
-                actions[env_idx] = action
+                   actions[env_idx] = Temp_acts[env_idx][0].copy()
+                   Temp_acts[env_idx] = Temp_acts[env_idx][1:].copy()
+               else:
+                   current_state = current_states[env_idx]
+                   current_state_norm = planner_processor.preprocess(current_state)
+                   x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                   action = x[0, d_s:(d_s+d_a)].copy()
+                   actions[env_idx] = action
          
-          # Step all environments at once
-          obs_vec, rewards_vec, terminated_vec, truncated_vec, info_vec = vec_env.step(actions)
+            # Step all environments at once
+            obs_vec, rewards_vec, terminated_vec, truncated_vec, info_vec = vec_env.step(actions)
          
-          # Update trajectories
-          for env_idx in range(num_envs):
-             if done_envs[env_idx]:
-                 continue
+             # Update trajectories
+            for env_idx in range(num_envs):
+               if done_envs[env_idx]:
+                   continue
              
-             observations[env_idx].append(obs_vec['observation'][env_idx].copy())
-             acts[env_idx].append(actions[env_idx].copy())
-             rewards[env_idx].append(rewards_vec[env_idx])
-             all_rewards[env_idx] += rewards_vec[env_idx]
+               observations[env_idx].append(obs_vec['observation'][env_idx].copy())
+               acts[env_idx].append(actions[env_idx].copy())
+               rewards[env_idx].append(rewards_vec[env_idx])
+               all_rewards[env_idx] += rewards_vec[env_idx]
              
-             current_states[env_idx] = obs_vec['observation'][env_idx].copy()
+               current_states[env_idx] = obs_vec['observation'][env_idx].copy()
              
-             if terminated_vec[env_idx] or truncated_vec[env_idx]:
-                 done_envs[env_idx] = True
-                 #print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
+               if terminated_vec[env_idx] or truncated_vec[env_idx]:
+                   done_envs[env_idx] = True
+                   #print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
          
         
-          # Check if all environments are done
-          if all(done_envs):
-             #print("All environments completed!")
-             break
+             # Check if all environments are done
+            if all(done_envs):
+                #print("All environments completed!")
+                break
      
-       # Find the trajectory with the maximum reward
-       for env_idx in range(num_envs):
-          total_steps += (len(observations[env_idx]) - 1)
-          trajs.append({
-              'observations': np.asarray(observations[env_idx].copy()),
-              'actions': np.asarray(acts[env_idx].copy()),
-              'rewards': np.asarray(spare_reward_prcocessor(rewards[env_idx].copy()))
-          })
+     else:
+        opt =  {"task_id": task_id}
+        #s0_vec = vec_env.reset(seed = reset_seeds, options=[opt for _ in range(num_envs)])
+        #current_states = s0_vec[0]['observation']
+        obs0, _ = vec_env.reset(seed=reset_seeds, options=[opt for _ in range(num_envs)])
+        if isinstance(obs0, dict):
+              current_states = obs0['observation']
+        else:
+              current_states = obs0
+     
+        # Store trajectories for each environment
+        all_rewards = [0.0 for _ in range(num_envs)]
+        done_envs = [False for _ in range(num_envs)]
+        observations = [[] for _ in range(num_envs)]
+        acts = [[] for _ in range(num_envs)]
+        rewards = [[] for _ in range(num_envs)]
+        Temp_acts = [[] for _ in range(num_envs)]
+        for env_idx in range(num_envs):
+            observations[env_idx].append(current_states[env_idx].copy())
+     
+        for i in range(episode_length):
+            actions = np.zeros((num_envs, d_a))
+         
+            # Generate actions for each environment
+            for env_idx in range(num_envs):
+               if done_envs[env_idx]:
+                   continue
+               if(continual_rollout):
+                   if(len(Temp_acts[env_idx]) == 0):
+                      current_state = current_states[env_idx]
+                      current_state_norm = planner_processor.preprocess(current_state)
+                      x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                      for k in range(len(x)):
+                          Temp_acts[env_idx].append(x[k, d_s:(d_s+d_a)].copy())
+                    
+                   actions[env_idx] = Temp_acts[env_idx][0].copy()
+                   Temp_acts[env_idx] = Temp_acts[env_idx][1:].copy()
+               else:
+                   current_state = current_states[env_idx]
+                   current_state_norm = planner_processor.preprocess(current_state)
+                   x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                   action = x[0, d_s:(d_s+d_a)].copy()
+                   actions[env_idx] = action
+         
+            # Step all environments at once
+            obs_vec, rewards_vec, terminated_vec, truncated_vec, info_vec = vec_env.step(actions)
+            obs_batch = obs_vec['observation'] if isinstance(obs_vec, dict) else obs_vec
+         
+             # Update trajectories
+            for env_idx in range(num_envs):
+               if done_envs[env_idx]:
+                   continue
+             
+               observations[env_idx].append(obs_batch[env_idx].copy())
+               acts[env_idx].append(actions[env_idx].copy())
+               rewards[env_idx].append(rewards_vec[env_idx])
+               all_rewards[env_idx] += rewards_vec[env_idx]
+             
+               current_states[env_idx] = obs_batch[env_idx].copy()
+             
+               if terminated_vec[env_idx] or truncated_vec[env_idx]:
+                   done_envs[env_idx] = True
+                   #print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
+         
         
+             # Check if all environments are done
+            if all(done_envs):
+                    #print("All environments completed!")
+                    break
+     
+            # Find the trajectory with the maximum reward
+     for env_idx in range(num_envs):
+                   total_steps += (len(observations[env_idx]) - 1)
+                   trajs.append({
+                      'observations': np.asarray(observations[env_idx].copy()),
+                      'actions': np.asarray(acts[env_idx].copy()),
+                      'rewards': np.asarray(spare_reward_prcocessor(rewards[env_idx].copy()))
+     })     
      vec_env.close()
      valid, success_rate = checktrajs(trajs)
      print(f"valid: {valid}, success rate: {success_rate:.2f}")
      if(goal_cell is None):
-          expert_score = get_expert_score(env_name)
-          score = get_normalized_score(trajs, expert_score)
+            expert_score = get_expert_score(env_name)
+            score = get_normalized_score(trajs, expert_score)
      else:
-          score = get_normalized_score(trajs)
+            score = get_normalized_score(trajs)
      #save_trajs(trajs, env_name, specific_env, checkpoint_step)
      #print(f"Average Normalized Score: {score:.2f}")
      return trajs, score, total_steps
 
+"""
+
+def rollout_parallel2(
+    env_name, specific_env,
+    horizon=32, steps_T=50, num_karras=10, eta=0.8,
+    episode_length=4000, checkpoint_step=1000000,
+    num_envs=8,
+    goal_cell: Optional[np.ndarray] = None,
+    start_cells: Optional[List[np.ndarray]] = None,
+    task_id: Optional[int] = None,
+    device: torch.device = None,
+    seed_base: int = 0,
+    continual_rollout=False,
+    chunk_size=5,          # currently unused
+):
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    trajs = []
+    total_steps = 0
+
+    # Seeding
+    rank = int(os.environ.get("RANK", 0))
+    np.random.seed(12345 + rank + seed_base)
+    torch.manual_seed(12345 + rank + seed_base)
+
+    # Environment & Vector Env
+    _, d_s, d_a = get_env(env_name, specific_env)
+
+    def make_env():
+        env, _, _ = get_env(env_name, specific_env)
+        return env
+
+    vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
+
+    # Load model
+    state_dict = get_planner(env_name, specific_env, checkpoint_step)
+
+    if env_name in ['kitchen', 'pointmaze', 'cube']:
+        model = DiT1d(
+            in_dim=(d_s + d_a), emb_dim=128, d_model=256,
+            n_heads=256//64, depth=2, timestep_emb_type="fourier"
+        ).to(device)
+    elif env_name == 'antmaze':
+        model = DiT1d(
+            in_dim=d_s, emb_dim=128, d_model=256,
+            n_heads=256//64, depth=2, timestep_emb_type="fourier"
+        ).to(device)
+    else:
+        raise ValueError(f"Invalid Environment: {env_name}")
+
+    model.load_state_dict(state_dict)
+    model.eval()
+
+    planner_processor = Planner_Processor(env_name, specific_env)
+    reset_seeds = list(range(seed_base, seed_base + num_envs))
+
+    def run_rollout(options_list):
+        """Helper to run one batch of environments (avoids duplication)."""
+        nonlocal total_steps
+
+        obs, _ = vec_env.reset(seed=reset_seeds, options=options_list)
+        if isinstance(obs, dict):
+            current_states = obs['observation']
+        else:
+            current_states = obs
+
+        all_rewards = [0.0] * num_envs
+        done_envs = [False] * num_envs
+        observations = [[] for _ in range(num_envs)]
+        acts = [[] for _ in range(num_envs)]
+        rewards = [[] for _ in range(num_envs)]
+        Temp_acts = [[] for _ in range(num_envs)]
+
+        for env_idx in range(num_envs):
+            observations[env_idx].append(current_states[env_idx].copy())
+
+        for i in range(episode_length):
+            actions = np.zeros((num_envs, d_a))
+
+            for env_idx in range(num_envs):
+                if done_envs[env_idx]:
+                    continue
+
+                current_state = current_states[env_idx]
+                current_state_norm = planner_processor.preprocess(current_state)
+
+                if continual_rollout and len(Temp_acts[env_idx]) > 0:
+                    action = Temp_acts[env_idx].pop(0)
+                else:
+                    x = sample_euler_karras(
+                        current_state_norm, model, d_s, d_a,
+                        horizon, steps_T, num_karras, eta, device
+                    )
+                    if continual_rollout:
+                        Temp_acts[env_idx] = [x[k, d_s:(d_s + d_a)].copy() 
+                                              for k in range(len(x))]
+                        action = Temp_acts[env_idx].pop(0)
+                    else:
+                        action = x[0, d_s:(d_s + d_a)].copy()
+
+                actions[env_idx] = action
+
+            # Step
+            obs_vec, rewards_vec, terminated_vec, truncated_vec, _ = vec_env.step(actions)
+
+            # Consistent observation extraction
+            obs_batch = obs_vec['observation'] if isinstance(obs_vec, dict) else obs_vec
+
+            # Update
+            for env_idx in range(num_envs):
+                if done_envs[env_idx]:
+                    continue
+
+                observations[env_idx].append(obs_batch[env_idx].copy())
+                acts[env_idx].append(actions[env_idx].copy())
+                rewards[env_idx].append(rewards_vec[env_idx])
+                all_rewards[env_idx] += rewards_vec[env_idx]
+                current_states[env_idx] = obs_batch[env_idx].copy()
+
+                if terminated_vec[env_idx] or truncated_vec[env_idx]:
+                    done_envs[env_idx] = True
+
+            if all(done_envs):
+                break
+
+        # Append finished trajectories
+        for env_idx in range(num_envs):
+            total_steps += len(observations[env_idx]) - 1
+            trajs.append({
+                'observations': np.asarray(observations[env_idx]),
+                'actions': np.asarray(acts[env_idx]),
+                'rewards': np.asarray(spare_reward_prcocessor(rewards[env_idx].copy()))  # FIXED
+            })
+
+    # ====================== Main Logic ======================
+    if start_cells is not None and len(start_cells) > 0:
+        for start_cell in start_cells:
+            opt = {
+                "goal_cell": goal_cell.copy() if goal_cell is not None else None,
+                "reset_cell": start_cell.copy() if start_cell is not None else None,
+            }
+            run_rollout([opt] * num_envs)
+    else:
+        opt = {"task_id": task_id}
+        run_rollout([opt] * num_envs)
+
+    vec_env.close()
+
+    valid, success_rate = checktrajs(trajs)
+    print(f"valid: {valid}, success rate: {success_rate:.2f}")
+
+    if goal_cell is None:
+        expert_score = get_expert_score(env_name)
+        score = get_normalized_score(trajs, expert_score)
+    else:
+        score = get_normalized_score(trajs)
+
+    return trajs, score, success_rate, total_steps
 
 import math
 from dataclasses import dataclass
@@ -1326,7 +1587,7 @@ def check_device():
     return device 
 
             
-def compute_threshold(kernels, dataloader, quantile):
+def compute_threshold_mahalanobis(kernels, dataloader, quantile):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     all_D2_total = []
     for i, (s, a, s_next) in enumerate(dataloader):
@@ -1350,4 +1611,80 @@ def compute_threshold(kernels, dataloader, quantile):
     print(f"variance_D2_total = {var_D2_total:.4f}")
     print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
     return tau
+
+def compute_threshold_mahalanobis_mog(kernels, dataloader, quantile):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    all_D2_total = []
+    for i, (s, a, s_next) in enumerate(dataloader):
+        s = s.to(device)
+        a = a.to(device)
+        s_next = s_next.to(device)
+        #compute total mahalanobis distance
+        with torch.no_grad():
+            D2_total = compute_total_mahalanobis_score_mog(kernels, s, a, s_next)
+        all_D2_total.extend(D2_total.detach().cpu().numpy())
+    
+    all_D2_total = np.array(all_D2_total)
+    mean_D2_total = float(all_D2_total.mean())
+    min_D2_total = float(all_D2_total.min())
+    max_D2_total = float(all_D2_total.max())
+    var_D2_total = float(all_D2_total.var())
+    tau = float(np.quantile(all_D2_total, quantile))
+    print(f"mean_D2_total = {mean_D2_total:.4f}")
+    print(f"min_D2_total = {min_D2_total:.4f}")
+    print(f"max_D2_total = {max_D2_total:.4f}")
+    print(f"variance_D2_total = {var_D2_total:.4f}")
+    print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
+    return tau
+
+def compute_threshold_log_prob_mog(kernels, dataloader, quantile):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    all_log_density_total = []
+    for i, (s, a, s_next) in enumerate(dataloader):
+        s = s.to(device)
+        a = a.to(device)
+        s_next = s_next.to(device)
+        #compute total mahalanobis distance
+        with torch.no_grad():
+            log_density_total = compute_log_density_mog(kernels, s, a, s_next)
+        all_log_density_total.extend(log_density_total.detach().cpu().numpy())
+    
+    all_log_density_total = np.array(all_log_density_total)
+    mean_log_density_total = float(all_log_density_total.mean())
+    min_log_density_total = float(all_log_density_total.min())
+    max_log_density_total = float(all_log_density_total.max())
+    var_log_density_total = float(all_log_density_total.var())
+    tau = float(np.quantile(all_log_density_total, 1 - quantile))
+    print(f"mean_D2_total = {mean_log_density_total:.4f}")
+    print(f"min_D2_total = {min_log_density_total:.4f}")
+    print(f"max_D2_total = {max_log_density_total:.4f}")
+    print(f"variance_D2_total = {var_log_density_total:.4f}")
+    print(f"τ ({(1 - quantile)*100:.0f}th percentile) : {tau:.4f}")
+    return tau
+
+def compute_threshold_log_prob(kernels, dataloader, quantile):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    all_log_density_total = []
+    for i, (s, a, s_next) in enumerate(dataloader):
+        s = s.to(device)
+        a = a.to(device)
+        s_next = s_next.to(device)
+        #compute total mahalanobis distance
+        with torch.no_grad():
+            log_density_total = compute_log_density(kernels, s, a, s_next)
+        all_log_density_total.extend(log_density_total.detach().cpu().numpy())
+    
+    all_log_density_total = np.array(all_log_density_total)
+    mean_log_density_total = float(all_log_density_total.mean())
+    min_log_density_total = float(all_log_density_total.min())
+    max_log_density_total = float(all_log_density_total.max())
+    var_log_density_total = float(all_log_density_total.var())
+    tau = float(np.quantile(all_log_density_total, 1 - quantile))
+    print(f"mean_D2_total = {mean_log_density_total:.4f}")
+    print(f"min_D2_total = {min_log_density_total:.4f}")
+    print(f"max_D2_total = {max_log_density_total:.4f}")
+    print(f"variance_D2_total = {var_log_density_total:.4f}")
+    print(f"τ ({(1 - quantile)*100:.0f}th percentile) : {tau:.4f}")
+    return tau
+    
     

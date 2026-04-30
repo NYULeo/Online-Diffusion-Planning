@@ -16,7 +16,7 @@ from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Dataset import get_PlannerName, get_dataset, Planner_Processor
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 from typing import List
-from utils import TrajectoryDict, rollout_parallel, get_planner, rollout_parallel2, save_planner, train_reward, train_kernel, train_critic, save_trajs, AlphaSchedulerConfig, checktrajs
+from utils import TrajectoryDict, rollout_parallel, get_planner, rollout_parallel2, save_planner, train_reward, train_kernel, train_kernel_mog, train_critic, save_trajs, AlphaSchedulerConfig, checktrajs
 from Pretrain.Dataset import get_env
 from torch.utils.data import DataLoader, DistributedSampler
 from accelerate.utils import broadcast
@@ -56,6 +56,9 @@ class Train_Kernel_Config:
     ensemble_size: int = 10
     num_hidden_layers: int = 2
     hidden_dim: int = 256
+    type_kernel: str = 'robust' | 'mog'
+    kernel_num_modes: Optional[int] = 8
+    kernel_noise_floor: Optional[float] = 1e-4
     λ_reg: float = 1e-3
 
 @dataclass
@@ -207,6 +210,9 @@ class OnlineFinetuner():
         self.config.RewardConfig.hidden_dim_reward = self.config.train_reward_config.hidden_dim
         self.config.RewardConfig.num_hidden_layers_critic = self.config.train_critic_config.hidden_layers
         self.config.RewardConfig.hidden_dim_critic = self.config.train_critic_config.hidden_dim
+        self.config.RewardConfig.type_kernel = self.config.train_kernel_config.type_kernel
+        self.config.RewardConfig.kernel_num_modes = self.config.train_kernel_config.kernel_num_modes
+        self.config.RewardConfig.kernel_noise_floor = self.config.train_kernel_config.kernel_noise_floor
         self.config.AMConfig.alpha_scheduler_config = self.config.AlphaConfig
         self.config.AMConfig.finetune_total_steps = self.config.finetune_steps
         self.config.AMConfig.batch_per_sample = self.config.finetune_batch_per_sample
@@ -259,14 +265,20 @@ class OnlineFinetuner():
     def set_reward_model(self, device):
         if self.config.critic:
             if(self.config.critic_model_checkpoint == 0):
-                self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
-                #self.reward_model = TotalReward_Mahalanobis(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
+                if(self.config.RewardConfig.constraint_type == 'log_prob'):
+                    self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
+                else:
+                    self.reward_model = TotalReward_Mahalanobis(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
             else:
-                self.reward_model = TotalReward_Critic(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, self.config.critic_model_checkpoint)
-                #self.reward_model = TotalReward_Critic_Mahalanobis(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, self.config.critic_model_checkpoint)
+                if(self.config.RewardConfig.constraint_type == 'log_prob'):
+                    self.reward_model = TotalReward_Critic(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, self.config.critic_model_checkpoint)
+                else:
+                    self.reward_model = TotalReward_Critic_Mahalanobis(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, self.config.critic_model_checkpoint)
         else:
-            self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
-            #self.reward_model = TotalReward_Mahalanobis(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
+            if(self.config.RewardConfig.constraint_type == 'log_prob'):
+                 self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
+            else:
+                 self.reward_model = TotalReward_Mahalanobis(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
     
     def gather_and_sync_trajs_and_buffer(self, local_trajs):
         # Gather local trajectories from all processes
@@ -499,7 +511,7 @@ class OnlineFinetuner():
             """ 
             if do_rollout:
                 seed_base = rank * num_envs_per_process
-                trajs, score, total_steps = rollout_parallel2(self.config.dataset_name, 
+                trajs, score, success_rate, total_steps = rollout_parallel2(self.config.dataset_name, 
                                              self.config.specific_dataset, 
                                              horizon = self.config.AMConfig.horizon, 
                                              steps_T = self.config.diffusion_steps, 
@@ -511,11 +523,12 @@ class OnlineFinetuner():
                                              goal_cell = self.config.train_reward_config.rollout_goal,
                                              device = self.device,
                                              start_cells = self.config.train_reward_config.rollout_start_cells,
+                                             task_id = self.config.train_reward_config.task_id,
                                              seed_base = seed_base,
                                              continual_rollout = self.config.continual_rollout)
                 #print(checktrajs(trajs)) 
             else:
-                trajs, score, total_steps = [], 0.0, 0
+                trajs, score, total_steps = [], 0.0, 0.0, 0
             
             self.accelerator.wait_for_everyone()                    
             
@@ -529,15 +542,19 @@ class OnlineFinetuner():
             
             #collect the score and number of env stepsacross all processes
             gathered_scores = self.accelerator.gather_for_metrics(torch.tensor([score], device=self.device, dtype = torch.float32),  use_gather_object=False)
+            gathered_success_rates = self.accelerator.gather_for_metrics(torch.tensor([success_rate], device=self.device, dtype = torch.float32), use_gather_object=False)
             gathered_steps = self.accelerator.gather_for_metrics(torch.tensor([total_steps], device=self.device, dtype = torch.int64),  use_gather_object=False)
             if self.accelerator.is_main_process:
                  total_steps = gathered_steps.int().sum().item()
                  num_rollout = (num_rollout_procs if num_rollout_procs is not None 
                                else self.accelerator.num_processes)
                  rollout_scores = gathered_scores.float()[:num_rollout]
+                 rollout_success_rates = gathered_success_rates.float()[:num_rollout]
                  avg_score = rollout_scores.float().mean().item()
+                 avg_success_rate = rollout_success_rates.float().mean().item()
                  #avg_score = gathered_scores.float().mean().item()
                  print(f"Total Number of Environment Steps: {total_steps}")
+                 print(f"Average Success Rate: {avg_success_rate:.2f}")
                  print(f"Average Normalized Score: {avg_score:.2f}")
             self.accelerator.wait_for_everyone()  
             
@@ -558,9 +575,11 @@ class OnlineFinetuner():
                              goal = self.config.train_reward_config.train_goal)
                   if self.config.kernel:
                       print(f"Starting Kernel Training")
-                      threshold = train_kernel(self.Train_Buffer, 
+                      if(self.config.train_kernel_config.type_kernel == 'robust'):
+                          threshold = train_kernel(self.Train_Buffer, 
                              dataset_name = self.config.dataset_name, 
                              specific_dataset = self.config.specific_dataset,
+                             constraint_type = self.config.RewardConfig.constraint_type,
                              batch_size = self.config.train_kernel_config.batch_size, 
                              lr = self.config.train_kernel_config.lr, 
                              num_steps = self.config.train_kernel_config.num_steps,
@@ -571,6 +590,23 @@ class OnlineFinetuner():
                              step = ((step+1) * self.config.AMConfig.per_round_steps),
                              quantile = self.config.RewardConfig.quantile)
                       
+                      elif(self.config.train_kernel_config.type_kernel == 'mog'):
+                          threshold = train_kernel_mog(self.Train_Buffer,
+                                      dataset_name = self.config.dataset_name,
+                                      specific_dataset = self.config.specific_dataset,
+                                      constraint_type = self.config.RewardConfig.constraint_type,
+                                      batch_size = self.config.train_kernel_config.batch_size,
+                                      lr = self.config.train_kernel_config.lr,
+                                      num_steps = self.config.train_kernel_config.num_steps,
+                                      ensemble_size = self.config.train_kernel_config.ensemble_size,
+                                      λ_reg = self.config.train_kernel_config.λ_reg,
+                                      num_modes = self.config.train_kernel_config.num_modes,
+                                      num_hidden_layers = self.config.train_kernel_config.num_hidden_layers,
+                                      hidden_dim = self.config.train_kernel_config.hidden_dim,
+                                      kernel_noise_floor = self.config.train_kernel_config.kernel_noise_floor,
+                                      step = ((step+1) * self.config.AMConfig.per_round_steps),
+                                      quantile = self.config.RewardConfig.quantile)
+
                   if self.config.critic:
                       print(f"Starting Critic Training")
                       #save_trajs(critic_buffer, self.config.dataset_name, self.config.specific_dataset, ((step+1) * self.config.AMConfig.per_round_steps))
@@ -601,7 +637,10 @@ class OnlineFinetuner():
             self.config.kernel_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             #if self.config.RewardConfig.max_mahalanobis_score < threshold: 
-            self.config.RewardConfig.max_mahalanobis_score = threshold
+            if(self.config.RewardConfig.constraint_type == 'mahalanobis' and self.config.RewardConfig.max_mahalanobis_score < threshold):
+                 self.config.RewardConfig.max_mahalanobis_score = threshold
+            elif(self.config.RewardConfig.constraint_type == 'log_prob' and self.config.RewardConfig.min_log_prob > threshold):
+                 self.config.RewardConfig.min_log_prob = threshold
             
             #self.config.critic_model_checkpoint = 0
             self.set_reward_model(self.device)

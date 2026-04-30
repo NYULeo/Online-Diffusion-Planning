@@ -496,7 +496,7 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
         train_Trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id)
         dataset = RewardDataset(train_Trajs, reward_name, sigma, alpha, target_reward, goal)
     else:
-        _, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
+        _, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id)
         dataset = test_dataset(trajs, reward_name, sigma, alpha, target_reward, goal)
     print(f"Testing the reward model on {len(dataset)} samples")
     a = factorint(len(dataset))
@@ -504,6 +504,7 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
     dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8)
     num = save_freq
     while num <= num_steps:
+         Rewards = []
          state_dict = load_model(reward_name, num)
          reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
          #reward_net = DeepScaledReward(obs_dim, act_dim).to(device)
@@ -523,10 +524,20 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
              #loss = reward_net.loss(s, a, r)
              total_mean_loss += loss.item()
              total_reward += pred.mean().item()
+             Rewards.extend(pred.detach().cpu().numpy())
              
          avg_mean_loss = total_mean_loss / len(dataloader)
          avg_reward = total_reward / len(dataloader)
          print(f"model {num}, Loss {avg_mean_loss:.4f}, Reward: {avg_reward:.4f}")
+         Rewards = np.array(Rewards)
+         mean_R = Rewards.mean()
+         std_R = Rewards.std()
+         max_R = Rewards.max()
+         min_R = Rewards.min()
+         print(f"mean reward: {mean_R:.4f}")
+         print(f'std_reward: {std_R:.4f}')
+         print(f"max_reward: {max_R:.4f}")
+         print(f"min_reward: {min_R:.4f}")
          num += save_freq
 
 def get_pretrained_reward(dataset_name, checkpoints, specific_dataset: Optional[str] = None):

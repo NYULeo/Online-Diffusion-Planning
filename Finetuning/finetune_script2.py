@@ -251,7 +251,7 @@ if __name__ == "__main__":
     OnlineFinetuner.finetune_planner()
     """
     
-    
+    """
     env_name = 'pointmaze'
     specific_env = 'medium'
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = True)
@@ -298,7 +298,7 @@ if __name__ == "__main__":
                             gamma = 0.95,
                             data_conservation = True)
     
-
+    
 
     FTConfig = FinetuningConfig(
         AMConfig = AMConfig, 
@@ -339,7 +339,7 @@ if __name__ == "__main__":
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
     
-    
+    """
     
 
 
@@ -430,7 +430,7 @@ if __name__ == "__main__":
     OnlineFinetuner.finetune_planner()
    """
 
-    """
+    
     env_name = 'cube'
     specific_env = 'single-play'
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = True)
@@ -439,9 +439,10 @@ if __name__ == "__main__":
     #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
     RWConfig = RewardConfig(
                beta = 1.0, 
-               min_log_prob = 5.0, 
+               min_log_prob = -30.0, 
                critic_gamma = 1.0,
-               explore = False) 
+               explore = False,
+               constraint_type = 'log_prob') 
 
     
     TrainRewardConfig = Train_Reward_Config(
@@ -452,17 +453,19 @@ if __name__ == "__main__":
                           lr = 1e-4, 
                           sigma = 7.0, 
                           target_reward = 20.0, 
-                          train_goal = np.array([[-2.5, -2.5]], dtype = np.float32),
-                          rollout_goal = np.array([[6, 1]]),
-                          rollout_start_cells = np.array([[6,6], [5,4], [2,4], [2,1]]))
+                          train_goal = None,
+                          task_id = 1)
       
     TrainKernelConfig = Train_Kernel_Config(
-                            batch_size = 256, 
-                            num_steps = 1000,
-                            lr = 3e-4,
+                            batch_size = 512, 
+                            num_steps = 50000,
+                            lr = 1e-4,
                             ensemble_size = 10,
-                            num_hidden_layers = 2,
-                            hidden_dim = 256,
+                            num_hidden_layers = 3,
+                            hidden_dim = 514,
+                            type_kernel = 'mog',
+                            kernel_num_modes = 5,
+                            kernel_noise_floor = 5e-4,
                             λ_reg = 1e-3)
     
     TrainCriticConfig = Train_Critic_Config(
@@ -475,8 +478,6 @@ if __name__ == "__main__":
                             gamma = 0.95,
                             data_conservation = True)
     
-
-
     FTConfig = FinetuningConfig(
         AMConfig = AMConfig, 
         RewardConfig = RWConfig, 
@@ -492,7 +493,7 @@ if __name__ == "__main__":
         buffer_size = 5500,
         finetune_steps = 300,
         finetune_rounds = 30,
-        diffusion_steps = 50,
+        diffusion_steps = 100,
         karras_percent = 0.05,
         Loss_Clip_percent = 0.75,
         finetune_batch_size = 12,
@@ -508,11 +509,11 @@ if __name__ == "__main__":
         rollout_length = 4000,  # or your desired value
         rollout_num_envs = 1, 
         continual_rollout = True,
-        num_rollout_processes = 4,
+        num_rollout_processes = 10,
         train_reward_config = TrainRewardConfig,
         train_kernel_config = TrainKernelConfig,
         train_critic_config = TrainCriticConfig) 
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-    """
+    

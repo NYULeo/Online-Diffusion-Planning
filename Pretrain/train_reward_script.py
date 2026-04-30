@@ -1,7 +1,7 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from Rewards.Reward_Backbone import train_reward
+from Rewards.Reward_Backbone import train_reward, test_Model
 from Pretrain.utils import set_seed
 import numpy as np
 
@@ -20,7 +20,7 @@ if __name__ == '__main__':
     goal = np.array([[-2.5, -2.5]], dtype = np.float32))
 """
 
-
+"""
 if __name__ == '__main__':
     set_seed(1)
     train_reward(
@@ -37,10 +37,10 @@ if __name__ == '__main__':
     target_reward = 25.0,
     specific_dataset = 'large',
     goal = np.array([[4.0, -3.0]], dtype = np.float32))
-
-
-
 """
+
+
+
 if __name__ == '__main__':
     set_seed(1)
     train_reward(
@@ -48,8 +48,8 @@ if __name__ == '__main__':
         hidden_layers = 4,
         hidden_dim = 256, 
         batch_size = 512,
-        num_steps = 1000,
-        save_freq = 1000,
+        num_steps = 10000,
+        save_freq = 5000,
         lr = 1e-04,
         sigma = None,
         alpha = 0.999,
@@ -58,7 +58,23 @@ if __name__ == '__main__':
         task_id = 1
     )
 
-"""
+    test_Model(
+        dataset_name = 'cube', 
+        hidden_layers = 4, 
+        hidden_dim = 256,
+        specific_dataset = 'single', 
+        trajs = None,
+        sigma = None,
+        alpha = 0.999, 
+        target_reward = 25.0,
+        task_id = 1,
+        save_freq = 10000, 
+        num_steps = 10000)
+
+    
+
+
+
 
 
 

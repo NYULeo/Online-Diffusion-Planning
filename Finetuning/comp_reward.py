@@ -9,7 +9,7 @@ os.chdir(project_root)
 import torch
 import torch.nn as nn
 from Pretrain.Rewards.nets import SimpleReward
-from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel
+from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel, MoGTransitionKernel
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_total_mahalanobis_score
 from Pretrain.Critic.nets import Critic
 from Finetuning.utils import get_reward_model, get_kernel, get_reward_stats, get_kernel_stats, get_critic_model, get_critic_stats
@@ -26,7 +26,7 @@ class RewardConfig:
     """Configuration for the adjoint matching fine‑tuner."""
     beta: float
     max_mahalanobis_score: Optional[float] = None
-    quantile: float = 0.999
+    quantile: float = 0.95
     min_log_prob: Optional[float] = None
     explore: bool = True
     gamma: float = 0.8
@@ -34,9 +34,13 @@ class RewardConfig:
     device = None
     d_s: int = 0 
     d_a: int = 0
+    type_kernel: str = 'robust' or 'mog',
+    constraint_type: str = 'mahalanobis' or 'log_prob'
     num_hidden_layers_kernel: int = 2
     hidden_dim_kernel: int = 256
     num_hidden_layers_reward: int = 1
+    kernel_num_modes: int = 8,
+    kernel_noise_floor: Optional[float] = 1e-4,
     hidden_dim_reward: int = 128
     num_hidden_layers_critic: int = 1
     hidden_dim_critic: int = 128
@@ -59,13 +63,24 @@ class TotalReward(nn.Module):
 
         kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
         self.kernels = []
-        for sd in kernel_state_dicts:
-            kernel_net = RobustTransitionKernel(
-                obs_dim, act_dim, self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel
-            ).to(self.config.device)
-            kernel_net.load_state_dict(sd)
-            kernel_net.eval()
-            self.kernels.append(kernel_net)
+        if(self.config.type_kernel == 'robust'):
+            Model = RobustTransitionKernel
+            for sd in kernel_state_dicts:
+                kernel_net = Model(
+                      obs_dim, act_dim, self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel
+                ).to(self.config.device)
+                kernel_net.load_state_dict(sd)
+                kernel_net.eval()
+                self.kernels.append(kernel_net)
+        else:
+            Model = MoGTransitionKernel
+            for sd in kernel_state_dicts:
+                 kernel_net = Model(
+                       obs_dim, act_dim, self.config.kernel_num_modes, self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel, noise_floor = self.config.kernel_noise_floor
+                 ).to(self.config.device)
+                 kernel_net.load_state_dict(sd)
+                 kernel_net.eval()
+                 self.kernels.append(kernel_net)
 
         self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint)
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
@@ -247,13 +262,24 @@ class TotalReward_Critic(nn.Module):
 
         kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
         self.kernels = []
-        for sd in kernel_state_dicts:
-            kernel_net = RobustTransitionKernel(
-                obs_dim, act_dim, self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel
-            ).to(self.config.device)
-            kernel_net.load_state_dict(sd)
-            kernel_net.eval()
-            self.kernels.append(kernel_net)
+        if(self.config.type_kernel == 'robust'):
+            Model = RobustTransitionKernel
+            for sd in kernel_state_dicts:
+                kernel_net = Model(
+                      obs_dim, act_dim, self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel
+                ).to(self.config.device)
+                kernel_net.load_state_dict(sd)
+                kernel_net.eval()
+                self.kernels.append(kernel_net)
+        else:
+            Model = MoGTransitionKernel
+            for sd in kernel_state_dicts:
+                 kernel_net = Model(
+                       obs_dim, act_dim, self.config.kernel_num_modes, self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel, noise_floor = self.config.kernel_noise_floor
+                 ).to(self.config.device)
+                 kernel_net.load_state_dict(sd)
+                 kernel_net.eval()
+                 self.kernels.append(kernel_net)
 
         self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint)
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
@@ -467,13 +493,24 @@ class TotalReward_Mahalanobis(nn.Module):
 
         kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
         self.kernels = []
-        for sd in kernel_state_dicts:
-            kernel_net = RobustTransitionKernel(
-                obs_dim, act_dim, self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel
-            ).to(self.config.device)
-            kernel_net.load_state_dict(sd)
-            kernel_net.eval()
-            self.kernels.append(kernel_net)
+        if(self.config.type_kernel == 'robust'):
+            Model = RobustTransitionKernel
+            for sd in kernel_state_dicts:
+                kernel_net = Model(
+                      obs_dim, act_dim, self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel
+                ).to(self.config.device)
+                kernel_net.load_state_dict(sd)
+                kernel_net.eval()
+                self.kernels.append(kernel_net)
+        else:
+            Model = MoGTransitionKernel
+            for sd in kernel_state_dicts:
+                 kernel_net = Model(
+                       obs_dim, act_dim, self.config.kernel_num_modes, self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel, noise_floor = self.config.kernel_noise_floor
+                 ).to(self.config.device)
+                 kernel_net.load_state_dict(sd)
+                 kernel_net.eval()
+                 self.kernels.append(kernel_net)
 
         self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint)
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
@@ -652,13 +689,24 @@ class TotalReward_Critic_Mahalanobis(nn.Module):
 
         kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
         self.kernels = []
-        for sd in kernel_state_dicts:
-            kernel_net = RobustTransitionKernel(
-                obs_dim, act_dim, self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel
-            ).to(self.config.device)
-            kernel_net.load_state_dict(sd)
-            kernel_net.eval()
-            self.kernels.append(kernel_net)
+        if(self.config.type_kernel == 'robust'):
+            Model = RobustTransitionKernel
+            for sd in kernel_state_dicts:
+                kernel_net = Model(
+                      obs_dim, act_dim, self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel
+                ).to(self.config.device)
+                kernel_net.load_state_dict(sd)
+                kernel_net.eval()
+                self.kernels.append(kernel_net)
+        else:
+            Model = MoGTransitionKernel
+            for sd in kernel_state_dicts:
+                 kernel_net = Model(
+                       obs_dim, act_dim, self.config.kernel_num_modes, self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel, noise_floor = self.config.kernel_noise_floor
+                 ).to(self.config.device)
+                 kernel_net.load_state_dict(sd)
+                 kernel_net.eval()
+                 self.kernels.append(kernel_net)
       
         self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint)
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
@@ -852,6 +900,7 @@ class TotalReward_Critic_Mahalanobis(nn.Module):
 
         total_reward = total_reward + lam * self.config.delta
         return total_reward, gradient
+
 
 
 

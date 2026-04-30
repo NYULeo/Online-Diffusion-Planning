@@ -341,7 +341,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
                 pickle.dump(traj_info, f)
      """
      print(sum(traj['rewards']))
-     return get_normalized_score([traj])
+     return traj
      #return len(traj['rewards'])
      #print(get_normalized_score([traj]))
 """
@@ -517,7 +517,8 @@ if __name__ == "__main__":
     specific_train_dataset = 'single-play'
     set_seed(1)
     
-    rollout(env_name, 
+    """
+    traj = rollout(env_name, 
             specific_train_dataset, horizon, 
             steps_T = 100, 
             num_karras = 5, 
@@ -525,10 +526,43 @@ if __name__ == "__main__":
             episode_length = 3000, 
             checkpoint_steps = 0, 
             render = True,  
-            base_seed = 4, 
+            base_seed = 9, 
             task_id = 1,
             continual_rollout = True,
             chunk_size = 32)
+
+    """
+    trajs, _, _ = rollout_parallel2(env_name = env_name, 
+                      specific_env = specific_train_dataset, 
+                      horizon = 32,
+                      steps_T = 100, 
+                      num_karras = 5, 
+                      eta = 0.8, 
+                      episode_length = 4000, 
+                      checkpoint_step = 0,
+                      num_envs = 10, 
+                      task_id = 1, 
+                      seed_base = 0, 
+                      continual_rollout = True, 
+                      chunk_size = 32)
+    print(len(trajs))
+
+    
+    """
+    env, _, _ = get_env(env_name, specific_train_dataset,  render_mode = 'rgb_array')
+    frames = []
+    obs, info = env.reset(seed=1, options = {"task_id": 1})  # may not exactly match logged init state
+    for a in traj['actions']:
+       obs, reward, terminated, truncated, info = env.step(a)
+       frame = env.render()
+       if frame is not None:
+            frames.append(frame)
+       if terminated or truncated:
+            break
+    media.write_video("demo2.mp4", frames, fps=50)
+    """
+    
+
     
     
     
