@@ -200,27 +200,26 @@ def reward_filter(obs, rews, goal):
             rews[i-1] = 0
     return rews
 """
-def save_to_finetuning(reward_net, dataset_name, specific_dataset: Optional[str] = None):
+def save_to_finetuning(reward_net, reward_name, dataset_name, specific_dataset: Optional[str] = None):
     reward_net.eval()
     net_dict = reward_net.state_dict()
-    name = getName(dataset_name, specific_dataset)
     if(specific_dataset is None):
         os.makedirs(f'./Finetuning/Rewards/{dataset_name}/Models/', exist_ok=True)
-        save_path = f'./Finetuning/Rewards/{dataset_name}/Models/{name}_Reward_{str(0)}.pkl'
+        save_path = f'./Finetuning/Rewards/{dataset_name}/Models/{reward_name}_{str(0)}.pkl'
     else:
         os.makedirs(f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
-        save_path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{name}_Reward_{str(0)}.pkl'
+        save_path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{reward_name}_{str(0)}.pkl'
     torch.save(net_dict, save_path)
     print(f"reward model save to {save_path}")
 
-def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str] = None):
-    name = getName(dataset_name, specific_dataset)
+def save_stats_to_finetuning(stats, reward_name, dataset_name, specific_dataset: Optional[str] = None):
+    #name = getName(dataset_name, specific_dataset)
     if(specific_dataset is None):
         os.makedirs(f'./Finetuning/Rewards/{dataset_name}/Stats/', exist_ok=True)
-        savepath = f'./Finetuning/Rewards/{dataset_name}/Stats/{name}_Reward_stats_{str(0)}.pkl'
+        savepath = f'./Finetuning/Rewards/{dataset_name}/Stats/{reward_name}_stats_{str(0)}.pkl'
     else:
         os.makedirs(f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/', exist_ok=True)
-        savepath = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/{name}_Reward_stats_{str(0)}.pkl'
+        savepath = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/{reward_name}_stats_{str(0)}.pkl'
     with open(savepath, 'wb') as f:
         pickle.dump(stats, f)
     print(f"saved stats to {savepath}")
