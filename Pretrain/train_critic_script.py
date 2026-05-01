@@ -39,14 +39,14 @@ if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     env_name = 'cube'
     specific_env = 'single-play'
-    data = get_dataset(env_name, specific_env, task_id = 1, traj_length = 100)
+    data = get_dataset(env_name, specific_env, task_id = 1, traj_length = None)
     trajs = data.get_trajectories()
     train_critic(dataset_name = env_name,
                  specific_dataset = specific_env, 
-                 hidden_layers = 4,
-                 hidden_dim = 512,
+                 hidden_layers = 2,
+                 hidden_dim = 128,
                  batch_size = 256, 
-                 num_steps = 5000, 
+                 num_steps = 1000, 
                  gamma = 0.995, 
                  horizon = 32, 
                  lr = 3e-04, 
@@ -61,9 +61,9 @@ if __name__ == '__main__':  # pragma: no cover
     
     test_critic(dataset_name = env_name,
                 specific_dataset = specific_env,
-                hidden_layers = 4,
-                hidden_dim = 512,
-                checkpoint_step = 5000,
+                hidden_layers = 2,
+                hidden_dim = 128,
+                checkpoint_step = 1000,
                 gamma = 0.995,
                 horizon = 32,
                 goal = None,
