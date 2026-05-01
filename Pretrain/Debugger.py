@@ -426,13 +426,12 @@ for end_idx in terminal_indices[:10]:  # test first few
         print(f"  Task {task_id}: success = {success}")
 """
 
-env, dataset, eval_dataset = ogbench.make_env_and_datasets('cube-single-play-singletask-task1-v0', render_mode = 'rgb_array')
-for i in range(len(dataset['rewards'])):
-    if(dataset['rewards'][i] > -1 and dataset['masks'][i] != 0):
-        print(i)
-         
-
-
-
+from Dataset import get_dataset
+data = get_dataset('cube', 'single-play', task_id = 1)
+trajs = data.get_trajectories()
+count = 0
+for traj in trajs:
+    if(traj['rewards'][-1] != 1):
+        print('No')
 
 
