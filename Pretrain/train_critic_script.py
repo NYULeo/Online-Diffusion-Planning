@@ -39,7 +39,7 @@ if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     env_name = 'cube'
     specific_env = 'single-play'
-    data = get_dataset(env_name, specific_env, task_id = 1, traj_length = None)
+    data = get_dataset(env_name, specific_env, task_id = 1, traj_length = 100)
     trajs = data.get_trajectories()
     train_critic(dataset_name = env_name,
                  specific_dataset = specific_env, 
