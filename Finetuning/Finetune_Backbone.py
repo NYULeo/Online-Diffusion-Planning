@@ -56,7 +56,7 @@ class Train_Kernel_Config:
     ensemble_size: int = 10
     num_hidden_layers: int = 2
     hidden_dim: int = 256
-    type_kernel: str = 'robust' | 'mog'
+    type_kernel: str = 'robust' or 'mog'
     kernel_num_modes: Optional[int] = 8
     kernel_noise_floor: Optional[float] = 1e-4
     λ_reg: float = 1e-3
