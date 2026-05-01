@@ -45,7 +45,7 @@ if __name__ == '__main__':
     set_seed(1)
     train_reward_pos_weight(
         dataset_name = 'cube',
-        hidden_layers = 3,
+        hidden_layers = 1,
         hidden_dim = 512, 
         batch_size = 512,
         num_steps = 30000,
@@ -61,7 +61,7 @@ if __name__ == '__main__':
 
     test_Model(
         dataset_name = 'cube', 
-        hidden_layers = 3, 
+        hidden_layers = 1, 
         hidden_dim = 512,
         specific_dataset = 'single', 
         trajs = None,
