@@ -286,7 +286,7 @@ def get_reward_name(dataset_name, specific_dataset: Optional[str] = None, task_i
          raise ValueError(f"Invalid dataset name: {dataset_name}")
         
     
-def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
+def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None, traj_length: Optional[int] = 100):
     from Dataset import KitchenDataset, PointMazeDataset, CubeDataset
     if(dataset_name == 'kitchen'):
          data_1 = KitchenDataset('complete')
@@ -322,16 +322,16 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
          if(specific_dataset is None): 
              raise ValueError(f"Invalid dataset name: {dataset_name}")
          elif(specific_dataset == 'single'):
-             data_1 = CubeDataset_Singletask('single-play', task_id)
-             data_2 = CubeDataset_Singletask('single-noisy', task_id)
+             data_1 = CubeDataset_Singletask('single-play', task_id, traj_length)
+             data_2 = CubeDataset_Singletask('single-noisy', task_id, traj_length)
              name = f'Cube_Reward_single_task{task_id}'
          elif(specific_dataset == 'double'):
-             data_1 = CubeDataset_Singletask('double-play', task_id)
-             data_2 = CubeDataset_Singletask('double-noisy', task_id)
+             data_1 = CubeDataset_Singletask('double-play', task_id, traj_length)
+             data_2 = CubeDataset_Singletask('double-noisy', task_id, traj_length)
              name = f'Cube_Reward_double_task{task_id}'
          elif(specific_dataset == 'triple'):
-             data_1 = CubeDataset_Singletask('triple-play', task_id)
-             data_2 = CubeDataset_Singletask('triple-noisy', task_id)
+             data_1 = CubeDataset_Singletask('triple-play', task_id, traj_length)
+             data_2 = CubeDataset_Singletask('triple-noisy', task_id, traj_length)
              name = f'Cube_Reward_triple_task{task_id}'
          else: 
               raise ValueError(f"Invalid dataset name: {specific_dataset}")
@@ -417,10 +417,10 @@ class RewardDataset(Dataset):
             torch.tensor(r, dtype=torch.float32),
         )
     
-def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, save_freq, lr, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None):
+def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, save_freq, lr, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None, traj_length: Optional[int] = 100):
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = check_device()
-    trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id)
+    trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
     print(f"Training reward approximator for {dataset_name} Dataset") 
     dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward, goal)
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
@@ -445,7 +445,8 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
         filepath = None,
         specific_dataset = specific_dataset, 
         target_reward = target_reward, 
-        goal = goal
+        goal = goal,
+        task_id = task_id
     )
     total_loss = 0
     step = 0
@@ -493,13 +494,14 @@ def train_reward_pos_weight(
     specific_dataset: Optional[str] = None,
     goal: Optional[np.array] = None,
     task_id: Optional[int] = None,
+    traj_length: Optional[int] = 100,
     pos_weight: float = 50.0,          # ← Very important
     device=None
 ):
     
     device = check_device()
 
-    trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id)
+    trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
     print(f"Training reward approximator for {dataset_name}-{specific_dataset}")
 
     dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward, goal)
@@ -530,6 +532,7 @@ def train_reward_pos_weight(
         target_reward = target_reward, 
         goal = goal,
         task_id = task_id,
+        traj_length = traj_length,
         pos_weight = pos_weight
     )
 
@@ -621,7 +624,7 @@ class test_dataset(Dataset):
             torch.tensor(r, dtype=torch.float32),
         )
         
-def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None, save_freq: int = 50, num_steps: int = 500):
+def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None, traj_length: Optional[int] = 100, save_freq: int = 50, num_steps: int = 500):
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = check_device()
     print(f"Using device {device}")
@@ -629,10 +632,10 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
     print(f"Target reward: {target_reward}, Sigma: {sigma}, Alpha: {alpha}")
 
     if(trajs is None): 
-        train_Trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id)
+        train_Trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
         dataset = RewardDataset(train_Trajs, reward_name, sigma, alpha, target_reward, goal)
     else:
-        _, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id)
+        _, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
         dataset = test_dataset(trajs, reward_name, sigma, alpha, target_reward, goal)
     print(f"Testing the reward model on {len(dataset)} samples")
     a = factorint(len(dataset))

@@ -35,11 +35,11 @@ def get_trajs(env_name: str, specific_env: str, step: int):
 
 
 if __name__ == '__main__':  # pragma: no cover
-    """
+    
     set_seed(1)
     env_name = 'cube'
     specific_env = 'single-play'
-    data = get_dataset(env_name, specific_env, task_id = 1)
+    data = get_dataset(env_name, specific_env, task_id = 1, traj_length = None)
     trajs = data.get_trajectories()
     train_critic(dataset_name = env_name,
                  specific_dataset = specific_env, 
@@ -52,11 +52,27 @@ if __name__ == '__main__':  # pragma: no cover
                  lr = 3e-05, 
                  tau = 0.005,
                  sigma = None,
-                 alpha = 0.999,
+                 alpha = 0.99,
                  #alpha = None,
-                 target_reward = 25.0,
-                 trajs = trajs)
-   """
+                 target_reward = 1000.0,
+                 trajs = trajs, 
+                 task_id = 1)
+    
+    test_critic(dataset_name = env_name,
+                specific_dataset = specific_env,
+                hidden_layers = 3,
+                hidden_dim = 128,
+                checkpoint_step = 10000,
+                gamma = 0.99,
+                horizon = 10,
+                goal = None,
+                sigma = None,
+                alpha = 0.99,
+                target_reward = 1000.0,
+                trajs = trajs,
+                task_id = 1)
+   
+   
     
     
     
@@ -82,7 +98,7 @@ if __name__ == '__main__':  # pragma: no cover
     
     
     
-    
+    """
     #large
     set_seed(1)
     env_name = 'pointmaze'
@@ -105,6 +121,7 @@ if __name__ == '__main__':  # pragma: no cover
                  #alpha = None,
                  target_reward = 25.0,
                  trajs = trajs)
+    """
     
     
     """

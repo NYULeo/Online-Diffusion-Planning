@@ -38,7 +38,7 @@ def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, 
                                 obs_dim, critic_net, optimizer, gamma, horizon, tau,
                                 specific_dataset: Optional[str] = None, 
                                 target_reward: Optional[float] = None,
-                                goal: Optional[np.array] = None):
+                                goal: Optional[np.array] = None, task_id: Optional[int] = None):
     
     """
     os.makedirs(f"./Pretrain/Critic/{dataset_name}/{specific_dataset}/args/", exist_ok=True)
@@ -110,6 +110,7 @@ def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, 
             'alpha': float(alpha) if alpha is not None else None,
             'target_reward': target_reward,
             'goal': convert_to_json_serializable(goal),
+            'task_id': task_id
         }
     }
     
@@ -217,7 +218,7 @@ def save_critic(model, dataset_name, specific_dataset, step, task_id: Optional[i
 def save_to_finetuning(critic_net, dataset_name, specific_dataset, task_id: Optional[int] = None):
     critic_net.eval()
     net_dict = critic_net.state_dict()
-    name = getName(dataset_name, specific_dataset, task_id)
+    name = get_CriticName(dataset_name, specific_dataset, task_id)
     """
     os.makedirs(f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
     save_path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(0)}.pkl'
@@ -239,7 +240,7 @@ def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str
 """
 
 def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
-    name = getName(dataset_name, specific_dataset, task_id)
+    name = get_CriticName(dataset_name, specific_dataset, task_id)
     ft_stats_dir = FINETUNE_DIR / "Critics" / dataset_name / specific_dataset / "Stats"
     ft_stats_dir.mkdir(parents=True, exist_ok=True)
     savepath = ft_stats_dir / f"{name}_stats_0.pkl"
@@ -433,12 +434,6 @@ def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, h
     dataset = CriticDataset(dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma, sigma, alpha, task_id)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
 
-    """
-    #prepare training
-    if(dataset_name == 'pointmaze'):
-          obs_dim = obs_dim - 2
-    """
-    
     
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True))
     critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
@@ -463,7 +458,8 @@ def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, h
             tau=tau,
             specific_dataset=specific_dataset,
             target_reward=target_reward,
-            goal=goal)  
+            goal=goal,
+            task_id = task_id)  
    
     print(f"Training critic for {dataset_name}-{specific_dataset}")
     for k in range(1, num_steps + 1):  # number of passes over dataset
@@ -513,13 +509,24 @@ def test_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, hi
     
     print(f"Testing critic for {dataset_name}-{specific_dataset} at checkpoint step {checkpoint_step}")
     total_loss = 0.0
+    Rewards = []
     for s, r in dataloader:
            s = s.to(device)
            r = r.to(device)
            pred = model(s)
            total_loss += ((pred - r)**2).mean().item()
+           Rewards.extend(pred.detach().cpu().numpy())
     avg_loss = total_loss/len(dataloader)
     print(f"Average Loss: {avg_loss:.4f}")
+    Rewards = np.array(Rewards)
+    mean_R = Rewards.mean()
+    std_R = Rewards.std()
+    max_R = Rewards.max()
+    min_R = Rewards.min()
+    print(f"mean Critic Value: {mean_R:.4f}")
+    print(f'std Critic Value: {std_R:.4f}')
+    print(f"max Critic Value: {max_R:.4f}")
+    print(f"min Critic Value: {min_R:.4f}")
 
 
 

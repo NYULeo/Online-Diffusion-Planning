@@ -59,7 +59,7 @@ def merger(traj_1, traj_2):
      else:
           return None   
 
-def get_dataset(name: str, specific_name: str, task_id: Optional[int] = None):
+def get_dataset(name: str, specific_name: str, task_id: Optional[int] = None, traj_length: Optional[int] = None):
        if(name == 'kitchen'):
             return KitchenDataset(specific_name)
        elif(name == 'pointmaze'):
@@ -70,7 +70,7 @@ def get_dataset(name: str, specific_name: str, task_id: Optional[int] = None):
             if(task_id is None):
                 return CubeDataset(specific_name)
             else:
-                return CubeDataset_Singletask(specific_name, task_id)
+                return CubeDataset_Singletask(specific_name, task_id, traj_length)
        else:
             raise ValueError(f"Invalid Dataset name: {name}")     
 
@@ -507,10 +507,10 @@ class CubeDataset:
         return env
 
 class CubeDataset_Singletask:
-    def __init__(self, name: str, task_id):
+    def __init__(self, name: str, task_id, traj_length: Optional[int] = None):
         
         self.name = name
-
+        self.traj_length = traj_length
         name_to_id = {
             "single-play": f"cube-single-play-singletask-task{task_id}-v0",
             "single-noisy": f"cube-single-noisy-singletask-task{task_id}-v0",
@@ -544,17 +544,23 @@ class CubeDataset_Singletask:
                 obs_slice = self.dataset["observations"][last_start : i + 1]
                 act_slice = self.dataset["actions"][last_start : i + 1]
                 rews = np.zeros(len(obs_slice))
+                L = len(obs_slice)
+                if(self.traj_length is not None):
+                       index = L - self.traj_length
+                       if(index < 0):
+                            index = 0
+                else:
+                       index =  0
 
                 if len(act_slice) < 10:
                     last_start = i + 1
                     continue
-                L = len(obs_slice)
                 if(self.dataset['masks'][i] == 0):
                      rews[-1] = 1
                      trajectory = {
-                           "observations": obs_slice[(L - 100):],
-                           "actions": act_slice[(L - 100):],
-                           'rewards': rews[(L - 100):]
+                           "observations": obs_slice[index:],
+                           "actions": act_slice[index:],
+                           'rewards': rews[index:]
                       }
                      trajectories.append(trajectory)
                      last_start = i + 1
