@@ -45,15 +45,15 @@ if __name__ == '__main__':
     set_seed(1)
     train_reward_pos_weight(
         dataset_name = 'cube',
-        hidden_layers = 1,
+        hidden_layers = 3,
         hidden_dim = 128, 
         batch_size = 256,
-        num_steps = 500,
-        save_freq = 100,
+        num_steps = 1000,
+        save_freq = 500,
         lr = 1e-04,
         sigma = None,
         alpha = 0.99,
-        target_reward = 500.0,
+        target_reward = 1000.0,
         specific_dataset = 'single',
         task_id = 1,
         pos_weight = 80.0
@@ -61,16 +61,16 @@ if __name__ == '__main__':
 
     test_Model(
         dataset_name = 'cube', 
-        hidden_layers = 1, 
+        hidden_layers = 3, 
         hidden_dim = 128,
         specific_dataset = 'single', 
         trajs = None,
         sigma = None,
         alpha = 0.99, 
-        target_reward = 500.0,
+        target_reward = 1000.0,
         task_id = 1,
-        save_freq = 500, 
-        num_steps = 500)
+        save_freq = 1000, 
+        num_steps = 1000)
 
 
 
