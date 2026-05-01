@@ -16,9 +16,7 @@ import numpy as np
 import torch
 
 
-a = [[1,2], [3, 4]]
-a = np.mean(a, axis = 0)
-print(a)
+
 
 
 

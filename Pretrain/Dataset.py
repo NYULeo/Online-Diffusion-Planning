@@ -548,13 +548,13 @@ class CubeDataset_Singletask:
                 if len(act_slice) < 10:
                     last_start = i + 1
                     continue
-                
+                L = len(obs_slice)
                 if(self.dataset['masks'][i] == 0):
                      rews[-1] = 1
                      trajectory = {
-                           "observations": obs_slice,
-                           "actions": act_slice,
-                           'rewards': rews
+                           "observations": obs_slice[(L - 300):],
+                           "actions": act_slice[(L - 300):],
+                           'rewards': rews[(L - 300):]
                       }
                      trajectories.append(trajectory)
                      last_start = i + 1

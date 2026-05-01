@@ -46,14 +46,14 @@ if __name__ == '__main__':
     train_reward_pos_weight(
         dataset_name = 'cube',
         hidden_layers = 1,
-        hidden_dim = 512, 
+        hidden_dim = 128, 
         batch_size = 512,
         num_steps = 30000,
         save_freq = 10000,
         lr = 2e-04,
         sigma = None,
         alpha = 0.999,
-        target_reward = 8.0,
+        target_reward = 10.0,
         specific_dataset = 'single',
         task_id = 1,
         pos_weight = 200.0
@@ -62,7 +62,7 @@ if __name__ == '__main__':
     test_Model(
         dataset_name = 'cube', 
         hidden_layers = 1, 
-        hidden_dim = 512,
+        hidden_dim = 128,
         specific_dataset = 'single', 
         trajs = None,
         sigma = None,
