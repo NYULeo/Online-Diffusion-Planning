@@ -64,11 +64,11 @@ if __name__ == '__main__':  # pragma: no cover
                 hidden_layers = 4,
                 hidden_dim = 512,
                 checkpoint_step = 5000,
-                gamma = 0.9999,
+                gamma = 0.995,
                 horizon = 10,
                 goal = None,
                 sigma = None,
-                alpha = 0.995,
+                alpha = 0.999999,
                 target_reward = 500.0,
                 trajs = trajs,
                 task_id = 1)
