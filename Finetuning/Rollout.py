@@ -227,11 +227,11 @@ def save_trajs(trajs, env_name, specific_env, step):
     print(f"trajectories saved")
 
 def save_success_trajs_for_reward(trajs, env_name, specific_env, task_id):
-    os.makedirs(f'./Finetuning/Rollouts/{env_name}/{specific_env}/', exist_ok=True)
     save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{task_id}/trajs_task{task_id}_success.pkl'
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
     with open(save_path, 'wb') as f:
-         pickle.dump(trajs, f)
-    print(f"trajectories saved")
+        pickle.dump(trajs, f)
+    print("trajectories saved")
 
 def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None, task_id: Optional[int] = None, base_seed: int = 0, continual_rollout = False, chunk_size = 5):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
@@ -529,9 +529,9 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
-    set_seed(1)
+    #set_seed(1)
     
-    
+    """
     traj = rollout(env_name, 
             specific_train_dataset, horizon, 
             steps_T = 100, 
@@ -544,14 +544,14 @@ if __name__ == "__main__":
             task_id = 1,
             continual_rollout = True,
             chunk_size = 32)
-
-    
     """
+    
+    
     total_success_trajs = []
     success_rate = 0.0
-    for i in range(1, 11):
+    for i in range(1, 21):
         set_seed(i)
-        for j in range(1, 11):
+        for j in range(1, 21):
            trajs, _, success_rate, _ = rollout_parallel2(env_name = env_name, 
                       specific_env = specific_train_dataset, 
                       horizon = 32,
@@ -568,10 +568,10 @@ if __name__ == "__main__":
            total_success_trajs.append(get_success_trajs(trajs))
            success_rate += success_rate
     
-    print(success_rate/100)
+    print(success_rate/400)
     print(len(total_success_trajs))
     save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 1)
-    """
+    
 
 
     """
