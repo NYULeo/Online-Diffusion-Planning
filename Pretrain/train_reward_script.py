@@ -48,15 +48,15 @@ if __name__ == '__main__':
         hidden_layers = 3,
         hidden_dim = 512, 
         batch_size = 512,
-        num_steps = 250000,
-        save_freq = 5000,
-        lr = 1e-04,
+        num_steps = 30000,
+        save_freq = 10000,
+        lr = 2e-04,
         sigma = None,
         alpha = 0.999,
-        target_reward = 10.0,
+        target_reward = 8.0,
         specific_dataset = 'single',
         task_id = 1,
-        pos_weight = 80.0
+        pos_weight = 200.0
     )
 
     test_Model(
@@ -69,8 +69,8 @@ if __name__ == '__main__':
         alpha = 0.999, 
         target_reward = 10.0,
         task_id = 1,
-        save_freq = 250000, 
-        num_steps = 250000)
+        save_freq = 30000, 
+        num_steps = 30000)
 
 
 

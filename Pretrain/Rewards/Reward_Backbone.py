@@ -508,7 +508,10 @@ def train_reward_pos_weight(
 
     reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
     optimizer = optim.AdamW(reward_net.parameters(), lr=lr, weight_decay=1e-4)
-
+    if(check_specifc_dataset(dataset_name)):
+        SD = specific_dataset
+    else:
+        SD = None
     # Save hyperparameters (you can keep your existing function)
     save_reward_hyperparameters(
         dataset_name, 
@@ -547,7 +550,7 @@ def train_reward_pos_weight(
         loss = (weights * (pred - r) ** 2).mean()
 
         # Optional: Add small L2 regularization on positive predictions
-        pos_reg = torch.mean(torch.relu(pred) ** 2) * 0.01
+        pos_reg = torch.mean(torch.relu(pred) ** 2) * 0.05
         total_loss_val = loss + pos_reg
 
         total_loss_val.backward()
@@ -565,8 +568,10 @@ def train_reward_pos_weight(
         if step % save_freq == 0 or step == num_steps:
             checkpoint = copy.deepcopy(reward_net).cpu()
             save_model(checkpoint, reward_name, step)
-            save_to_finetuning(reward_net, dataset_name, specific_dataset)
 
+    save_to_finetuning(reward_net, dataset_name, SD)
+    stats = get_pretrained_reward_stats(reward_name)
+    save_stats_to_finetuning(stats, dataset_name, SD)
     print("Reward model training finished!")
     return reward_net
 
