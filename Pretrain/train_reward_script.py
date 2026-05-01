@@ -51,12 +51,12 @@ if __name__ == '__main__':
         num_steps = 2000,
         save_freq = 500,
         lr = 1e-04,
-        sigma = None,
-        alpha = 0.99,
-        target_reward = 1000.0,
+        sigma = 7.0,
+        #alpha = 0.99,
+        target_reward = 20.0,
         specific_dataset = 'single',
         task_id = 1,
-        traj_length = 100,
+        traj_length = None,
         pos_weight = 80.0
     )
 
@@ -66,11 +66,11 @@ if __name__ == '__main__':
         hidden_dim = 128,
         specific_dataset = 'single', 
         trajs = None,
-        sigma = None,
-        alpha = 0.99, 
-        target_reward = 1000.0,
+        sigma = 7.0,
+        #alpha = 0.99, 
+        target_reward = 20.0,
         task_id = 1,
-        traj_length = 100,
+        traj_length = None,
         save_freq = 2000, 
         num_steps = 2000)
 
