@@ -43,37 +43,37 @@ if __name__ == '__main__':  # pragma: no cover
     trajs = data.get_trajectories()
     train_critic(dataset_name = env_name,
                  specific_dataset = specific_env, 
-                 hidden_layers = 3,
-                 hidden_dim = 128,
-                 batch_size = 512, 
+                 hidden_layers = 4,
+                 hidden_dim = 512,
+                 batch_size = 256, 
                  num_steps = 5000, 
-                 gamma = 0.9999, 
+                 gamma = 0.995, 
                  horizon = 10, 
-                 lr = 3e-05, 
+                 lr = 3e-04, 
                  tau = 0.005,
                  goal = None,
-                 sigma = None,
+                 #sigma = None,
                  alpha = 0.999999,
                  #alpha = None,
-                 target_reward = 1.0,
+                 target_reward = 500.0,
                  trajs = trajs, 
                  task_id = 1)
     
     test_critic(dataset_name = env_name,
                 specific_dataset = specific_env,
-                hidden_layers = 3,
-                hidden_dim = 128,
+                hidden_layers = 4,
+                hidden_dim = 512,
                 checkpoint_step = 5000,
                 gamma = 0.9999,
                 horizon = 10,
                 goal = None,
                 sigma = None,
-                alpha = 0.999999,
-                target_reward = 1.0,
+                alpha = 0.995,
+                target_reward = 500.0,
                 trajs = trajs,
                 task_id = 1)
    
-   
+
     
     
     
@@ -120,22 +120,23 @@ if __name__ == '__main__':  # pragma: no cover
                  #sigma = 7.0,
                  alpha = 0.999,
                  #alpha = None,
-                 target_reward = 25.0,
+                 target_reward = 1.0,
                  trajs = trajs)
-    """
+    
+
     
     
-    """
     test_critic(dataset_name = env_name, 
                 specific_dataset = specific_env, 
                 hidden_layers = 3, 
-                hidden_dim = 256,
-                checkpoint_step = 4000, 
-                sigma = 300.0, 
+                hidden_dim = 128,
+                checkpoint_step = 10000, 
+                #sigma = 300.0, 
                 gamma = 0.99, 
-                horizon = 70, 
+                horizon = 10, 
                 goal =  np.array([[4.0, -3.0]], dtype = np.float32),
-                target_reward = 10.0, 
+                alpha = 0.999,
+                target_reward = 1.0, 
                 trajs = trajs)
      """
     
