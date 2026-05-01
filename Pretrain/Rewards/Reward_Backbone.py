@@ -535,7 +535,7 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
         dataset = test_dataset(trajs, reward_name, sigma, alpha, target_reward, goal)
     print(f"Testing the reward model on {len(dataset)} samples")
     a = factorint(len(dataset))
-    batch_size = int(np.min(list(a.keys())))
+    batch_size = 256
     dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8)
     num = save_freq
     while num <= num_steps:

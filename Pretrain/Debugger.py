@@ -427,11 +427,14 @@ for end_idx in terminal_indices[:10]:  # test first few
 """
 
 from Dataset import get_dataset
-data = get_dataset('cube', 'single-play', task_id = 1)
-trajs = data.get_trajectories()
+data1 = get_dataset('cube', 'single-play', task_id = 1)
+data2 = get_dataset('cube', 'single-noisy', task_id = 1)
+trajs1 = data1.get_trajectories()
+trajs2 = data2.get_trajectories()
+trajs = trajs1 + trajs2
 count = 0
 for traj in trajs:
-    if(traj['rewards'][-1] != 1):
-        print('No')
+    print(len(traj['rewards']))
+
 
 

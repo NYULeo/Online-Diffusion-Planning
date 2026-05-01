@@ -532,7 +532,7 @@ if __name__ == "__main__":
             chunk_size = 32)
 
     """
-    trajs, _, _ = rollout_parallel2(env_name = env_name, 
+    trajs, _, success_rate, _ = rollout_parallel2(env_name = env_name, 
                       specific_env = specific_train_dataset, 
                       horizon = 32,
                       steps_T = 100, 
@@ -545,9 +545,9 @@ if __name__ == "__main__":
                       seed_base = 0, 
                       continual_rollout = True, 
                       chunk_size = 32)
-    print(len(trajs))
+    print(success_rate)
 
-    
+
     """
     env, _, _ = get_env(env_name, specific_train_dataset,  render_mode = 'rgb_array')
     frames = []
