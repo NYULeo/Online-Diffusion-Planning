@@ -43,7 +43,7 @@ if __name__ == '__main__':
 
 if __name__ == '__main__':
     set_seed(1)
-    train_reward_pos_weight(
+    train_reward(
         dataset_name = 'cube',
         hidden_layers = 3,
         hidden_dim = 128, 
@@ -53,11 +53,10 @@ if __name__ == '__main__':
         lr = 1e-04,
         sigma = 7.0,
         #alpha = 0.99,
-        target_reward = 100.0,
+        target_reward = 20.0,
         specific_dataset = 'single',
         task_id = 1,
-        traj_length = None,
-        pos_weight = 80.0
+        traj_length = None
     )
 
     test_Model(
@@ -68,7 +67,7 @@ if __name__ == '__main__':
         trajs = None,
         sigma = 7.0,
         #alpha = 0.99, 
-        target_reward = 100.0,
+        target_reward = 20.0,
         task_id = 1,
         traj_length = None,
         save_freq = 2000, 
