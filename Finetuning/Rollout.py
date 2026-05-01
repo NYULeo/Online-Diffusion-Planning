@@ -25,6 +25,13 @@ from utils import get_normalized_score, rollout_parallel2, get_current_state, ge
 def feasibility_check(generated_state, new_state):
     return np.linalg.norm(generated_state - new_state)
 
+def get_success_trajs(trajs):
+    success_trajs = []
+    for traj in trajs:
+        if(traj['rewards'][-1] == 1):
+            success_trajs.append(traj)
+    return success_trajs
+
 def render(dataset_name, specific_dataset, traj, goal_cell, start_cell):
      env, _, _ = get_env(dataset_name, specific_dataset, render_mode = 'rgb_array')
      #env = gym.make("antmaze-medium-v0") 
@@ -215,6 +222,13 @@ def set_seed(seed=0):
 def save_trajs(trajs, env_name, specific_env, step):
     os.makedirs(f'./Finetuning/Rollouts/{env_name}/{specific_env}/', exist_ok=True)
     save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info_{str(step)}.pkl'
+    with open(save_path, 'wb') as f:
+         pickle.dump(trajs, f)
+    print(f"trajectories saved")
+
+def save_success_trajs_for_reward(trajs, env_name, specific_env, task_id):
+    os.makedirs(f'./Finetuning/Rollouts/{env_name}/{specific_env}/', exist_ok=True)
+    save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{task_id}/trajs_task{task_id}_success.pkl'
     with open(save_path, 'wb') as f:
          pickle.dump(trajs, f)
     print(f"trajectories saved")
@@ -515,7 +529,7 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
-    set_seed(1)
+    #set_seed(1)
     
     """
     traj = rollout(env_name, 
@@ -532,7 +546,11 @@ if __name__ == "__main__":
             chunk_size = 32)
 
     """
-    trajs, _, success_rate, _ = rollout_parallel2(env_name = env_name, 
+    total_success_trajs = []
+    success_rate = 0.0
+    for i in range(1, 11):
+        set_seed(i)
+        trajs, _, success_rate, _ = rollout_parallel2(env_name = env_name, 
                       specific_env = specific_train_dataset, 
                       horizon = 32,
                       steps_T = 100, 
@@ -542,10 +560,15 @@ if __name__ == "__main__":
                       checkpoint_step = 0,
                       num_envs = 10, 
                       task_id = 1, 
-                      seed_base = 0, 
+                      seed_base = 1, 
                       continual_rollout = True, 
                       chunk_size = 32)
-    print(success_rate)
+        total_success_trajs.append(get_success_trajs(trajs))
+        success_rate += success_rate
+    
+    print(success_rate/10)
+    print(len(total_success_trajs))
+    
 
 
     """

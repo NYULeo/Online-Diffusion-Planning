@@ -476,6 +476,99 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
     stats = get_pretrained_reward_stats(reward_name)
     save_stats_to_finetuning(stats, dataset_name, SD)
 
+def train_reward_pos_weight(
+    dataset_name: str,
+    hidden_layers: int = 3,
+    hidden_dim: int = 512,
+    batch_size: int = 512,
+    num_steps: int = 30000,
+    save_freq: int = 5000,
+    lr: float = 1e-4,
+    sigma: Optional[float] = None,
+    alpha: Optional[float] = None,
+    target_reward: Optional[float] = None,
+    specific_dataset: Optional[str] = None,
+    goal: Optional[np.array] = None,
+    task_id: Optional[int] = None,
+    pos_weight: float = 50.0,          # ← Very important
+    device=None
+):
+    
+    device = check_device()
+
+    trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id)
+    print(f"Training reward approximator for {dataset_name}-{specific_dataset}")
+
+    dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward, goal)
+    dataloader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
+                                  pin_memory=True, num_workers=8))
+
+    reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
+    optimizer = optim.AdamW(reward_net.parameters(), lr=lr, weight_decay=1e-4)
+
+    # Save hyperparameters (you can keep your existing function)
+    save_reward_hyperparameters(
+        dataset_name, 
+        batch_size, 
+        num_steps, 
+        lr, 
+        sigma,
+        alpha,
+        obs_dim,
+        act_dim, 
+        reward_name, 
+        optimizer, 
+        reward_net, 
+        filepath = None,
+        specific_dataset = specific_dataset, 
+        target_reward = target_reward, 
+        goal = goal,
+        task_id = task_id,
+        pos_weight = pos_weight
+    )
+
+    total_loss = 0.0
+    step = 0
+
+    for step in range(1, num_steps + 1):
+        s, a, r = next(dataloader)
+        s = s.to(device)
+        a = a.to(device)
+        r = r.to(device)
+
+        optimizer.zero_grad()
+        pred = reward_net(s, a)                     # (B,)
+
+        # === Weighted MSE Loss (Critical Fix) ===
+        weights = torch.where(r > 0, pos_weight, 1.0)
+        loss = (weights * (pred - r) ** 2).mean()
+
+        # Optional: Add small L2 regularization on positive predictions
+        pos_reg = torch.mean(torch.relu(pred) ** 2) * 0.01
+        total_loss_val = loss + pos_reg
+
+        total_loss_val.backward()
+        torch.nn.utils.clip_grad_norm_(reward_net.parameters(), max_norm=5.0)
+        optimizer.step()
+
+        total_loss += loss.item()
+
+        if step % 1000 == 0:
+            avg_loss = total_loss / 1000
+            pos_ratio = (r > 0).float().mean().item()
+            print(f"Step {step:6d} | Loss: {avg_loss:.6f} | Pos Ratio: {pos_ratio:.4f}")
+            total_loss = 0.0
+
+        if step % save_freq == 0 or step == num_steps:
+            checkpoint = copy.deepcopy(reward_net).cpu()
+            save_model(checkpoint, reward_name, step)
+            save_to_finetuning(reward_net, dataset_name, specific_dataset)
+
+    print("Reward model training finished!")
+    return reward_net
+
+
+
 class test_dataset(Dataset):
     def __init__(self, trajs, Reward_name, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, goal: Optional[np.array] = None):
         self.stats = get_pretrained_reward_stats(Reward_name)
