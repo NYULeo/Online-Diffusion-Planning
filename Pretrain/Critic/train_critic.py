@@ -492,7 +492,7 @@ def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, h
                tgt_param.data.mul_(1 - tau)
                tgt_param.data.add_(tau * param.data)
         
-           if(k % 5000 == 0):
+           if(k % 1000 == 0):
                 target_critic.eval()
                 save_critic(target_critic, dataset_name, specific_dataset, k, task_id)
                 print(f"Checkpoint saved at step {k}")
