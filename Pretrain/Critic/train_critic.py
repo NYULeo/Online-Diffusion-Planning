@@ -462,6 +462,7 @@ def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, h
             task_id = task_id)  
    
     print(f"Training critic for {dataset_name}-{specific_dataset}")
+    total_loss = 0.0
     for k in range(1, num_steps + 1):  # number of passes over dataset
            s, r, s_next = next(dataloader)
            s = s.to(device)
@@ -476,11 +477,16 @@ def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, h
            # Predicted V-values
            q_pred = critic(s)
            loss = ((q_pred - target) ** 2).mean()
+           total_loss += loss.item()
 
            optimizer.zero_grad()
            loss.backward()
            optimizer.step()
            
+           if(k % 100 == 0):
+                avg_loss = total_loss/100
+                print(f"Average Loss: {avg_loss:.4f}")
+                total_loss = 0.0
            # Soft update target network
            for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):
                tgt_param.data.mul_(1 - tau)
@@ -488,11 +494,11 @@ def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, h
         
            if(k % 5000 == 0):
                 target_critic.eval()
-                save_critic(target_critic, dataset_name, specific_dataset, k)
+                save_critic(target_critic, dataset_name, specific_dataset, k, task_id)
                 print(f"Checkpoint saved at step {k}")
-    save_to_finetuning(target_critic, dataset_name, specific_dataset)
-    stats = get_critic_stats(dataset_name, specific_dataset)
-    save_stats_to_finetuning(stats, dataset_name, specific_dataset)
+    save_to_finetuning(target_critic, dataset_name, specific_dataset, task_id)
+    stats = get_critic_stats(dataset_name, specific_dataset, task_id)
+    save_stats_to_finetuning(stats, dataset_name, specific_dataset, task_id)
     print(f"critic model saved")
 
 
