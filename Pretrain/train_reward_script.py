@@ -53,7 +53,7 @@ if __name__ == '__main__':
         lr = 1e-04,
         sigma = None,
         alpha = 0.99,
-        target_reward = 500.0,
+        target_reward = 5000.0,
         specific_dataset = 'single',
         task_id = 1,
         pos_weight = 80.0
@@ -67,7 +67,7 @@ if __name__ == '__main__':
         trajs = None,
         sigma = None,
         alpha = 0.99, 
-        target_reward = 500.0,
+        target_reward = 5000.0,
         task_id = 1,
         save_freq = 500, 
         num_steps = 500)
