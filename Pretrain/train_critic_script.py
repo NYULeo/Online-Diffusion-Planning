@@ -70,8 +70,8 @@ if __name__ == '__main__':  # pragma: no cover
                 gamma = 0.99,
                 horizon = 32,
                 goal = None,
-                #sigma = 8.0,
-                alpha = 0.99,
+                sigma = 8.0,
+                #alpha = 0.99,
                 target_reward = 50.0,
                 trajs = trajs_2,
                 task_id = 1)
