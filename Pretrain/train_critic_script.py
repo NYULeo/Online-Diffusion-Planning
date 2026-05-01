@@ -14,14 +14,15 @@ from Pretrain.Critic.train_critic import test_critic
 
 
 
-def get_trajs(env_name: str, specific_env: str, step: int):
+def get_trajs(env_name: str, specific_env: str, task_id: int, step: int):
     path = (
         REPO_ROOT
         / "Finetuning"
         / "Rollouts"
         / env_name
         / specific_env
-        / f"Generated_trajs_Info_{step}.pkl"
+        / f'task_{str(task_id)}'
+        / f"Generated_trajs_Info_{str(step)}.pkl"
     )
     if not path.exists():
         raise FileNotFoundError(
@@ -40,7 +41,9 @@ if __name__ == '__main__':  # pragma: no cover
     env_name = 'cube'
     specific_env = 'single-play'
     data = get_dataset(env_name, specific_env, task_id = 1, traj_length = None)
-    trajs = data.get_trajectories()
+    trajs_1 = data.get_trajectories()
+    trajs_2 = get_trajs(env_name, specific_env, task_id = 1, step = 0)
+    trajs = trajs_1 + trajs_2
     train_critic(dataset_name = env_name,
                  specific_dataset = specific_env, 
                  hidden_layers = 3,
@@ -56,7 +59,7 @@ if __name__ == '__main__':  # pragma: no cover
                  #alpha = 0.99,
                  #alpha = None,
                  target_reward = 200.0,
-                 trajs = trajs, 
+                 trajs = trajs_2, 
                  task_id = 1)
     
     test_critic(dataset_name = env_name,
