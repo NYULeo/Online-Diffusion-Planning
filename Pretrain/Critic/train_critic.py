@@ -281,7 +281,7 @@ def get_critic_stats(dataset_name, specific_dataset, task_id: Optional[int] = No
 
 
 class Critic_Test_Dataset(Dataset):
-    def __init__(self, dataset_name: str, specific_dataset: str, trajs, sigma: Optional[float] = None, alpha: Optional[float] = None, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
+    def __init__(self, dataset_name: str, specific_dataset: str, trajs, sigma: Optional[float] = None, alpha: Optional[float] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
         # ----- gather raw obs/actions to fit stats -----
         """
         if(dataset_name == 'pointmaze'):
@@ -290,7 +290,7 @@ class Critic_Test_Dataset(Dataset):
                 traj['observations'] = traj['observations'][:,:2]
         """
         
-        self.stats = get_critic_stats(dataset_name, specific_dataset)
+        self.stats = get_critic_stats(dataset_name, specific_dataset, task_id)
         allowed_values = [0, 1]
 
         transitions = []

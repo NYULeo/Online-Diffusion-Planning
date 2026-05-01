@@ -67,6 +67,7 @@ if __name__ == '__main__':  # pragma: no cover
                 gamma = 0.99,
                 horizon = 10,
                 goal = None,
+                task_id = 1,
                 sigma = None,
                 alpha = 0.99,
                 target_reward = 1000.0,
