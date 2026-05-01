@@ -47,7 +47,7 @@ if __name__ == '__main__':  # pragma: no cover
                  hidden_dim = 128,
                  batch_size = 256, 
                  num_steps = 1000, 
-                 gamma = 0.995, 
+                 gamma = 0.99999, 
                  horizon = 32, 
                  lr = 3e-04, 
                  tau = 0.005,
@@ -55,7 +55,7 @@ if __name__ == '__main__':  # pragma: no cover
                  #sigma = None,
                  alpha = 0.9999999,
                  #alpha = None,
-                 target_reward = 500.0,
+                 target_reward = 1000.0,
                  trajs = trajs, 
                  task_id = 1)
     
@@ -64,12 +64,12 @@ if __name__ == '__main__':  # pragma: no cover
                 hidden_layers = 2,
                 hidden_dim = 128,
                 checkpoint_step = 1000,
-                gamma = 0.995,
+                gamma = 0.99999,
                 horizon = 32,
                 goal = None,
                 sigma = None,
                 alpha = 0.9999999,
-                target_reward = 500.0,
+                target_reward = 1000.0,
                 trajs = trajs,
                 task_id = 1)
    
