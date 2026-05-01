@@ -550,7 +550,8 @@ if __name__ == "__main__":
     success_rate = 0.0
     for i in range(1, 11):
         set_seed(i)
-        trajs, _, success_rate, _ = rollout_parallel2(env_name = env_name, 
+        for j in range(1, 11):
+           trajs, _, success_rate, _ = rollout_parallel2(env_name = env_name, 
                       specific_env = specific_train_dataset, 
                       horizon = 32,
                       steps_T = 100, 
@@ -560,14 +561,15 @@ if __name__ == "__main__":
                       checkpoint_step = 0,
                       num_envs = 10, 
                       task_id = 1, 
-                      seed_base = 1, 
+                      seed_base = j, 
                       continual_rollout = True, 
                       chunk_size = 32)
-        total_success_trajs.append(get_success_trajs(trajs))
-        success_rate += success_rate
+           total_success_trajs.append(get_success_trajs(trajs))
+           success_rate += success_rate
     
-    print(success_rate/10)
+    print(success_rate/100)
     print(len(total_success_trajs))
+    save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 1)
     
 
 
