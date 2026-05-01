@@ -90,7 +90,7 @@ def getName(env_name, specific_env):
 def save_reward_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, alpha, 
                                   obs_dim, act_dim, reward_name, optimizer, reward_net, filepath: Optional[str] = None, 
                                   specific_dataset: Optional[str] = None, target_reward: Optional[float] = None,
-                                  goal: Optional[np.array] = None):
+                                  goal: Optional[np.array] = None, task_id: Optional[int] = None, pos_weight: Optional[float] = None):
     
     if filepath is None:
         os.makedirs(f"./Pretrain/Rewards/{reward_name}/args/", exist_ok=True)
@@ -155,12 +155,15 @@ def save_reward_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, 
             'batch_size': batch_size,
             'lr': lr,
             'optimizer': optimizer_params,
+            'pos_weight': pos_weight,
+
         },
         'reward_processing': {
             'sigma': float(sigma) if sigma is not None else None,
             'alpha': float(alpha) if alpha is not None else None,
             'target_reward': target_reward,
             'goal': convert_to_json_serializable(goal),
+            'task_id': task_id
         }
     }
     
