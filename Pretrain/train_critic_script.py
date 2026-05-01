@@ -55,7 +55,7 @@ if __name__ == '__main__':  # pragma: no cover
                  sigma = 7.0,
                  #alpha = 0.99,
                  #alpha = None,
-                 target_reward = 50000.0,
+                 target_reward = 20.0,
                  trajs = trajs, 
                  task_id = 1)
     
@@ -69,7 +69,7 @@ if __name__ == '__main__':  # pragma: no cover
                 goal = None,
                 sigma = 7.0,
                 #alpha = 0.99,
-                target_reward = 50000.0,
+                target_reward = 20.0,
                 trajs = trajs,
                 task_id = 1)
    
