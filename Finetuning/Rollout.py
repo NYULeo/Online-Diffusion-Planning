@@ -529,9 +529,9 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
-    #set_seed(1)
+    set_seed(1)
     
-    """
+    
     traj = rollout(env_name, 
             specific_train_dataset, horizon, 
             steps_T = 100, 
@@ -540,11 +540,12 @@ if __name__ == "__main__":
             episode_length = 3000, 
             checkpoint_steps = 0, 
             render = True,  
-            base_seed = 9, 
+            base_seed = 1, 
             task_id = 1,
             continual_rollout = True,
             chunk_size = 32)
 
+    
     """
     total_success_trajs = []
     success_rate = 0.0
@@ -570,7 +571,7 @@ if __name__ == "__main__":
     print(success_rate/100)
     print(len(total_success_trajs))
     save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 1)
-    
+    """
 
 
     """
