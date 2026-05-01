@@ -506,8 +506,8 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
               save_model(checkpoint, dataset_name, specific_dataset, task_id, step)
            
     save_to_finetuning(reward_net, dataset_name, SD, task_id)
-    stats = get_pretrained_reward_stats()
-    save_stats_to_finetuning(reward_net, dataset_name, SD, task_id)
+    stats = get_pretrained_reward_stats(dataset_name, SD, task_id)
+    save_stats_to_finetuning(stats, dataset_name, SD, task_id)
 
 def train_reward_pos_weight(
     dataset_name: str,
