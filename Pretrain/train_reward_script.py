@@ -67,10 +67,10 @@ if __name__ == '__main__':
         trajs = None,
         sigma = None,
         alpha = 0.999, 
-        target_reward = 50.0,
+        target_reward = 10.0,
         task_id = 1,
-        save_freq = 10000, 
-        num_steps = 10000)
+        save_freq = 250000, 
+        num_steps = 250000)
 
 
 
