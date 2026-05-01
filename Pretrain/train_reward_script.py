@@ -48,8 +48,8 @@ if __name__ == '__main__':
         hidden_layers = 1,
         hidden_dim = 128, 
         batch_size = 512,
-        num_steps = 30000,
-        save_freq = 10000,
+        num_steps = 1000,
+        save_freq = 500,
         lr = 2e-04,
         sigma = None,
         alpha = 0.999,
@@ -69,8 +69,8 @@ if __name__ == '__main__':
         alpha = 0.999, 
         target_reward = 10.0,
         task_id = 1,
-        save_freq = 30000, 
-        num_steps = 30000)
+        save_freq = 1000, 
+        num_steps = 1000)
 
 
 
