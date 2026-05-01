@@ -284,9 +284,21 @@ def get_reward_name(dataset_name, specific_dataset: Optional[str] = None, task_i
     
     else:
          raise ValueError(f"Invalid dataset name: {dataset_name}")
-        
+
+def check_trajs_exit(env_name, specific_env, task_id, step):
+    from pathlib import Path
+    if(step is not None):
+         path = Path(f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{task_id}/Generated_trajs_Info_{step}.pkl')
+    else:
+         path = Path(f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info_{step}.pkl')
+    if not path.exists():
+        return None
+    else:
+        with path.open('rb') as f:
+             trajs = pickle.load(f)
+        return trajs
     
-def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None, traj_length: Optional[int] = 100):
+def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None, traj_length: Optional[int] = None):
     from Dataset import KitchenDataset, PointMazeDataset, CubeDataset
     if(dataset_name == 'kitchen'):
          data_1 = KitchenDataset('complete')
@@ -417,10 +429,15 @@ class RewardDataset(Dataset):
             torch.tensor(r, dtype=torch.float32),
         )
     
-def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, save_freq, lr, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None, traj_length: Optional[int] = 100):
+def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, save_freq, lr, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None, traj_length: Optional[int] = None):
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = check_device()
-    trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+    trajs_1, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+    trajs_2 = check_trajs_exit(dataset_name, specific_env, task_id, step)
+    if(trajs_2 is not None):
+        trajs = trajs_1 + trajs_2
+    else:
+        trajs = trajs_1
     print(f"Training reward approximator for {dataset_name} Dataset") 
     dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward, goal)
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))

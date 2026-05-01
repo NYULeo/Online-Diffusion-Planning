@@ -59,7 +59,7 @@ if __name__ == '__main__':  # pragma: no cover
                  #alpha = 0.99,
                  #alpha = None,
                  target_reward = 20.0,
-                 trajs = trajs, 
+                 trajs = trajs_2, 
                  task_id = 1)
     
     test_critic(dataset_name = env_name,
@@ -73,7 +73,7 @@ if __name__ == '__main__':  # pragma: no cover
                 sigma = 8.0,
                 #alpha = 0.99,
                 target_reward = 20.0,
-                trajs = trajs,
+                trajs = trajs_2,
                 task_id = 1)
 
 
