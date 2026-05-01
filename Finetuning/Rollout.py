@@ -568,7 +568,7 @@ if __name__ == "__main__":
            total_success_trajs.append(get_success_trajs(trajs))
            success_rate += success_rate
     
-    print(success_rate/400)
+    print(success_rate/900)
     print(len(total_success_trajs))
     save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 1)
     
