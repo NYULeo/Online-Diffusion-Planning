@@ -51,6 +51,7 @@ if __name__ == '__main__':  # pragma: no cover
                  horizon = 10, 
                  lr = 3e-05, 
                  tau = 0.005,
+                 goal = None,
                  sigma = None,
                  alpha = 0.99,
                  #alpha = None,
