@@ -46,8 +46,8 @@ if __name__ == '__main__':  # pragma: no cover
     trajs = trajs_1 + trajs_2
     train_critic(dataset_name = env_name,
                  specific_dataset = specific_env, 
-                 hidden_layers = 3,
-                 hidden_dim = 128,
+                 hidden_layers = 4,
+                 hidden_dim = 256,
                  batch_size = 256, 
                  num_steps = 50000, 
                  gamma = 0.99, 
@@ -64,8 +64,8 @@ if __name__ == '__main__':  # pragma: no cover
     
     test_critic(dataset_name = env_name,
                 specific_dataset = specific_env,
-                hidden_layers = 3,
-                hidden_dim = 128,
+                hidden_layers = 4,
+                hidden_dim = 256,
                 checkpoint_step = 50000,
                 gamma = 0.99,
                 horizon = 32,
