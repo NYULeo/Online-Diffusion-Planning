@@ -52,8 +52,8 @@ if __name__ == '__main__':
         save_freq = 100,
         lr = 2e-04,
         sigma = None,
-        alpha = 0.9999,
-        target_reward = 500.0,
+        alpha = 0.9999999,
+        target_reward = 10000.0,
         specific_dataset = 'single',
         task_id = 1,
         pos_weight = 200.0
@@ -66,8 +66,8 @@ if __name__ == '__main__':
         specific_dataset = 'single', 
         trajs = None,
         sigma = None,
-        alpha = 0.9999, 
-        target_reward = 500.0,
+        alpha = 0.9999999, 
+        target_reward = 10000.0,
         task_id = 1,
         save_freq = 500, 
         num_steps = 500)
