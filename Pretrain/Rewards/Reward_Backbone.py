@@ -588,10 +588,11 @@ def train_reward_pos_weight(
         if step % save_freq == 0 or step == num_steps:
             checkpoint = copy.deepcopy(reward_net).cpu()
             save_model(checkpoint, reward_name, step)
-
-    save_to_finetuning(reward_net, dataset_name, SD)
+     
+     
+    save_to_finetuning(reward_net, reward_name, dataset_name, SD)
     stats = get_pretrained_reward_stats(reward_name)
-    save_stats_to_finetuning(stats, dataset_name, SD)
+    save_stats_to_finetuning(stats, reward_name, dataset_name, SD)
     print("Reward model training finished!")
     return reward_net
 
