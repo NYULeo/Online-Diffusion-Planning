@@ -532,7 +532,6 @@ def train_reward_pos_weight(
         target_reward = target_reward, 
         goal = goal,
         task_id = task_id,
-        traj_length = traj_length,
         pos_weight = pos_weight
     )
 
