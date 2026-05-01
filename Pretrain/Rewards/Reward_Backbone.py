@@ -559,8 +559,8 @@ def train_reward_pos_weight(
 
         total_loss += loss.item()
 
-        if step % 1000 == 0:
-            avg_loss = total_loss / 1000
+        if step % 100 == 0:
+            avg_loss = total_loss / 100
             pos_ratio = (r > 0).float().mean().item()
             print(f"Step {step:6d} | Loss: {avg_loss:.6f} | Pos Ratio: {pos_ratio:.4f}")
             total_loss = 0.0
