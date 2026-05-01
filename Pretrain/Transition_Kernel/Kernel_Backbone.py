@@ -242,6 +242,20 @@ def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str
         pickle.dump(stats, f)
     print(f"saved stats to {savepath}")
    
+
+def check_trajs_exit(env_name, specific_env, task_id, step):
+    from pathlib import Path
+    if(step is not None):
+         path = Path(f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{task_id}/Generated_trajs_Info_{step}.pkl')
+    else:
+         path = Path(f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info_{step}.pkl')
+    if not path.exists():
+        return None
+    else:
+        with path.open('rb') as f:
+             trajs = pickle.load(f)
+        return trajs
+    
 def count_files_in_folder(folder_path):
     """
     Count the number of files in a specific folder.

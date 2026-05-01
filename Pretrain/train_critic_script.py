@@ -49,7 +49,7 @@ if __name__ == '__main__':  # pragma: no cover
                  hidden_layers = 3,
                  hidden_dim = 128,
                  batch_size = 256, 
-                 num_steps = 50000, 
+                 num_steps = 60000, 
                  gamma = 0.99, 
                  horizon = 10, 
                  lr = 3e-04, 
@@ -59,21 +59,21 @@ if __name__ == '__main__':  # pragma: no cover
                  #alpha = 0.99,
                  #alpha = None,
                  target_reward = 200.0,
-                 trajs = trajs, 
+                 trajs = trajs_2, 
                  task_id = 1)
     
     test_critic(dataset_name = env_name,
                 specific_dataset = specific_env,
                 hidden_layers = 3,
                 hidden_dim = 128,
-                checkpoint_step = 50000,
+                checkpoint_step = 60000,
                 gamma = 0.99,
                 horizon = 10,
                 goal = None,
                 sigma = 8.0,
                 #alpha = 0.99,
                 target_reward = 200.0,
-                trajs = trajs,
+                trajs = trajs_2,
                 task_id = 1)
 
 
