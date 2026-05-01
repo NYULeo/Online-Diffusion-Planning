@@ -433,7 +433,7 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = check_device()
     trajs_1, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
-    trajs_2 = check_trajs_exit(dataset_name, specific_dataset, task_id, step)
+    trajs_2 = check_trajs_exit(dataset_name, specific_dataset, task_id, 0)
     if(trajs_2 is not None):
         trajs = trajs_1 + trajs_2
     else:
