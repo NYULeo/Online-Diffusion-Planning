@@ -45,7 +45,7 @@ if __name__ == '__main__':
     set_seed(1)
     train_reward(
         dataset_name = 'cube',
-        hidden_layers = 3,
+        hidden_layers = 2,
         hidden_dim = 128, 
         batch_size = 256,
         num_steps = 500,
@@ -61,7 +61,7 @@ if __name__ == '__main__':
 
     test_Model(
         dataset_name = 'cube', 
-        hidden_layers = 3, 
+        hidden_layers = 2, 
         hidden_dim = 128,
         specific_dataset = 'single', 
         trajs = None,
