@@ -5,7 +5,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 from dataclasses import dataclass
 from gymnasium.vector import AsyncVectorEnv
-from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker
+from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs
 #from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
 from Finetuning.comp_reward import RewardConfig, TotalReward, TotalReward_Critic, TotalReward_Critic_Mahalanobis, TotalReward_Mahalanobis
 from adjoint_matching import AdjointMatchingFineTuner, AdjointMatchingConfig
@@ -253,6 +253,8 @@ class OnlineFinetuner():
         self.Train_Buffer = []
         dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
         trajs = dataset.get_trajectories()
+        if(self.config.train_reward_config.task_id is not None):
+            trajs = get_trajs(self.config.dataset_name, self.config.specific_dataset, self.config.train_reward_config.step, self.config.train_reward_config.task_id)
         self.Finetune_Buffer.extend(trajs)
         self.Train_Buffer.extend(trajs)
 

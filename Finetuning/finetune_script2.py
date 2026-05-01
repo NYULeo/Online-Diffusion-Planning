@@ -251,7 +251,7 @@ if __name__ == "__main__":
     OnlineFinetuner.finetune_planner()
     """
     
-    """
+    
     env_name = 'pointmaze'
     specific_env = 'medium'
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = True)
@@ -264,7 +264,8 @@ if __name__ == "__main__":
                min_log_prob = 5.0,
                quantile = 0.95,
                critic_gamma = 1.0,
-               explore = False) 
+               explore = False,
+               constraint_type = 'log_prob') 
 
     
     TrainRewardConfig = Train_Reward_Config(
@@ -286,6 +287,7 @@ if __name__ == "__main__":
                             ensemble_size = 10,
                             num_hidden_layers = 2,
                             hidden_dim = 256,
+                            type_kernel = 'robust',
                             λ_reg = 1e-3)
     
     TrainCriticConfig = Train_Critic_Config(
@@ -339,7 +341,7 @@ if __name__ == "__main__":
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
     
-    """
+    
     
 
 
@@ -431,6 +433,8 @@ if __name__ == "__main__":
    """
 
     
+
+    """
     env_name = 'cube'
     specific_env = 'single-play'
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = True)
@@ -446,13 +450,13 @@ if __name__ == "__main__":
 
     
     TrainRewardConfig = Train_Reward_Config(
-                          hidden_layers = 1,
-                          hidden_dim = 32,
+                          hidden_layers = 2,
+                          hidden_dim = 128,
                           batch_size = 256, 
-                          num_steps = 400, 
-                          lr = 1e-4, 
-                          sigma = 7.0, 
-                          target_reward = 20.0, 
+                          num_steps = 500, 
+                          lr = 1e-04, 
+                          sigma = 8.0, 
+                          target_reward = 50.0, 
                           train_goal = None,
                           task_id = 1)
       
@@ -469,11 +473,11 @@ if __name__ == "__main__":
                             λ_reg = 1e-3)
     
     TrainCriticConfig = Train_Critic_Config(
-                            hidden_layers = 1,
-                            hidden_dim = 128,
+                            hidden_layers = 4,
+                            hidden_dim = 512,
                             batch_size = 256,
-                            num_steps = 5000,
-                            lr = 1e-05,
+                            num_steps = 20000,
+                            lr = 3e-04,
                             tau = 0.005,
                             gamma = 0.95,
                             data_conservation = True)
@@ -516,4 +520,4 @@ if __name__ == "__main__":
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-    
+    """

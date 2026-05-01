@@ -191,15 +191,22 @@ def get_critic_stats(dataset_name, specific_dataset, step):
         stats = pickle.load(f)
     return stats 
 
-def save_trajs(trajs, env_name, specific_env, step):
-    os.makedirs(f'./Finetuning/Rollouts/{env_name}/{specific_env}/', exist_ok=True)
-    save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info_{str(step)}.pkl'
+def save_trajs(trajs, env_name, specific_env, step, task_id: Optional[int] = None):
+    if(task_id is not None):
+        path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/'
+    else:
+        path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{str(task_id)}/'
+    os.makedirs(path, exist_ok=True)
+    save_path =  f'{path}/Generated_trajs_Info_{str(step)}.pkl'
     with open(save_path, 'wb') as f:
          pickle.dump(trajs, f)
     print(f"trajectories saved")
 
-def get_trajs(env_name, specific_env, step):
-    path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info_{str(step)}.pkl'
+def get_trajs(env_name, specific_env, step, task_id: Optional[int] = None):
+    if(task_id is not None):
+        path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{str(task_id)}/Generated_trajs_Info_{str(step)}.pkl'
+    else:
+        path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info_{str(step)}.pkl'
     with open(path, 'rb') as f:
         trajs = pickle.load(f)
     return trajs
