@@ -1,6 +1,7 @@
 import sys
 import os
 from sympy.printing.rcode import reserved_words
+from torch.utils._sympy.value_ranges import ValueRangeError
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(project_root)
@@ -37,7 +38,7 @@ def check_specifc_dataset(dataset_name):
     elif(dataset_name == 'cube'):
          return True
 
-def getName(env_name, specific_env):
+def getName(env_name, specific_env, task_id: Optional[int] = None):
      if(env_name == 'kitchen'):
           return 'Kitchen'
      elif(env_name == 'pointmaze'):
@@ -73,19 +74,25 @@ def getName(env_name, specific_env):
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
      elif(env_name == 'cube'):
+         if(task_id is None):
+            raise ValueError('Task ID is required for cube dataset')
          if specific_env == 'single':
-              return 'Cube_Single'
+              return f'Cube_Single_Task{task_id}'
          elif specific_env == 'double':
-              return 'Cube_Double'
+              return 'Cube_Double_Task{task_id}'
          elif specific_env == 'triple':
-              return 'Cube_Triple'
+              return 'Cube_Triple_Task{task_id}'
          elif specific_env == 'quadruple':
-              return 'Cube_Quadruple'
+              return 'Cube_Quadruple_Task{task_id}'
          else:
               raise ValueError(f"Invalid cube dataset name: {specific_env}")
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
+def get_reward_name(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
+    name = getName(dataset_name, specific_dataset, task_id)
+    reward_name = f"{name}_Reward"
+    return reward_name
 
 def save_reward_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, alpha, 
                                   obs_dim, act_dim, reward_name, optimizer, reward_net, filepath: Optional[str] = None, 
@@ -203,8 +210,9 @@ def reward_filter(obs, rews, goal):
             rews[i-1] = 0
     return rews
 """
-def save_to_finetuning(reward_net, reward_name, dataset_name, specific_dataset: Optional[str] = None):
+def save_to_finetuning(reward_net, dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
     reward_net.eval()
+    reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     net_dict = reward_net.state_dict()
     if(specific_dataset is None):
         os.makedirs(f'./Finetuning/Rewards/{dataset_name}/Models/', exist_ok=True)
@@ -215,8 +223,9 @@ def save_to_finetuning(reward_net, reward_name, dataset_name, specific_dataset: 
     torch.save(net_dict, save_path)
     print(f"reward model save to {save_path}")
 
-def save_stats_to_finetuning(stats, reward_name, dataset_name, specific_dataset: Optional[str] = None):
+def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
     #name = getName(dataset_name, specific_dataset)
+    reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     if(specific_dataset is None):
         os.makedirs(f'./Finetuning/Rewards/{dataset_name}/Stats/', exist_ok=True)
         savepath = f'./Finetuning/Rewards/{dataset_name}/Stats/{reward_name}_stats_{str(0)}.pkl'
@@ -227,8 +236,9 @@ def save_stats_to_finetuning(stats, reward_name, dataset_name, specific_dataset:
         pickle.dump(stats, f)
     print(f"saved stats to {savepath}")
 
-def save_model(reward_net, reward_name, num_steps):
+def save_model(reward_net, dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None, num_steps: int = 0):
     reward_net.eval()
+    reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     net_dict = reward_net.state_dict()
     os.makedirs(f'./Pretrain/Rewards/{reward_name}/Models/', exist_ok=True)
     save_path = f'./Pretrain/Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
@@ -236,8 +246,9 @@ def save_model(reward_net, reward_name, num_steps):
     torch.save(net_dict, save_path)
     print(f"reward model save to {reward_name}_{num_steps}.pkl")
 
-def load_model(reward_name, num_steps):
+def load_model( dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None, num_steps: int = 0):
     #load_path = f'./Pretrain/Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
+    reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     load_path = os.path.join(
         project_root,
         "Pretrain",
@@ -492,11 +503,11 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
         
            if step % save_freq == 0:
               checkpoint = copy.deepcopy(reward_net)
-              save_model(checkpoint, reward_name, step)
+              save_model(checkpoint, dataset_name, specific_dataset, task_id, step)
            
-    save_to_finetuning(reward_net, dataset_name, SD)
-    stats = get_pretrained_reward_stats(reward_name)
-    save_stats_to_finetuning(stats, dataset_name, SD)
+    save_to_finetuning(reward_net, dataset_name, SD, task_id)
+    stats = get_pretrained_reward_stats()
+    save_stats_to_finetuning(reward_net, dataset_name, SD, task_id)
 
 def train_reward_pos_weight(
     dataset_name: str,
@@ -587,12 +598,12 @@ def train_reward_pos_weight(
 
         if step % save_freq == 0 or step == num_steps:
             checkpoint = copy.deepcopy(reward_net).cpu()
-            save_model(checkpoint, reward_name, step)
+            save_model(cehckpoint, dataset_name, specific_dataset, task_id, step)
      
      
-    save_to_finetuning(reward_net, reward_name, dataset_name, SD)
+    save_to_finetuning(reward_net, dataset_name, SD, task_id)
     stats = get_pretrained_reward_stats(reward_name)
-    save_stats_to_finetuning(stats, reward_name, dataset_name, SD)
+    save_stats_to_finetuning(stats, dataset_name, SD, task_id, step)
     print("Reward model training finished!")
     return reward_net
 
@@ -648,12 +659,12 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
     print(f"Using device {device}")
     print(f"Testing the reward model for {dataset_name} Dataset")
     print(f"Target reward: {target_reward}, Sigma: {sigma}, Alpha: {alpha}")
-
+    reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     if(trajs is None): 
-        train_Trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+        train_Trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
         dataset = RewardDataset(train_Trajs, reward_name, sigma, alpha, target_reward, goal)
     else:
-        _, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+        _, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
         dataset = test_dataset(trajs, reward_name, sigma, alpha, target_reward, goal)
     print(f"Testing the reward model on {len(dataset)} samples")
     a = factorint(len(dataset))
@@ -662,7 +673,7 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
     num = save_freq
     while num <= num_steps:
          Rewards = []
-         state_dict = load_model(reward_name, num)
+         state_dict = load_model(dataset_name, specific_dataset, task_id, num)
          reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
          #reward_net = DeepScaledReward(obs_dim, act_dim).to(device)
          #reward_net = Reward(obs_dim, act_dim).to(device)
@@ -697,20 +708,22 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
          print(f"min_reward: {min_R:.4f}")
          num += save_freq
 
-def get_pretrained_reward(dataset_name, checkpoints, specific_dataset: Optional[str] = None):
-       _, name, obs_dim, act_dim  =  Train_Dataset(dataset_name, specific_dataset)
-       reward_model_state_dict = load_model(name, checkpoints)
-       return reward_model_state_dict, obs_dim, act_dim, name
+def get_pretrained_reward(dataset_name, checkpoints, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
+       _, _, obs_dim, act_dim  =  Train_Dataset(dataset_name, specific_dataset)
+       reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
+       reward_model_state_dict = load_model(reward_name, checkpoints)
+       return reward_model_state_dict, obs_dim, act_dim, reward_name
 
-def get_pretrained_reward_stats(Reward_name):
+def get_pretrained_reward_stats(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
     #stats_path = f'./Pretrain/Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
+    reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     stats_path = os.path.join(
         project_root,
         "Pretrain",
         "Rewards",
-        Reward_name,
+        reward_name,
         "Stats",
-        f"{Reward_name}_stats.pkl",
+        f"{reward_name}_stats.pkl",
     )
     with open(stats_path, 'rb') as f:
         stats = pickle.load(f)
