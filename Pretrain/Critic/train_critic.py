@@ -504,7 +504,7 @@ def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, h
 
 def test_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, checkpoint_step, gamma, horizon, goal = None,  sigma: Optional[float] = None, alpha: Optional[float] = None,  target_reward = 1.0, trajs: Optional[List[TrajectoryDict]] = None, task_id: Optional[int] = None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dataset = Critic_Test_Dataset(dataset_name, specific_dataset, trajs, sigma, alpha, goal, target_reward, horizon, gamma)
+    dataset = Critic_Test_Dataset(dataset_name, specific_dataset, trajs, sigma, alpha, goal, task_id, target_reward, horizon, gamma)
     batch_size = 100
     dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True)
     model_state_dict, obs_dim = get_critic_model(dataset_name, specific_dataset, checkpoint_step, task_id)
