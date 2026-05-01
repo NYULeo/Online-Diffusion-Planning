@@ -444,7 +444,8 @@ class RewardDataset(Dataset):
 def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, save_freq, lr, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None, traj_length: Optional[int] = None):
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = check_device()
-    trajs_1, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+    reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
+    trajs_1, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
     trajs_2 = check_trajs_exit(dataset_name, specific_dataset, task_id, 0)
     if(trajs_2 is not None):
         trajs = trajs_1 + trajs_2
@@ -529,8 +530,9 @@ def train_reward_pos_weight(
 ):
     
     device = check_device()
-
-    trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+    
+    reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
+    trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
     print(f"Training reward approximator for {dataset_name}-{specific_dataset}")
 
     dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward, goal)
