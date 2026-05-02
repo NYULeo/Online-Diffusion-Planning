@@ -32,7 +32,7 @@ if __name__ == '__main__':  # pragma: no cover
                  λ_reg = 1e-3)
     """
     dataset = 'cube'
-    specific_dataset = 'single'
+    specific_dataset = 'single-play'
     trajs = get_trajs(dataset, specific_dataset, task_id = 1, step = 0)
     """
     train_kernel(dataset_name = dataset, 
