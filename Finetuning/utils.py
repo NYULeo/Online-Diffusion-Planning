@@ -98,7 +98,7 @@ def save_reward_model(reward_net, dataset_name, specific_dataset, step):
 
 def save_kernel_model(kernel_net, dataset_name, specific_dataset, step, ensemble_idx):
     kernel_net.eval()
-    name = getName(dataset_name, specific_dataset)
+    name = getName2(dataset_name, specific_dataset)
     specific_dataset = reward_name_converter(specific_dataset)
     net_dict = kernel_net.state_dict()
     if(check_specific_dataset(dataset_name)):
@@ -135,7 +135,7 @@ def get_reward_stats(dataset_name, specific_dataset, step, task_id: Optional[int
 
 def get_kernel(dataset_name, specific_dataset, step):
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
-    name = getName(dataset_name, specific_dataset)
+    name = getName2(dataset_name, specific_dataset)
     specific_dataset = reward_name_converter(specific_dataset)
     if(check_specific_dataset(dataset_name)):
         path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}'
@@ -152,7 +152,7 @@ def get_kernel(dataset_name, specific_dataset, step):
     return kernel_state_dicts, obs_dim, act_dim
 
 def get_kernel_stats(dataset_name, specific_dataset, step):
-    name = getName(dataset_name, specific_dataset)
+    name = getName2(dataset_name, specific_dataset)
     specific_dataset = reward_name_converter(specific_dataset)
     if(check_specific_dataset(dataset_name)):
         path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Stats/{name}_Kernel_stats_{str(step)}.pkl'
@@ -311,6 +311,44 @@ def getName(env_name, specific_env):
                 return 'Cube_QuadruplePlay'
           elif specific_env == 'quadruple-noisy':
                 return 'Cube_QuadrupleNoisy'
+     else:
+         raise ValueError(f"Invalid environment name: {env_name}")
+
+
+def getName2(env_name, specific_env):
+     if(env_name == 'kitchen'):
+        
+          return 'Kitchen'
+     elif(env_name == 'pointmaze'):
+          if specific_env == 'umaze':
+               return 'PointMaze_Umaze'
+          elif specific_env == 'large':
+               return 'PointMaze_Large'
+          elif specific_env== 'medium':
+               return 'PointMaze_Medium'
+          else:
+              raise ValueError(f"Invalid specific environment: {specific_env}")
+     elif(env_name == 'antmaze'):
+          if specific_env == 'medium':
+               return 'AntMaze_Medium'
+          elif specific_env == 'large':
+               return 'AntMaze_Large'
+          elif specific_env == 'umaze':
+               return 'AntMaze_Umaze'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
+     
+     elif(env_name == 'cube'):
+          if specific_env == 'single':
+                return 'Cube_Single'
+          elif specific_env == 'double':
+                return 'Cube_Double'
+          elif specific_env == 'triple':
+                return 'Cube_Triple'
+          elif specific_env == 'quadruple':
+                return 'Cube_Quadruple'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
