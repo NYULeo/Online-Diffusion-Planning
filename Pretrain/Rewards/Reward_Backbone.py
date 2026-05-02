@@ -309,7 +309,7 @@ def get_reward_name(dataset_name, specific_dataset: Optional[str] = None, task_i
 
 def check_trajs_exit(env_name, specific_env, task_id, step):
     from pathlib import Path
-    if(step is not None):
+    if(task_id is not None):
          path = Path(f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{task_id}/Generated_trajs_Info_{step}.pkl')
     else:
          path = Path(f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info_{step}.pkl')
@@ -451,16 +451,12 @@ class RewardDataset(Dataset):
             torch.tensor(r, dtype=torch.float32),
         )
     
-def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, save_freq, lr, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None, traj_length: Optional[int] = None):
+def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, save_freq, lr, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None, traj_length: Optional[int] = None, trajs: Optional[list] = None):
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = check_device()
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
-    trajs_1, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
-    trajs_2 = check_trajs_exit(dataset_name, specific_dataset, task_id, 0)
-    if(trajs_2 is not None):
-        trajs = trajs_2
-    else:
-        trajs = trajs_1
+    if(trajs is  None): 
+         trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
     print(f"Training reward approximator for {dataset_name} Dataset") 
     dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward, goal)
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
@@ -673,14 +669,9 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
     print(f"Target reward: {target_reward}, Sigma: {sigma}, Alpha: {alpha}")
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     if(trajs is None): 
-        if(task_id is None):
-            train_Trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
-            dataset = RewardDataset(train_Trajs, reward_name, sigma, alpha, target_reward, goal)
-        else:
-            trajs = get_trajs(dataset_name, specific_dataset, 0, task_id)
-            dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward, goal)
+        train_Trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+        dataset = RewardDataset(train_Trajs, reward_name, sigma, alpha, target_reward, goal)
     else:
-        _, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
         dataset = test_dataset(trajs, reward_name, sigma, alpha, target_reward, goal)
     print(f"Testing the reward model on {len(dataset)} samples")
     a = factorint(len(dataset))

@@ -8,6 +8,21 @@ import pickle
 
 
 
+def check_trajs_exit(env_name, specific_env, task_id, step):
+    from pathlib import Path
+    if(task_id is not None):
+         path = Path(f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{task_id}/Generated_trajs_Info_{step}.pkl')
+    else:
+         path = Path(f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info_{step}.pkl')
+    if not path.exists():
+        print(f"trajs not found")
+        return None
+    else:
+        with path.open('rb') as f:
+             trajs = pickle.load(f)
+        return trajs
+
+
 
 """
 if __name__ == '__main__':
@@ -47,6 +62,7 @@ if __name__ == '__main__':
 
 if __name__ == '__main__':
     set_seed(1)
+    trajs = check_trajs_exit('cube', 'single-play', 1, 0)
     train_reward(
         dataset_name = 'cube',
         hidden_layers = 2,
@@ -60,7 +76,8 @@ if __name__ == '__main__':
         target_reward = 50.0,
         specific_dataset = 'single',
         task_id = 1,
-        traj_length = None
+        traj_length = None,
+        trajs = trajs
     )
 
     test_Model(
@@ -68,7 +85,7 @@ if __name__ == '__main__':
         hidden_layers = 2, 
         hidden_dim = 128,
         specific_dataset = 'single', 
-        trajs = None,
+        trajs = trajs,
         sigma = 8.0,
         #alpha = 0.99, 
         target_reward = 50.0,
