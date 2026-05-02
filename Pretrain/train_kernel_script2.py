@@ -62,8 +62,7 @@ if __name__ == '__main__':  # pragma: no cover
          num_hidden_layers = 3,
          hidden_dim = 514,
          λ_reg = 1e-3,
-         noise_floor = 5e-4,
-         trajs = trajs)
+         noise_floor = 5e-4)
       
     test_kernel_mog(dataset_name = dataset,
                 specific_dataset = specific_dataset,
