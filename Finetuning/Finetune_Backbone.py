@@ -427,6 +427,7 @@ class OnlineFinetuner():
         
         if self.accelerator.is_main_process:
              save_hyperparameters(self.config)
+             print(f"Horizon: {self.config.AlphaConfig}")
         """
         if self.accelerator.is_main_process:
              print(f"Starting Rollout")
@@ -568,6 +569,7 @@ class OnlineFinetuner():
             threshold = 0.0
             if self.accelerator.is_main_process:
                   print(f"Starting Reward Training")
+                  print(f"Horizon: {self.config.AMConfig.horizon}")
                   train_reward(self.Train_Buffer, 
                              dataset_name = self.config.dataset_name, 
                              hidden_layers = self.config.train_reward_config.hidden_layers,
