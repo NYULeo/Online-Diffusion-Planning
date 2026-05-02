@@ -33,7 +33,7 @@ if __name__ == '__main__':  # pragma: no cover
     """
     dataset = 'cube'
     specific_dataset = 'single-play'
-    trajs = get_trajs(dataset, specific_dataset, task_id = 1, step = 0)
+    
     """
     train_kernel(dataset_name = dataset, 
                  specific_dataset = specific_dataset, 
@@ -46,6 +46,9 @@ if __name__ == '__main__':  # pragma: no cover
                  hidden_dim = 256,
                  λ_reg = 1e-3)
     """
+    path = REPO_ROOT / "Finetuning" / "Rollouts" / dataset / specific_dataset / "Generated_trajs_Info_0.pkl"
+    with open(path, "rb") as f:
+          trajs = pickle.load(f)
     train_mog_kernel(
          dataset_name = dataset,
          specific_dataset = specific_dataset,
