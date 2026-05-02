@@ -1,5 +1,7 @@
 import sys
 import os
+
+from Finetuning.heatmap_plot import critic_heatmap
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -33,6 +35,7 @@ from gymnasium.vector import AsyncVectorEnv
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Critic.nets import Critic
+from Pretrain.Critic.train_critic import get_CriticName
 from Pretrain.Dataset import get_dataset
 import json
 
@@ -82,17 +85,17 @@ def reward_filter(obs, rews, goal):
             rews[i-1] = 0.0
     return rews
 
-def save_reward_model(reward_net, dataset_name, specific_dataset, step):
+def save_reward_model(reward_net, dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
     reward_net.eval()
-    name = getName(dataset_name, specific_dataset)
     net_dict = reward_net.state_dict()
     specific_dataset = reward_name_converter(specific_dataset)
+    reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     if(check_specific_dataset(dataset_name)):
           os.makedirs(f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
-          save_path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{name}_Reward_{str(step)}.pkl'
+          save_path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{reward_name}_Reward_{str(step)}.pkl'
     else: 
           os.makedirs(f'./Finetuning/Rewards/{dataset_name}/Models/', exist_ok=True)
-          save_path = f'./Finetuning/Rewards/{dataset_name}/Models/{name}_Reward_{str(step)}.pkl'
+          save_path = f'./Finetuning/Rewards/{dataset_name}/Models/{reward_name}_Reward_{str(step)}.pkl'
     #print("Exists:", os.path.isfile(save_path), "Size:", os.path.getsize(save_path) if os.path.isfile(save_path) else None)
     torch.save(net_dict, save_path)
 
@@ -135,6 +138,7 @@ def get_reward_stats(dataset_name, specific_dataset, step, task_id: Optional[int
 
 def get_kernel(dataset_name, specific_dataset, step):
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+    specific_dataset = reward_name_converter(specific_dataset)
     name = getName2(dataset_name, specific_dataset)
     specific_dataset = reward_name_converter(specific_dataset)
     if(check_specific_dataset(dataset_name)):
@@ -184,30 +188,30 @@ def get_planner(dataset_name, specific_dataset, step):
     #checkpoint = torch.load(checkpoint_path,  weights_only=True)
     return checkpoint['ema']
 
-def save_critic(model, dataset_name, specific_dataset, step):
+def save_critic(model, dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
     model.eval()
-    name = getName(dataset_name, specific_dataset)
+    critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
     net_dict = model.state_dict()
     os.makedirs(f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
-    save_path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl'
+    save_path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{critic_name}_Critic_{str(step)}.pkl'
     #print("Exists:", os.path.isfile(save_path), "Size:", os.path.getsize(save_path) if os.path.isfile(save_path) else None)
     torch.save(net_dict, save_path)
-    print(f"critic model save to {name}_{str(step)}.pkl")
+    print(f"critic model save to {critic_name}_{str(step)}.pkl")
 
-def get_critic_model(dataset_name, specific_dataset, step):
+def get_critic_model(dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
     """
     if(dataset_name == 'pointmaze'):
          obs_dim = obs_dim - 2
     """
-    name = getName(dataset_name, specific_dataset)
-    path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl'
+    critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
+    path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{critic_name}_Critic_{str(step)}.pkl'
     model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
     return model_state_dict, obs_dim
 
-def get_critic_stats(dataset_name, specific_dataset, step):
-    name = getName(dataset_name, specific_dataset)
-    path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/{name}_Critic_stats_{str(step)}.pkl'
+def get_critic_stats(dataset_name, specific_dataset, task_id: Optional[int] = None,  step: int = 0):
+    critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
+    path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/{critic_name}_Critic_stats_{str(step)}.pkl'
     with open(path, 'rb') as f:
         stats = pickle.load(f)
     return stats 
@@ -381,7 +385,8 @@ class KernelDataset(Dataset):
          self.save_stats(dataset_name, specific_dataset, step)
     
     def save_stats(self, dataset_name, specific_dataset, step):
-        name = getName(dataset_name, specific_dataset)
+        specific_dataset = reward_name_converter(specific_dataset)
+        name = getName2(dataset_name, specific_dataset)
         stats_name =  str(name) + f'_Kernel_stats_{str(step)}.pkl'
         if(check_specific_dataset(dataset_name)):
              stats_dir = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Stats/'
@@ -448,8 +453,9 @@ class RewardDataset(Dataset):
         self.save_stats(dataset_name, specific_dataset, task_id, step)
     
     def save_stats(self, dataset_name, specific_dataset, task_id: Optional[int] = 0, step = 0):
-        name = getName(dataset_name, specific_dataset, task_id)
-        stats_name =  str(name) + f'_Reward_stats_{str(step)}.pkl'
+        specific_dataset = reward_name_converter(specific_dataset)
+        reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
+        stats_name =  str(reward_name) + f'_Reward_stats_{str(step)}.pkl'
         if(check_specific_dataset(dataset_name)):
             stats_dir = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/'
         else:
@@ -705,7 +711,7 @@ def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_da
 
 
 class CriticDataset(Dataset):
-    def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, step: int, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
+    def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, task_id: Optional[int] = None,  step: int = 0, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
         # ----- gather raw obs/actions to fit stats -----
         """
         if(dataset_name == 'pointmaze'):
@@ -746,11 +752,11 @@ class CriticDataset(Dataset):
                    transitions.append((obs_t, r_t, obs_next_t))
 
         self.transitions = transitions
-        self.save_stats(dataset_name, specific_dataset, step)
+        self.save_stats(dataset_name, specific_dataset, task_id, step)
     
-    def save_stats(self, dataset_name, specific_dataset, step):
-        name = getName(dataset_name, specific_dataset)
-        stats_name =  str(name) + f'_Critic_stats_{str(step)}.pkl'
+    def save_stats(self, dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
+        critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
+        stats_name =  str(critic_name) + f'_Critic_stats_{str(step)}.pkl'
         stats_dir = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/'
         os.makedirs(stats_dir, exist_ok=True)
         savepath = os.path.join(stats_dir, stats_name)

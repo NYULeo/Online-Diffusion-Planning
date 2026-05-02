@@ -497,7 +497,7 @@ if __name__ == "__main__":
         critic = True,
         kernel = True,
         buffer_size = 5500,
-        finetune_steps = 300,
+        finetune_steps = 60,
         finetune_rounds = 30,
         diffusion_steps = 100,
         karras_percent = 0.05,
