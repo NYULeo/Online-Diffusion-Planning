@@ -445,7 +445,7 @@ if __name__ == "__main__":
     RWConfig = RewardConfig(
                beta = 1.0, 
                #min_log_prob = 0,
-               max_mahalanobis_score = 5.0 
+               max_mahalanobis_score = 5.0,
                critic_gamma = 1.0,
                explore = False,
                constraint_type = 'mahalanobis') 
@@ -500,7 +500,7 @@ if __name__ == "__main__":
         finetune_steps = 60,
         finetune_rounds = 30,
         diffusion_steps = 500,
-        karras_percent = 0.25,
+        karras_percent = 0.0,
         Loss_Clip_percent = 0.75,
         finetune_batch_size = 12,
         finetune_batch_per_sample = 6,
