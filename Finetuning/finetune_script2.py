@@ -444,7 +444,7 @@ if __name__ == "__main__":
     #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
     RWConfig = RewardConfig(
                beta = 1.0, 
-               min_log_prob = -35.0, 
+               min_log_prob = -55.0, 
                critic_gamma = 1.0,
                explore = False,
                constraint_type = 'log_prob') 
