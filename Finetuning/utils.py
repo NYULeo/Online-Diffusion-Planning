@@ -44,6 +44,18 @@ def check_specific_dataset(dataset_name):
     elif(dataset_name == 'pointmaze'):
          return True
 
+def reward_name_converter(specific_dataset):
+    if(specific_dataset == 'single-play' or specific_dataset == 'single-noise'):
+        return 'single'
+    elif(specific_dataset == 'double-play' or specific_dataset == 'double-noise'):
+        return 'double'
+    elif(specific_dataset == 'triple-play' or specific_dataset == 'triple-noise'):
+        return 'triple'
+    elif(specific_dataset == 'quadruple-play' or specific_dataset == 'quadruple-noise'):
+        return 'quadruple'
+    else:
+        return specific_dataset
+
 def spare_reward_prcocessor(rewards):
     Temp = []
     for i in range(1, len(rewards)):
@@ -74,6 +86,7 @@ def save_reward_model(reward_net, dataset_name, specific_dataset, step):
     reward_net.eval()
     name = getName(dataset_name, specific_dataset)
     net_dict = reward_net.state_dict()
+    specific_dataset = reward_name_converter(specific_dataset)
     if(check_specific_dataset(dataset_name)):
           os.makedirs(f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
           save_path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{name}_Reward_{str(step)}.pkl'
@@ -86,6 +99,7 @@ def save_reward_model(reward_net, dataset_name, specific_dataset, step):
 def save_kernel_model(kernel_net, dataset_name, specific_dataset, step, ensemble_idx):
     kernel_net.eval()
     name = getName(dataset_name, specific_dataset)
+    specific_dataset = reward_name_converter(specific_dataset)
     net_dict = kernel_net.state_dict()
     if(check_specific_dataset(dataset_name)):
           os.makedirs(f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}', exist_ok=True)
@@ -98,6 +112,7 @@ def save_kernel_model(kernel_net, dataset_name, specific_dataset, step, ensemble
 
 def get_reward_model(dataset_name, specific_dataset, step, task_id: Optional[int] = None):
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+    specific_dataset = reward_name_converter(specific_dataset)
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     if(check_specific_dataset(dataset_name)):
         path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{reward_name}_{str(step)}.pkl'
@@ -107,6 +122,7 @@ def get_reward_model(dataset_name, specific_dataset, step, task_id: Optional[int
     return model_state_dict, obs_dim, act_dim
 
 def get_reward_stats(dataset_name, specific_dataset, step, task_id: Optional[int] = None):
+    specific_dataset = reward_name_converter(specific_dataset)
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     if(check_specific_dataset(dataset_name)):
         path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/{reward_name}_stats_{str(step)}.pkl'
@@ -120,6 +136,7 @@ def get_reward_stats(dataset_name, specific_dataset, step, task_id: Optional[int
 def get_kernel(dataset_name, specific_dataset, step):
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
     name = getName(dataset_name, specific_dataset)
+    specific_dataset = reward_name_converter(specific_dataset)
     if(check_specific_dataset(dataset_name)):
         path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}'
     else:
@@ -136,6 +153,7 @@ def get_kernel(dataset_name, specific_dataset, step):
 
 def get_kernel_stats(dataset_name, specific_dataset, step):
     name = getName(dataset_name, specific_dataset)
+    specific_dataset = reward_name_converter(specific_dataset)
     if(check_specific_dataset(dataset_name)):
         path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Stats/{name}_Kernel_stats_{str(step)}.pkl'
     else:
@@ -196,9 +214,9 @@ def get_critic_stats(dataset_name, specific_dataset, step):
 
 def save_trajs(trajs, env_name, specific_env, step, task_id: Optional[int] = None):
     if(task_id is not None):
-        path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/'
+        path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{str(task_id)}'
     else:
-        path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{str(task_id)}/'
+        path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/'
     os.makedirs(path, exist_ok=True)
     save_path =  f'{path}/Generated_trajs_Info_{str(step)}.pkl'
     with open(save_path, 'wb') as f:
