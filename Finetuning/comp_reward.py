@@ -123,9 +123,9 @@ class TotalReward(nn.Module):
         #avg = torch.logsumexp(lps, dim=0) - math.log(len(self.kernels)) 
         """
         if(self.config.type_kernel == 'robust'):
-            avg = compute_log_density_mog(self.kernels, s, a, s_next)
-        else:
             avg = compute_log_density(self.kernels, s, a, s_next)
+        else:
+            avg = compute_log_density_mog(self.kernels, s, a, s_next)
         x = self.config.min_log_prob - avg
         return F.softplus(x, beta=self.config.beta)
 
@@ -337,9 +337,9 @@ class TotalReward_Critic(nn.Module):
         #avg = torch.logsumexp(lps, dim=0) - math.log(len(self.kernels)) 
         """
         if(self.config.type_kernel == 'robust'):
-            avg = compute_log_density_mog(self.kernels, s, a, s_next)
-        else:
             avg = compute_log_density(self.kernels, s, a, s_next)
+        else:
+            avg = compute_log_density_mog(self.kernels, s, a, s_next)
         x = self.config.min_log_prob - avg
         return F.softplus(x, beta=self.config.beta)
 
