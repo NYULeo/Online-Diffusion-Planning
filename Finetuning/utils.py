@@ -100,8 +100,8 @@ def save_reward_model(reward_net, dataset_name, specific_dataset, task_id: Optio
 
 def save_kernel_model(kernel_net, dataset_name, specific_dataset, step, ensemble_idx):
     kernel_net.eval()
-    name = getName2(dataset_name, specific_dataset)
     specific_dataset = reward_name_converter(specific_dataset)
+    name = getName2(dataset_name, specific_dataset)
     net_dict = kernel_net.state_dict()
     if(check_specific_dataset(dataset_name)):
           os.makedirs(f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}', exist_ok=True)
@@ -154,8 +154,8 @@ def get_kernel(dataset_name, specific_dataset, step):
     return kernel_state_dicts, obs_dim, act_dim
 
 def get_kernel_stats(dataset_name, specific_dataset, step):
-    name = getName2(dataset_name, specific_dataset)
     specific_dataset = reward_name_converter(specific_dataset)
+    name = getName2(dataset_name, specific_dataset)
     if(check_specific_dataset(dataset_name)):
         path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Stats/{name}_Kernel_stats_{str(step)}.pkl'
     else:
