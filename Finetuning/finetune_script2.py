@@ -470,7 +470,7 @@ if __name__ == "__main__":
                             num_hidden_layers = 3,
                             hidden_dim = 514,
                             type_kernel = 'mog',
-                            kernel_num_modes = 8,
+                            kernel_num_modes = 5,
                             kernel_noise_floor = 5e-4,
                             λ_reg = 1e-3)
     
