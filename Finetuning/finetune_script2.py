@@ -499,7 +499,7 @@ if __name__ == "__main__":
         finetune_steps = 60,
         finetune_rounds = 30,
         diffusion_steps = 200,
-        karras_percent = 0.05,
+        karras_percent = 0.25,
         Loss_Clip_percent = 0.75,
         finetune_batch_size = 12,
         finetune_batch_per_sample = 6,
