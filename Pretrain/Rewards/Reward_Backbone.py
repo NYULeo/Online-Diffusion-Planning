@@ -457,6 +457,8 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     if(trajs is  None): 
          trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+    else:
+         _, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
     print(f"Training reward approximator for {dataset_name} Dataset") 
     dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward, goal)
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
