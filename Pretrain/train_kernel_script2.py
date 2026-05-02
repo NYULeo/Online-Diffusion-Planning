@@ -32,7 +32,7 @@ if __name__ == '__main__':  # pragma: no cover
                  λ_reg = 1e-3)
     """
     dataset = 'cube'
-    specific_dataset = 'single-play'
+    specific_dataset = 'single'
     
     """
     train_kernel(dataset_name = dataset, 
