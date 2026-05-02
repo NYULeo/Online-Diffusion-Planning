@@ -673,12 +673,12 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
     print(f"Target reward: {target_reward}, Sigma: {sigma}, Alpha: {alpha}")
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     if(trajs is None): 
-        if(task_id is not None):
+        if(task_id is None):
             train_Trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
             dataset = RewardDataset(train_Trajs, reward_name, sigma, alpha, target_reward, goal)
         else:
             trajs = get_trajs(dataset_name, specific_dataset, 0, task_id)
-            dataset = RewardDataset(train_Trajs, reward_name, sigma, alpha, target_reward, goal)
+            dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward, goal)
     else:
         _, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
         dataset = test_dataset(trajs, reward_name, sigma, alpha, target_reward, goal)
