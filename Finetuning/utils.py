@@ -35,7 +35,6 @@ from gymnasium.vector import AsyncVectorEnv
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Critic.nets import Critic
-from Pretrain.Critic.train_critic import get_CriticName
 from Pretrain.Dataset import get_dataset
 import json
 
@@ -355,6 +354,52 @@ def getName2(env_name, specific_env):
               raise ValueError(f"Invalid Dataset name: {specific_env}")
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
+
+
+def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
+     if(env_name == 'kitchen'):
+          if(specific_env == 'complete'):
+               return 'Kitchen_High'
+          elif(specific_env == 'partial'):
+               return 'Kitchen_Medium'
+          elif(specific_env == 'mixed'):
+               return 'Kitchen_Mixed'
+          else:
+               raise ValueError(f"Invalid specific environment: {specific_env}")
+     elif(env_name == 'pointmaze'):
+         if(specific_env == 'large'):
+              return 'PointMaze_Large'
+         elif(specific_env == 'medium'):
+              return 'PointMaze_Medium'
+         elif(specific_env == 'unmaze'):
+              return 'PointMaze_Unmaze'
+         else:
+              raise ValueError(f"Invalid specific environment: {specific_env}")
+     elif(env_name == 'cube'):
+         if specific_env == 'single-play':
+              return f'Cube_SinglePlay_task{task_id}'
+         elif specific_env == 'single-noisy':
+             return f'Cube_SingleNoisy_task{task_id}'
+         elif specific_env == 'double-play':
+             return f'Cube_DoublePlay_task{task_id}'
+         elif specific_env == 'double-noisy':
+             return f'Cube_DoubleNoisy_task{task_id}'
+         elif specific_env == 'triple-play':
+             return f'Cube_TriplePlay_task{task_id}'
+         elif specific_env == 'triple-noisy':
+             return f'Cube_TripleNoisy_task{task_id}'
+         elif specific_env == 'quadruple-play':
+             return f'Cube_QuadruplePlay_task{task_id}'
+         elif specific_env == 'quadruple-noisy':
+             return f'Cube_QuadrupleNoisy_task{task_id}'
+         else:
+             raise ValueError(f"Invalid cube dataset name: {specific_env}")
+     else:
+         raise ValueError(f"Invalid environment name: {env_name}")
+
+
+
+
 
 class KernelDataset(Dataset):
     def __init__(self, trajectories: List[TrajectoryDict], dataset_name: str, specific_dataset: str, step: int):
