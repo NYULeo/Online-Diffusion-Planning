@@ -38,6 +38,16 @@ def check_specifc_dataset(dataset_name):
     elif(dataset_name == 'cube'):
          return True
 
+def get_trajs(env_name, specific_env, step, task_id: Optional[int] = None):
+    if(task_id is not None):
+        path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{str(task_id)}/Generated_trajs_Info_{str(step)}.pkl'
+    else:
+        path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info_{str(step)}.pkl'
+    with open(path, 'rb') as f:
+        trajs = pickle.load(f)
+    return trajs
+
+
 def getName(env_name, specific_env, task_id: Optional[int] = None):
      if(env_name == 'kitchen'):
           return 'Kitchen'
@@ -663,8 +673,11 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
     print(f"Target reward: {target_reward}, Sigma: {sigma}, Alpha: {alpha}")
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     if(trajs is None): 
-        train_Trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
-        dataset = RewardDataset(train_Trajs, reward_name, sigma, alpha, target_reward, goal)
+        if(task_id is not None):
+            train_Trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+            dataset = RewardDataset(train_Trajs, reward_name, sigma, alpha, target_reward, goal)
+        else:
+            trajs = get_trajs(dataset_name, specific_dataset, 0, task_id)
     else:
         _, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
         dataset = test_dataset(trajs, reward_name, sigma, alpha, target_reward, goal)
