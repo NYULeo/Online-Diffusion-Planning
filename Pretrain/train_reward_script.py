@@ -63,6 +63,7 @@ if __name__ == '__main__':
 if __name__ == '__main__':
     set_seed(1)
     trajs = check_trajs_exit('cube', 'single-play', 1, 0)
+    new_trajs = trajs.copy()
     train_reward(
         dataset_name = 'cube',
         hidden_layers = 2,
