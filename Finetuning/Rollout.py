@@ -528,13 +528,13 @@ if __name__ == "__main__":
     
     horizon = 32
     env_name = 'cube'
-    specific_train_dataset = 'double-play'
+    specific_train_dataset = 'single-play'
     set_seed(9)
     
     
     traj = rollout(env_name, 
             specific_train_dataset, horizon, 
-            steps_T = 200, 
+            steps_T = 500, 
             num_karras = 50, 
             eta = 0.8, 
             episode_length = 3000, 
