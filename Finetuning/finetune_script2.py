@@ -445,7 +445,7 @@ if __name__ == "__main__":
     #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
     RWConfig = RewardConfig(
                beta = 1.0, 
-               min_log_prob = -30.0, 
+               min_log_prob = -33.0, 
                critic_gamma = 1.0,
                explore = False,
                constraint_type = 'log_prob') 
@@ -464,9 +464,9 @@ if __name__ == "__main__":
       
     TrainKernelConfig = Train_Kernel_Config(
                             batch_size = 512, 
-                            num_steps = 50000,
+                            num_steps = 2000,
                             lr = 1e-4,
-                            ensemble_size = 20,
+                            ensemble_size = 10,
                             num_hidden_layers = 3,
                             hidden_dim = 514,
                             type_kernel = 'mog',
