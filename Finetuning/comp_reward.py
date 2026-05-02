@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 from Pretrain.Rewards.nets import SimpleReward
 from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel, MoGTransitionKernel
-from Pretrain.Transition_Kernel.Kernel_Backbone import compute_total_mahalanobis_score
+from Pretrain.Transition_Kernel.Kernel_Backbone import compute_total_mahalanobis_score, compute_log_density, compute_log_density_mog
 from Pretrain.Critic.nets import Critic
 from Finetuning.utils import get_reward_model, get_kernel, get_reward_stats, get_kernel_stats, get_critic_model, get_critic_stats
 from typing import Optional
@@ -113,12 +113,19 @@ class TotalReward(nn.Module):
         return (s - self.kernel_obs_mean_t) * self.kernel_obs_inv_std_t
 
     def sigmoid(self, s: torch.Tensor, a: torch.Tensor, s_next: torch.Tensor) -> torch.Tensor:
+        """
         lps = []
         for k in self.kernels:
             mu, log_std = k(s, a)
+            lp = k.log_prob(s)
             lps.append(k.log_prob(s_next, mu, log_std))
         avg = torch.stack(lps, dim=0).mean(dim=0)
         #avg = torch.logsumexp(lps, dim=0) - math.log(len(self.kernels)) 
+        """
+        if(self.config.type_kernel == 'robust'):
+            avg = compute_log_density_mog(self.kernels, s, a, s_next)
+        else:
+            avg = compute_log_density(self.kernels, s, a, s_next)
         x = self.config.min_log_prob - avg
         return F.softplus(x, beta=self.config.beta)
 
@@ -321,12 +328,18 @@ class TotalReward_Critic(nn.Module):
         return (s - self.critic_obs_mean_t) * self.critic_obs_inv_std_t
 
     def sigmoid(self, s: torch.Tensor, a: torch.Tensor, s_next: torch.Tensor) -> torch.Tensor:
+        """
         lps = []
         for k in self.kernels:
             mu, log_std = k(s, a)
             lps.append(k.log_prob(s_next, mu, log_std))
         avg = torch.stack(lps, dim=0).mean(dim=0)
         #avg = torch.logsumexp(lps, dim=0) - math.log(len(self.kernels)) 
+        """
+        if(self.config.type_kernel == 'robust'):
+            avg = compute_log_density_mog(self.kernels, s, a, s_next)
+        else:
+            avg = compute_log_density(self.kernels, s, a, s_next)
         x = self.config.min_log_prob - avg
         return F.softplus(x, beta=self.config.beta)
 
