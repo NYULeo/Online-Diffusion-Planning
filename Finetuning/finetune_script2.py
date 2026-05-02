@@ -498,7 +498,7 @@ if __name__ == "__main__":
         buffer_size = 5500,
         finetune_steps = 60,
         finetune_rounds = 30,
-        diffusion_steps = 200,
+        diffusion_steps = 500,
         karras_percent = 0.25,
         Loss_Clip_percent = 0.75,
         finetune_batch_size = 12,
