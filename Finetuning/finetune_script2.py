@@ -468,9 +468,9 @@ if __name__ == "__main__":
                             lr = 1e-4,
                             ensemble_size = 10,
                             num_hidden_layers = 3,
-                            hidden_dim = 514,
+                            hidden_dim = 512,
                             type_kernel = 'mog',
-                            kernel_num_modes = 5,
+                            kernel_num_modes = 8,
                             kernel_noise_floor = 5e-4,
                             λ_reg = 1e-3)
     
