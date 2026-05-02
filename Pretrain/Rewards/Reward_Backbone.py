@@ -515,7 +515,7 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
               save_model(checkpoint, dataset_name, specific_dataset, task_id, step)
            
     save_to_finetuning(reward_net, dataset_name, SD, task_id)
-    stats = get_pretrained_reward_stats(dataset_name, SD, task_id)
+    stats = get_pretrained_reward_stats(reward_name)
     save_stats_to_finetuning(stats, dataset_name, SD, task_id)
 
 def train_reward_pos_weight(
@@ -724,9 +724,8 @@ def get_pretrained_reward(dataset_name, checkpoints, specific_dataset: Optional[
        reward_model_state_dict = load_model(reward_name, checkpoints)
        return reward_model_state_dict, obs_dim, act_dim, reward_name
 
-def get_pretrained_reward_stats(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
+def get_pretrained_reward_stats(reward_name):
     #stats_path = f'./Pretrain/Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
-    reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     stats_path = os.path.join(
         project_root,
         "Pretrain",
