@@ -86,13 +86,13 @@ def getName(env_name, specific_env, task_id: Optional[int] = None):
      elif(env_name == 'cube'):
          if(task_id is None):
             raise ValueError('Task ID is required for cube dataset')
-         if specific_env == 'single':
+         if specific_env == 'single' or specific_env == 'single-play':
               return f'Cube_Single_Task{task_id}'
-         elif specific_env == 'double':
+         elif specific_env == 'double'  or specific_env == 'double-play':
               return 'Cube_Double_Task{task_id}'
-         elif specific_env == 'triple':
+         elif specific_env == 'triple' or specific_env == 'triple-play':
               return 'Cube_Triple_Task{task_id}'
-         elif specific_env == 'quadruple':
+         elif specific_env == 'quadruple' or specific_env == 'quadruple-play':
               return 'Cube_Quadruple_Task{task_id}'
          else:
               raise ValueError(f"Invalid cube dataset name: {specific_env}")
