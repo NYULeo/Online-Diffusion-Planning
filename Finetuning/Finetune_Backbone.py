@@ -607,7 +607,7 @@ class OnlineFinetuner():
                                       num_steps = self.config.train_kernel_config.num_steps,
                                       ensemble_size = self.config.train_kernel_config.ensemble_size,
                                       λ_reg = self.config.train_kernel_config.λ_reg,
-                                      num_modes = self.config.train_kernel_config.num_modes,
+                                      num_modes = self.config.train_kernel_config.kernel_num_modes,
                                       num_hidden_layers = self.config.train_kernel_config.num_hidden_layers,
                                       hidden_dim = self.config.train_kernel_config.hidden_dim,
                                       kernel_noise_floor = self.config.train_kernel_config.kernel_noise_floor,
