@@ -427,7 +427,6 @@ class OnlineFinetuner():
         
         if self.accelerator.is_main_process:
              save_hyperparameters(self.config)
-             print(f"Horizon: {self.config.AlphaConfig}")
         """
         if self.accelerator.is_main_process:
              print(f"Starting Rollout")
@@ -582,6 +581,7 @@ class OnlineFinetuner():
                              target_reward = self.config.train_reward_config.target_reward, 
                              specific_dataset = self.config.specific_dataset, 
                              goal = self.config.train_reward_config.train_goal)
+                  """
                   if self.config.kernel:
                       print(f"Starting Kernel Training")
                       if(self.config.train_kernel_config.type_kernel == 'robust'):
@@ -615,11 +615,12 @@ class OnlineFinetuner():
                                       kernel_noise_floor = self.config.train_kernel_config.kernel_noise_floor,
                                       step = ((step+1) * self.config.AMConfig.per_round_steps),
                                       quantile = self.config.RewardConfig.quantile)
-
+                  """
                   if self.config.critic:
                       print(f"Starting Critic Training")
                       #save_trajs(critic_buffer, self.config.dataset_name, self.config.specific_dataset, ((step+1) * self.config.AMConfig.per_round_steps))
                       print(f"Number of trajectories of Critic Training: {len(critic_buffer)}")
+                      print(f"Horizon: {self.config.AMConfig.horizon}")
                       train_critic(critic_buffer, 
                                    dataset_name = self.config.dataset_name, 
                                    specific_dataset = self.config.specific_dataset, 
