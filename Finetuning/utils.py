@@ -97,18 +97,10 @@ def save_kernel_model(kernel_net, dataset_name, specific_dataset, step, ensemble
 def get_reward_model(dataset_name, specific_dataset, step, task_id: Optional[int] = None):
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
-    if(task_id is not None):
-         path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/task_{str(task_id)}/Models'
     if(check_specific_dataset(dataset_name)):
-         if(task_id is not None):
-             path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/task_{str(task_id)}/Models/{reward_name}_{str(step)}.pkl'
-         else:
-             path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{reward_name}_{str(step)}.pkl'
+        path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{reward_name}_{str(step)}.pkl'
     else:
-         if(task_id is not None):
-               path = f'./Finetuning/Rewards/{dataset_name}/Models/task_{str(task_id)}/{reward_name}_{str(step)}.pkl'
-         else:
-               path = f'./Finetuning/Rewards/{dataset_name}/Models/{reward_name}_{str(step)}.pkl'
+        path = f'./Finetuning/Rewards/{dataset_name}/Models/{reward_name}_{str(step)}.pkl'
     model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
     return model_state_dict, obs_dim, act_dim
 
@@ -116,6 +108,7 @@ def get_reward_stats(dataset_name, specific_dataset, step, task_id: Optional[int
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     if(check_specific_dataset(dataset_name)):
         path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/{reward_name}_stats_{str(step)}.pkl'
+        
     else:
         path = f'./Finetuning/Rewards/{dataset_name}/Stats/{reward_name}_stats_{str(step)}.pkl'
     with open(path, 'rb') as f:
