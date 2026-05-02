@@ -10,7 +10,7 @@ import torch
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
-from Pretrain.Dataset import KitchenDataset, PointMazeDataset, CubeDataset
+from Pretrain.Dataset import CubeDataset_Singletask, KitchenDataset, PointMazeDataset, CubeDataset
 from .Kernel_Net import  RobustTransitionKernel, MoGTransitionKernel
 from sympy import factorint
 import pickle
@@ -299,7 +299,7 @@ def load_model(kernel_name, num_steps, ensemble_idx):
     state_dict = torch.load(load_path, weights_only=True)
     return state_dict
 
-def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None):
+def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
     if(dataset_name == 'kitchen'):
          data_1 = KitchenDataset('complete')
          data_2 = KitchenDataset('partial')
@@ -330,27 +330,43 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None):
          return trajs, name, obs_dim, act_dim
      
     elif(dataset_name == 'cube'):
+        
         if(specific_dataset is None): 
              raise ValueError(f"Invalid dataset name: {dataset_name}")
         elif(specific_dataset == 'single'):
              data_1 = CubeDataset('single-play')
              data_2 = CubeDataset('single-noisy')
+             if(task_id is not None):
+                 data_3 = CubeDataset_Singletask('single-play', task_id)
+                 data_4 = CubeDataset_Singletask('single-noisy', task_id)
              name = 'Cube_Kernel_single'
         elif(specific_dataset == 'double'):
              data_1 = CubeDataset('double-play')
              data_2 = CubeDataset('double-noisy')
+             if(task_id is not None):
+                 data_3 = CubeDataset_Singletask('double-play', task_id)
+                 data_4 = CubeDataset_Singletask('double-noisy', task_id)
              name = 'Cube_Kernel_double'
         elif(specific_dataset == 'triple'):
              data_1 = CubeDataset('triple-play')
              data_2 = CubeDataset('triple-noisy')
+             if(task_id is not None):
+                 data_3 = CubeDataset_Singletask('triple-play', task_id)
+                 data_4 = CubeDataset_Singletask('triple-noisy', task_id)
              name = 'Cube_Kernel_triple'
         elif(specific_dataset == 'quadruple'):
              data_1 = CubeDataset('quadruple-play')
              data_2 = CubeDataset('quadruple-noisy')
+             if(task_id is not None):
+                 data_3 = CubeDataset_Singletask('quadruple-play', task_id)
+                 data_4 = CubeDataset_Singletask('quadruple-noisy', task_id)
              name = 'Cube_Kernel_quadruple'
         else: 
             raise ValueError(f"Invalid dataset name: {specific_dataset}")
-        trajs = data_1.get_trajectories() + data_2.get_trajectories()
+        if(task_id is not None):
+            trajs = data_1.get_trajectories() + data_2.get_trajectories() + data_3.get_trajectories() + data_4.get_trajectories()
+        else:
+            trajs = data_1.get_trajectories() + data_2.get_trajectories()
         obs_dim = data_1.get_state_dim()
         act_dim = data_1.get_action_dim()
         return trajs, name, obs_dim, act_dim
@@ -549,6 +565,7 @@ from tqdm import tqdm
 def train_mog_kernel(
     dataset_name: str,
     specific_dataset: str = None,
+    task_id: Optional[int] = None,
     trajs: Optional[list] = None,
     batch_size: int = 256,
     lr: float = 1e-4,
@@ -570,11 +587,12 @@ def train_mog_kernel(
         print(f"  Specific dataset: {specific_dataset}")
 
     # Prepare dataset
-    if(trajs is None):
-          trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
+    train_trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id)
+    if(trajs is not None):
+          total_trajs = train_trajs + trajs
     else:
-          _, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
-    dataset = KernelDataset(trajs, kernel_name)
+          total_trajs = train_trajs
+    dataset = KernelDataset(total_trajs, kernel_name)
     loader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
                               pin_memory=True, num_workers=8))
 
@@ -854,18 +872,19 @@ def test_kernel(dataset_name, specific_dataset: str = None,
         step += save_freq
 
 
-def test_kernel_mog(dataset_name, specific_dataset: str = None,
+def test_kernel_mog(dataset_name, specific_dataset: str = None, task_id: Optional[int] = None,
                 trajs: list = None,
                 save_freq: int = 50, num_steps: int = 500, num_hidden_layers = 2, hidden_dim = 256, ensemble_size = 3, num_modes = 9, noise_floor = 1e-6, quantile = 0.95):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #device = check_device()
     print("Using device:", device)
 
-    train_trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
-    if trajs is None:
-        dataset = test_dataset(train_trajs, kernel_name)
+    train_trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id)
+    if trajs is not None:
+        total_trajs = train_trajs + trajs
     else:
-        dataset = test_dataset(trajs, kernel_name)
+        total_trajs = train_trajs
+    dataset = test_dataset(total_trajs, kernel_name)
     dataloader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=True, num_workers=8)
     
     # For each saved checkpoint / ensemble member

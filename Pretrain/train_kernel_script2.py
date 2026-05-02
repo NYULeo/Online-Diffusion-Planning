@@ -52,6 +52,7 @@ if __name__ == '__main__':  # pragma: no cover
     train_mog_kernel(
          dataset_name = dataset,
          specific_dataset = specific_dataset,
+         task_id = 1,
          trajs = trajs,
          batch_size = 512,
          lr = 1e-4,
@@ -66,6 +67,7 @@ if __name__ == '__main__':  # pragma: no cover
       
     test_kernel_mog(dataset_name = dataset,
                 specific_dataset = specific_dataset,
+                task_id = 1,
                 trajs = trajs,
                 save_freq = 2000,
                 num_steps = 2000,
