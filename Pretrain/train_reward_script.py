@@ -78,7 +78,7 @@ if __name__ == '__main__':
         specific_dataset = 'single',
         task_id = 1,
         traj_length = None,
-        trajs = trajs
+        trajs = new_trajs
     )
 
     test_Model(
@@ -86,7 +86,7 @@ if __name__ == '__main__':
         hidden_layers = 2, 
         hidden_dim = 128,
         specific_dataset = 'single', 
-        trajs = trajs,
+        trajs = new_trajs,
         sigma = 8.0,
         #alpha = 0.99, 
         target_reward = 50.0,
