@@ -33,6 +33,7 @@ if __name__ == '__main__':  # pragma: no cover
     """
     dataset = 'cube'
     specific_dataset = 'single'
+    trajs = get_trajs(dataset, specific_dataset, task_id = 1, step = 0)
     """
     train_kernel(dataset_name = dataset, 
                  specific_dataset = specific_dataset, 
@@ -57,11 +58,12 @@ if __name__ == '__main__':  # pragma: no cover
          num_hidden_layers = 3,
          hidden_dim = 514,
          λ_reg = 1e-3,
-         noise_floor = 5e-4)
+         noise_floor = 5e-4,
+         trajs = trajs)
       
     test_kernel_mog(dataset_name = dataset,
                 specific_dataset = specific_dataset,
-                trajs = None,
+                trajs = trajs,
                 save_freq = 2000,
                 num_steps = 2000,
                 num_hidden_layers = 3,

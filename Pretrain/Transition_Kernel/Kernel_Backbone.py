@@ -671,7 +671,7 @@ def train_mog_kernel(
 
 def train_kernel(dataset_name, specific_dataset: str = None,
                  batch_size=256, lr=1e-3, num_steps=10000, save_freq = 200,
-                 ensemble_size=10, hidden_layers = 2, hidden_dim = 256, λ_reg=1e-3):
+                 ensemble_size=10, hidden_layers = 2, hidden_dim = 256, λ_reg=1e-3, trajs: Optional[list] = None):
     # Prepare dataset / dataloader
     if specific_dataset is None:
         print(f"Training kernel for {dataset_name}")
@@ -680,8 +680,8 @@ def train_kernel(dataset_name, specific_dataset: str = None,
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = check_device()
     print("Using device:", device)
-
-    trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
+    if(trajs is None):
+           trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
     dataset = KernelDataset(trajs, kernel_name)
     loader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
                               pin_memory=True, num_workers=8))
