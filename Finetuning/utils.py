@@ -139,7 +139,6 @@ def get_kernel(dataset_name, specific_dataset, step):
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
     specific_dataset = reward_name_converter(specific_dataset)
     name = getName2(dataset_name, specific_dataset)
-    specific_dataset = reward_name_converter(specific_dataset)
     if(check_specific_dataset(dataset_name)):
         path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}'
     else:
