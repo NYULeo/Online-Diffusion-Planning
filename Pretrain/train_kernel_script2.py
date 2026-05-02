@@ -46,7 +46,7 @@ if __name__ == '__main__':  # pragma: no cover
                  hidden_dim = 256,
                  λ_reg = 1e-3)
     """
-    path = REPO_ROOT / "Finetuning" / "Rollouts" / dataset / specific_dataset / f'task_{1}' / "Generated_trajs_Info_0.pkl"
+    path = REPO_ROOT / "Finetuning" / "Rollouts" / dataset / 'single-play'/ f'task_{1}' / "Generated_trajs_Info_0.pkl"
     with open(path, "rb") as f:
           trajs = pickle.load(f)
     train_mog_kernel(
