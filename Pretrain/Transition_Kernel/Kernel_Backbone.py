@@ -549,6 +549,7 @@ from tqdm import tqdm
 def train_mog_kernel(
     dataset_name: str,
     specific_dataset: str = None,
+    trajs: Optional[list] = None,
     batch_size: int = 256,
     lr: float = 1e-4,
     num_steps: int = 25000,
@@ -569,7 +570,10 @@ def train_mog_kernel(
         print(f"  Specific dataset: {specific_dataset}")
 
     # Prepare dataset
-    trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
+    if(trajs is None):
+          trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
+    else:
+          _, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
     dataset = KernelDataset(trajs, kernel_name)
     loader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
                               pin_memory=True, num_workers=8))
