@@ -84,7 +84,9 @@ if __name__ == '__main__':
         traj_length = None,
         trajs = new_trajs
     )
+    
     trajs = check_trajs_exit('cube', 'single-play', 1, 0)
+    
     new_trajs = trajs.copy()
     for traj in new_trajs:
         if(traj['rewards'][-1] != 1):

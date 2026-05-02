@@ -765,7 +765,7 @@ class TotalReward_Critic_Mahalanobis(nn.Module):
 
     def sigmoid(self, s: torch.Tensor, a: torch.Tensor, s_next: torch.Tensor) -> torch.Tensor:
         if(self.config.type_kernel == 'robust'):
-             D2 = compute_total_mahalanobis_score(self.kernels, s, a, s_next)
+             D2 =  compute_total_mahalanobis_score(self.kernels, s, a, s_next)
         else:
              D2 =  compute_total_mahalanobis_score_mog(self.kernels, s, a, s_next)
         tau = self.config.max_mahalanobis_score   # should be your calibrated τ (e.g. 95th percentile)

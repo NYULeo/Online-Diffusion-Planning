@@ -829,10 +829,13 @@ class CriticDataset(Dataset):
         new_rews = []
         for t in range(len(rews)):
             R = 0.0
+            t = int(t)
+            horizon = int(horizon)
             for i in range(t, min(t + horizon, len(rews))):
                 R += (gamma**(i-t))*rews[i]
             new_rews.append(R)
         return new_rews
+    
 
 def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, step: int, goal = None, target_reward = 1.0):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
