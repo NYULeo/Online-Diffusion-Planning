@@ -251,10 +251,12 @@ class OnlineFinetuner():
     def Initialize_BufferDataset(self):
         self.Finetune_Buffer = []
         self.Train_Buffer = []
-        dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
-        trajs = dataset.get_trajectories()
+        
         if(self.config.train_reward_config.task_id is not None):
-            trajs = get_trajs(self.config.dataset_name, self.config.specific_dataset, self.config.train_reward_config.step, self.config.train_reward_config.task_id)
+            trajs = get_trajs(self.config.dataset_name, self.config.specific_dataset, 0, self.config.train_reward_config.task_id)
+        else:
+            dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
+            trajs = dataset.get_trajectories()
         self.Finetune_Buffer.extend(trajs)
         self.Train_Buffer.extend(trajs)
 
@@ -343,8 +345,11 @@ class OnlineFinetuner():
               return None  # Other processes don't need the buffer
     
     def data_conservation_update(self, critic_buffer):
-        dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
-        trajs = dataset.get_trajectories()
+        if(self.config.train_reward_config.task_id is not None):
+             trajs = get_trajs(self.config.dataset_name, self.config.specific_dataset, 0, self.config.train_reward_config.task_id)
+        else:
+             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
+             trajs = dataset.get_trajectories()
         half_size_1 = len(trajs) // 2
         half_pretrained_trajs = random.sample(trajs, half_size_1)
         half_size_2 = len(critic_buffer) // 2

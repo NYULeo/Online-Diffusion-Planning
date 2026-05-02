@@ -448,7 +448,7 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
     trajs_1, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
     trajs_2 = check_trajs_exit(dataset_name, specific_dataset, task_id, 0)
     if(trajs_2 is not None):
-        trajs = trajs_1 + trajs_2
+        trajs = trajs_2
     else:
         trajs = trajs_1
     print(f"Training reward approximator for {dataset_name} Dataset") 
@@ -600,7 +600,7 @@ def train_reward_pos_weight(
 
         if step % save_freq == 0 or step == num_steps:
             checkpoint = copy.deepcopy(reward_net).cpu()
-            save_model(cehckpoint, dataset_name, specific_dataset, task_id, step)
+            save_model(checkpoint, dataset_name, specific_dataset, task_id, step)
      
      
     save_to_finetuning(reward_net, dataset_name, SD, task_id)
@@ -659,7 +659,7 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = check_device()
     print(f"Using device {device}")
-    print(f"Testing the reward model for {dataset_name} Dataset")
+    print(f"Testing the reward model for {dataset_name}-{specific_dataset} Dataset")
     print(f"Target reward: {target_reward}, Sigma: {sigma}, Alpha: {alpha}")
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     if(trajs is None): 
