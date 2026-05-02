@@ -39,6 +39,8 @@ import json
 def check_specific_dataset(dataset_name):
     if(dataset_name == 'kitchen'):
          return False
+    elif(dataset_name == 'cube'):
+         return True
     elif(dataset_name == 'pointmaze'):
          return True
 
