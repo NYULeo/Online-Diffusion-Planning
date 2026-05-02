@@ -346,7 +346,7 @@ class KernelDataset(Dataset):
         )
 
 class RewardDataset(Dataset):
-    def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, step: int, goal: Optional[np.array] = None, target_reward: Optional[float] = None):
+    def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, step: int, goal: Optional[np.array] = None, target_reward: Optional[float] = None, task_id: Optional[int] = 1):
             
         # ----- gather raw obs/actions to fit stats -----
         obs_list, act_list = [], []
@@ -386,10 +386,10 @@ class RewardDataset(Dataset):
                 transitions.append((obs_t, a_t, r_t))
 
         self.transitions = transitions
-        self.save_stats(dataset_name, specific_dataset, step)
+        self.save_stats(dataset_name, specific_dataset, task_id, step)
     
-    def save_stats(self, dataset_name, specific_dataset, step):
-        name = getName(dataset_name, specific_dataset)
+    def save_stats(self, dataset_name, specific_dataset, task_id: Optional[int] = 0, step = 0):
+        name = getName(dataset_name, specific_dataset, task_id)
         stats_name =  str(name) + f'_Reward_stats_{str(step)}.pkl'
         if(check_specific_dataset(dataset_name)):
             stats_dir = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/'
