@@ -256,6 +256,7 @@ class OnlineFinetuner():
     def Initialize_BufferDataset(self):
         self.Finetune_Buffer = []
         self.Train_Buffer = []
+        self.Train_Kernel_Buffer = []
         
         if(self.config.train_reward_config.task_id is not None):
             trajs = get_trajs(self.config.dataset_name, self.config.specific_dataset, 0, self.config.train_reward_config.task_id)
@@ -265,6 +266,7 @@ class OnlineFinetuner():
         
         self.Finetune_Buffer.extend(trajs)
         self.Train_Buffer.extend(trajs)
+        self.Train_Kernel_Buffer.extend(trajs)
 
         self.PlannerDataset = PlannerDataset(
                    self.Finetune_Buffer, 
@@ -312,6 +314,7 @@ class OnlineFinetuner():
             print(f"Rollout Completed: Collected {len(collected_trajs)} trajectories across {num_rollout} rollout processes")
             #print(f"Rollout Completed: Collected {len(collected_trajs)} trajectories across {self.accelerator.num_processes} processes")
             
+            self.Train_Kernel_Buffer.extend(collected_trajs)
             success_trajs = get_success_trajs(collected_trajs)
             self.Train_Buffer.extend(success_trajs)
             self.Finetune_Buffer.extend(success_trajs)
@@ -349,6 +352,7 @@ class OnlineFinetuner():
               for process_trajs in gathered_trajs_list:
                   if process_trajs:
                       critic_buffer.extend(process_trajs)
+              critic_buffer = get_success_trajs(critic_buffer)
               if self.config.train_critic_config.data_conservation:
                   critic_buffer = self.data_conservation_update(critic_buffer)
               return critic_buffer
@@ -361,11 +365,14 @@ class OnlineFinetuner():
         else:
              dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
              trajs = dataset.get_trajectories()
-        half_size_1 = len(trajs) // 2
-        half_pretrained_trajs = random.sample(trajs, half_size_1)
-        half_size_2 = len(critic_buffer) // 2
-        half_buffer_trajs = random.sample(critic_buffer, half_size_2)
-        critic_buffer = half_pretrained_trajs + half_buffer_trajs
+        if(len(critic_buffer) < 2):
+             critic_buffer.extend(trajs)
+        else:
+             half_size_1 = len(trajs) // 2
+             half_pretrained_trajs = random.sample(trajs, half_size_1)
+             half_size_2 = len(critic_buffer) // 2
+             half_buffer_trajs = random.sample(critic_buffer, half_size_2)
+             critic_buffer = half_pretrained_trajs + half_buffer_trajs
         return critic_buffer
 
     def finetune_planner(self):
@@ -598,7 +605,7 @@ class OnlineFinetuner():
                   if self.config.kernel:
                       print(f"Starting Kernel Training")
                       if(self.config.train_kernel_config.type_kernel == 'robust'):
-                          threshold = train_kernel(self.Train_Buffer, 
+                          threshold = train_kernel(self.Train_Kernel_Buffer, 
                              dataset_name = self.config.dataset_name, 
                              specific_dataset = self.config.specific_dataset,
                              constraint_type = self.config.RewardConfig.constraint_type,
@@ -613,7 +620,7 @@ class OnlineFinetuner():
                              quantile = self.config.RewardConfig.quantile)
                       
                       elif(self.config.train_kernel_config.type_kernel == 'mog'):
-                          threshold = train_kernel_mog(self.Train_Buffer,
+                          threshold = train_kernel_mog(self.Train_Kernel_Buffer,
                                       dataset_name = self.config.dataset_name,
                                       specific_dataset = self.config.specific_dataset,
                                       constraint_type = self.config.RewardConfig.constraint_type,

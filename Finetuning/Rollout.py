@@ -9,9 +9,11 @@ import numpy as np
 import mediapy as media
 from Pretrain.Dataset import get_env
 from Pretrain.Planners.Backbone.Dit import DiT1d
+from torch.utils.data import DataLoader
+from Finetuning.utils import cycle
 #from Pretrain.Planners.Backbone.utils import get_pretrained_planner
-from Finetuning.utils import get_planner, get_normalized_score, get_expert_score, spare_reward_prcocessor
-from Pretrain.Dataset import Planner_Processor
+from Finetuning.utils import get_planner, get_normalized_score, get_expert_score, spare_reward_prcocessor, PlannerDataset
+from Pretrain.Dataset import Planner_Processor, get_dataset
 from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde, sample_euler_karras, sample_euler_karras2
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
 import pickle
@@ -358,6 +360,53 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      return traj
      #return len(traj['rewards'])
      #print(get_normalized_score([traj]))
+
+
+
+def Test_Kernel(env_name, specific_env, horizon, steps_T, num_karras, eta, time, checkpoint_steps, task_id: Optional[int] = None):
+     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
+    
+     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
+     device = "cuda" if torch.cuda.is_available() else "cpu"
+     print(f"Using device {device}")
+     
+     _, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array')
+    
+    # Create environment factory function
+     state_dict = get_planner(env_name, specific_env, checkpoint_steps)
+     if( env_name == 'kitchen'):
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     elif (env_name == 'pointmaze'):
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     elif(env_name == 'antmaze'):
+           model = DiT1d(in_dim = (d_s), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     elif(env_name == 'cube'):
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     else:
+          raise ValueError(f"Invalid Environment: {env_name}")
+     model.load_state_dict(state_dict)
+     model.eval()
+     
+
+     #get Processor
+     planner_processor = Planner_Processor(env_name, specific_env)
+
+     dataset = get_dataset(env_name, specific_env, task_id)
+     trajs = dataset.get_trajectories()
+     planner_dataset = PlannerDataset(trajs, horizon, env_name, specific_env)
+     dataloader = cycle(DataLoader(planner_dataset, batch_size = 1, shuffle = False))
+    
+     for i in range(time):
+            norm_state = next(dataloader)
+            x = sample_euler_karras(norm_state, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+    
+     
+   
+     #return len(traj['rewards'])
+     #print(get_normalized_score([traj]))
+
+
+
 """
 def model_rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, checkpoint_steps, train_goal: Optional[np.ndarray] = None, rollout_goal: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
