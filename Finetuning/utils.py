@@ -905,10 +905,10 @@ def get_success_trajs(trajs):
 
 class PlannerDataset(Dataset):
     def __init__(self, trajs: List[TrajectoryDict], horizon: int, dataset_name: str, specific_dataset: str, cutoff_length: Optional[int] = None):
-        self.trajs = trajs
+        self.trajs = copy.deepcopy(trajs)
         if(cutoff_length is not None):
             self.trajs = traj_cutoff(self.trajs, cutoff_length)
-        print(f"total steps for Finetuning: {np.sum([len(traj['observations']) for traj in trajs])}")
+        print(f"total steps for Finetuning: {np.sum([len(traj['observations']) for traj in self.trajs])}")
         self.conditions = []
         self.horizon = horizon
         self.planner_processor = Planner_Processor(dataset_name, specific_dataset)
