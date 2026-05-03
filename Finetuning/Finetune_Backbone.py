@@ -636,7 +636,9 @@ class OnlineFinetuner():
                                    step = ((step+1) * self.config.AMConfig.per_round_steps), 
                                    goal = self.config.train_reward_config.train_goal, 
                                    target_reward = self.config.train_reward_config.target_reward)
-           
+                                    
+                                  
+
             self.accelerator.wait_for_everyone()
             stats = torch.tensor([threshold], device = self.accelerator.device)
             stats = broadcast(stats, from_process=0)
