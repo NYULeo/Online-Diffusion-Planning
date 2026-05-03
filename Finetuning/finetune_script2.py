@@ -495,7 +495,7 @@ if __name__ == "__main__":
         kernel_model_checkpoint = 0,
         critic_model_checkpoint = 0,
         critic = True,
-        kernel = True,
+        kernel = False,
         buffer_size = 5500,
         finetune_buffer_cutoff_length = 50,
         finetune_steps = 150,
