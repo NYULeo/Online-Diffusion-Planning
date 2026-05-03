@@ -345,7 +345,7 @@ class OnlineFinetuner():
           # ALL processes must participate in gather_for_metrics (collective operation)
           gathered_trajs_list = self.accelerator.gather_for_metrics([local_trajs if local_trajs else []], use_gather_object=True)
           self.accelerator.wait_for_everyone()
-          
+          train_critic = False
           # Only main process needs to process the gathered data
           if self.accelerator.is_main_process:
               critic_buffer = []
@@ -353,11 +353,13 @@ class OnlineFinetuner():
                   if process_trajs:
                       critic_buffer.extend(process_trajs)
               critic_buffer = get_success_trajs(critic_buffer)
+              if(len(critic_buffer) > 2):
+                  train_critic = True
               if self.config.train_critic_config.data_conservation:
                   critic_buffer = self.data_conservation_update(critic_buffer)
-              return critic_buffer
+              return critic_buffer, train_critic
           else:
-              return None  # Other processes don't need the buffer
+              return None, train_critic  # Other processes don't need the buffer
     
     def data_conservation_update(self, critic_buffer):
         if(self.config.train_reward_config.task_id is not None):
@@ -564,7 +566,7 @@ class OnlineFinetuner():
             
             self.gather_and_sync_trajs_and_buffer(trajs)
             if self.config.critic:
-                 critic_buffer = self.collect_critic_buffer(trajs)
+                 critic_buffer, train_critic = self.collect_critic_buffer(trajs)
                  self.accelerator.wait_for_everyone()
             
             #collect the score and number of env stepsacross all processes
@@ -636,7 +638,7 @@ class OnlineFinetuner():
                                       step = ((step+1) * self.config.AMConfig.per_round_steps),
                                       quantile = self.config.RewardConfig.quantile)
                   
-                  if self.config.critic:
+                  if self.config.critic and train_critic:
                       print(f"Starting Critic Training")
                       #save_trajs(critic_buffer, self.config.dataset_name, self.config.specific_dataset, ((step+1) * self.config.AMConfig.per_round_steps))
                       print(f"Number of trajectories of Critic Training: {len(critic_buffer)}")
