@@ -249,7 +249,13 @@ class OnlineFinetuner():
                    self.accelerator,
                    self.config.planner_checkpoint, 
                    self.config.AMConfig)
-    
+
+    def check_success(self, trajs):
+        for traj in trajs:
+            if(traj['rewards'][-1] != 1):
+                return False
+        return True
+
     def Initialize_BufferDataset(self):
         self.Finetune_Buffer = []
         self.Train_Buffer = []
@@ -261,6 +267,7 @@ class OnlineFinetuner():
             trajs = dataset.get_trajectories()
         total_steps = np.sum([len(traj['observations']) for traj in trajs])
         print(f"Total Steps in the finetuning buffer: {total_steps}")
+        print(f"Success: {self.check_success(trajs)}")
         exit()
         self.Finetune_Buffer.extend(trajs)
         self.Train_Buffer.extend(trajs)
