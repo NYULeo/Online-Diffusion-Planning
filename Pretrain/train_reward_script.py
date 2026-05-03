@@ -39,7 +39,7 @@ if __name__ == '__main__':
     goal = np.array([[-2.5, -2.5]], dtype = np.float32))
 """
 
-
+"""
 if __name__ == '__main__':
     set_seed(1)
     train_reward(
@@ -56,10 +56,10 @@ if __name__ == '__main__':
     target_reward = 25.0,
     specific_dataset = 'large',
     goal = np.array([[4.0, -3.0]], dtype = np.float32))
-
-
-
 """
+
+
+
 if __name__ == '__main__':
     set_seed(1)
     trajs = check_trajs_exit('cube', 'single-play', 1, 0)
@@ -105,7 +105,7 @@ if __name__ == '__main__':
         traj_length = None,
         save_freq = 2000, 
         num_steps = 2000)
-"""
+
 
 
 
