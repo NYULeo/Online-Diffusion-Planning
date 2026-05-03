@@ -276,13 +276,13 @@ class OnlineFinetuner():
     def set_reward_model(self, device):
         if self.config.critic:
             critic_exist = check_Critic(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, step = self.config.critic_model_checkpoint)
-            print(f"Critic exists at step {self.config.kernel_model_checkpoint}")
             if(not critic_exist):
                 if(self.config.RewardConfig.constraint_type == 'log_prob'):
                     self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, task_id = self.config.train_reward_config.task_id)
                 else:
                     self.reward_model = TotalReward_Mahalanobis(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, task_id = self.config.train_reward_config.task_id)
             else:
+                print(f"Critic exists at step {self.config.kernel_model_checkpoint}")
                 if(self.config.RewardConfig.constraint_type == 'log_prob'):
                     self.reward_model = TotalReward_Critic(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, self.config.critic_model_checkpoin, task_id = self.config.train_reward_config.task_id)
                 else:
