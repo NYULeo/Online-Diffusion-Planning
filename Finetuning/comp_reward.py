@@ -290,7 +290,7 @@ class TotalReward_Critic(nn.Module):
 
         self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint, task_id)
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
-        self.critic_stat = get_critic_stats(dataset_name, specific_dataset, critic_checkpoint)
+        self.critic_stat = get_critic_stats(dataset_name, specific_dataset, task_id, critic_checkpoint)
 
         self.config.d_s = obs_dim
         self.config.d_a = act_dim
@@ -726,7 +726,7 @@ class TotalReward_Critic_Mahalanobis(nn.Module):
       
         self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint, task_id)
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
-        self.critic_stat = get_critic_stats(dataset_name, specific_dataset, critic_checkpoint)
+        self.critic_stat = get_critic_stats(dataset_name, specific_dataset, task_id, critic_checkpoint)
 
         self.config.d_s = obs_dim
         self.config.d_a = act_dim
