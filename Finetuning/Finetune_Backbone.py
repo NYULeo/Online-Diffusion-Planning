@@ -659,7 +659,10 @@ class OnlineFinetuner():
             
             #set the new total reward model
             self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
-            self.config.kernel_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
+            if(self.config.kernel):
+                 self.config.kernel_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
+            else:
+                 self.config.kernel_model_checkpoint = 0
             self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             #if self.config.RewardConfig.max_mahalanobis_score < threshold: 
             if(self.config.RewardConfig.constraint_type == 'mahalanobis' and self.config.RewardConfig.max_mahalanobis_score < threshold):

@@ -60,7 +60,7 @@ class TotalReward(nn.Module):
         ).to(self.config.device)
         self.reward_net.load_state_dict(reward_state_dict)
         self.reward_net.eval()
-
+        
         kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
         self.kernels = []
         if(self.config.type_kernel == 'robust'):
@@ -84,6 +84,7 @@ class TotalReward(nn.Module):
 
         self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint, task_id)
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
+       
 
         self.config.d_s = obs_dim
         self.config.d_a = act_dim
@@ -266,7 +267,6 @@ class TotalReward_Critic(nn.Module):
         ).to(self.config.device)
         self.critic.load_state_dict(critic_state_dict)
         self.critic.eval()
-
         kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
         self.kernels = []
         if(self.config.type_kernel == 'robust'):
