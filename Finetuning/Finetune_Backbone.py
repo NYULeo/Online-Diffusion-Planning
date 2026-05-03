@@ -1,5 +1,7 @@
 import sys
 import os
+
+from ogbench.locomaze import task_id
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -568,7 +570,6 @@ class OnlineFinetuner():
             threshold = 0.0
             if self.accelerator.is_main_process:
                   print(f"Starting Reward Training")
-                  print(f"Horizon: {self.config.AMConfig.horizon}")
                   train_reward(self.Train_Buffer, 
                              dataset_name = self.config.dataset_name, 
                              hidden_layers = self.config.train_reward_config.hidden_layers,
@@ -580,8 +581,9 @@ class OnlineFinetuner():
                              step = ((step+1) * self.config.AMConfig.per_round_steps), 
                              target_reward = self.config.train_reward_config.target_reward, 
                              specific_dataset = self.config.specific_dataset, 
-                             goal = self.config.train_reward_config.train_goal)
-                  """
+                             goal = self.config.train_reward_config.train_goal,
+                             task_id = self.config.train_reward_config.task_id)
+                  
                   if self.config.kernel:
                       print(f"Starting Kernel Training")
                       if(self.config.train_kernel_config.type_kernel == 'robust'):
@@ -615,7 +617,7 @@ class OnlineFinetuner():
                                       kernel_noise_floor = self.config.train_kernel_config.kernel_noise_floor,
                                       step = ((step+1) * self.config.AMConfig.per_round_steps),
                                       quantile = self.config.RewardConfig.quantile)
-                  """
+                  
                   if self.config.critic:
                       print(f"Starting Critic Training")
                       #save_trajs(critic_buffer, self.config.dataset_name, self.config.specific_dataset, ((step+1) * self.config.AMConfig.per_round_steps))
@@ -635,7 +637,8 @@ class OnlineFinetuner():
                                    tau = self.config.train_critic_config.tau, 
                                    step = ((step+1) * self.config.AMConfig.per_round_steps), 
                                    goal = self.config.train_reward_config.train_goal, 
-                                   target_reward = self.config.train_reward_config.target_reward)
+                                   target_reward = self.config.train_reward_config.target_reward,
+                                   task_id = self.config.train_reward_config.task_id)
                                     
                                   
 

@@ -454,7 +454,7 @@ class KernelDataset(Dataset):
         )
 
 class RewardDataset(Dataset):
-    def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, step: int, goal: Optional[np.array] = None, target_reward: Optional[float] = None, task_id: Optional[int] = 1):
+    def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, step: int, goal: Optional[np.array] = None, target_reward: Optional[float] = None, task_id: Optional[int] = None):
             
         # ----- gather raw obs/actions to fit stats -----
         obs_list, act_list = [], []
@@ -834,12 +834,11 @@ class CriticDataset(Dataset):
         return new_rews
     
 
-def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, step: int, goal = None, target_reward = 1.0):
+def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, step: int, goal = None, target_reward = 1.0, task_id: Optional[int] = None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Horizon: {horizon}")
-    exit()
     #get information
-    dataset = CriticDataset(trajs, sigma, dataset_name, specific_dataset, step, goal, target_reward, horizon, gamma)
+
+    dataset = CriticDataset(trajs, sigma, dataset_name, specific_dataset, task_id, step, goal, target_reward, horizon, gamma)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
     
     """
