@@ -605,11 +605,11 @@ class CriticDataset(Dataset):
             new_rews.append(R)
         return new_rews
 """
-def train_reward(trajs: List[TrajectoryDict], dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, lr, sigma, step, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None):
+def train_reward(trajs: List[TrajectoryDict], dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, lr, sigma, step, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
     print(f"Training reward approximator for {dataset_name}_{specific_dataset} Dataset") 
-    dataset = RewardDataset(trajs, sigma, dataset_name, specific_dataset, step, goal, target_reward)
+    dataset = RewardDataset(trajs, sigma, dataset_name, specific_dataset, step, goal, target_reward, task_id)
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
     reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
     optimizer = optim.AdamW(reward_net.parameters(), lr = lr, weight_decay = 1e-4)

@@ -622,7 +622,6 @@ class OnlineFinetuner():
                       print(f"Starting Critic Training")
                       #save_trajs(critic_buffer, self.config.dataset_name, self.config.specific_dataset, ((step+1) * self.config.AMConfig.per_round_steps))
                       print(f"Number of trajectories of Critic Training: {len(critic_buffer)}")
-                      print(f"Horizon: {self.config.AMConfig.horizon}")
                       train_critic(critic_buffer, 
                                    dataset_name = self.config.dataset_name, 
                                    specific_dataset = self.config.specific_dataset, 
