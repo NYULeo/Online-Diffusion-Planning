@@ -7,7 +7,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 from dataclasses import dataclass
 from gymnasium.vector import AsyncVectorEnv
-from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs
+from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs, check_Critic
 #from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
 from Finetuning.comp_reward import RewardConfig, TotalReward, TotalReward_Critic, TotalReward_Critic_Mahalanobis, TotalReward_Mahalanobis
 from adjoint_matching import AdjointMatchingFineTuner, AdjointMatchingConfig
@@ -275,7 +275,8 @@ class OnlineFinetuner():
 
     def set_reward_model(self, device):
         if self.config.critic:
-            if(self.config.critic_model_checkpoint == 0):
+            critic_exist = check_Critic(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, step = self.config.critic_model_checkpoint)
+            if(critic_exist):
                 if(self.config.RewardConfig.constraint_type == 'log_prob'):
                     self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, task_id = self.config.train_reward_config.task_id)
                 else:
@@ -291,6 +292,7 @@ class OnlineFinetuner():
             else:
                  self.reward_model = TotalReward_Mahalanobis(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, task_id = self.config.train_reward_config.task_id)
     
+
     def gather_and_sync_trajs_and_buffer(self, local_trajs):
         # Gather local trajectories from all processes
         gathered_trajs_list = self.accelerator.gather_for_metrics([local_trajs if local_trajs else []], use_gather_object=True)

@@ -807,6 +807,14 @@ def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_da
     print(f"Kernel model saved")
     return threshold
 
+def check_Critic(dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
+    name = get_CriticName(dataset_name, specific_dataset, task_id)
+    path = f"./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl"
+    if(os.path.exists(path)):
+        return True
+    else:
+        return False
+         
 
 class CriticDataset(Dataset):
     def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, task_id: Optional[int] = None,  step: int = 0, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
