@@ -7,7 +7,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 from dataclasses import dataclass
 from gymnasium.vector import AsyncVectorEnv
-from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs
+from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs
 #from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
 from Finetuning.comp_reward import RewardConfig, TotalReward, TotalReward_Critic, TotalReward_Critic_Mahalanobis, TotalReward_Mahalanobis
 from adjoint_matching import AdjointMatchingFineTuner, AdjointMatchingConfig
@@ -91,6 +91,7 @@ class FinetuningConfig():
     critic: bool = False
     kernel: bool = False
     buffer_size: int = 100000
+    finetune_buffer_cutoff_length: Optional[int] = None
     finetune_steps: int = 1000000
     finetune_rounds: int = 10
     diffusion_steps: int = 30
@@ -156,6 +157,7 @@ def save_hyperparameters(config: FinetuningConfig, filepath: Optional[str] = Non
             'finetune_batch_size': config.finetune_batch_size,
             'finetune_batch_per_sample': config.finetune_batch_per_sample,
             'buffer_size': config.buffer_size,
+            'finetune_buffer_cutoff_length': config.finetune_buffer_cutoff_length,
             'finetune_lr': config.finetune_lr,
             'reward_scaling_factor': config.reward_scaling_factor,
             'finetune_total_steps': config.finetune_steps,
@@ -250,11 +252,6 @@ class OnlineFinetuner():
                    self.config.planner_checkpoint, 
                    self.config.AMConfig)
 
-    def check_success(self, trajs):
-        for traj in trajs:
-            if(traj['rewards'][-1] != 1):
-                return False
-        return True
 
     def Initialize_BufferDataset(self):
         self.Finetune_Buffer = []
@@ -265,10 +262,7 @@ class OnlineFinetuner():
         else:
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
             trajs = dataset.get_trajectories()
-        total_steps = np.sum([len(traj['observations']) for traj in trajs])
-        print(f"Total Steps in the finetuning buffer: {total_steps}")
-        print(f"Success: {self.check_success(trajs)}")
-        exit()
+        
         self.Finetune_Buffer.extend(trajs)
         self.Train_Buffer.extend(trajs)
 
@@ -276,7 +270,8 @@ class OnlineFinetuner():
                    self.Finetune_Buffer, 
                    self.config.AMConfig.horizon, 
                    self.config.dataset_name, 
-                   self.config.specific_dataset)
+                   self.config.specific_dataset, 
+                   self.config.finetune_buffer_cutoff_length)
 
     def set_reward_model(self, device):
         if self.config.critic:
@@ -336,8 +331,8 @@ class OnlineFinetuner():
               self.Finetune_Buffer,
               self.config.AMConfig.horizon,
               self.config.dataset_name,
-              self.config.specific_dataset
-             )
+              self.config.specific_dataset,
+              self.config.finetune_buffer_cutoff_length)
    
     def collect_critic_buffer(self, local_trajs):
           # ALL processes must participate in gather_for_metrics (collective operation)

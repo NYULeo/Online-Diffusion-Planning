@@ -18,17 +18,23 @@ import gymnasium_robotics  # registers the envs
 import numpy as np
 import torch
 import pickle
+from scipy.ndimage import gaussian_filter1d
 
 
 
 path = f'./Finetuning/Rollouts/cube/single-play/task_1/Generated_trajs_Info_0.pkl'
 with open(path, 'rb') as f:
     trajs = pickle.load(f)
-from Finetuning.utils import CriticDataset
-dataset = CriticDataset(trajs, sigma = 7.0, dataset_name = 'cube', specific_dataset = 'single-play', step = 0, goal = None, target_reward = None, horizon = 32, gamma = 0.99)
 
-
-
+for traj in trajs:
+    rews = traj['rewards']
+    rews[-1] = 50.0
+    print(len(rews))
+    rews = rews[len(rews)-50:]
+    print(len(rews))
+    rews = gaussian_filter1d(rews, sigma = 8.0, mode = 'nearest')
+    print(rews)
+    exit()
 
 
 

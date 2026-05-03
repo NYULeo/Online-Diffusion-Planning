@@ -882,11 +882,33 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
     save_critic(target_critic, dataset_name, specific_dataset, task_id, step)
     print(f"critic model saved")
 
+def traj_cutoff(trajs, length):
+    new_trajs = []
+    for traj in trajs:
+        L = len(traj['observations'])
+        if(L > (length + 1)):
+             index_obs = L - (length + 1)
+             index_acts = L - length
+             index_rews = L - length
+             traj['observations'] = traj['observations'][index_obs:]
+             traj['actions'] = traj['actions'][index_acts:]
+             traj['rewards'] = traj['rewards'][index_rews:]
+        new_trajs.append(traj)
+    return new_trajs
 
+def get_success_trajs(trajs):
+    success_trajs = []
+    for traj in trajs:
+        if(traj['rewards'][-1] == 1):
+            success_trajs.append(traj)
+    return success_trajs
 
 class PlannerDataset(Dataset):
-    def __init__(self, trajs: List[TrajectoryDict], horizon: int, dataset_name: str, specific_dataset: str):
+    def __init__(self, trajs: List[TrajectoryDict], horizon: int, dataset_name: str, specific_dataset: str, cutoff_length: Optional[int] = None):
         self.trajs = trajs
+        if(cutoff_length is not None):
+            self.trajs = traj_cutoff(self.trajs, cutoff_length)
+        print(f"total steps for Finetuning: {np.sum([len(traj['observations']) for traj in trajs])}")
         self.conditions = []
         self.horizon = horizon
         self.planner_processor = Planner_Processor(dataset_name, specific_dataset)

@@ -497,6 +497,7 @@ if __name__ == "__main__":
         critic = True,
         kernel = False,
         buffer_size = 5500,
+        finetune_buffer_cutoff_length = 50,
         finetune_steps = 150,
         finetune_rounds = 30,
         diffusion_steps = 200,
