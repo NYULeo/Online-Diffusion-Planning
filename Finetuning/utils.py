@@ -29,7 +29,7 @@ from torch.utils.data import DataLoader
 import torch.optim as optim
 from Pretrain.Transition_Kernel.Kernel_Net import MoGTransitionKernel, RobustTransitionKernel
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_total_mahalanobis_score, compute_log_density_mog, compute_log_density, compute_total_mahalanobis_score_mog
-from Pretrain.Rewards.Reward_Backbone import get_reward_name
+#from Pretrain.Rewards.Reward_Backbone import get_reward_name
 from Pretrain.Dataset import KitchenDataset, PointMazeDataset, get_env, Planner_Processor
 from gymnasium.vector import AsyncVectorEnv
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
@@ -88,7 +88,8 @@ def save_reward_model(reward_net, dataset_name, specific_dataset, task_id: Optio
     reward_net.eval()
     net_dict = reward_net.state_dict()
     specific_dataset = reward_name_converter(specific_dataset)
-    reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
+    #reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
+    reward_name = get_RewardName(dataset_name, specific_dataset, task_id)
     if(check_specific_dataset(dataset_name)):
           os.makedirs(f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
           save_path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{reward_name}_Reward_{str(step)}.pkl'
@@ -115,7 +116,8 @@ def save_kernel_model(kernel_net, dataset_name, specific_dataset, step, ensemble
 def get_reward_model(dataset_name, specific_dataset, step, task_id: Optional[int] = None):
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
     specific_dataset = reward_name_converter(specific_dataset)
-    reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
+    #reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
+    reward_name = get_RewardName(dataset_name, specific_dataset, task_id)
     if(check_specific_dataset(dataset_name)):
         path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{reward_name}_{str(step)}.pkl'
     else:
@@ -125,7 +127,8 @@ def get_reward_model(dataset_name, specific_dataset, step, task_id: Optional[int
 
 def get_reward_stats(dataset_name, specific_dataset, step, task_id: Optional[int] = None):
     specific_dataset = reward_name_converter(specific_dataset)
-    reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
+    #reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
+    reward_name = get_RewardName(dataset_name, specific_dataset, task_id)
     if(check_specific_dataset(dataset_name)):
         path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/{reward_name}_stats_{str(step)}.pkl'
         
@@ -398,6 +401,56 @@ def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
 
 
 
+def get_RewardName(env_name, specific_env, task_id: Optional[int] = None):
+     if(env_name == 'kitchen'):
+          return 'Kitchen'
+     elif(env_name == 'pointmaze'):
+          if specific_env == 'open_dense':
+               return 'PointMaze_OpenDense'
+          elif specific_env == 'umaze':
+               return 'PointMaze_Umaze'
+          elif specific_env == 'large_dense':
+               return 'PointMaze_LargeDense'
+          elif specific_env== 'medium':
+               return 'PointMaze_Medium'
+          elif specific_env == 'umaze_dense':
+               return 'PointMaze_UmazeDense'
+          elif specific_env == 'large':
+               return 'PointMaze_Large'
+          elif specific_env == 'open':
+               return 'PointMaze_Open'
+          else:
+              raise ValueError(f"Invalid specific environment: {specific_env}")
+     elif(env_name == 'antmaze'):
+          if specific_env == 'medium_play':
+               return 'AntMaze_MediumPlay'
+          elif specific_env == 'umaze_diverse':
+               return 'AntMaze_UmazeDiverse'
+          elif specific_env == 'large_diverse':
+               return 'AntMaze_LargeDiverse'
+          elif specific_env == 'large_play':
+               return 'AntMaze_LargePlay'
+          elif specific_env == 'medium_diverse':
+               return 'AntMaze_MediumDiverse'
+          elif specific_env == 'umaze':
+               return 'AntMaze_Umaze'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
+     elif(env_name == 'cube'):
+         if(task_id is None):
+            raise ValueError('Task ID is required for cube dataset')
+         if specific_env == 'single' or specific_env == 'single-play':
+              return f'Cube_Single_Task{task_id}'
+         elif specific_env == 'double'  or specific_env == 'double-play':
+              return f'Cube_Double_Task{task_id}'
+         elif specific_env == 'triple' or specific_env == 'triple-play':
+              return f'Cube_Triple_Task{task_id}'
+         elif specific_env == 'quadruple' or specific_env == 'quadruple-play':
+              return f'Cube_Quadruple_Task{task_id}'
+         else:
+              raise ValueError(f"Invalid cube dataset name: {specific_env}")
+     else:
+         raise ValueError(f"Invalid environment name: {env_name}")
 
 
 class KernelDataset(Dataset):
@@ -498,7 +551,8 @@ class RewardDataset(Dataset):
     
     def save_stats(self, dataset_name, specific_dataset, task_id: Optional[int] = 0, step = 0):
         specific_dataset = reward_name_converter(specific_dataset)
-        reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
+        #reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
+        reward_name = get_RewardName(dataset_name, specific_dataset, task_id)
         stats_name =  str(reward_name) + f'_Reward_stats_{str(step)}.pkl'
         if(check_specific_dataset(dataset_name)):
             stats_dir = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/'

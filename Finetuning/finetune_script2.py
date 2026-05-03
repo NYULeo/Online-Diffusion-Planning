@@ -452,7 +452,7 @@ if __name__ == "__main__":
 
     
     TrainRewardConfig = Train_Reward_Config(
-                          hidden_layers = 2,
+                          hidden_layers = 3,
                           hidden_dim = 128,
                           batch_size = 256, 
                           num_steps = 2000, 

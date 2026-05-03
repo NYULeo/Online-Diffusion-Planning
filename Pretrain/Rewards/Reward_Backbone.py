@@ -89,11 +89,11 @@ def getName(env_name, specific_env, task_id: Optional[int] = None):
          if specific_env == 'single' or specific_env == 'single-play':
               return f'Cube_Single_Task{task_id}'
          elif specific_env == 'double'  or specific_env == 'double-play':
-              return 'Cube_Double_Task{task_id}'
+              return f'Cube_Double_Task{task_id}'
          elif specific_env == 'triple' or specific_env == 'triple-play':
-              return 'Cube_Triple_Task{task_id}'
+              return f'Cube_Triple_Task{task_id}'
          elif specific_env == 'quadruple' or specific_env == 'quadruple-play':
-              return 'Cube_Quadruple_Task{task_id}'
+              return f'Cube_Quadruple_Task{task_id}'
          else:
               raise ValueError(f"Invalid cube dataset name: {specific_env}")
      else:
@@ -458,7 +458,8 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
     if(trajs is  None): 
          trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
     else:
-         _, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+         train_trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+         trajs = trajs + train_trajs
     print(f"Training reward approximator for {dataset_name} Dataset") 
     dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward, goal)
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
@@ -533,6 +534,7 @@ def train_reward_pos_weight(
     goal: Optional[np.array] = None,
     task_id: Optional[int] = None,
     traj_length: Optional[int] = 100,
+    trajs: Optional[list] = None,
     pos_weight: float = 50.0,          # ← Very important
     device=None
 ):
@@ -540,7 +542,12 @@ def train_reward_pos_weight(
     device = check_device()
     
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
-    trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+    #trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+    if(trajs is  None): 
+         trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+    else:
+         train_trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+         trajs = trajs + train_trajs
     print(f"Training reward approximator for {dataset_name}-{specific_dataset}")
 
     dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward, goal)
@@ -674,7 +681,8 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
         train_Trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
         dataset = RewardDataset(train_Trajs, reward_name, sigma, alpha, target_reward, goal)
     else:
-        _, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+        train_trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+        trajs = trajs + train_trajs
         dataset = test_dataset(trajs, reward_name, sigma, alpha, target_reward, goal)
     print(f"Testing the reward model on {len(dataset)} samples")
     a = factorint(len(dataset))

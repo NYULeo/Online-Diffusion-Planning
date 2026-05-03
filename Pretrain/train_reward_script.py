@@ -70,7 +70,7 @@ if __name__ == '__main__':
             exit()
     train_reward(
         dataset_name = 'cube',
-        hidden_layers = 2,
+        hidden_layers = 3,
         hidden_dim = 128, 
         batch_size = 256,
         num_steps = 2000,
@@ -94,7 +94,7 @@ if __name__ == '__main__':
             exit()
     test_Model(
         dataset_name = 'cube', 
-        hidden_layers = 2, 
+        hidden_layers = 3, 
         hidden_dim = 128,
         specific_dataset = 'single', 
         trajs = new_trajs,

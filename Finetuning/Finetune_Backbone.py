@@ -308,9 +308,10 @@ class OnlineFinetuner():
                else self.accelerator.num_processes)
             print(f"Rollout Completed: Collected {len(collected_trajs)} trajectories across {num_rollout} rollout processes")
             #print(f"Rollout Completed: Collected {len(collected_trajs)} trajectories across {self.accelerator.num_processes} processes")
-        
-            self.Train_Buffer.extend(collected_trajs)
-            self.Finetune_Buffer.extend(collected_trajs)
+            
+            success_trajs = get_success_trajs(collected_trajs)
+            self.Train_Buffer.extend(success_trajs)
+            self.Finetune_Buffer.extend(success_trajs)
             if len(self.Finetune_Buffer) > self.config.buffer_size:
                  num_to_remove = len(self.Finetune_Buffer) - self.config.buffer_size
                  self.Finetune_Buffer = self.Finetune_Buffer[num_to_remove:] 
@@ -338,7 +339,7 @@ class OnlineFinetuner():
           # ALL processes must participate in gather_for_metrics (collective operation)
           gathered_trajs_list = self.accelerator.gather_for_metrics([local_trajs if local_trajs else []], use_gather_object=True)
           self.accelerator.wait_for_everyone()
-    
+          
           # Only main process needs to process the gathered data
           if self.accelerator.is_main_process:
               critic_buffer = []
@@ -541,6 +542,7 @@ class OnlineFinetuner():
                                              task_id = self.config.train_reward_config.task_id,
                                              seed_base = seed_base,
                                              continual_rollout = self.config.continual_rollout)
+                #trajs = get_success_trajs(trajs)
                 #print(checktrajs(trajs)) 
             else:
                 trajs, score, total_steps = [], 0.0, 0.0, 0
