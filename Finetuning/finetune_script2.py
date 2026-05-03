@@ -457,8 +457,8 @@ if __name__ == "__main__":
                           batch_size = 256, 
                           num_steps = 2000, 
                           lr = 1e-04, 
-                          sigma = 20.0, 
-                          target_reward = 100.0, 
+                          sigma = 8.0, 
+                          target_reward = 50.0, 
                           train_goal = None,
                           task_id = 1)
       
