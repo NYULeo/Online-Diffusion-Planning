@@ -629,7 +629,7 @@ def train_reward(trajs: List[TrajectoryDict], dataset_name: str, hidden_layers: 
            optimizer.step()
            total_loss += loss.item()
            counter += 1
-    save_reward_model(reward_net, dataset_name, specific_dataset, step)
+    save_reward_model(reward_net, dataset_name, specific_dataset, task_id, step)
     print(f"reward model saved")
            
 def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, constraint_type: str = 'mahalanobis',
@@ -879,7 +879,7 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
                tgt_param.data.mul_(1 - tau)
                tgt_param.data.add_(tau * param.data)
     target_critic.eval()
-    save_critic(target_critic, dataset_name, specific_dataset, step)
+    save_critic(target_critic, dataset_name, specific_dataset, task_id, step)
     print(f"critic model saved")
 
 
