@@ -763,7 +763,7 @@ class CriticDataset(Dataset):
             for traj in trajs:
                 traj['observations'] = traj['observations'][:,:2]
         """
-        
+        print(f"Horzion: {horizon}")
         obs_all = []
         for traj in trajs:
             obs_all.append(traj['observations'])
@@ -787,15 +787,8 @@ class CriticDataset(Dataset):
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
             rews = gaussian_filter1d(rews, sigma)
-            print(len(obs))
-            print(horizon)
-            print(type(horizon))
-            horizon = int(horizon)
             if(len(obs) > horizon):
-               print(len(rews))
                rews = self.reward_processor(rews, horizon, gamma)
-               print(len(rews))
-               exit()
                for t in range(len(obs)-horizon):
                    obs_t = self.stats.norm_obs(obs[t])
                    r_t   = rews[t]
@@ -836,8 +829,6 @@ class CriticDataset(Dataset):
         new_rews = []
         for t in range(len(rews)):
             R = 0.0
-            t = int(t)
-            horizon = int(horizon)
             for i in range(t, min(t + horizon, len(rews))):
                 R += (gamma**(i-t))*rews[i]
             new_rews.append(R)
@@ -847,8 +838,6 @@ class CriticDataset(Dataset):
 def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, step: int, goal = None, target_reward = 1.0):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    print(f"Horizon: {horizon}")
-    exit()
     #get information
     dataset = CriticDataset(trajs, sigma, dataset_name, specific_dataset, step, goal, target_reward, horizon, gamma)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
