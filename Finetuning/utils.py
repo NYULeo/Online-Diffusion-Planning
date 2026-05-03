@@ -846,7 +846,9 @@ class CriticDataset(Dataset):
 
 def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, step: int, goal = None, target_reward = 1.0):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    
+    print(f"Horizon: {horizon}")
+    exit()
     #get information
     dataset = CriticDataset(trajs, sigma, dataset_name, specific_dataset, step, goal, target_reward, horizon, gamma)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
