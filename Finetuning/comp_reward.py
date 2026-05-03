@@ -260,7 +260,7 @@ class TotalReward_Critic(nn.Module):
         self.reward_net.load_state_dict(reward_state_dict)
         self.reward_net.eval()
 
-        critic_state_dict, critic_obs_dim = get_critic_model(dataset_name, specific_dataset, critic_checkpoint)
+        critic_state_dict, critic_obs_dim = get_critic_model(dataset_name, specific_dataset, task_id, critic_checkpoint)
         self.critic = Critic(
             critic_obs_dim, self.config.hidden_dim_critic, self.config.num_hidden_layers_critic
         ).to(self.config.device)
@@ -696,7 +696,7 @@ class TotalReward_Critic_Mahalanobis(nn.Module):
         self.reward_net.load_state_dict(reward_state_dict)
         self.reward_net.eval()
 
-        critic_state_dict, critic_obs_dim = get_critic_model(dataset_name, specific_dataset, critic_checkpoint)
+        critic_state_dict, critic_obs_dim = get_critic_model(dataset_name, specific_dataset, task_id, critic_checkpoint)
         self.critic = Critic(
             critic_obs_dim, self.config.hidden_dim_critic, self.config.num_hidden_layers_critic
         ).to(self.config.device)
