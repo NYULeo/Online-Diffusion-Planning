@@ -40,7 +40,7 @@ if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     env_name = 'cube'
     specific_env = 'single-play'
-    data = get_dataset(env_name, specific_env, task_id = 1, traj_length = 200)
+    data = get_dataset(env_name, specific_env, task_id = 1, traj_length = None)
     trajs_1 = data.get_trajectories()
     trajs_2 = get_trajs(env_name, specific_env, task_id = 1, step = 0)
     trajs = trajs_1 + trajs_2
@@ -74,7 +74,7 @@ if __name__ == '__main__':  # pragma: no cover
                 sigma = 8.0,
                 #alpha = 0.99,
                 target_reward = 50.0,
-                trajs = trajs_2,
+                trajs = trajs,
                 task_id = 1)
 
    
