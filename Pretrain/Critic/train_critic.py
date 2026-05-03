@@ -243,7 +243,7 @@ def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str
     name = get_CriticName(dataset_name, specific_dataset, task_id)
     ft_stats_dir = FINETUNE_DIR / "Critics" / dataset_name / specific_dataset / "Stats"
     ft_stats_dir.mkdir(parents=True, exist_ok=True)
-    savepath = ft_stats_dir / f"{name}_stats_0.pkl"
+    savepath = ft_stats_dir / f"{name}_Critic_stats_0.pkl"
     with open(savepath, "wb") as f:
         pickle.dump(stats, f)
     print(f"saved stats to {savepath}")
