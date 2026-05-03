@@ -73,12 +73,12 @@ if __name__ == '__main__':
         hidden_layers = 2,
         hidden_dim = 128, 
         batch_size = 256,
-        num_steps = 1000,
+        num_steps = 2000,
         save_freq = 500,
         lr = 1e-04,
         sigma = 8.0,
         #alpha = 0.99,
-        target_reward = 50.0,
+        target_reward = 100.0,
         specific_dataset = 'single',
         task_id = 1,
         traj_length = None,
@@ -100,11 +100,11 @@ if __name__ == '__main__':
         trajs = new_trajs,
         sigma = 8.0,
         #alpha = 0.99, 
-        target_reward = 50.0,
+        target_reward = 100.0,
         task_id = 1,
         traj_length = None,
-        save_freq = 1000, 
-        num_steps = 1000)
+        save_freq = 2000, 
+        num_steps = 2000)
 
 
 
