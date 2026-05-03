@@ -119,9 +119,9 @@ def get_reward_model(dataset_name, specific_dataset, step, task_id: Optional[int
     #reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     reward_name = get_RewardName(dataset_name, specific_dataset, task_id)
     if(check_specific_dataset(dataset_name)):
-        path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{reward_name}_{str(step)}.pkl'
+        path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{reward_name}_Reward_{str(step)}.pkl'
     else:
-        path = f'./Finetuning/Rewards/{dataset_name}/Models/{reward_name}_{str(step)}.pkl'
+        path = f'./Finetuning/Rewards/{dataset_name}/Models/{reward_name}_Reward_{str(step)}.pkl'
     model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
     return model_state_dict, obs_dim, act_dim
 
@@ -130,10 +130,10 @@ def get_reward_stats(dataset_name, specific_dataset, step, task_id: Optional[int
     #reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     reward_name = get_RewardName(dataset_name, specific_dataset, task_id)
     if(check_specific_dataset(dataset_name)):
-        path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/{reward_name}_stats_{str(step)}.pkl'
+        path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/{reward_name}_Reward_stats_{str(step)}.pkl'
         
     else:
-        path = f'./Finetuning/Rewards/{dataset_name}/Stats/{reward_name}_stats_{str(step)}.pkl'
+        path = f'./Finetuning/Rewards/{dataset_name}/Stats/{reward_name}_Reward_stats_{str(step)}.pkl'
     with open(path, 'rb') as f:
         stats = pickle.load(f)
     return stats  

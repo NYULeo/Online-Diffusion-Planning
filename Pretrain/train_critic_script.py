@@ -36,7 +36,7 @@ def get_trajs(env_name: str, specific_env: str, task_id: int, step: int):
 
 
 if __name__ == '__main__':  # pragma: no cover
-    
+    """
     set_seed(1)
     env_name = 'cube'
     specific_env = 'single-play'
@@ -76,7 +76,7 @@ if __name__ == '__main__':  # pragma: no cover
                 trajs = trajs_2,
                 task_id = 1)
 
-
+   """
 
     
     
@@ -103,7 +103,7 @@ if __name__ == '__main__':  # pragma: no cover
     
     
     
-    """
+    
     #large
     set_seed(1)
     env_name = 'pointmaze'
@@ -117,14 +117,14 @@ if __name__ == '__main__':  # pragma: no cover
                  batch_size = 512, 
                  num_steps = 10000, 
                  gamma = 0.99, 
-                 horizon = 10, 
+                 horizon = 20, 
                  lr = 3e-05, 
                  tau = 0.005,
                  goal = np.array([[4.0, -3.0]], dtype = np.float32),
                  #sigma = 7.0,
                  alpha = 0.999,
                  #alpha = None,
-                 target_reward = 1.0,
+                 target_reward = 25.0,
                  trajs = trajs)
     
 
@@ -137,12 +137,12 @@ if __name__ == '__main__':  # pragma: no cover
                 checkpoint_step = 10000, 
                 #sigma = 300.0, 
                 gamma = 0.99, 
-                horizon = 10, 
+                horizon = 20, 
                 goal =  np.array([[4.0, -3.0]], dtype = np.float32),
                 alpha = 0.999,
-                target_reward = 1.0, 
+                target_reward = 25.0, 
                 trajs = trajs)
-    """
+    
     
     
     #medium
