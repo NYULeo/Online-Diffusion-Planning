@@ -209,11 +209,9 @@ class RobustTransitionKernel(nn.Module):
         Temp = 0.5 * (D * math.log(2 * math.pi) + 2 * log_std.sum(dim=-1))
         return Temp
 
-    
+"""
 class MoGTransitionKernel(nn.Module):
-    """
-    Mixture of Gaussians Transition Kernel
-    """
+   
     def __init__(
         self,
         obs_dim: int,
@@ -259,7 +257,7 @@ class MoGTransitionKernel(nn.Module):
         return mu, log_std, weights
 
     def log_prob(self, s_next: torch.Tensor, mu, log_std, weights):
-        """Return positive log probability (log p(s'|s,a)) - Recommended for your use"""
+       
         var = torch.exp(2 * log_std) + self.noise_floor
         var = torch.clamp(var, min=1e-6)
         
@@ -281,5 +279,126 @@ class MoGTransitionKernel(nn.Module):
         return log_prob                     # ← Positive log probability
 
     def mog_nll(self, s_next: torch.Tensor, mu, log_std, weights):
-        """Negative Log Likelihood - for training"""
+       
         return -self.log_prob(s_next, mu, log_std, weights).mean()
+
+"""
+
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import math
+
+
+class MoGTransitionKernel(nn.Module):
+    """
+    Improved Mixture of Gaussians Transition Kernel
+    - Supports deeper networks with residual connections
+    - Better suited for complex manipulation (OGbench Cube)
+    """
+    def __init__(
+        self,
+        obs_dim: int,
+        act_dim: int,
+        num_modes: int = 16,
+        num_hidden_layers: int = 7,
+        hidden_dim: int = 768,
+        min_log_std: float = -5.0,
+        max_log_std: float = 4.0,
+        noise_floor: float = 1e-6,
+        use_residual: bool = True,
+    ):
+        super().__init__()
+        
+        self.obs_dim = obs_dim
+        self.act_dim = act_dim
+        self.num_modes = num_modes
+        self.noise_floor = noise_floor
+        self.min_log_std = min_log_std
+        self.max_log_std = max_log_std
+        self.use_residual = use_residual
+
+        # ====================== Backbone ======================
+        layers = []
+        input_dim = obs_dim + act_dim
+        
+        # First layer
+        layers.append(nn.Linear(input_dim, hidden_dim))
+        layers.append(nn.LayerNorm(hidden_dim))
+        layers.append(nn.ReLU())
+        
+        # Hidden layers with residual connections
+        for i in range(num_hidden_layers - 1):
+            layers.append(nn.Linear(hidden_dim, hidden_dim))
+            layers.append(nn.LayerNorm(hidden_dim))
+            layers.append(nn.ReLU())
+        
+        self.backbone = nn.ModuleList(layers)
+        
+        # ====================== Output Head ======================
+        # Output: [mu (modes*obs), log_std (modes*obs), logits (modes)]
+        self.head = nn.Linear(hidden_dim, num_modes * (obs_dim * 2 + 1))
+
+    def forward(self, s: torch.Tensor, a: torch.Tensor):
+        x = torch.cat([s, a], dim=-1)
+        h = x
+        
+        for i in range(0, len(self.backbone), 3):  # step = Linear + LN + ReLU
+            linear = self.backbone[i]
+            norm = self.backbone[i+1]
+            act = self.backbone[i+2]
+            
+            h_new = linear(h)
+            h_new = norm(h_new)
+            h_new = act(h_new)
+            
+            # Residual connection (if dimensions match)
+            if self.use_residual and h.shape == h_new.shape:
+                h = h + h_new
+            else:
+                h = h_new
+        
+        # Output head
+        out = self.head(h)  # (B, num_modes * (2*obs + 1))
+        out = out.view(-1, self.num_modes, 2 * self.obs_dim + 1)
+        
+        mu = out[..., :self.obs_dim]
+        log_std = out[..., self.obs_dim:2*self.obs_dim]
+        logits = out[..., -1]
+        
+        # Stable std clamping
+        log_std = self.min_log_std + F.softplus(log_std - self.min_log_std)
+        log_std = torch.clamp(log_std, max=self.max_log_std)
+        
+        weights = F.softmax(logits, dim=-1)
+        
+        return mu, log_std, weights
+
+    def log_prob(self, s_next: torch.Tensor, mu, log_std, weights):
+        """Positive log probability: log p(s'|s,a)"""
+        var = torch.exp(2 * log_std) + self.noise_floor
+        var = torch.clamp(var, min=1e-8)
+        
+        residual = s_next.unsqueeze(1) - mu          # (B, modes, obs_dim)
+        residual = torch.clamp(residual, -10.0, 10.0)
+        
+        mahal = ((residual ** 2) / var).sum(dim=-1)
+        
+        log_prob_per_mode = -0.5 * (
+            mahal 
+            + self.obs_dim * math.log(2 * math.pi) 
+            + torch.log(var).sum(dim=-1)
+        )
+        
+        # Mixture log probability
+        log_prob = torch.logsumexp(
+            log_prob_per_mode + torch.log(weights + 1e-8),
+            dim=-1
+        )
+        return log_prob
+
+    def mog_nll(self, s_next: torch.Tensor, mu, log_std, weights):
+        """Negative Log Likelihood for training"""
+        return -self.log_prob(s_next, mu, log_std, weights).mean()
+
