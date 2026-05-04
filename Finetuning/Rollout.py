@@ -639,7 +639,7 @@ if __name__ == "__main__":
     
     print(success_rate/100)
     print(len(total_success_trajs))
-    save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 1)
+    save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 4)
     
 
 
