@@ -56,7 +56,8 @@ if __name__ == '__main__':  # pragma: no cover
           trajs = pickle.load(f)
     
    
-    
+    dataset = 'cube'
+    specific_dataset = 'single'
     train_mog_kernel(
          dataset_name = dataset,
          specific_dataset = specific_dataset,
