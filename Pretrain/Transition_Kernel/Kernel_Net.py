@@ -292,88 +292,51 @@ import math
 
 
 class MoGTransitionKernel(nn.Module):
-    """
-    Improved Mixture of Gaussians Transition Kernel
-    - Supports deeper networks with residual connections
-    - Better suited for complex manipulation (OGbench Cube)
-    """
-    def __init__(
-        self,
-        obs_dim: int,
-        act_dim: int,
-        num_modes: int = 16,
-        num_hidden_layers: int = 7,
-        hidden_dim: int = 768,
-        min_log_std: float = -5.0,
-        max_log_std: float = 4.0,
-        noise_floor: float = 1e-6,
-        use_residual: bool = True,
-    ):
+    def __init__(self, obs_dim, act_dim, num_modes=24, num_hidden_layers=8, 
+                 hidden_dim=1024, noise_floor=1e-6, use_residual=True):
         super().__init__()
-        
         self.obs_dim = obs_dim
-        self.act_dim = act_dim
         self.num_modes = num_modes
         self.noise_floor = noise_floor
-        self.min_log_std = min_log_std
-        self.max_log_std = max_log_std
         self.use_residual = use_residual
 
-        # ====================== Backbone ======================
-        layers = []
         input_dim = obs_dim + act_dim
+        self.input_proj = nn.Linear(input_dim, hidden_dim)
         
-        # First layer
-        layers.append(nn.Linear(input_dim, hidden_dim))
-        layers.append(nn.LayerNorm(hidden_dim))
-        layers.append(nn.ReLU())
+        self.layers = nn.ModuleList()
+        for _ in range(num_hidden_layers):
+            block = nn.ModuleList([
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.LayerNorm(hidden_dim),
+                nn.ReLU()
+            ])
+            self.layers.append(block)
         
-        # Hidden layers with residual connections
-        for i in range(num_hidden_layers - 1):
-            layers.append(nn.Linear(hidden_dim, hidden_dim))
-            layers.append(nn.LayerNorm(hidden_dim))
-            layers.append(nn.ReLU())
-        
-        self.backbone = nn.ModuleList(layers)
-        
-        # ====================== Output Head ======================
-        # Output: [mu (modes*obs), log_std (modes*obs), logits (modes)]
         self.head = nn.Linear(hidden_dim, num_modes * (obs_dim * 2 + 1))
 
-    def forward(self, s: torch.Tensor, a: torch.Tensor):
+    def forward(self, s, a):
         x = torch.cat([s, a], dim=-1)
-        h = x
+        h = self.input_proj(x)
         
-        for i in range(0, len(self.backbone), 3):  # step = Linear + LN + ReLU
-            linear = self.backbone[i]
-            norm = self.backbone[i+1]
-            act = self.backbone[i+2]
-            
-            h_new = linear(h)
-            h_new = norm(h_new)
-            h_new = act(h_new)
-            
-            # Residual connection (if dimensions match)
-            if self.use_residual and h.shape == h_new.shape:
+        for block in self.layers:
+            linear, norm, act = block
+            h_new = act(norm(linear(h)))
+            if self.use_residual:
                 h = h + h_new
             else:
                 h = h_new
         
-        # Output head
-        out = self.head(h)  # (B, num_modes * (2*obs + 1))
-        out = out.view(-1, self.num_modes, 2 * self.obs_dim + 1)
+        out = self.head(h).view(-1, self.num_modes, 2*self.obs_dim + 1)
         
         mu = out[..., :self.obs_dim]
         log_std = out[..., self.obs_dim:2*self.obs_dim]
         logits = out[..., -1]
         
-        # Stable std clamping
-        log_std = self.min_log_std + F.softplus(log_std - self.min_log_std)
-        log_std = torch.clamp(log_std, max=self.max_log_std)
-        
+        log_std = torch.clamp(F.softplus(log_std) - 5.0, -5.0, 4.0)
         weights = F.softmax(logits, dim=-1)
         
         return mu, log_std, weights
+
 
     def log_prob(self, s_next: torch.Tensor, mu, log_std, weights):
         """Positive log probability: log p(s'|s,a)"""
@@ -401,4 +364,3 @@ class MoGTransitionKernel(nn.Module):
     def mog_nll(self, s_next: torch.Tensor, mu, log_std, weights):
         """Negative Log Likelihood for training"""
         return -self.log_prob(s_next, mu, log_std, weights).mean()
-
