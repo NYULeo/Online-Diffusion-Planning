@@ -247,6 +247,12 @@ def save_success_trajs_for_reward(trajs, env_name, specific_env, task_id, step):
         pickle.dump(trajs, f)
     print("trajectories saved")
 
+def load_success_trajs(env_name, specific_env, task_id, step):
+    save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{task_id}/trajs_task{task_id}_success_{step}.pkl'
+    with open(save_path, 'rb') as f:
+        trajs = pickle.load(f)
+    return trajs
+ 
 def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None, task_id: Optional[int] = None, base_seed: int = 0, continual_rollout = False, chunk_size = 5):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}, episode_length: {episode_length}")
