@@ -73,7 +73,7 @@ if __name__ == '__main__':  # pragma: no cover
          save_freq = 1000,
          ensemble_size = 10,
          num_modes = 5,
-         num_hidden_layers = 3,
+         num_hidden_layers = 4,
          hidden_dim = 514,
          λ_reg = 3e-4,
          noise_floor = 1e-6)
