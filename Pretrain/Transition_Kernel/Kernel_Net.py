@@ -209,7 +209,7 @@ class RobustTransitionKernel(nn.Module):
         Temp = 0.5 * (D * math.log(2 * math.pi) + 2 * log_std.sum(dim=-1))
         return Temp
 
-"""
+
 class MoGTransitionKernel(nn.Module):
    
     def __init__(
@@ -282,85 +282,5 @@ class MoGTransitionKernel(nn.Module):
        
         return -self.log_prob(s_next, mu, log_std, weights).mean()
 
-"""
 
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import math
-
-
-class MoGTransitionKernel(nn.Module):
-    def __init__(self, obs_dim, act_dim, num_modes=24, num_hidden_layers=8, 
-                 hidden_dim=1024, noise_floor=1e-6, use_residual=True):
-        super().__init__()
-        self.obs_dim = obs_dim
-        self.num_modes = num_modes
-        self.noise_floor = noise_floor
-        self.use_residual = use_residual
-
-        input_dim = obs_dim + act_dim
-        self.input_proj = nn.Linear(input_dim, hidden_dim)
-        
-        self.layers = nn.ModuleList()
-        for _ in range(num_hidden_layers):
-            block = nn.ModuleList([
-                nn.Linear(hidden_dim, hidden_dim),
-                nn.LayerNorm(hidden_dim),
-                nn.ReLU()
-            ])
-            self.layers.append(block)
-        
-        self.head = nn.Linear(hidden_dim, num_modes * (obs_dim * 2 + 1))
-
-    def forward(self, s, a):
-        x = torch.cat([s, a], dim=-1)
-        h = self.input_proj(x)
-        
-        for block in self.layers:
-            linear, norm, act = block
-            h_new = act(norm(linear(h)))
-            if self.use_residual:
-                h = h + h_new
-            else:
-                h = h_new
-        
-        out = self.head(h).view(-1, self.num_modes, 2*self.obs_dim + 1)
-        
-        mu = out[..., :self.obs_dim]
-        log_std = out[..., self.obs_dim:2*self.obs_dim]
-        logits = out[..., -1]
-        
-        log_std = torch.clamp(F.softplus(log_std) - 5.0, -5.0, 4.0)
-        weights = F.softmax(logits, dim=-1)
-        
-        return mu, log_std, weights
-
-
-    def log_prob(self, s_next: torch.Tensor, mu, log_std, weights):
-        """Positive log probability: log p(s'|s,a)"""
-        var = torch.exp(2 * log_std) + self.noise_floor
-        var = torch.clamp(var, min=1e-8)
-        
-        residual = s_next.unsqueeze(1) - mu          # (B, modes, obs_dim)
-        residual = torch.clamp(residual, -10.0, 10.0)
-        
-        mahal = ((residual ** 2) / var).sum(dim=-1)
-        
-        log_prob_per_mode = -0.5 * (
-            mahal 
-            + self.obs_dim * math.log(2 * math.pi) 
-            + torch.log(var).sum(dim=-1)
-        )
-        
-        # Mixture log probability
-        log_prob = torch.logsumexp(
-            log_prob_per_mode + torch.log(weights + 1e-8),
-            dim=-1
-        )
-        return log_prob
-
-    def mog_nll(self, s_next: torch.Tensor, mu, log_std, weights):
-        """Negative Log Likelihood for training"""
-        return -self.log_prob(s_next, mu, log_std, weights).mean()
