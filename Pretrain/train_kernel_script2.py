@@ -11,6 +11,9 @@ from Pretrain.utils import set_seed
 import pickle
 from Finetuning.utils import get_trajs
 
+from Finetuning.Rollout import Test_Kernel_on_Generated_Trajs, Kernel_Config
+
+
 
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
@@ -31,8 +34,7 @@ if __name__ == '__main__':  # pragma: no cover
                  hidden_dim = 256,
                  λ_reg = 1e-3)
     """
-    dataset = 'cube'
-    specific_dataset = 'single'
+   
     
     """
     train_kernel(dataset_name = dataset, 
@@ -46,37 +48,66 @@ if __name__ == '__main__':  # pragma: no cover
                  hidden_dim = 256,
                  λ_reg = 1e-3)
     """
-    path = REPO_ROOT / "Finetuning" / "Rollouts" / dataset / 'single-play'/ f'task_{1}' / "Generated_trajs_Info_0.pkl"
+    
+    dataset = 'cube'
+    specific_dataset = 'single-play'
+    path = REPO_ROOT / "Finetuning" / "Rollouts" / f"{dataset}"/ f"{specific_dataset}"/ f'task_{4}' / f"trajs_task{4}_success.pkl"
     with open(path, "rb") as f:
           trajs = pickle.load(f)
+    
+   
+    
     train_mog_kernel(
          dataset_name = dataset,
          specific_dataset = specific_dataset,
-         task_id = 1,
+         task_id = 4,
          trajs = trajs,
          batch_size = 512,
          lr = 1e-4,
-         num_steps = 50000,
-         save_freq = 10000,
+         num_steps = 5000,
+         save_freq = 1000,
          ensemble_size = 10,
-         num_modes = 5,
-         num_hidden_layers = 3,
+         num_modes = 10,
+         num_hidden_layers = 4,
          hidden_dim = 514,
          λ_reg = 1e-3,
          noise_floor = 5e-4)
       
     test_kernel_mog(dataset_name = dataset,
                 specific_dataset = specific_dataset,
-                task_id = 1,
+                task_id = 4,
                 trajs = trajs,
-                save_freq = 50000,
-                num_steps = 50000,
-                num_hidden_layers = 3,
+                save_freq = 2000,
+                num_steps = 2000,
+                num_hidden_layers = 4,
                 hidden_dim = 514,
                 ensemble_size = 10, 
-                num_modes = 5,
+                num_modes = 10,
                 quantile = 0.95,
                 noise_floor = 5e-4)
+    
+    
+
+    print("Testing Kernel on Generated trajs: ")
+    dataset = 'cube'
+    specific_dataset = 'single-play'
+    kernel_config = Kernel_Config(type_kernel = 'mog',
+                                  kernel_num_modes = 10,
+                                  kernel_noise_floor = 5e-4,
+                                  num_hidden_layers = 4,
+                                  hidden_dim = 514,
+                                  ensemble_size = 10)
+    Test_Kernel_on_Generated_Trajs(
+        env_name = dataset, 
+        specific_env = specific_dataset, 
+        horizon = 32, 
+        kernel_config = kernel_config,
+        steps_T = 200, 
+        num_karras = 10, 
+        eta = 0.8, 
+        time = 1000, 
+        checkpoint_steps = 0, 
+        task_id = 4)
 
 
 

@@ -30,9 +30,9 @@ with open(path, 'rb') as f:
 data = get_dataset('cube', 'single-play', task_id = 4)
 trajs = data.get_trajectories()
 
-print(trajs[9]['rewards'][-1])
-print(trajs[9]['observations'][-1][19:22])
-
+a = np.array([1,2,3])
+a = torch.tensor(a).unsqueeze(0)
+print(a)
 """
 for traj in trajs:
     rews = traj['rewards']

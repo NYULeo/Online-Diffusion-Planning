@@ -12,7 +12,7 @@ from Pretrain.Planners.Backbone.Dit import DiT1d
 from torch.utils.data import DataLoader
 from Finetuning.utils import cycle
 #from Pretrain.Planners.Backbone.utils import get_pretrained_planner
-from Finetuning.utils import get_planner, get_normalized_score, get_expert_score, spare_reward_prcocessor, PlannerDataset
+from Finetuning.utils import get_planner, get_normalized_score, get_expert_score, spare_reward_prcocessor, PlannerDataset, get_current_state, spare_reward_prcocessor
 from Pretrain.Dataset import Planner_Processor, get_dataset
 from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde, sample_euler_karras, sample_euler_karras2
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
@@ -23,7 +23,18 @@ import gymnasium_robotics
 from Pretrain.Dataset import get_dataset
 from gymnasium.wrappers import TimeLimit
 from typing import Optional
-from utils import get_normalized_score, rollout_parallel3, get_current_state, get_trajs, spare_reward_prcocessor
+#from utils import get_normalized_score, rollout_parallel3, get_current_state, get_trajs, spare_reward_prcocessor, compute_threshold_log_prob_mog, compute_threshold_mahalanobis_mog
+from dataclasses import dataclass
+
+@dataclass
+class Kernel_Config:
+    ensemble_size: int = 10
+    num_hidden_layers: int = 2
+    hidden_dim: int = 256
+    type_kernel: str = 'robust' or 'mog'
+    kernel_num_modes: Optional[int] = 8
+    kernel_noise_floor: Optional[float] = 1e-4
+
 
 def feasibility_check(generated_state, new_state):
     return np.linalg.norm(generated_state - new_state)
@@ -377,11 +388,42 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      #return len(traj['rewards'])
      #print(get_normalized_score([traj]))
 
+def load_kernel(env_name, specific_env, checkpoint_steps, kernel_config: Kernel_Config):
+    from Pretrain.Transition_Kernel.Kernel_Backbone import MoGTransitionKernel
+    from Finetuning.utils import get_kernel, get_kernel_stats
+    kernel_state_dicts, obs_dim, act_dim = get_kernel(env_name, specific_env, checkpoint_steps)
+    kernels = []
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    kernel_stats = get_kernel_stats(env_name, specific_env, checkpoint_steps)
+    Model = MoGTransitionKernel
+    for sd in kernel_state_dicts:
+            kernel_net = Model(
+                obs_dim, act_dim, kernel_config.kernel_num_modes, kernel_config.num_hidden_layers, kernel_config.hidden_dim, noise_floor = kernel_config.kernel_noise_floor
+            ).to(device)
+            kernel_net.load_state_dict(sd)
+            kernel_net.eval()
+            kernels.append(kernel_net)
+    return kernels, kernel_stats, obs_dim, act_dim
 
+def compute_log_prob(kernels, kernel_stats, x, obs_dim, act_dim, type: str = 'log_density'):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    from Pretrain.Transition_Kernel.Kernel_Backbone import  compute_log_density_mog, compute_total_mahalanobis_score_mog
+    values = []
+    for i in range(1, len(x)-1):
+        obs = torch.tensor(kernel_stats.norm_obs(x[i, :obs_dim].copy()), dtype = torch.float32).unsqueeze(0).to(device)
+        act = torch.tensor(x[i, obs_dim:(obs_dim+act_dim)].copy(), dtype = torch.float32).unsqueeze(0).to(device)
+        s_next = torch.tensor(kernel_stats.norm_obs(x[i+1, :obs_dim].copy())).unsqueeze(0).to(device)
+        if(type == 'log_density'):
+            value = compute_log_density_mog(kernels, obs, act, s_next).item()
+        else:
+            value = compute_total_mahalanobis_score_mog(kernels, obs, act, s_next).item()
+        values.append(value)
+    return np.mean(values)
 
-def Test_Kernel(env_name, specific_env, horizon, steps_T, num_karras, eta, time, checkpoint_steps, task_id: Optional[int] = None):
+def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_config: Kernel_Config,  steps_T, num_karras, eta, time, checkpoint_steps, task_id: Optional[int] = None):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-    
+     
+
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      device = "cuda" if torch.cuda.is_available() else "cpu"
      print(f"Using device {device}")
@@ -411,10 +453,30 @@ def Test_Kernel(env_name, specific_env, horizon, steps_T, num_karras, eta, time,
      trajs = dataset.get_trajectories()
      planner_dataset = PlannerDataset(trajs, horizon, env_name, specific_env)
      dataloader = cycle(DataLoader(planner_dataset, batch_size = 1, shuffle = False))
-    
+     kernels, kernel_stats, obs_dim, act_dim = load_kernel(env_name, specific_env, checkpoint_steps, kernel_config)
+     mahalanobis_scores = []
+     log_density_scores = []
      for i in range(time):
             norm_state = next(dataloader)
+            norm_state = norm_state.squeeze(0).numpy()
             x = sample_euler_karras(norm_state, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+            log_density_score = compute_log_prob(kernels, kernel_stats, x, obs_dim, act_dim, type = 'log_density')
+            mahalanobis_score = compute_log_prob(kernels, kernel_stats, x, obs_dim, act_dim, type = 'mahalanobis')
+            mahalanobis_scores.append(mahalanobis_score)
+            log_density_scores.append(log_density_score)
+           
+     print(f"Mean of Mahalanobis scores: {np.mean(mahalanobis_scores):.4f}")
+     print(f"Max of Mahalanobis scores: {np.max(mahalanobis_scores):.4f}")
+     print(f"Min of Mahalanobis scores: {np.min(mahalanobis_scores):.4f}")
+     print(f"STD of Mahalanobis scores: {np.std(mahalanobis_scores):.4f}")
+     print(f"quantile 0.95 of Mahalanobis scores: {np.quantile(mahalanobis_scores, 0.95):.4f}")
+
+     print("--------------------------------------------------------------------------------------------------")
+     print(f"Mean of log_density scores: {np.mean(log_density_scores):.4f}")
+     print(f"Max of log_density scores: {np.max(log_density_scores):.4f}")
+     print(f"Min of log_density scores: {np.min(log_density_scores):.4f}")
+     print(f"STD of log_density scores: {np.std(log_density_scores):.4f}")
+     print(f"quantile 0.05 of Mahalanobis scores: {np.quantile(log_density_scores, 0.05):.4f}")
     
      
    
@@ -594,6 +656,24 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
+    kernel_config = Kernel_Config(type_kernel = 'mog',
+                                  kernel_num_modes = 5,
+                                  kernel_noise_floor = 5e-4,
+                                  num_hidden_layers = 3,
+                                  hidden_dim = 514,
+                                  ensemble_size = 10)
+    Test_Kernel_on_Generated_Trajs(
+        env_name = env_name, 
+        specific_env = specific_train_dataset, 
+        horizon = horizon, 
+        kernel_config = kernel_config,
+        type = 'mahalanobis',
+        steps_T = 200, 
+        num_karras = 10, 
+        eta = 0.8, 
+        time = 10, 
+        checkpoint_steps = 0, 
+        task_id = 4)
     #set_seed(1)
     #np.random.seed(1)
     
@@ -613,7 +693,7 @@ if __name__ == "__main__":
     """
 
 
-    
+    """
     set_seed(1)
     total_success_trajs = []
     success_rate = 0.0
@@ -640,7 +720,7 @@ if __name__ == "__main__":
     print(success_rate/100)
     print(len(total_success_trajs))
     save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 4)
-    
+    """
 
 
     """
