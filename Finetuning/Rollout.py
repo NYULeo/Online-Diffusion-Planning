@@ -617,7 +617,7 @@ if __name__ == "__main__":
     set_seed(1)
     total_success_trajs = []
     success_rate = 0.0
-    for i in range(1, 11):
+    for i in range(1, 50):
         #set_seed(i)
         #for j in range(1, 21):
            trajs, _, success_rate, _ = rollout_parallel3(env_name = env_name, 
