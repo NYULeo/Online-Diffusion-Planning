@@ -37,8 +37,8 @@ def determine_stride(dataset_name, specific_dataset):
 #-------------------------------------------------------------------------------------#
 #------------------------------------- Dataset ---------------------------------------#
 #-------------------------------------------------------------------------------------#
-def get_env(env_name, specific_env, render_mode = None):
-    data = get_dataset(env_name, specific_env)
+def get_env(env_name, specific_env, render_mode = None, task_id: Optional[int] = None, episode_length: Optional[int] = None):
+    data = get_dataset(env_name, specific_env, task_id, episode_length)
     env = data.get_env(render_mode)
     d_s = data.get_state_dim()
     d_a = data.get_action_dim()
@@ -464,10 +464,11 @@ class CubeDataset:
             raise ValueError(f"Invalid dataset name: {name}")
 
         self.dataset_id = name_to_id[name]
-
+        
+        
         self.env, self.dataset, self.eval_dataset = ogbench.make_env_and_datasets(
-            self.dataset_id, render_mode="rgb_array"
-        )
+                 self.dataset_id, render_mode="rgb_array"
+            )
 
 
     def get_trajectories(self) -> List[Dict[str, np.ndarray]]:
@@ -527,9 +528,11 @@ class CubeDataset_Singletask:
 
         self.dataset_id = name_to_id[name]
 
+       
+      
         self.env, self.dataset, self.eval_dataset = ogbench.make_env_and_datasets(
-            self.dataset_id, render_mode="rgb_array"
-        )
+                 self.dataset_id, render_mode="rgb_array"
+            )
 
 
     def get_trajectories(self) -> List[Dict[str, np.ndarray]]:

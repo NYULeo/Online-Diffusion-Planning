@@ -21,8 +21,9 @@ import random
 import gymnasium as gym
 import gymnasium_robotics
 from Pretrain.Dataset import get_dataset
+from gymnasium.wrappers import TimeLimit
 from typing import Optional
-from utils import get_normalized_score, rollout_parallel2, get_current_state, get_trajs, spare_reward_prcocessor
+from utils import get_normalized_score, rollout_parallel3, get_current_state, get_trajs, spare_reward_prcocessor
 
 def feasibility_check(generated_state, new_state):
     return np.linalg.norm(generated_state - new_state)
@@ -242,7 +243,19 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      device = "cuda" if torch.cuda.is_available() else "cpu"
      print(f"Using device {device}")
      
-     env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array')
+     
+     #env.reset(seed=1)  # Important: pass seed to env.reset
+     env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', task_id = task_id, episode_length = None)
+     #env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', episode_length = episode_length)
+     np.random.seed(base_seed)
+     """
+     if hasattr(env, 'action_space'):
+        env.action_space.seed(base_seed)
+        env.unwrapped._permute_blocks = False
+     """
+    
+    # 2. Reset environment with both seed and task_id
+     #env.reset(seed=base_seed)   # Important first reset
     
     # Create environment factory function
      state_dict = get_planner(env_name, specific_env, checkpoint_steps)
@@ -263,13 +276,16 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      planner_processor = Planner_Processor(env_name, specific_env)
 
      #reset
-     #s0 = env.reset(seed = 0, options={"goal_cell": goal_cell, "reset_cell": reset_cell})
      if(env_name == 'cube'):
-        s0 = env.reset(seed = base_seed, options = {"task_id": task_id})
+        #s0, info = env.reset(seed = base_seed, options = dict( task_id=task_id))
+        s0, info = env.reset(seed = base_seed)
      if(goal_cell is not None):
-        s0 = env.reset(seed = base_seed, options = {"goal_cell": goal_cell, "reset_cell": start_cell})
+        s0, info = env.reset(seed = base_seed, options = {"goal_cell": goal_cell, "reset_cell": start_cell})
      else:
-        s0 = env.reset(seed = base_seed)
+        s0, info = env.reset(seed = base_seed)
+     
+     print("Goal cube position:", info['goal'][19:22])
+     print("Goal cube Quaternion:", info['goal'][22:26])
      
      """
      if(env_name == 'antmaze'):
@@ -578,30 +594,33 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
-    set_seed(9)
-    
-    
-    traj = rollout(env_name, 
-            specific_train_dataset, horizon, 
-            steps_T = 500, 
-            num_karras = 50, 
-            eta = 0.8, 
-            episode_length = 3000, 
-            checkpoint_steps = 0, 
-            render = True,  
-            base_seed = 1, 
-            task_id = 1,
-            continual_rollout = True,
-            chunk_size = 32)
-    
+    #set_seed(1)
+    #np.random.seed(1)
     
     """
+    traj = rollout(env_name, 
+            specific_train_dataset, horizon, 
+            steps_T = 200, 
+            num_karras = 10, 
+            eta = 0.8, 
+            episode_length = 3000, 
+            checkpoint_steps = 35, 
+            render = True,  
+            base_seed = 1, 
+            task_id = 4,
+            continual_rollout = True,
+            chunk_size = 32)
+    """
+
+
+    
+    
     total_success_trajs = []
     success_rate = 0.0
-    for i in range(1, 21):
-        set_seed(i)
-        for j in range(1, 21):
-           trajs, _, success_rate, _ = rollout_parallel2(env_name = env_name, 
+    for i in range(1, 3):
+        #set_seed(i)
+        #for j in range(1, 21):
+           trajs, _, success_rate, _ = rollout_parallel3(env_name = env_name, 
                       specific_env = specific_train_dataset, 
                       horizon = 32,
                       steps_T = 100, 
@@ -609,18 +628,19 @@ if __name__ == "__main__":
                       eta = 0.8, 
                       episode_length = 4000, 
                       checkpoint_step = 0,
-                      num_envs = 10, 
-                      task_id = 1, 
-                      seed_base = j, 
+                      num_envs = 5, 
+                      task_id = 4, 
+                      seed_base = i, 
                       continual_rollout = True, 
                       chunk_size = 32)
+        
            total_success_trajs.append(get_success_trajs(trajs))
            success_rate += success_rate
     
     print(success_rate/900)
     print(len(total_success_trajs))
     save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 1)
-    """
+    
 
 
     """

@@ -1721,6 +1721,176 @@ def rollout_parallel2(
 
     return trajs, score, success_rate, total_steps
 
+
+
+
+def rollout_parallel3(
+    env_name, specific_env,
+    horizon=32, steps_T=50, num_karras=10, eta=0.8,
+    episode_length=4000, checkpoint_step=1000000,
+    num_envs=8,
+    goal_cell: Optional[np.ndarray] = None,
+    start_cells: Optional[List[np.ndarray]] = None,
+    task_id: Optional[int] = None,
+    device: torch.device = None,
+    seed_base: int = 0,
+    continual_rollout=False,
+    chunk_size=5,          # currently unused
+):
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    trajs = []
+    total_steps = 0
+
+    # Seeding
+    rank = int(os.environ.get("RANK", 0))
+    np.random.seed(12345 + rank + seed_base)
+    torch.manual_seed(12345 + rank + seed_base)
+
+    # Environment & Vector Env
+    _, d_s, d_a = get_env(env_name, specific_env, task_id = task_id)
+
+    def make_env():
+        env, _, _ = get_env(env_name, specific_env, task_id = task_id)
+        return env
+
+    vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
+
+    # Load model
+    state_dict = get_planner(env_name, specific_env, checkpoint_step)
+
+    if env_name in ['kitchen', 'pointmaze', 'cube']:
+        model = DiT1d(
+            in_dim=(d_s + d_a), emb_dim=128, d_model=256,
+            n_heads=256//64, depth=2, timestep_emb_type="fourier"
+        ).to(device)
+    elif env_name == 'antmaze':
+        model = DiT1d(
+            in_dim=d_s, emb_dim=128, d_model=256,
+            n_heads=256//64, depth=2, timestep_emb_type="fourier"
+        ).to(device)
+    else:
+        raise ValueError(f"Invalid Environment: {env_name}")
+
+    model.load_state_dict(state_dict)
+    model.eval()
+
+    planner_processor = Planner_Processor(env_name, specific_env)
+    reset_seeds = list(range(seed_base, seed_base + num_envs))
+
+    def run_rollout(options_list: Optional[dict] = None):
+        """Helper to run one batch of environments (avoids duplication)."""
+        nonlocal total_steps
+        
+        if(options_list is not None):
+             obs, info = vec_env.reset(seed=reset_seeds, options=options_list)
+        else:
+             obs, info = vec_env.reset(seed=reset_seeds)
+        
+        
+        if isinstance(obs, dict):
+            current_states = obs['observation']
+        else:
+            current_states = obs
+
+        all_rewards = [0.0] * num_envs
+        done_envs = [False] * num_envs
+        observations = [[] for _ in range(num_envs)]
+        acts = [[] for _ in range(num_envs)]
+        rewards = [[] for _ in range(num_envs)]
+        Temp_acts = [[] for _ in range(num_envs)]
+
+        for env_idx in range(num_envs):
+            observations[env_idx].append(current_states[env_idx].copy())
+
+        for i in range(episode_length):
+            actions = np.zeros((num_envs, d_a))
+
+            for env_idx in range(num_envs):
+                if done_envs[env_idx]:
+                    continue
+
+                current_state = current_states[env_idx]
+                current_state_norm = planner_processor.preprocess(current_state)
+
+                if continual_rollout and len(Temp_acts[env_idx]) > 0:
+                    action = Temp_acts[env_idx].pop(0)
+                else:
+                    x = sample_euler_karras(
+                        current_state_norm, model, d_s, d_a,
+                        horizon, steps_T, num_karras, eta, device
+                    )
+                    if continual_rollout:
+                        Temp_acts[env_idx] = [x[k, d_s:(d_s + d_a)].copy() 
+                                              for k in range(len(x))]
+                        action = Temp_acts[env_idx].pop(0)
+                    else:
+                        action = x[0, d_s:(d_s + d_a)].copy()
+
+                actions[env_idx] = action
+
+            # Step
+            obs_vec, rewards_vec, terminated_vec, truncated_vec, _ = vec_env.step(actions)
+
+            # Consistent observation extraction
+            obs_batch = obs_vec['observation'] if isinstance(obs_vec, dict) else obs_vec
+
+            # Update
+            for env_idx in range(num_envs):
+                if done_envs[env_idx]:
+                    continue
+
+                observations[env_idx].append(obs_batch[env_idx].copy())
+                acts[env_idx].append(actions[env_idx].copy())
+                rewards[env_idx].append(rewards_vec[env_idx])
+                all_rewards[env_idx] += rewards_vec[env_idx]
+                current_states[env_idx] = obs_batch[env_idx].copy()
+
+                if terminated_vec[env_idx] or truncated_vec[env_idx]:
+                    done_envs[env_idx] = True
+
+            if all(done_envs):
+                break
+
+        # Append finished trajectories
+        for env_idx in range(num_envs):
+            total_steps += len(observations[env_idx]) - 1
+            trajs.append({
+                'observations': np.asarray(observations[env_idx]),
+                'actions': np.asarray(acts[env_idx]),
+                'rewards': np.asarray(spare_reward_prcocessor(rewards[env_idx].copy()))  # FIXED
+            })
+
+    # ====================== Main Logic ======================
+    if start_cells is not None and len(start_cells) > 0:
+        for start_cell in start_cells:
+            opt = {
+                "goal_cell": goal_cell.copy() if goal_cell is not None else None,
+                "reset_cell": start_cell.copy() if start_cell is not None else None,
+            }
+           
+            run_rollout([opt] * num_envs)
+    else:
+        run_rollout()
+
+    vec_env.close()
+
+    valid, success_rate = checktrajs(trajs)
+    print(f"valid: {valid}, success rate: {success_rate:.2f}")
+
+    if goal_cell is None:
+        expert_score = get_expert_score(env_name)
+        score = get_normalized_score(trajs, expert_score)
+    else:
+        score = get_normalized_score(trajs)
+
+    return trajs, score, success_rate, total_steps
+
+
+
+
+
 import math
 from dataclasses import dataclass
 @dataclass

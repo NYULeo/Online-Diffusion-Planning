@@ -19,6 +19,7 @@ import numpy as np
 import torch
 import pickle
 from scipy.ndimage import gaussian_filter1d
+from Pretrain.Dataset import get_dataset
 
 
 
@@ -26,6 +27,13 @@ path = f'./Finetuning/Rollouts/cube/single-play/task_1/Generated_trajs_Info_0.pk
 with open(path, 'rb') as f:
     trajs = pickle.load(f)
 
+data = get_dataset('cube', 'single-play', task_id = 4)
+trajs = data.get_trajectories()
+
+print(trajs[9]['rewards'][-1])
+print(trajs[9]['observations'][-1][19:22])
+
+"""
 for traj in trajs:
     rews = traj['rewards']
     rews[-1] = 50.0
@@ -35,7 +43,7 @@ for traj in trajs:
     rews = gaussian_filter1d(rews, sigma = 8.0, mode = 'nearest')
     print(rews)
     exit()
-
+"""
 
 
 

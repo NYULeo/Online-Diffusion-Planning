@@ -460,7 +460,7 @@ if __name__ == "__main__":
                           sigma = 8.0, 
                           target_reward = 50.0, 
                           train_goal = None,
-                          task_id = 1)
+                          task_id = 4)
       
     TrainKernelConfig = Train_Kernel_Config(
                             batch_size = 512, 
@@ -503,8 +503,8 @@ if __name__ == "__main__":
         diffusion_steps = 200,
         karras_percent = 0.05,
         Loss_Clip_percent = 0.75,
-        finetune_batch_size = 28,
-        finetune_batch_per_sample = 3,
+        finetune_batch_size = 12,
+        finetune_batch_per_sample = 2,
         finetune_lr = 2e-05,
         initial_lam = 0.5,
         eta_lam = 0.5,

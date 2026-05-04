@@ -18,7 +18,7 @@ from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Dataset import get_PlannerName, get_dataset, Planner_Processor
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 from typing import List
-from utils import TrajectoryDict, rollout_parallel, get_planner, rollout_parallel2, save_planner, train_reward, train_kernel, train_kernel_mog, train_critic, save_trajs, AlphaSchedulerConfig, checktrajs
+from utils import TrajectoryDict, rollout_parallel, get_planner, rollout_parallel2, save_planner, train_reward, train_kernel, train_kernel_mog, train_critic, save_trajs, AlphaSchedulerConfig, checktrajs, rollout_parallel3
 from Pretrain.Dataset import get_env
 from torch.utils.data import DataLoader, DistributedSampler
 from accelerate.utils import broadcast
@@ -259,7 +259,9 @@ class OnlineFinetuner():
         self.Train_Kernel_Buffer = []
         
         if(self.config.train_reward_config.task_id is not None):
-            trajs = get_trajs(self.config.dataset_name, self.config.specific_dataset, 0, self.config.train_reward_config.task_id)
+            #trajs = get_trajs(self.config.dataset_name, self.config.specific_dataset, 0, self.config.train_reward_config.task_id)
+            dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id)
+            trajs = dataset.get_trajectories()
         else:
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
             trajs = dataset.get_trajectories()
@@ -363,10 +365,12 @@ class OnlineFinetuner():
     
     def data_conservation_update(self, critic_buffer):
         if(self.config.train_reward_config.task_id is not None):
-             trajs = get_trajs(self.config.dataset_name, self.config.specific_dataset, 0, self.config.train_reward_config.task_id)
+            dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id)
+            trajs = dataset.get_trajectories()
         else:
-             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
-             trajs = dataset.get_trajectories()
+            dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
+            trajs = dataset.get_trajectories()
+        
         if(len(critic_buffer) < 2):
              critic_buffer.extend(trajs)
         else:
@@ -539,7 +543,7 @@ class OnlineFinetuner():
             """ 
             if do_rollout:
                 seed_base = rank * num_envs_per_process
-                trajs, score, success_rate, total_steps = rollout_parallel2(self.config.dataset_name, 
+                trajs, score, success_rate, total_steps = rollout_parallel3(self.config.dataset_name, 
                                              self.config.specific_dataset, 
                                              horizon = self.config.AMConfig.horizon, 
                                              steps_T = self.config.diffusion_steps, 
