@@ -44,7 +44,7 @@ if __name__ == '__main__':  # pragma: no cover
     trajs_1 = data.get_trajectories()
     trajs_2 = get_trajs(env_name, specific_env, task_id = 1, step = 0)
     trajs = trajs_1 + trajs_2
-    """
+    
     train_critic(dataset_name = env_name,
                  specific_dataset = specific_env, 
                  hidden_layers = 4,
@@ -62,7 +62,7 @@ if __name__ == '__main__':  # pragma: no cover
                  target_reward = 50.0,
                  trajs = trajs_2, 
                  task_id = 1)
-    """
+    
     test_critic(dataset_name = env_name,
                 specific_dataset = specific_env,
                 hidden_layers = 4,

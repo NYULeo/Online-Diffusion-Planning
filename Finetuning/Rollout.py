@@ -614,21 +614,21 @@ if __name__ == "__main__":
 
 
     
-    
+    set_seed(1)
     total_success_trajs = []
     success_rate = 0.0
-    for i in range(1, 3):
+    for i in range(1, 11):
         #set_seed(i)
         #for j in range(1, 21):
            trajs, _, success_rate, _ = rollout_parallel3(env_name = env_name, 
                       specific_env = specific_train_dataset, 
                       horizon = 32,
-                      steps_T = 100, 
-                      num_karras = 5, 
+                      steps_T = 200, 
+                      num_karras = 10, 
                       eta = 0.8, 
                       episode_length = 4000, 
                       checkpoint_step = 0,
-                      num_envs = 5, 
+                      num_envs = 10, 
                       task_id = 4, 
                       seed_base = i, 
                       continual_rollout = True, 
@@ -637,7 +637,7 @@ if __name__ == "__main__":
            total_success_trajs.append(get_success_trajs(trajs))
            success_rate += success_rate
     
-    print(success_rate/900)
+    print(success_rate/100)
     print(len(total_success_trajs))
     save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 1)
     
