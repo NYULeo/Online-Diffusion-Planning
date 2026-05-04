@@ -240,8 +240,8 @@ def save_trajs(trajs, env_name, specific_env, step):
          pickle.dump(trajs, f)
     print(f"trajectories saved")
 
-def save_success_trajs_for_reward(trajs, env_name, specific_env, task_id):
-    save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{task_id}/trajs_task{task_id}_success.pkl'
+def save_success_trajs_for_reward(trajs, env_name, specific_env, task_id, step):
+    save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{task_id}/trajs_task{task_id}_success_{step}.pkl'
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     with open(save_path, 'wb') as f:
         pickle.dump(trajs, f)
@@ -420,7 +420,7 @@ def compute_log_prob(kernels, kernel_stats, x, obs_dim, act_dim, type: str = 'lo
         values.append(value)
     return np.mean(values)
 
-def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_config: Kernel_Config,  steps_T, num_karras, eta, time, checkpoint_steps, task_id: Optional[int] = None):
+def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_config: Kernel_Config,  steps_T, num_karras, eta, time, planner_checkpoint, kernel_checkpoint, task_id: Optional[int] = None):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      
 
@@ -431,7 +431,7 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
      _, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array')
     
     # Create environment factory function
-     state_dict = get_planner(env_name, specific_env, checkpoint_steps)
+     state_dict = get_planner(env_name, specific_env, planner_checkpoint)
      if( env_name == 'kitchen'):
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
      elif (env_name == 'pointmaze'):
@@ -453,7 +453,7 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
      trajs = dataset.get_trajectories()
      planner_dataset = PlannerDataset(trajs, horizon, env_name, specific_env)
      dataloader = cycle(DataLoader(planner_dataset, batch_size = 1, shuffle = False))
-     kernels, kernel_stats, obs_dim, act_dim = load_kernel(env_name, specific_env, checkpoint_steps, kernel_config)
+     kernels, kernel_stats, obs_dim, act_dim = load_kernel(env_name, specific_env, kernel_checkpoint, kernel_config)
      mahalanobis_scores = []
      log_density_scores = []
      for i in range(time):

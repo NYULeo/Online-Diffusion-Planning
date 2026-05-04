@@ -11,7 +11,7 @@ from Pretrain.utils import set_seed
 import pickle
 from Finetuning.utils import get_trajs
 
-from Finetuning.Rollout import Test_Kernel_on_Generated_Trajs, Kernel_Config
+from Finetuning.Rollout import Test_Kernel_on_Generated_Trajs, Kernel_Config, save_success_trajs_for_reward
 
 
 
@@ -54,8 +54,14 @@ if __name__ == '__main__':  # pragma: no cover
     path = REPO_ROOT / "Finetuning" / "Rollouts" / f"{dataset}"/ f"{specific_dataset}"/ f'task_{4}' / f"trajs_task{4}_success.pkl"
     with open(path, "rb") as f:
           trajs = pickle.load(f)
+    new_trajs = []
+    for traj in trajs:
+         new_trajs.extend(traj)
     
-   
+    save_success_trajs_for_reward(new_trajs, dataset, specific_dataset, 4, 0)
+         
+    
+    """
     dataset = 'cube'
     specific_dataset = 'single'
     train_mog_kernel(
@@ -88,14 +94,14 @@ if __name__ == '__main__':  # pragma: no cover
                 noise_floor = 5e-4)
     
     
-
+   
     print("Testing Kernel on Generated trajs: ")
     dataset = 'cube'
     specific_dataset = 'single-play'
     kernel_config = Kernel_Config(type_kernel = 'mog',
-                                  kernel_num_modes = 10,
+                                  kernel_num_modes = 5,
                                   kernel_noise_floor = 5e-4,
-                                  num_hidden_layers = 4,
+                                  num_hidden_layers = 3,
                                   hidden_dim = 514,
                                   ensemble_size = 10)
     Test_Kernel_on_Generated_Trajs(
@@ -106,10 +112,11 @@ if __name__ == '__main__':  # pragma: no cover
         steps_T = 200, 
         num_karras = 10, 
         eta = 0.8, 
-        time = 1000, 
-        checkpoint_steps = 0, 
+        time = 200, 
+        planner_checkpoint = 25,
+        kernel_checkpoint = 0,
         task_id = 4)
-
+    """
 
 
     """
