@@ -72,9 +72,9 @@ if __name__ == '__main__':  # pragma: no cover
          num_steps = 5000,
          save_freq = 1000,
          ensemble_size = 10,
-         num_modes = 10,
-         num_hidden_layers = 5,
-         hidden_dim = 1024,
+         num_modes = 5,
+         num_hidden_layers = 3,
+         hidden_dim = 514,
          λ_reg = 3e-4,
          noise_floor = 1e-6)
 
@@ -86,10 +86,10 @@ if __name__ == '__main__':  # pragma: no cover
                 trajs = trajs,
                 save_freq = 5000,
                 num_steps = 5000,
-                num_hidden_layers = 5,
-                hidden_dim = 1024,
+                num_hidden_layers = 4,
+                hidden_dim = 514,
                 ensemble_size = 10, 
-                num_modes = 10,
+                num_modes = 5,
                 quantile = 0.95,
                 noise_floor = 1e-6)
     
@@ -99,10 +99,10 @@ if __name__ == '__main__':  # pragma: no cover
     dataset = 'cube'
     specific_dataset = 'single-play'
     kernel_config = Kernel_Config(type_kernel = 'mog',
-                                  kernel_num_modes = 10,
+                                  kernel_num_modes = 5,
                                   kernel_noise_floor = 1e-6,
-                                  num_hidden_layers = 5,
-                                  hidden_dim = 1024,
+                                  num_hidden_layers = 4,
+                                  hidden_dim = 514,
                                   ensemble_size = 10)
     Test_Kernel_on_Generated_Trajs(
         env_name = dataset, 
