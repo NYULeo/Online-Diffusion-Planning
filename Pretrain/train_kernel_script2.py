@@ -49,6 +49,9 @@ if __name__ == '__main__':  # pragma: no cover
                  λ_reg = 1e-3)
     """
     
+
+
+    """
     dataset = 'cube'
     specific_dataset = 'single-play'
     
@@ -88,7 +91,7 @@ if __name__ == '__main__':  # pragma: no cover
                 quantile = 0.95,
                 noise_floor = 5e-4)
     
-    
+    """
    
     print("Testing Kernel on Generated trajs: ")
     dataset = 'cube'
@@ -107,8 +110,8 @@ if __name__ == '__main__':  # pragma: no cover
         steps_T = 200, 
         num_karras = 10, 
         eta = 0.8, 
-        time = 200, 
-        planner_checkpoint = 25,
+        time = 500, 
+        planner_checkpoint = 0,
         kernel_checkpoint = 0,
         task_id = 4)
     
