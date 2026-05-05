@@ -658,7 +658,7 @@ if __name__ == "__main__":
     
   
     
-    
+    """
     set_seed(1)
     horizon = 32
     env_name = 'cube'
@@ -676,9 +676,9 @@ if __name__ == "__main__":
             task_id = 5,
             continual_rollout = True,
             chunk_size = 32)
-    
-
     """
+
+    
     from Finetuning.utils import rollout_parallel3
     set_seed(1)
     horizon = 32
@@ -710,7 +710,7 @@ if __name__ == "__main__":
     print(len(total_success_trajs))
     save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 4)
 
-   """
+   
 
     """
     env, _, _ = get_env(env_name, specific_train_dataset,  render_mode = 'rgb_array')

@@ -51,7 +51,7 @@ if __name__ == '__main__':  # pragma: no cover
     
 
 
-    
+    """
     dataset = 'cube'
     specific_dataset = 'single-play'
     
@@ -93,7 +93,7 @@ if __name__ == '__main__':  # pragma: no cover
                 quantile = 0.95,
                 noise_floor = 1e-6)
     
-    
+    """
    
     print("Testing Kernel on Generated trajs: ")
     dataset = 'cube'
@@ -117,7 +117,7 @@ if __name__ == '__main__':  # pragma: no cover
         kernel_checkpoint = 0,
         task_id = 4)
     
-
+   
 
     """
     path = REPO_ROOT / "Finetuning" / "Rollouts" / dataset / specific_dataset / "Generated_trajs_Info_0.pkl"
