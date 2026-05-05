@@ -35,7 +35,6 @@ class Kernel_Config:
     kernel_num_modes: Optional[int] = 8
     kernel_noise_floor: Optional[float] = 1e-4
 
-
 def feasibility_check(generated_state, new_state):
     return np.linalg.norm(generated_state - new_state)
 
@@ -301,9 +300,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      else:
         s0, info = env.reset(seed = base_seed)
      
-     print("Goal cube position:", info['goal'][19:22])
-     print("Goal cube Quaternion:", info['goal'][22:26])
-     
+
      """
      if(env_name == 'antmaze'):
           current_state = np.concatenate([
@@ -659,33 +656,16 @@ if __name__ == "__main__":
     """
 
     
+  
+    
+    
+    set_seed(1)
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
-    kernel_config = Kernel_Config(type_kernel = 'mog',
-                                  kernel_num_modes = 5,
-                                  kernel_noise_floor = 5e-4,
-                                  num_hidden_layers = 3,
-                                  hidden_dim = 514,
-                                  ensemble_size = 10)
-    Test_Kernel_on_Generated_Trajs(
-        env_name = env_name, 
-        specific_env = specific_train_dataset, 
-        horizon = horizon, 
-        kernel_config = kernel_config,
-        type = 'mahalanobis',
-        steps_T = 200, 
-        num_karras = 10, 
-        eta = 0.8, 
-        time = 10, 
-        checkpoint_steps = 0, 
-        task_id = 4)
-    #set_seed(1)
-    #np.random.seed(1)
-    
-    """
     traj = rollout(env_name, 
-            specific_train_dataset, horizon, 
+            specific_train_dataset, 
+            horizon, 
             steps_T = 200, 
             num_karras = 10, 
             eta = 0.8, 
@@ -693,14 +673,17 @@ if __name__ == "__main__":
             checkpoint_steps = 35, 
             render = True,  
             base_seed = 1, 
-            task_id = 4,
+            task_id = 5,
             continual_rollout = True,
             chunk_size = 32)
-    """
+    
 
-
     """
+    from Finetuning.utils import rollout_parallel3
     set_seed(1)
+    horizon = 32
+    env_name = 'cube'
+    specific_train_dataset = 'single-play'
     total_success_trajs = []
     success_rate = 0.0
     for i in range(1, 50):
@@ -726,8 +709,8 @@ if __name__ == "__main__":
     print(success_rate/100)
     print(len(total_success_trajs))
     save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 4)
-    """
 
+   """
 
     """
     env, _, _ = get_env(env_name, specific_train_dataset,  render_mode = 'rgb_array')

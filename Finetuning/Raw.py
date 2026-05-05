@@ -22,17 +22,33 @@ from scipy.ndimage import gaussian_filter1d
 from Pretrain.Dataset import get_dataset
 
 
+goals = {'task_1': np.array( [ 0.0,       -1.0,        0.199599]), 
+         'task_2': np.array([7.50000000e-01, 8.02418254e-18, 1.99598996e-01]),
+         'task_3': np.array([-7.50000000e-01,  1.21832368e-19,  1.99598996e-01]),
+         'task_4': np.array([0.75,     2.0,       0.199599]),
+         'task_5': np.array([ 0.75,     -2.0,        0.199599])}
 
-path = f'./Finetuning/Rollouts/cube/single-play/task_1/Generated_trajs_Info_0.pkl'
+
+
+path = f'./Finetuning/Rollouts/cube/single-play/task_4/trajs_task4_success_0.pkl'
 with open(path, 'rb') as f:
     trajs = pickle.load(f)
 
-data = get_dataset('cube', 'single-play', task_id = 4)
-trajs = data.get_trajectories()
 
-a = np.array([1,2,3])
-a = torch.tensor(a).unsqueeze(0)
-print(a)
+"""
+data = get_dataset('cube', 'single-play', task_id = 5)
+trajs = data.get_trajectories()
+"""
+
+
+for i in range(1,6):
+    total_dist = 0.0
+    for traj in trajs:
+        position = traj['observations'][-1][19:22]
+        total_dist += np.linalg.norm(position - goals[f"task_{i}"])
+    average_dist = total_dist/len(trajs)
+    print(f"Task {i} average distance: {average_dist}")
+
 """
 for traj in trajs:
     rews = traj['rewards']

@@ -1788,7 +1788,7 @@ def rollout_parallel3(
         else:
              obs, info = vec_env.reset(seed=reset_seeds)
         
-        
+    
         if isinstance(obs, dict):
             current_states = obs['observation']
         else:
