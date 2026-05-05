@@ -74,7 +74,7 @@ if __name__ == '__main__':  # pragma: no cover
     with open(path, 'rb') as f:
           trajs_2 = pickle.load(f)
     trajs = trajs_1 + trajs_2
-
+    check_cube_single_goal_reach(trajs, 4)
     test_critic(dataset_name = env_name,
                 specific_dataset = specific_env,
                 hidden_layers = 4,
