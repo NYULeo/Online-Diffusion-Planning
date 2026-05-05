@@ -444,18 +444,18 @@ if __name__ == "__main__":
     #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
     RWConfig = RewardConfig(
                beta = 1.0, 
-               #min_log_prob = 0,
-               max_mahalanobis_score = 100.0,
+               min_log_prob = -170.0,
+               #max_mahalanobis_score = 100.0,
                critic_gamma = 1.0,
                explore = False,
-               constraint_type = 'mahalanobis') 
+               constraint_type = 'log_prob') 
 
     
     TrainRewardConfig = Train_Reward_Config(
-                          hidden_layers = 3,
+                          hidden_layers = 2,
                           hidden_dim = 128,
                           batch_size = 256, 
-                          num_steps = 2000, 
+                          num_steps = 4000, 
                           lr = 1e-04, 
                           sigma = 8.0, 
                           target_reward = 50.0, 
@@ -464,15 +464,15 @@ if __name__ == "__main__":
       
     TrainKernelConfig = Train_Kernel_Config(
                             batch_size = 512, 
-                            num_steps = 2000,
-                            lr = 1e-4,
+                            num_steps = 5000,
+                            lr = 5e-5,
                             ensemble_size = 10,
-                            num_hidden_layers = 3,
+                            num_hidden_layers = 4,
                             hidden_dim = 514,
                             type_kernel = 'mog',
                             kernel_num_modes = 5,
-                            kernel_noise_floor = 5e-4,
-                            λ_reg = 1e-3)
+                            kernel_noise_floor = 1e-6,
+                            λ_reg = 3e-4)
     
     TrainCriticConfig = Train_Critic_Config(
                             hidden_layers = 4,
@@ -481,7 +481,7 @@ if __name__ == "__main__":
                             num_steps = 20000,
                             lr = 3e-04,
                             tau = 0.005,
-                            gamma = 0.95,
+                            gamma = 0.99,
                             data_conservation = True)
     
     FTConfig = FinetuningConfig(
@@ -496,15 +496,15 @@ if __name__ == "__main__":
         critic_model_checkpoint = 0,
         critic = True,
         kernel = True,
-        buffer_size = 5500,
+        buffer_size = 20000,
         finetune_buffer_cutoff_length = 50,
         finetune_steps = 150,
         finetune_rounds = 30,
         diffusion_steps = 200,
         karras_percent = 0.05,
         Loss_Clip_percent = 0.75,
-        finetune_batch_size = 12,
-        finetune_batch_per_sample = 2,
+        finetune_batch_size = 18,
+        finetune_batch_per_sample = 3,
         finetune_lr = 2e-05,
         initial_lam = 0.5,
         eta_lam = 0.5,
@@ -516,7 +516,7 @@ if __name__ == "__main__":
         rollout_length = 4000,  # or your desired value
         rollout_num_envs = 1, 
         continual_rollout = True,
-        num_rollout_processes = 10,
+        num_rollout_processes = 20,
         train_reward_config = TrainRewardConfig,
         train_kernel_config = TrainKernelConfig,
         train_critic_config = TrainCriticConfig) 

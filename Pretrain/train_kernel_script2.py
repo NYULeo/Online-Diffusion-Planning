@@ -54,11 +54,7 @@ if __name__ == '__main__':  # pragma: no cover
     
     dataset = 'cube'
     specific_dataset = 'single-play'
-
-    
     trajs = load_success_trajs(dataset, specific_dataset, task_id = 4, step = 0)
-         
-    
     dataset = 'cube'
     specific_dataset = 'single'
     train_mog_kernel(
@@ -93,7 +89,7 @@ if __name__ == '__main__':  # pragma: no cover
                 noise_floor = 1e-6)
     
     
-   
+    """
     print("Testing Kernel on Generated trajs: ")
     dataset = 'cube'
     specific_dataset = 'single-play'
@@ -115,6 +111,7 @@ if __name__ == '__main__':  # pragma: no cover
         planner_checkpoint = 0,
         kernel_checkpoint = 0,
         task_id = 4)
+      """
     
    
 
