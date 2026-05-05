@@ -680,34 +680,36 @@ if __name__ == "__main__":
 
     
     from Finetuning.utils import rollout_parallel3
-    set_seed(1)
+    #set_seed(1)
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
-    total_success_trajs = []
+    #total_success_trajs = []
    
     
-    #for i in range(0, 13):
-      # task_id = i*5
-       #for j in range(1, 50):
-       #set_seed(j)
-    trajs, _, success_rate, _ = rollout_parallel3(env_name = env_name, 
+    for i in range(0, 13):
+       checkpoint_step = i*5
+       total_success_rate = 0.0
+       for j in range(1, 51):
+          set_seed(j)
+          trajs, _, success_rate, _ = rollout_parallel3(env_name = env_name, 
                       specific_env = specific_train_dataset, 
                       horizon = 32,
                       steps_T = 200, 
                       num_karras = 10, 
                       eta = 0.8, 
                       episode_length = 4000, 
-                      checkpoint_step = 0,
+                      checkpoint_step = checkpoint_step,
                       num_envs = 10, 
                       task_id = 4, 
-                      seed_base = 1, 
+                      seed_base = j, 
                       continual_rollout = True, 
                       chunk_size = 32)
-    print(len(trajs))
-    success_trajs = get_success_trajs(trajs)
-    success_rate = len(success_trajs) / len(trajs)
-    print(f"Success Rate for task {4}: {success_rate:.4f}")
+          success_trajs = get_success_trajs(trajs)
+          success_rate = len(success_trajs) / len(trajs)
+          total_success_rate += success_rate
+       total_success_rate = total_success_rate / 50
+       print(f"Success Rate for checkpoint {checkpoint_step}: {total_success_rate:.4f}")
      # print(len(total_success_trajs))
     #save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 4)
 
