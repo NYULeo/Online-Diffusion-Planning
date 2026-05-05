@@ -14,6 +14,21 @@ from Pretrain.Dataset import get_dataset
 from Pretrain.Critic.train_critic import test_critic
 
 
+def check_cube_single_goal_reach(trajs, task_id):   
+    goals = {'task_1': np.array( [ 0.0,       -1.0,        0.199599]), 
+         'task_2': np.array([7.50000000e-01, 8.02418254e-18, 1.99598996e-01]),
+         'task_3': np.array([-7.50000000e-01,  1.21832368e-19,  1.99598996e-01]),
+         'task_4': np.array([0.75,     2.0,       0.199599]),
+         'task_5': np.array([ 0.75,     -2.0,        0.199599])}
+    
+    total_dist = 0.0
+    for traj in trajs:
+           position = traj['observations'][-1][19:22]
+           total_dist += np.linalg.norm(position - goals[f"task_{task_id}"])
+    average_dist = total_dist/len(trajs)
+    print(f"Task {task_id} average distance: {average_dist}")
+
+
 
 
 
@@ -30,8 +45,8 @@ if __name__ == '__main__':  # pragma: no cover
     path = PROJECT_ROOT / "Finetuning" / "Rollouts" / "cube" / "single-play" / "task_4" / "trajs_task4_success_0.pkl"
     with open(path, 'rb') as f:
           trajs_2 = pickle.load(f)
-    trajs = trajs_1 + trajs_2
-    
+    trajs = trajs_2
+    check_cube_single_goal_reach(trajs, 4)
     train_critic(dataset_name = env_name,
                  specific_dataset = specific_env, 
                  hidden_layers = 4,
