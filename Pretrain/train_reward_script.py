@@ -77,42 +77,45 @@ if __name__ == '__main__':
 
 if __name__ == '__main__':
     set_seed(1)
+    """
     path = f'./Finetuning/Rollouts/cube/single-play/task_4/trajs_task4_success_0.pkl'
     with open(path, 'rb') as f:
           trajs = pickle.load(f)
+    """
     train_reward(
         dataset_name = 'cube',
-        hidden_layers = 2,
+        hidden_layers = 3,
         hidden_dim = 128, 
         batch_size = 256,
-        num_steps = 4000,
+        num_steps = 5000,
         save_freq = 500,
         lr = 1e-04,
         sigma = 8.0,
         #alpha = 0.99,
         target_reward = 50.0,
-        specific_dataset = 'single',
-        task_id = 4,
-        traj_length = 200,
-        trajs = trajs
+        specific_dataset = 'double',
+        task_id = 2,
+        traj_length = 500,
+        trajs = None
     )
-    
+    """
     path = f'./Finetuning/Rollouts/cube/single-play/task_4/trajs_task4_success_0.pkl'
     with open(path, 'rb') as f:
           trajs = pickle.load(f)
+    """
     test_Model(
         dataset_name = 'cube', 
-        hidden_layers = 2, 
+        hidden_layers = 3, 
         hidden_dim = 128,
-        specific_dataset = 'single', 
-        trajs = trajs,
+        specific_dataset = 'double', 
+        trajs = None,
         sigma = 8.0,
         #alpha = 0.99, 
         target_reward = 50.0,
-        task_id = 4,
-        traj_length = 200,
-        save_freq = 4000, 
-        num_steps = 4000)
+        task_id = 2,
+        traj_length = 500,
+        save_freq = 5000, 
+        num_steps = 5000)
 
 
 

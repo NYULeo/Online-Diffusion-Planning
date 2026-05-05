@@ -35,6 +35,21 @@ def check_cube_single_goal_reach(trajs, task_id):
     average_dist = total_dist/len(trajs)
     print(f"Task {task_id} average distance: {average_dist}")
 
+def check_cube_double_goal_reach(trajs, task_id):   
+    goals = {   'task_1': [np.array([0.00000000e+00, 4.40762988e-19, 1.99598996e-01]),  np.array([0.0,   1.0,   0.199599])], 
+                'task_2': [np.array([-0.75,      1.0,        0.199599]),  np.array([0.75,     1.0,       0.199599])],
+                'task_3': [np.array([0.0,       -2.0,        0.199599]),  np.array([0.0,      2.0,       0.199599])],
+                'task_4': [np.array([0.0,        1.0,        0.199599]),  np.array([0.0,       -1.0,        0.199599])],
+                'task_5': [np.array([0.00000000e+00,  -3.99397428e-18,   1.99213779e-01]),  np.array([0.00000000e+00,   9.37726514e-18,   5.99039293e-01])]     }
+    total_dist = 0.0
+    for traj in trajs:
+           position_1 = traj['observations'][-1][19:22]
+           position_2 = traj['observations'][-1][28:31]
+           dist_1 = np.linalg.norm(position_1 - goals[f"task_{task_id}"][0])
+           dist_2 = np.linalg.norm(position_2 - goals[f"task_{task_id}"][1])
+           total_dist += dist_1 + dist_2
+    average_dist = total_dist/len(trajs)
+    print(f"Task {task_id} average distance: {average_dist}")
 
 
 
@@ -42,7 +57,11 @@ path = f'./Finetuning/Rollouts/cube/single-play/task_4/trajs_task4_success_0.pkl
 with open(path, 'rb') as f:
     trajs = pickle.load(f)
 
+data = get_dataset('cube', 'double-play', task_id = 5, traj_length = None)
+trajs = data.get_trajectories()
 
+for i in range(1, 6):
+     check_cube_double_goal_reach(trajs, i)
 """
 data = get_dataset('cube', 'single-play', task_id = 5)
 trajs = data.get_trajectories()
