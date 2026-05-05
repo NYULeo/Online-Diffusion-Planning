@@ -1,6 +1,7 @@
 import sys
 import os
 from pathlib import Path
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 import argparse
 import pickle
 import numpy as np
@@ -26,7 +27,7 @@ if __name__ == '__main__':  # pragma: no cover
     specific_env = 'single-play'
     data = get_dataset(env_name, specific_env, task_id = 4, traj_length = None)
     trajs_1 = data.get_trajectories()
-    path = f'./Finetuning/Rollouts/cube/single-play/task_4/trajs_task4_success_0.pkl'
+    path = PROJECT_ROOT / "Finetuning" / "Rollouts" / "cube" / "single-play" / "task_4" / "trajs_task4_success_0.pkl"
     with open(path, 'rb') as f:
           trajs_2 = pickle.load(f)
     trajs = trajs_1 + trajs_2
@@ -51,7 +52,10 @@ if __name__ == '__main__':  # pragma: no cover
     
     data = get_dataset(env_name, specific_env, task_id = 4, traj_length = None)
     trajs_1 = data.get_trajectories()
-    path = f'./Finetuning/Rollouts/cube/single-play/task_4/trajs_task4_success_0.pkl'
+    
+  
+    path = PROJECT_ROOT / "Finetuning" / "Rollouts" / "cube" / "single-play" / "task_4" / "trajs_task4_success_0.pkl"
+
     with open(path, 'rb') as f:
           trajs_2 = pickle.load(f)
     trajs = trajs_1 + trajs_2
