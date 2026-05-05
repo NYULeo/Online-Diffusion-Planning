@@ -52,7 +52,7 @@ if __name__ == '__main__':  # pragma: no cover
                  hidden_layers = 4,
                  hidden_dim = 512,
                  batch_size = 256, 
-                 num_steps = 20000, 
+                 num_steps = 30000, 
                  gamma = 0.99, 
                  horizon = 32, 
                  lr = 3e-04, 
@@ -73,13 +73,13 @@ if __name__ == '__main__':  # pragma: no cover
 
     with open(path, 'rb') as f:
           trajs_2 = pickle.load(f)
-    trajs = trajs_1 + trajs_2
+    trajs =  trajs_2
     check_cube_single_goal_reach(trajs, 4)
     test_critic(dataset_name = env_name,
                 specific_dataset = specific_env,
                 hidden_layers = 4,
                 hidden_dim = 512,
-                checkpoint_step = 20000,
+                checkpoint_step = 30000,
                 gamma = 0.99,
                 horizon = 32,
                 goal = None,
