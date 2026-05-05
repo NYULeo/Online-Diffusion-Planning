@@ -698,12 +698,13 @@ if __name__ == "__main__":
                       num_karras = 10, 
                       eta = 0.8, 
                       episode_length = 4000, 
-                      checkpoint_step = 4,
+                      checkpoint_step = 0,
                       num_envs = 10, 
                       task_id = 4, 
                       seed_base = 1, 
                       continual_rollout = True, 
                       chunk_size = 32)
+    print(len(trajs))
     success_trajs = get_success_trajs(trajs)
     success_rate = len(success_trajs) / len(trajs)
     print(f"Success Rate for task {4}: {success_rate:.4f}")
