@@ -40,12 +40,12 @@ if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     env_name = 'cube'
     specific_env = 'single-play'
-    data = get_dataset(env_name, specific_env, task_id = 4, traj_length = None)
+    data = get_dataset(env_name, specific_env, task_id = 4, traj_length = 200)
     trajs_1 = data.get_trajectories()
     path = PROJECT_ROOT / "Finetuning" / "Rollouts" / "cube" / "single-play" / "task_4" / "trajs_task4_success_0.pkl"
     with open(path, 'rb') as f:
           trajs_2 = pickle.load(f)
-    trajs = trajs_2
+    trajs = trajs_2 + trajs_1
     check_cube_single_goal_reach(trajs, 4)
     train_critic(dataset_name = env_name,
                  specific_dataset = specific_env, 
@@ -65,15 +65,12 @@ if __name__ == '__main__':  # pragma: no cover
                  trajs = trajs, 
                  task_id = 4)
     
-    data = get_dataset(env_name, specific_env, task_id = 4, traj_length = None)
+    data = get_dataset(env_name, specific_env, task_id = 4, traj_length = 200)
     trajs_1 = data.get_trajectories()
-    
-  
     path = PROJECT_ROOT / "Finetuning" / "Rollouts" / "cube" / "single-play" / "task_4" / "trajs_task4_success_0.pkl"
-
     with open(path, 'rb') as f:
           trajs_2 = pickle.load(f)
-    trajs =  trajs_2
+    trajs =  trajs_2 + trajs_1
     check_cube_single_goal_reach(trajs, 4)
     test_critic(dataset_name = env_name,
                 specific_dataset = specific_env,
