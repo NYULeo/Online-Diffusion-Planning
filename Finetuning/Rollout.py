@@ -702,13 +702,15 @@ if __name__ == "__main__":
                       seed_base = i, 
                       continual_rollout = True, 
                       chunk_size = 32)
-        
+           print(len(trajs))
            total_success_trajs.append(get_success_trajs(trajs))
+           print(len( total_success_trajs))
+           exit()
            success_rate += success_rate
     
-    print(success_rate/100)
-    print(len(total_success_trajs))
-    save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 4)
+    print(success_rate/50)
+   # print(len(total_success_trajs))
+    #save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 4)
 
    
 
