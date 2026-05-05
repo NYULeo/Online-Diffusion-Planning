@@ -4,8 +4,9 @@ from pathlib import Path
 import argparse
 import pickle
 import numpy as np
-REPO_ROOT = Path(__file__).resolve().parents[1]  # Online-Diffusion-Planning/
-sys.path.insert(0, str(REPO_ROOT))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from Rewards.Reward_Backbone import train_reward, test_Model, train_reward_pos_weight
+from Pretrain.utils import set_seed
 from Pretrain.Critic.train_critic import train_critic
 from Pretrain.utils import set_seed
 from Pretrain.Dataset import get_dataset

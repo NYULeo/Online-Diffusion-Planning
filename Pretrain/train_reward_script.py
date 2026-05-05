@@ -67,10 +67,10 @@ if __name__ == '__main__':
           trajs = pickle.load(f)
     train_reward(
         dataset_name = 'cube',
-        hidden_layers = 3,
-        hidden_dim = 256, 
+        hidden_layers = 2,
+        hidden_dim = 128, 
         batch_size = 256,
-        num_steps = 2000,
+        num_steps = 1000,
         save_freq = 500,
         lr = 1e-04,
         sigma = 8.0,
@@ -78,7 +78,7 @@ if __name__ == '__main__':
         target_reward = 50.0,
         specific_dataset = 'single',
         task_id = 4,
-        traj_length = None,
+        traj_length = 200,
         trajs = trajs
     )
     
@@ -87,17 +87,17 @@ if __name__ == '__main__':
           trajs = pickle.load(f)
     test_Model(
         dataset_name = 'cube', 
-        hidden_layers = 3, 
-        hidden_dim = 256,
+        hidden_layers = 2, 
+        hidden_dim = 128,
         specific_dataset = 'single', 
         trajs = trajs,
         sigma = 8.0,
         #alpha = 0.99, 
         target_reward = 50.0,
         task_id = 4,
-        traj_length = None,
-        save_freq = 2000, 
-        num_steps = 2000)
+        traj_length = 200,
+        save_freq = 1000, 
+        num_steps = 1000)
 
 
 
