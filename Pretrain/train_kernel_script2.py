@@ -51,7 +51,7 @@ if __name__ == '__main__':  # pragma: no cover
     
 
 
-    """
+    
     dataset = 'cube'
     specific_dataset = 'single-play'
     trajs = load_success_trajs(dataset, specific_dataset, task_id = 4, step = 0)
@@ -64,7 +64,7 @@ if __name__ == '__main__':  # pragma: no cover
          trajs = trajs,
          batch_size = 512,
          lr = 1e-4,
-         num_steps = 2000,
+         num_steps = 5000,
          save_freq = 1000,
          ensemble_size = 10,
          num_modes = 10,
@@ -79,17 +79,17 @@ if __name__ == '__main__':  # pragma: no cover
                 specific_dataset = specific_dataset,
                 task_id = 4,
                 trajs = trajs,
-                save_freq = 2000,
-                num_steps = 2000,
+                save_freq = 5000,
+                num_steps = 5000,
                 num_hidden_layers = 4,
                 hidden_dim = 514,
                 ensemble_size = 10, 
                 num_modes = 10,
                 quantile = 0.95,
                 noise_floor = 5e-4)
+    
+    
     """
-    
-    
     print("Testing Kernel on Generated trajs: ")
     dataset = 'cube'
     specific_dataset = 'single-play'
@@ -111,7 +111,7 @@ if __name__ == '__main__':  # pragma: no cover
         planner_checkpoint = 0,
         kernel_checkpoint = 0,
         task_id = 4)
-
+    """
       
     
    
