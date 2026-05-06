@@ -696,7 +696,7 @@ if __name__ == "__main__":
   
     
     
-    set_seed(45)
+    set_seed(5)
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
@@ -707,7 +707,7 @@ if __name__ == "__main__":
             num_karras = 10, 
             eta = 0.8, 
             episode_length = 3000, 
-            checkpoint_steps = 20, 
+            checkpoint_steps = 25, 
             render = True,  
             base_seed = 1, 
             task_id = 4,
