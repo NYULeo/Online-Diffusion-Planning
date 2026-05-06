@@ -759,8 +759,14 @@ def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_da
     #print("Using device:", device)
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
     dataset = KernelDataset(trajs, dataset_name, specific_dataset, step)
-    loader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
-                              pin_memory=True, num_workers=8))
+    loader = cycle(DataLoader(dataset,
+                                  batch_size=batch_size, 
+                                  shuffle=True,
+                                  pin_memory=True, 
+                                  num_workers=8, 
+                                  persistent_workers=True, 
+                                  prefetch_factor=4, 
+                                  drop_last=True))
     # Create ensemble of models
     ensemble = [MoGTransitionKernel(obs_dim, act_dim, num_modes, num_hidden_layers, hidden_dim, kernel_noise_floor).to(device) for _ in range(ensemble_size)]
     optimizers = [optim.Adam(m.parameters(), lr, weight_decay=1e-5) for m in ensemble]
@@ -773,8 +779,8 @@ def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_da
         s_next = s_next.to(device)
         # For each model in ensemble, compute loss
         losses = []
-        mus = []
-        log_stds = []
+        #mus = []
+        #log_stds = []
         for m in ensemble:
             mu, log_std, weights = m(s, a)
             loss = m.mog_nll(s_next, mu, log_std, weights)
@@ -787,6 +793,7 @@ def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_da
             loss = loss + λ_reg * penalty
             losses.append(loss)
         # Backprop
+        """
         for m, opt, loss in zip(ensemble, optimizers, losses):
             opt.zero_grad()
             loss.backward()
@@ -795,12 +802,29 @@ def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_da
         # Logging
         avg_loss = sum(loss.item() for loss in losses) / ensemble_size
         total_loss += avg_loss
+        """
+        for m, opt, loss, scaler in zip(ensemble, optimizers, losses, scalers):
+            opt.zero_grad(set_to_none=True)
+            scaler.scale(loss).backward()
+            scaler.unscale_(opt)
+            torch.nn.utils.clip_grad_norm_(m.parameters(), max_norm=5.0)
+            scaler.step(opt)
+            scaler.update()
 
-    new_loader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=True, num_workers=8)
+    #new_loader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=True, num_workers=8)
+    new_loader = DataLoader(
+        dataset,
+        batch_size=1024,  # larger eval batch can be much faster
+        shuffle=False,
+        pin_memory=(device.type == "cuda"),
+        num_workers=8,
+        persistent_workers=True,
+        prefetch_factor=4,
+    )
     if(constraint_type == 'mahalanobis'):
-         threshold = compute_threshold_mahalanobis_mog(ensemble, new_loader, quantile)
+         threshold = compute_threshold_mahalanobis_mog(ensemble, new_loader, quantile, device)
     else:
-         threshold = compute_threshold_log_prob_mog(ensemble, new_loader, quantile)
+         threshold = compute_threshold_log_prob_mog(ensemble, new_loader, quantile, device)
     for idx, m in enumerate(ensemble):
          ckpt = copy.deepcopy(m).cpu()
          save_kernel_model(ckpt, dataset_name, specific_dataset, step, idx)
@@ -1992,6 +2016,7 @@ def compute_threshold_mahalanobis(kernels, dataloader, quantile):
     print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
     return tau
 
+"""
 def compute_threshold_mahalanobis_mog(kernels, dataloader, quantile):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     all_D2_total = []
@@ -2016,7 +2041,28 @@ def compute_threshold_mahalanobis_mog(kernels, dataloader, quantile):
     print(f"variance_D2_total = {var_D2_total:.4f}")
     print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
     return tau
+"""
 
+def compute_threshold_mahalanobis_mog(kernels, dataloader, quantile, device):
+    chunks = []
+    with torch.no_grad():
+        for s, a, s_next in dataloader:
+            s = s.to(device, non_blocking=True)
+            a = a.to(device, non_blocking=True)
+            s_next = s_next.to(device, non_blocking=True)
+            d2 = compute_total_mahalanobis_score_mog(kernels, s, a, s_next)
+            chunks.append(d2.detach().float().cpu())
+    all_vals = torch.cat(chunks, dim=0)
+    tau = torch.quantile(all_vals, quantile).item()
+    print(f"mean_D2_total = {all_vals.mean().item():.4f}")
+    print(f"min_D2_total = {all_vals.min().item():.4f}")
+    print(f"max_D2_total = {all_vals.max().item():.4f}")
+    print(f"variance_D2_total = {all_vals.var(unbiased=False).item():.4f}")
+    print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
+    return tau
+
+
+"""
 def compute_threshold_log_prob_mog(kernels, dataloader, quantile):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     all_log_density_total = []
@@ -2041,7 +2087,7 @@ def compute_threshold_log_prob_mog(kernels, dataloader, quantile):
     print(f"variance_D2_total = {var_log_density_total:.4f}")
     print(f"τ ({(1 - quantile)*100:.0f}th percentile) : {tau:.4f}")
     return tau
-
+"""
 def compute_threshold_log_prob(kernels, dataloader, quantile):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     all_log_density_total = []
@@ -2067,4 +2113,20 @@ def compute_threshold_log_prob(kernels, dataloader, quantile):
     print(f"τ ({(1 - quantile)*100:.0f}th percentile) : {tau:.4f}")
     return tau
     
-    
+def compute_threshold_log_prob_mog(kernels, dataloader, quantile, device):
+    chunks = []
+    with torch.no_grad():
+        for s, a, s_next in dataloader:
+            s = s.to(device, non_blocking=True)
+            a = a.to(device, non_blocking=True)
+            s_next = s_next.to(device, non_blocking=True)
+            lp = compute_log_density_mog(kernels, s, a, s_next)
+            chunks.append(lp.detach().float().cpu())
+    all_vals = torch.cat(chunks, dim=0)
+    tau = torch.quantile(all_vals, 1.0 - quantile).item()
+    print(f"mean_log_density_total = {all_vals.mean().item():.4f}")
+    print(f"min_log_density_total = {all_vals.min().item():.4f}")
+    print(f"max_log_density_total = {all_vals.max().item():.4f}")
+    print(f"variance_log_density_total = {all_vals.var(unbiased=False).item():.4f}")
+    print(f"τ ({(1-quantile)*100:.0f}th percentile) : {tau:.4f}")
+    return tau

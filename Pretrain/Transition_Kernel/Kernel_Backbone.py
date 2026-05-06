@@ -594,7 +594,7 @@ def train_mog_kernel(
           total_trajs = train_trajs
     dataset = KernelDataset(total_trajs, kernel_name)
     loader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
-                              pin_memory=True, num_workers=8))
+                              pin_memory=True, num_workers=8, persistent_workers=True))
 
     # Create ensemble of MoG kernels
     ensemble = [
