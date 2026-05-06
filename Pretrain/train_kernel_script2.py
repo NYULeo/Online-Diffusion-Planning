@@ -9,7 +9,7 @@ os.chdir(REPO_ROOT)
 from Pretrain.Transition_Kernel.Kernel_Backbone import train_kernel, test_kernel, train_mog_kernel, test_kernel_mog
 from Pretrain.utils import set_seed
 import pickle
-from Finetuning.utils import get_trajs
+from Finetuning.utils import get_trajs, check_device
 
 from Finetuning.Rollout import Test_Kernel_on_Generated_Trajs, Kernel_Config, save_success_trajs_for_reward, load_success_trajs
 
@@ -51,7 +51,7 @@ if __name__ == '__main__':  # pragma: no cover
     
 
 
-    
+    """
     dataset = 'cube'
     specific_dataset = 'single-play'
     trajs = load_success_trajs(dataset, specific_dataset, task_id = 4, step = 0)
@@ -87,15 +87,15 @@ if __name__ == '__main__':  # pragma: no cover
                 num_modes = 10,
                 quantile = 0.95,
                 noise_floor = 5e-4)
-    
-    
     """
+    
+    
     print("Testing Kernel on Generated trajs: ")
     dataset = 'cube'
     specific_dataset = 'single-play'
     kernel_config = Kernel_Config(type_kernel = 'mog',
-                                  kernel_num_modes = 5,
-                                  kernel_noise_floor = 1e-6,
+                                  kernel_num_modes = 10,
+                                  kernel_noise_floor = 5e-4,
                                   num_hidden_layers = 4,
                                   hidden_dim = 514,
                                   ensemble_size = 10)
@@ -111,7 +111,7 @@ if __name__ == '__main__':  # pragma: no cover
         planner_checkpoint = 0,
         kernel_checkpoint = 0,
         task_id = 4)
-      """
+
       
     
    

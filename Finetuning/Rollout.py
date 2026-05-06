@@ -12,7 +12,7 @@ from Pretrain.Planners.Backbone.Dit import DiT1d
 from torch.utils.data import DataLoader
 from Finetuning.utils import cycle
 #from Pretrain.Planners.Backbone.utils import get_pretrained_planner
-from Finetuning.utils import get_planner, get_normalized_score, get_expert_score, spare_reward_prcocessor, PlannerDataset, get_current_state, spare_reward_prcocessor
+from Finetuning.utils import get_planner, get_normalized_score, get_expert_score, spare_reward_prcocessor, PlannerDataset, get_current_state, spare_reward_prcocessor, check_device
 from Pretrain.Dataset import Planner_Processor, get_dataset
 from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde, sample_euler_karras, sample_euler_karras2
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
@@ -431,12 +431,11 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      #return len(traj['rewards'])
      #print(get_normalized_score([traj]))
 
-def load_kernel(env_name, specific_env, checkpoint_steps, kernel_config: Kernel_Config):
+def load_kernel(env_name, specific_env, checkpoint_steps, kernel_config: Kernel_Config, device: str):
     from Pretrain.Transition_Kernel.Kernel_Backbone import MoGTransitionKernel
     from Finetuning.utils import get_kernel, get_kernel_stats
     kernel_state_dicts, obs_dim, act_dim = get_kernel(env_name, specific_env, checkpoint_steps)
     kernels = []
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     kernel_stats = get_kernel_stats(env_name, specific_env, checkpoint_steps)
     Model = MoGTransitionKernel
     for sd in kernel_state_dicts:
@@ -448,14 +447,14 @@ def load_kernel(env_name, specific_env, checkpoint_steps, kernel_config: Kernel_
             kernels.append(kernel_net)
     return kernels, kernel_stats, obs_dim, act_dim
 
-def compute_log_prob(kernels, kernel_stats, x, obs_dim, act_dim, type: str = 'log_density'):
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+def compute_log_prob(kernels, kernel_stats, x, obs_dim, act_dim, type: str = 'log_density', device: str = 'cuda'):
+    #device = 'cuda' if torch.cuda.is_available() else 'cpu'
     from Pretrain.Transition_Kernel.Kernel_Backbone import  compute_log_density_mog, compute_total_mahalanobis_score_mog
     values = []
     for i in range(1, len(x)-1):
         obs = torch.tensor(kernel_stats.norm_obs(x[i, :obs_dim].copy()), dtype = torch.float32).unsqueeze(0).to(device)
         act = torch.tensor(x[i, obs_dim:(obs_dim+act_dim)].copy(), dtype = torch.float32).unsqueeze(0).to(device)
-        s_next = torch.tensor(kernel_stats.norm_obs(x[i+1, :obs_dim].copy())).unsqueeze(0).to(device)
+        s_next = torch.tensor(kernel_stats.norm_obs(x[i+1, :obs_dim].copy()), dtype = torch.float32).unsqueeze(0).to(device)
         if(type == 'log_density'):
             value = compute_log_density_mog(kernels, obs, act, s_next).item()
         else:
@@ -468,7 +467,7 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
      
 
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     device = "cuda" if torch.cuda.is_available() else "cpu"
+     device = check_device()
      print(f"Using device {device}")
      
      _, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array')
@@ -496,15 +495,15 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
      trajs = dataset.get_trajectories()
      planner_dataset = PlannerDataset(trajs, horizon, env_name, specific_env)
      dataloader = cycle(DataLoader(planner_dataset, batch_size = 1, shuffle = False))
-     kernels, kernel_stats, obs_dim, act_dim = load_kernel(env_name, specific_env, kernel_checkpoint, kernel_config)
+     kernels, kernel_stats, obs_dim, act_dim = load_kernel(env_name, specific_env, kernel_checkpoint, kernel_config, device)
      mahalanobis_scores = []
      log_density_scores = []
      for i in range(time):
             norm_state = next(dataloader)
             norm_state = norm_state.squeeze(0).numpy()
             x = sample_euler_karras(norm_state, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
-            log_density_score = compute_log_prob(kernels, kernel_stats, x, obs_dim, act_dim, type = 'log_density')
-            mahalanobis_score = compute_log_prob(kernels, kernel_stats, x, obs_dim, act_dim, type = 'mahalanobis')
+            log_density_score = compute_log_prob(kernels, kernel_stats, x, obs_dim, act_dim, type = 'log_density', device = device)
+            mahalanobis_score = compute_log_prob(kernels, kernel_stats, x, obs_dim, act_dim, type = 'mahalanobis', device = device)
             mahalanobis_scores.append(mahalanobis_score)
             log_density_scores.append(log_density_score)
            
