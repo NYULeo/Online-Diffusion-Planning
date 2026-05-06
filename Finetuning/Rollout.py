@@ -426,9 +426,9 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      with open('Generated_trajectory.pkl', 'wb') as f:
                 pickle.dump(traj_info, f)
      """
-     print(sum(traj['rewards']))
-     return traj
-     #return len(traj['rewards'])
+     #print(sum(traj['rewards']))
+     #return traj
+     return sum(traj['rewards'])
      #print(get_normalized_score([traj]))
 
 def load_kernel(env_name, specific_env, checkpoint_steps, kernel_config: Kernel_Config, device: str):
@@ -698,23 +698,31 @@ if __name__ == "__main__":
   
     
     
-    set_seed(2)
+    #set_seed(26)
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
-    traj = rollout(env_name, 
+    #total_reward = 0.0
+    #for i in range(1, 11):
+    set_seed(20)
+    reward = rollout(
+            env_name, 
             specific_train_dataset, 
             horizon, 
             steps_T = 200, 
             num_karras = 10, 
             eta = 0.8, 
             episode_length = 3000, 
-            checkpoint_steps = 0, 
+            checkpoint_steps = 60, 
             render = True,  
             base_seed = 0, 
             task_id = 4,
             continual_rollout = True,
             chunk_size = 31)
+        #total_reward += reward
+    
+    #print(f"Success Rate: {total_reward / 10 :.4f}")
+       
     
 
     """
