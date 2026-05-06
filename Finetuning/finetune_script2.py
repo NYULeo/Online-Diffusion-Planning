@@ -449,8 +449,7 @@ if __name__ == "__main__":
                critic_gamma = 1.0,
                explore = False,
                constraint_type = 'log_prob') 
-
-    
+  
     TrainRewardConfig = Train_Reward_Config(
                           hidden_layers = 2,
                           hidden_dim = 128,

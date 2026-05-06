@@ -707,12 +707,12 @@ if __name__ == "__main__":
             num_karras = 10, 
             eta = 0.8, 
             episode_length = 3000, 
-            checkpoint_steps = 25, 
+            checkpoint_steps = 5, 
             render = True,  
             base_seed = 1, 
             task_id = 4,
             continual_rollout = True,
-            chunk_size = 32)
+            chunk_size = 31)
     
 
     """

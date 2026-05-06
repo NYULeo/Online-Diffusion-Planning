@@ -473,7 +473,7 @@ class KernelDataset(Dataset):
          for traj in trajectories:
             obs = traj['observations']
             acts = traj['actions']
-            for t in range(len(acts)):
+            for t in range(len(obs)-1):
                 s_t = self.stats.norm_obs(obs[t])
                 a_t   = acts[t]
                 s_tp1 = self.stats.norm_obs(obs[t+1])
