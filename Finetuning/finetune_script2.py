@@ -455,7 +455,7 @@ if __name__ == "__main__":
                           hidden_layers = 2,
                           hidden_dim = 128,
                           batch_size = 256, 
-                          num_steps = 4000, 
+                          num_steps = 5000, 
                           lr = 1e-04, 
                           sigma = 8.0, 
                           target_reward = 50.0, 
