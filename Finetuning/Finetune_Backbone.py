@@ -92,6 +92,7 @@ class FinetuningConfig():
     kernel: bool = False
     buffer_size: int = 100000
     finetune_buffer_cutoff_length: Optional[int] = None
+    train_buffer_cutoff_length: Optional[int] = None
     finetune_steps: int = 1000000
     finetune_rounds: int = 10
     diffusion_steps: int = 30
@@ -158,6 +159,7 @@ def save_hyperparameters(config: FinetuningConfig, filepath: Optional[str] = Non
             'finetune_batch_per_sample': config.finetune_batch_per_sample,
             'buffer_size': config.buffer_size,
             'finetune_buffer_cutoff_length': config.finetune_buffer_cutoff_length,
+            'train_buffer_cutoff_length': config.train_buffer_cutoff_length,
             'finetune_lr': config.finetune_lr,
             'reward_scaling_factor': config.reward_scaling_factor,
             'finetune_total_steps': config.finetune_steps,
@@ -260,7 +262,7 @@ class OnlineFinetuner():
         
         if(self.config.train_reward_config.task_id is not None):
             #trajs = get_trajs(self.config.dataset_name, self.config.specific_dataset, 0, self.config.train_reward_config.task_id)
-            dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id)
+            dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = self.config.train_buffer_cutoff_length)
             trajs = dataset.get_trajectories()
         else:
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
@@ -365,7 +367,7 @@ class OnlineFinetuner():
     
     def data_conservation_update(self, critic_buffer):
         if(self.config.train_reward_config.task_id is not None):
-            dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id)
+            dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = self.config.train_buffer_cutoff_length)
             trajs = dataset.get_trajectories()
         else:
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
