@@ -896,7 +896,7 @@ class CriticDataset(Dataset):
         return new_rews
     
 
-def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, step: int, goal = None, target_reward = 1.0, task_id: Optional[int] = None):
+def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, sigma: float, batch_size, num_steps, gamma, horizon, lr, min_lr, tau, step: int, goal = None, target_reward = 1.0, task_id: Optional[int] = None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #get information
 
@@ -915,6 +915,12 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
     target_critic.load_state_dict(critic.state_dict())
     target_critic.eval()
     optimizer = optim.Adam(critic.parameters(), lr = lr)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max = num_steps,   # one scheduler step per training step
+            eta_min = min_lr
+        )
+
 
     print(f"Training critic for {dataset_name}-{specific_dataset}")
     for k in range(1, num_steps + 1):  # number of passes over dataset
@@ -935,6 +941,7 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
            optimizer.zero_grad()
            loss.backward()
            optimizer.step()
+           scheduler.step()
 
            # Soft update target network
            for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):

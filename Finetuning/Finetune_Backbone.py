@@ -69,7 +69,8 @@ class Train_Critic_Config:
     hidden_dim: int = 128
     batch_size: int = 256
     num_steps: int = 3000
-    lr: float = 1e-5
+    lr: float = 5e-05
+    min_lr: float = 1e-05
     tau: float = 0.005
     gamma: float = 1.0
     data_conservation: bool = False
@@ -572,7 +573,7 @@ class OnlineFinetuner():
             
             self.gather_and_sync_trajs_and_buffer(trajs)
             if self.config.critic:
-                 critic_buffer, train_critic = self.collect_critic_buffer(trajs)
+                 critic_buffer, update_critic = self.collect_critic_buffer(trajs)
                  self.accelerator.wait_for_everyone()
             
             #collect the score and number of env stepsacross all processes
@@ -644,7 +645,7 @@ class OnlineFinetuner():
                                       step = ((step+1) * self.config.AMConfig.per_round_steps),
                                       quantile = self.config.RewardConfig.quantile)
                   
-                  if self.config.critic and train_critic:
+                  if self.config.critic and update_critic:
                       print(f"Starting Critic Training")
                       #save_trajs(critic_buffer, self.config.dataset_name, self.config.specific_dataset, ((step+1) * self.config.AMConfig.per_round_steps))
                       print(f"Number of trajectories of Critic Training: {len(critic_buffer)}")
@@ -659,6 +660,7 @@ class OnlineFinetuner():
                                    gamma = self.config.train_critic_config.gamma, 
                                    horizon = self.config.AMConfig.horizon, 
                                    lr = self.config.train_critic_config.lr, 
+                                   min_lr = self.config.train_critic_config.min_lr,
                                    tau = self.config.train_critic_config.tau, 
                                    step = ((step+1) * self.config.AMConfig.per_round_steps), 
                                    goal = self.config.train_reward_config.train_goal, 
