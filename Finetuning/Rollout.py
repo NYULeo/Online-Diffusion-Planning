@@ -300,7 +300,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      #env.reset(seed=1)  # Important: pass seed to env.reset
      env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', task_id = task_id, episode_length = None)
      #env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', episode_length = episode_length)
-     np.random.seed(base_seed)
+     #np.random.seed(base_seed)
      """
      if hasattr(env, 'action_space'):
         env.action_space.seed(base_seed)
@@ -331,11 +331,14 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      #reset
      if(env_name == 'cube'):
         #s0, info = env.reset(seed = base_seed, options = dict( task_id=task_id))
-        s0, info = env.reset(seed = base_seed)
+        #s0, info = env.reset(seed = base_seed)
+        s0, info = env.reset()
      if(goal_cell is not None):
-        s0, info = env.reset(seed = base_seed, options = {"goal_cell": goal_cell, "reset_cell": start_cell})
+        #s0, info = env.reset(seed = base_seed, options = {"goal_cell": goal_cell, "reset_cell": start_cell})
+        s0, info = env.reset( options = {"goal_cell": goal_cell, "reset_cell": start_cell})
      else:
-        s0, info = env.reset(seed = base_seed)
+        #s0, info = env.reset(seed = base_seed)
+        s0, info = env.reset()
      
     
      """
@@ -696,7 +699,7 @@ if __name__ == "__main__":
   
     
     
-    set_seed(5)
+    set_seed(2)
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
@@ -707,9 +710,9 @@ if __name__ == "__main__":
             num_karras = 10, 
             eta = 0.8, 
             episode_length = 3000, 
-            checkpoint_steps = 5, 
+            checkpoint_steps = 0, 
             render = True,  
-            base_seed = 1, 
+            base_seed = 0, 
             task_id = 4,
             continual_rollout = True,
             chunk_size = 31)
