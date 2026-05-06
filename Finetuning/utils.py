@@ -814,6 +814,8 @@ def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_da
         """
 
     #new_loader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=True, num_workers=8)
+    threshold = None
+    """
     new_loader = DataLoader(
         dataset,
         batch_size=1024,  # larger eval batch can be much faster
@@ -823,10 +825,12 @@ def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_da
         persistent_workers=True,
         prefetch_factor=4,
     )
+    
     if(constraint_type == 'mahalanobis'):
          threshold = compute_threshold_mahalanobis_mog(ensemble, new_loader, quantile, device)
     else:
          threshold = compute_threshold_log_prob_mog(ensemble, new_loader, quantile, device)
+    """
     for idx, m in enumerate(ensemble):
          ckpt = copy.deepcopy(m).cpu()
          save_kernel_model(ckpt, dataset_name, specific_dataset, step, idx)

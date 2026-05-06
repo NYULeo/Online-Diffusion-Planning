@@ -670,9 +670,11 @@ class OnlineFinetuner():
                                   
 
             self.accelerator.wait_for_everyone()
+            """
             stats = torch.tensor([threshold], device = self.accelerator.device)
             stats = broadcast(stats, from_process=0)
             threshold = stats.tolist()[0]
+            """
             
             #set the new total reward model
             self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
@@ -682,10 +684,12 @@ class OnlineFinetuner():
                  self.config.kernel_model_checkpoint = 0
             self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             #if self.config.RewardConfig.max_mahalanobis_score < threshold: 
+            """
             if(self.config.RewardConfig.constraint_type == 'mahalanobis' and self.config.RewardConfig.max_mahalanobis_score < threshold):
                  self.config.RewardConfig.max_mahalanobis_score = threshold
             elif(self.config.RewardConfig.constraint_type == 'log_prob' and self.config.RewardConfig.min_log_prob > threshold):
                  self.config.RewardConfig.min_log_prob = threshold
+            """
             
             #self.config.critic_model_checkpoint = 0
             self.set_reward_model(self.device)

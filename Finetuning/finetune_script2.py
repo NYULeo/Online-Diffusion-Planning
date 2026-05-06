@@ -464,7 +464,7 @@ if __name__ == "__main__":
     TrainKernelConfig = Train_Kernel_Config(
                             batch_size = 512, 
                             num_steps = 5000,
-                            lr = 5e-5,
+                            lr = 1e-4,
                             ensemble_size = 10,
                             num_hidden_layers = 4,
                             hidden_dim = 514,
@@ -499,7 +499,7 @@ if __name__ == "__main__":
         buffer_size = 20000,
         finetune_buffer_cutoff_length = 50,
         train_buffer_cutoff_length = 200,
-        finetune_steps = 60,
+        finetune_steps = 150,
         finetune_rounds = 30,
         diffusion_steps = 200,
         karras_percent = 0.05,
