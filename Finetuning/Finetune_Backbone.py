@@ -263,15 +263,19 @@ class OnlineFinetuner():
         
         if(self.config.train_reward_config.task_id is not None):
             #trajs = get_trajs(self.config.dataset_name, self.config.specific_dataset, 0, self.config.train_reward_config.task_id)
-            dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = self.config.train_buffer_cutoff_length)
-            trajs = dataset.get_trajectories()
+            dataset_reward = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = self.config.train_buffer_cutoff_length)
+            trajs_reward = dataset_reward.get_trajectories()
+            dataset_kernel = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id)
+            trajs_kernel = dataset_kernel.get_trajectories()
+            self.Finetune_Buffer.extend(trajs_reward)
+            self.Train_Buffer.extend(trajs_reward)
+            self.Train_Kernel_Buffer.extend(trajs_kernel)
         else:
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
             trajs = dataset.get_trajectories()
-        
-        self.Finetune_Buffer.extend(trajs)
-        self.Train_Buffer.extend(trajs)
-        self.Train_Kernel_Buffer.extend(trajs)
+            self.Finetune_Buffer.extend(trajs)
+            self.Train_Buffer.extend(trajs)
+            self.Train_Kernel_Buffer.extend(trajs)
 
         self.PlannerDataset = PlannerDataset(
                    self.Finetune_Buffer, 
@@ -300,7 +304,6 @@ class OnlineFinetuner():
             else:
                  self.reward_model = TotalReward_Mahalanobis(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, task_id = self.config.train_reward_config.task_id)
     
-
     def gather_and_sync_trajs_and_buffer(self, local_trajs):
         # Gather local trajectories from all processes
         gathered_trajs_list = self.accelerator.gather_for_metrics([local_trajs if local_trajs else []], use_gather_object=True)

@@ -579,8 +579,7 @@ def train_mog_kernel(
     noise_floor: float = 1e-6,
     device=None
 ):
-    if device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = check_device()
 
     print(f"Training MoG Transition Kernel for {dataset_name}")
     if specific_dataset:
@@ -591,11 +590,11 @@ def train_mog_kernel(
     if(trajs is not None):
           total_trajs = train_trajs + trajs
     else:
-          total_trajs = train_trajs
+          total_trajs = train_trajs 
     dataset = KernelDataset(total_trajs, kernel_name)
-    loader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
-                              pin_memory=True, num_workers=8, persistent_workers=True))
-
+    loader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True,
+                              pin_memory=True, num_workers=8, persistent_workers = True))
+    
     # Create ensemble of MoG kernels
     ensemble = [
         MoGTransitionKernel(
@@ -667,8 +666,8 @@ def train_mog_kernel(
         avg_loss = sum(loss.item() for loss in losses) / ensemble_size
         total_loss += avg_loss
 
-        if step % 500 == 0:
-            print(f"Step {step:6d} | Avg Loss: {total_loss/500:.6f}")
+        if step % 100 == 0:
+            print(f"Step {step:6d} | Avg Loss: {total_loss/100:.6f}")
             total_loss = 0.0
 
         # Save checkpoints
