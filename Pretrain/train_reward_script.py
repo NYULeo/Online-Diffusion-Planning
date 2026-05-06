@@ -95,7 +95,7 @@ if __name__ == '__main__':
         target_reward = 50.0,
         specific_dataset = 'single',
         task_id = 4,
-        traj_length = 500,
+        traj_length = 200,
         trajs = trajs
     )
     
@@ -113,7 +113,7 @@ if __name__ == '__main__':
         #alpha = 0.99, 
         target_reward = 50.0,
         task_id = 4,
-        traj_length = 500,
+        traj_length = 200,
         save_freq = 5000, 
         num_steps = 5000)
 

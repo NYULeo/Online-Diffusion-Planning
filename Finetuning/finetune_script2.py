@@ -478,7 +478,7 @@ if __name__ == "__main__":
                             hidden_dim = 512,
                             batch_size = 256,
                             num_steps = 20000,
-                            lr = 8e-05,
+                            lr = 5e-05,
                             min_lr = 1e-05,
                             tau = 0.005,
                             gamma = 0.99,
