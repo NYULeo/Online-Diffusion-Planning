@@ -793,7 +793,7 @@ def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_da
             loss = loss + λ_reg * penalty
             losses.append(loss)
         # Backprop
-        """
+        
         for m, opt, loss in zip(ensemble, optimizers, losses):
             opt.zero_grad()
             loss.backward()
@@ -802,14 +802,16 @@ def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_da
         # Logging
         avg_loss = sum(loss.item() for loss in losses) / ensemble_size
         total_loss += avg_loss
+        
         """
-        for m, opt, loss, scaler in zip(ensemble, optimizers, losses, scalers):
+        for m, opt, loss, scaler in zip(ensemble, optimizers, losses, scaler):
             opt.zero_grad(set_to_none=True)
             scaler.scale(loss).backward()
             scaler.unscale_(opt)
             torch.nn.utils.clip_grad_norm_(m.parameters(), max_norm=5.0)
             scaler.step(opt)
             scaler.update()
+        """
 
     #new_loader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=True, num_workers=8)
     new_loader = DataLoader(
