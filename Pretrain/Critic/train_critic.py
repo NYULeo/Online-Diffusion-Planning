@@ -34,7 +34,7 @@ def spare_reward_prcocessor(rewards):
     return np.array(new_rewards, dtype = np.float64) 
     #return np.array(new_rewards) 
 
-def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, alpha, 
+def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, min_lr,sigma, alpha, 
                                 obs_dim, critic_net, optimizer, gamma, horizon, tau,
                                 specific_dataset: Optional[str] = None, 
                                 target_reward: Optional[float] = None,
@@ -98,6 +98,7 @@ def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, 
             'num_steps': num_steps,
             'batch_size': batch_size,
             'lr': lr,
+            'min_lr': min_lr,
             'optimizer': optimizer_params,
         },
         'critic_config': {
@@ -428,7 +429,7 @@ class CriticDataset(Dataset):
             #new_rews.append(np.sum(rews[t:]))
         return new_rews
 
-def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, gamma, horizon, lr, tau, goal, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward = 1.0, trajs: List[TrajectoryDict] = None, task_id: Optional[int] = None):
+def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, gamma, horizon, lr, min_lr, tau, goal, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward = 1.0, trajs: List[TrajectoryDict] = None, task_id: Optional[int] = None):
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = check_device()
 
@@ -445,12 +446,18 @@ def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, h
     target_critic.load_state_dict(critic.state_dict())
     target_critic.eval()
     optimizer = optim.Adam(critic.parameters(), lr = lr)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max = num_steps,   # one scheduler step per training step
+            eta_min = min_lr
+        )
 
     save_critic_hyperparameters(
             dataset_name=dataset_name,
             batch_size=batch_size,
             num_steps=num_steps,
             lr=lr,
+            min_lr = min_lr,
             sigma=sigma,
             alpha=alpha,
             obs_dim=obs_dim,
@@ -485,6 +492,7 @@ def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, h
            optimizer.zero_grad()
            loss.backward()
            optimizer.step()
+           scheduler.step()
            
            if(k % 1000 == 0):
                 avg_loss = total_loss/1000
