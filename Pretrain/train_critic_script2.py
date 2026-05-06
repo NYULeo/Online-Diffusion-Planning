@@ -82,7 +82,6 @@ if __name__ == '__main__':  # pragma: no cover
                  num_steps = 30000, 
                  gamma = 0.99, 
                  horizon = 32, 
-                 #lr = 3e-04, 
                  lr = 8e-05,
                  min_lr = 1e-05,
                  tau = 0.005,
