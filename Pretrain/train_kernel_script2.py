@@ -63,15 +63,15 @@ if __name__ == '__main__':  # pragma: no cover
          task_id = 4,
          trajs = trajs,
          batch_size = 512,
-         lr = 5e-5,
+         lr = 1e-4,
          num_steps = 5000,
          save_freq = 1000,
          ensemble_size = 10,
-         num_modes = 5,
+         num_modes = 10,
          num_hidden_layers = 4,
          hidden_dim = 514,
-         λ_reg = 3e-4,
-         noise_floor = 1e-6)
+         λ_reg = 1e-3,
+         noise_floor = 5e-4)
 
    
       
@@ -84,9 +84,9 @@ if __name__ == '__main__':  # pragma: no cover
                 num_hidden_layers = 4,
                 hidden_dim = 514,
                 ensemble_size = 10, 
-                num_modes = 5,
+                num_modes = 10,
                 quantile = 0.95,
-                noise_floor = 1e-6)
+                noise_floor = 5e-4)
     
     
     """
