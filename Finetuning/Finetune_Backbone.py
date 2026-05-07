@@ -90,7 +90,9 @@ class FinetuningConfig():
     train_kernel_config: Train_Kernel_Config 
     train_critic_config: Train_Critic_Config
     critic: bool = False
+    update_critic: bool = True
     kernel: bool = False
+    update_kernel: bool = True
     buffer_size: int = 100000
     finetune_buffer_cutoff_length: Optional[int] = None
     train_buffer_cutoff_length: Optional[int] = None
@@ -364,9 +366,16 @@ class OnlineFinetuner():
                   train_critic = True
               if self.config.train_critic_config.data_conservation:
                   critic_buffer = self.data_conservation_update(critic_buffer)
-              return critic_buffer, train_critic
+              #return critic_buffer, train_critic
           else:
-              return None, train_critic  # Other processes don't need the buffer
+              #return None, train_critic  # Other processes don't need the buffer
+              critic_buffer = None
+          flag = torch.tensor([1 if train_critic else 0], device=self.accelerator.device, dtype=torch.int64)
+          flag = broadcast(flag, from_process=0)  # accelerate.utils.broadcast
+          train_critic = bool(flag.item())
+          
+          return critic_buffer, train_critic
+
     
     def data_conservation_update(self, critic_buffer):
         if(self.config.train_reward_config.task_id is not None):
@@ -725,7 +734,7 @@ class OnlineFinetuner():
                                       x_generated_plans = x_generated_plans)
                   """
 
-                  if self.config.critic and update_critic:
+                  if self.config.critic and update_critic and self.config.update_critic:
                       print(f"Starting Critic Training")
                       #save_trajs(critic_buffer, self.config.dataset_name, self.config.specific_dataset, ((step+1) * self.config.AMConfig.per_round_steps))
                       print(f"Number of trajectories of Critic Training: {len(critic_buffer)}")
@@ -748,8 +757,9 @@ class OnlineFinetuner():
                                    task_id = self.config.train_reward_config.task_id)
                                     
             self.accelerator.wait_for_everyone()
-            if self.config.kernel:
-                      print(f"Starting Kernel Training")
+            if self.config.kernel and self.config.update_kernel:
+                      if self.accelerator.is_main_process:
+                           print(f"Starting Kernel Training")
                       if(self.config.train_kernel_config.type_kernel == 'robust'):
                           threshold = train_kernel(self.Train_Kernel_Buffer, 
                              dataset_name = self.config.dataset_name, 
@@ -801,11 +811,18 @@ class OnlineFinetuner():
             
             #set the new total reward model
             self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
-            if(self.config.kernel):
-                 self.config.kernel_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
+            if(self.config.kernel and self.config.update_kernel):
+                  self.config.kernel_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
+            else:
+                  self.config.kernel_model_checkpoint = 0
+            
+            if(self.config.critic and self.config.update_critic):
+                if update_critic:
+                     self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
+                else:
+                     self.config.kernel_model_checkpoint = 0
             else:
                  self.config.kernel_model_checkpoint = 0
-            self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             #if self.config.RewardConfig.max_mahalanobis_score < threshold: 
             
             """
@@ -818,7 +835,6 @@ class OnlineFinetuner():
             
             #self.config.critic_model_checkpoint = 0
             self.set_reward_model(self.device)
-            
             if self.accelerator.is_main_process:
                    print(f"Finetuning round {step+1} completed")
                    print()

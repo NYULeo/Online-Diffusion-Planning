@@ -79,7 +79,7 @@ if __name__ == '__main__':  # pragma: no cover
                  hidden_layers = 4,
                  hidden_dim = 512,
                  batch_size = 256, 
-                 num_steps = 65000, 
+                 num_steps = 5000, 
                  gamma = 0.99, 
                  horizon = 32, 
                  lr = 1e-05,
@@ -90,7 +90,7 @@ if __name__ == '__main__':  # pragma: no cover
                  #alpha = 0.99,
                  #alpha = None,
                  target_reward = 80.0,
-                 trajs = trajs, 
+                 trajs = trajs_2, 
                  task_id = task_id)
     
     data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
@@ -111,12 +111,12 @@ if __name__ == '__main__':  # pragma: no cover
                 specific_dataset = specific_env,
                 hidden_layers = 4,
                 hidden_dim = 512,
-                checkpoint_step = 0,
+                checkpoint_step = 5000,
                 gamma = 0.99,
                 horizon = 32,
                 goal = None,
                 sigma = 3.0,
                 #alpha = 0.99,
                 target_reward = 80.0,
-                trajs = trajs,
+                trajs = trajs_2,
                 task_id = task_id)

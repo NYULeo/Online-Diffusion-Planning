@@ -837,7 +837,9 @@ def train_kernel(
     x_generated_plans: Optional[list] = None,
     accelerator=None,
 ):
-    print(f"Training kernel for {dataset_name}_{specific_dataset}")
+   
+    if accelerator is not None and accelerator.is_main_process:
+          print(f"Training kernel for {dataset_name}_{specific_dataset}")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
 
@@ -850,7 +852,7 @@ def train_kernel(
         world = accelerator.num_processes
 
     # normalize constraint string
-    ctype = "log_density" if constraint_type in ("log_prob", "log_density") else "mahalanobis"
+    ctype = "log_prob" if constraint_type in ("log_prob", "log_density") else "mahalanobis"
 
     # -----------------------------
     # Phase A: train on main only
@@ -931,7 +933,7 @@ def train_kernel(
                 act = torch.tensor(x[j, obs_dim:obs_dim + act_dim].copy(), dtype=torch.float32).unsqueeze(0).to(device)
                 s_next = torch.tensor(kernel_stats.norm_obs(x[j + 1, :obs_dim].copy()), dtype=torch.float32).unsqueeze(0).to(device)
 
-                if ctype == "log_density":
+                if ctype == "log_prob":
                     v = compute_log_density(eval_ensemble, obs, act, s_next).item()
                 else:
                     v = compute_total_mahalanobis_score(eval_ensemble, obs, act, s_next).item()
@@ -947,7 +949,7 @@ def train_kernel(
             values = []
             for chunk in gathered:
                 values.extend(chunk)
-            if ctype == "log_density":
+            if ctype == "log_prob":
                 threshold = float(np.quantile(values, 1 - quantile))
             else:
                 threshold = float(np.quantile(values, quantile))
@@ -981,8 +983,9 @@ def train_kernel_mog(
     quantile: float = 0.95,
     x_generated_plans: Optional[List] = None,
     accelerator=None,
-):
-    print(f"Training kernel for {dataset_name}_{specific_dataset}")
+):   
+    if accelerator is not None and accelerator.is_main_process:
+          print(f"Training kernel for {dataset_name}_{specific_dataset}")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
 
@@ -993,7 +996,7 @@ def train_kernel_mog(
         rank = accelerator.process_index
         world = accelerator.num_processes
 
-    ctype = "log_density" if constraint_type in ("log_prob", "log_density") else "mahalanobis"
+    ctype = "log_prob" if constraint_type in ("log_prob", "log_density") else "mahalanobis"
 
     # -----------------------------
     # Phase A: train on main only
@@ -1071,7 +1074,7 @@ def train_kernel_mog(
                 act = torch.tensor(x[j, obs_dim:obs_dim + act_dim].copy(), dtype=torch.float32).unsqueeze(0).to(device)
                 s_next = torch.tensor(kernel_stats.norm_obs(x[j + 1, :obs_dim].copy()), dtype=torch.float32).unsqueeze(0).to(device)
 
-                if ctype == "log_density":
+                if ctype == "log_prob":
                     v = compute_log_density_mog(eval_ensemble, obs, act, s_next).item()
                 else:
                     v = compute_total_mahalanobis_score_mog(eval_ensemble, obs, act, s_next).item()
@@ -1086,7 +1089,7 @@ def train_kernel_mog(
             values = []
             for chunk in gathered:
                 values.extend(chunk)
-            if ctype == "log_density":
+            if ctype == "log_prob":
                 threshold = float(np.quantile(values, 1 - quantile))
             else:
                 threshold = float(np.quantile(values, quantile))

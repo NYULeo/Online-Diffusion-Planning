@@ -704,7 +704,7 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
-    checkpoint = 30
+    checkpoint = 55
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}, checkpoint: {checkpoint}")
@@ -720,7 +720,7 @@ if __name__ == "__main__":
                eta = 0.8, 
                episode_length = 3000, 
                checkpoint_steps = checkpoint, 
-               render = True,  
+               render = False,  
                base_seed = j, 
                task_id = 4,
                continual_rollout = True,
