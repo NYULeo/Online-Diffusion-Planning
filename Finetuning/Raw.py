@@ -52,16 +52,20 @@ def check_cube_double_goal_reach(trajs, task_id):
     print(f"Task {task_id} average distance: {average_dist}")
 
 
-
+"""
 path = f'./Finetuning/Rollouts/cube/single-play/task_4/trajs_task4_success_0.pkl'
 with open(path, 'rb') as f:
     trajs = pickle.load(f)
 
 data = get_dataset('cube', 'double-play', task_id = 5, traj_length = None)
 trajs = data.get_trajectories()
+"""
 
-for i in range(1, 6):
-     check_cube_double_goal_reach(trajs, i)
+
+a = np.array([1,2,3,4,5,6,7])
+print(np.quantile(a, 0.95))
+
+
 """
 data = get_dataset('cube', 'single-play', task_id = 5)
 trajs = data.get_trajectories()

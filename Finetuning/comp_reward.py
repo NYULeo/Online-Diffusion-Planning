@@ -28,6 +28,8 @@ class RewardConfig:
     max_mahalanobis_score: Optional[float] = None
     quantile: float = 0.95
     min_log_prob: Optional[float] = None
+    constraint_adapt: bool = True
+    number_of_generated_plans: int = 50
     explore: bool = True
     gamma: float = 0.8
     critic_gamma: float = 0.99

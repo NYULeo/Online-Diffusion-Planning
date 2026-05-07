@@ -444,20 +444,23 @@ if __name__ == "__main__":
     #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
     RWConfig = RewardConfig(
                beta = 1.0, 
+               quantile = 0.999,
                min_log_prob = -110.0,
+               constraint_adapt = True,
+               number_of_generated_plans = 100,
                #max_mahalanobis_score = 100.0,
                critic_gamma = 1.0,
                explore = False,
                constraint_type = 'log_prob') 
   
     TrainRewardConfig = Train_Reward_Config(
-                          hidden_layers = 2,
-                          hidden_dim = 128,
+                          hidden_layers = 4,
+                          hidden_dim = 512,
                           batch_size = 256, 
                           num_steps = 5000, 
                           lr = 1e-04, 
-                          sigma = 7.0, 
-                          target_reward = 50.0, 
+                          sigma = 3.0, 
+                          target_reward = 80.0, 
                           train_goal = None,
                           task_id = 4)
       
@@ -477,9 +480,9 @@ if __name__ == "__main__":
                             hidden_layers = 4,
                             hidden_dim = 512,
                             batch_size = 256,
-                            num_steps = 20000,
-                            lr = 8e-05,
-                            min_lr = 1e-05,
+                            num_steps = 65000,
+                            lr = 1e-05,
+                            min_lr = 1e-06,
                             tau = 0.005,
                             gamma = 0.99,
                             data_conservation = True)

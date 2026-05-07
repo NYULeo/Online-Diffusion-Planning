@@ -79,6 +79,8 @@ class Train_Critic_Config:
 class FinetuningConfig():
     AMConfig: AdjointMatchingConfig | Acc_AdjointMatchingConfig
     RewardConfig: RewardConfig 
+    constraint_adapt: bool = True
+    number_of_generated_plans: int = 50
     AlphaConfig: AlphaSchedulerConfig
     dataset_name: str
     specific_dataset: str
@@ -387,6 +389,25 @@ class OnlineFinetuner():
              critic_buffer = half_pretrained_trajs + half_buffer_trajs
         return critic_buffer
 
+    def get_generated_plans(self, number_of_generated_plans: int):
+        dataloader = cycle(DataLoader(self.PlannerDataset, batch_size = 1, shuffle = False))
+        generated_plans = []
+        for i in range(number_of_generated_plans):
+            s0 = next(dataloader)
+            x = sample_euler_karras(s0, 
+                               self.AMFineTuner.new_score_net, 
+                               self.config.AMConfig.d_s, 
+                               self.config.AMConfig.d_a, 
+                               self.config.AMConfig.horizon,  
+                               self.config.AMConfig.diffusion_steps, 
+                               self.config.AMConfig.num_karras, 
+                               self.config.AMConfig.eta, 
+                               self.device)
+            generated_plans.append(x)
+        return generated_plans
+                
+
+
     def finetune_planner(self):
         if self.accelerator.is_main_process:
             print("Env Details: ------------------------------------------------------------------------------")
@@ -520,7 +541,14 @@ class OnlineFinetuner():
             
             self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
             self.accelerator.wait_for_everyone()
+            if self.accelerator.is_main_process:
+                if(self.config.RewardConfig.constraint_adapt == True):
+                      x_generated_plans = self.get_generated_plans(self.config.RewardConfig.number_of_generated_plans)
+                      print(f"Generated {len(x_generated_plans)} plans for cosntraint adaptation")
+                else:
+                      x_generated_plans = None
             
+            self.accelerator.wait_for_everyone()
             if torch.cuda.is_available():
                   torch.cuda.synchronize()  
             self.accelerator.wait_for_everyone() 
@@ -620,7 +648,6 @@ class OnlineFinetuner():
                           threshold = train_kernel(self.Train_Kernel_Buffer, 
                              dataset_name = self.config.dataset_name, 
                              specific_dataset = self.config.specific_dataset,
-                             constraint_type = self.config.RewardConfig.constraint_type,
                              batch_size = self.config.train_kernel_config.batch_size, 
                              lr = self.config.train_kernel_config.lr, 
                              num_steps = self.config.train_kernel_config.num_steps,
@@ -629,13 +656,14 @@ class OnlineFinetuner():
                              num_hidden_layers = self.config.train_kernel_config.num_hidden_layers,
                              hidden_dim = self.config.train_kernel_config.hidden_dim,
                              step = ((step+1) * self.config.AMConfig.per_round_steps),
-                             quantile = self.config.RewardConfig.quantile)
+                             constraint_type = self.config.RewardConfig.constraint_type,
+                             quantile = self.config.RewardConfig.quantile, 
+                             x_generated_plans = x_generated_plans)
                       
                       elif(self.config.train_kernel_config.type_kernel == 'mog'):
                           threshold = train_kernel_mog(self.Train_Kernel_Buffer,
                                       dataset_name = self.config.dataset_name,
                                       specific_dataset = self.config.specific_dataset,
-                                      constraint_type = self.config.RewardConfig.constraint_type,
                                       batch_size = self.config.train_kernel_config.batch_size,
                                       lr = self.config.train_kernel_config.lr,
                                       num_steps = self.config.train_kernel_config.num_steps,
@@ -646,7 +674,9 @@ class OnlineFinetuner():
                                       hidden_dim = self.config.train_kernel_config.hidden_dim,
                                       kernel_noise_floor = self.config.train_kernel_config.kernel_noise_floor,
                                       step = ((step+1) * self.config.AMConfig.per_round_steps),
-                                      quantile = self.config.RewardConfig.quantile)
+                                      constraint_type = self.config.RewardConfig.constraint_type,
+                                      quantile = self.config.RewardConfig.quantile,
+                                      x_generated_plans = x_generated_plans)
                   
                   if self.config.critic and update_critic:
                       print(f"Starting Critic Training")
@@ -687,12 +717,12 @@ class OnlineFinetuner():
                  self.config.kernel_model_checkpoint = 0
             self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             #if self.config.RewardConfig.max_mahalanobis_score < threshold: 
-            """
-            if(self.config.RewardConfig.constraint_type == 'mahalanobis' and self.config.RewardConfig.max_mahalanobis_score < threshold):
+        
+            if(self.config.RewardConfig.constraint_type == 'mahalanobis' ):
                  self.config.RewardConfig.max_mahalanobis_score = threshold
-            elif(self.config.RewardConfig.constraint_type == 'log_prob' and self.config.RewardConfig.min_log_prob > threshold):
+            elif(self.config.RewardConfig.constraint_type == 'log_prob'):
                  self.config.RewardConfig.min_log_prob = threshold
-            """
+            
             
             #self.config.critic_model_checkpoint = 0
             self.set_reward_model(self.device)

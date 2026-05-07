@@ -704,7 +704,7 @@ if __name__ == "__main__":
     specific_train_dataset = 'single-play'
     #total_reward = 0.0
     #for i in range(1, 11):
-    set_seed(20)
+    set_seed(3)
     reward = rollout(
             env_name, 
             specific_train_dataset, 
@@ -713,7 +713,7 @@ if __name__ == "__main__":
             num_karras = 10, 
             eta = 0.8, 
             episode_length = 3000, 
-            checkpoint_steps = 60, 
+            checkpoint_steps = 20, 
             render = True,  
             base_seed = 0, 
             task_id = 4,

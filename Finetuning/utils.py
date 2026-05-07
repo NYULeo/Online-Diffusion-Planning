@@ -6,6 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 #from matplotlib import color_sequences
+from scipy.special import j0
 import torch
 import numpy as np
 import torch
@@ -686,9 +687,9 @@ def train_reward(trajs: List[TrajectoryDict], dataset_name: str, hidden_layers: 
     save_reward_model(reward_net, dataset_name, specific_dataset, task_id, step)
     print(f"reward model saved")
            
-def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, constraint_type: str = 'mahalanobis',
+def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, 
                  batch_size=256, lr=1e-3, num_steps=10000,
-                 ensemble_size=10, λ_reg=1e-3, num_hidden_layers=2, hidden_dim=256, step: int = 0, quantile: float = 0.95):
+                 ensemble_size=10, λ_reg=1e-3, num_hidden_layers=2, hidden_dim=256, step: int = 0, constraint_type: str = 'mahalanobis', quantile: float = 0.95, x_generated_plans: Optional[list] = None):
     # Prepare dataset / dataloader
     print(f"Training kernel for {dataset_name}_{specific_dataset}")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -737,22 +738,27 @@ def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
         avg_loss = sum(losses).item() / ensemble_size
         total_loss += avg_loss
     
-
+    """
     new_loader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=True, num_workers=8)
     if(constraint_type == 'mahalanobis'):
         threshold = compute_threshold_mahalanobis(ensemble, new_loader, quantile)
     else:
         threshold = compute_threshold_log_prob(ensemble, new_loader, quantile)
+    """
+    threshold = None
+    if(x_generated_plans is not None):
+        _, kernel_stats, _, _ = get_kernel_stats(dataset_name, specific_dataset, step)
+        threshold = compute_threshold(ensemble, kernel_stats, obs_dim, act_dim,  x_generated_plans, constraint_type, quantile, device)
+        print(f"New Threshold for {constraint_type}: {threshold}")
     for idx, m in enumerate(ensemble):
          ckpt = copy.deepcopy(m).cpu()
          save_kernel_model(ckpt, dataset_name, specific_dataset, step, idx)
     print(f"Kernel model saved")
     return threshold
 
-
-def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, constraint_type: str = 'mahalanobis',
+def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str,
                  batch_size=256, lr=1e-3, num_steps=10000,
-                 ensemble_size=10, λ_reg=1e-3, num_modes: Optional[int] = 8,   num_hidden_layers=2, hidden_dim=256, kernel_noise_floor: Optional[float] = 1e-4, step: int = 0, quantile: float = 0.95):
+                 ensemble_size=10, λ_reg=1e-3, num_modes: Optional[int] = 8,   num_hidden_layers=2, hidden_dim=256, kernel_noise_floor: Optional[float] = 1e-4, step: int = 0,  constraint_type: str = 'mahalanobis', quantile: float = 0.95, x_generated_plans: Optional[List] = None):
     # Prepare dataset / dataloader
     print(f"Training kernel for {dataset_name}_{specific_dataset}")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -814,7 +820,7 @@ def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_da
         """
 
     #new_loader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=True, num_workers=8)
-    threshold = None
+    
     """
     new_loader = DataLoader(
         dataset,
@@ -831,11 +837,60 @@ def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_da
     else:
          threshold = compute_threshold_log_prob_mog(ensemble, new_loader, quantile, device)
     """
+    threshold = None
+    if(x_generated_plans is not None):
+        _, kernel_stats, _, _ = get_kernel_stats(dataset_name, specific_dataset, step)
+        threshold = compute_threshold_mog(ensemble, kernel_stats, obs_dim, act_dim,  x_generated_plans, constraint_type, quantile, device)
+        print(f"New Threshold for {constraint_type}: {threshold}")
     for idx, m in enumerate(ensemble):
          ckpt = copy.deepcopy(m).cpu()
          save_kernel_model(ckpt, dataset_name, specific_dataset, step, idx)
     print(f"Kernel model saved")
     return threshold
+
+def compute_threshold_mog(kernels, kernel_stats, obs_dim, act_dim, x, constraint_type: str = 'log_density', quantile: float = 0.999, device: str = 'cuda'):
+    #device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    values = []
+    for i in range(len(x)):
+       for j in range(1, len(x[i])-1):
+           obs = torch.tensor(kernel_stats.norm_obs(x[i][j, :obs_dim].copy()), dtype = torch.float32).unsqueeze(0).to(device)
+           act = torch.tensor(x[i][j, obs_dim:(obs_dim+act_dim)].copy(), dtype = torch.float32).unsqueeze(0).to(device)
+           s_next = torch.tensor(kernel_stats.norm_obs(x[i][j+1, :obs_dim].copy()), dtype = torch.float32).unsqueeze(0).to(device)
+           if(constraint_type == 'log_density'):
+               value = compute_log_density_mog(kernels, obs, act, s_next).item()
+           else:
+               value = compute_total_mahalanobis_score_mog(kernels, obs, act, s_next).item()
+           values.append(value)
+    if(constraint_type == 'log_density'):
+         threshold = np.quantile(values, (1 - quantile))
+    elif(constraint_type == 'mahalanobis'):
+         threshold = np.quantile(values, quantile)
+    else:
+         raise ValueError(f"Invalid constraint type: {constraint_type}")
+    return threshold
+
+def compute_threshold(kernels, kernel_stats, obs_dim, act_dim, x, constraint_type: str = 'log_density', quantile: float = 0.999, device: str = 'cuda'):
+    #device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    values = []
+    for i in range(len(x)):
+       for j in range(1, len(x[i])-1):
+           obs = torch.tensor(kernel_stats.norm_obs(x[i][j, :obs_dim].copy()), dtype = torch.float32).unsqueeze(0).to(device)
+           act = torch.tensor(x[i][j, obs_dim:(obs_dim+act_dim)].copy(), dtype = torch.float32).unsqueeze(0).to(device)
+           s_next = torch.tensor(kernel_stats.norm_obs(x[i][j+1, :obs_dim].copy()), dtype = torch.float32).unsqueeze(0).to(device)
+           if(constraint_type == 'log_density'):
+                value = compute_log_density(kernels, obs, act, s_next).item()
+           else:
+                value = compute_total_mahalanobis_score(kernels, obs, act, s_next).item()
+           values.append(value)
+    if(constraint_type == 'log_density'):
+         threshold = np.quantile(values, (1 - quantile))
+    elif(constraint_type == 'mahalanobis'):
+         threshold = np.quantile(values, quantile)
+    else:
+         raise ValueError(f"Invalid constraint type: {constraint_type}")
+    return threshold
+     
+
 
 def check_Critic(dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
     name = get_CriticName(dataset_name, specific_dataset, task_id)
