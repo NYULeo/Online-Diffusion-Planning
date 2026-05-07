@@ -502,7 +502,7 @@ if __name__ == "__main__":
         buffer_size = 20000,
         finetune_buffer_cutoff_length = 50,
         train_buffer_cutoff_length = 200,
-        finetune_steps = 150,
+        finetune_steps = 300,
         finetune_rounds = 30,
         diffusion_steps = 200,
         karras_percent = 0.05,
