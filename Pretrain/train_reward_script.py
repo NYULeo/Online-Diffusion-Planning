@@ -78,12 +78,17 @@ if __name__ == '__main__':
 if __name__ == '__main__':
     set_seed(1)
     
-    path = f'./Finetuning/Rollouts/cube/single-play/task_4/trajs_task4_success_0.pkl'
+    dataset_name = 'cube'
+    specific_dataset = 'single'
+    task_id = 4
+    traj_length = 200
+
+    path = f'./Finetuning/Rollouts/{dataset_name}/{specific_dataset}-play/task_{task_id}/trajs_task{task_id}_success_0.pkl'
     with open(path, 'rb') as f:
           trajs = pickle.load(f)
     
     train_reward(
-        dataset_name = 'cube',
+        dataset_name = dataset_name,
         hidden_layers = 4,
         hidden_dim = 512, 
         batch_size = 256,
@@ -93,27 +98,27 @@ if __name__ == '__main__':
         sigma = 3.0,
         #alpha = 0.99,
         target_reward = 80.0,
-        specific_dataset = 'single',
-        task_id = 4,
-        traj_length = 200,
+        specific_dataset = specific_dataset,
+        task_id = task_id,
+        traj_length = traj_length,
         trajs = trajs
     )
     
-    path = f'./Finetuning/Rollouts/cube/single-play/task_4/trajs_task4_success_0.pkl'
+    path = f'./Finetuning/Rollouts/{dataset_name}/{specific_dataset}-play/task_{task_id}/trajs_task{task_id}_success_0.pkl'
     with open(path, 'rb') as f:
           trajs = pickle.load(f)
     
     test_Model(
-        dataset_name = 'cube', 
+        dataset_name = dataset_name, 
         hidden_layers = 4, 
         hidden_dim = 512,
-        specific_dataset = 'single', 
+        specific_dataset = specific_dataset, 
         trajs = trajs,
         sigma = 3.0,
         #alpha = 0.99, 
         target_reward = 80.0,
-        task_id = 4,
-        traj_length = 200,
+        task_id = task_id,
+        traj_length = traj_length,
         save_freq = 5000, 
         num_steps = 5000)
 

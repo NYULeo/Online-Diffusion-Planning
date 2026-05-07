@@ -255,7 +255,6 @@ class OnlineFinetuner():
                    self.config.planner_checkpoint, 
                    self.config.AMConfig)
 
-
     def Initialize_BufferDataset(self):
         self.Finetune_Buffer = []
         self.Train_Buffer = []
@@ -392,6 +391,7 @@ class OnlineFinetuner():
         generated_plans = []
         for i in range(number_of_generated_plans):
             s0 = next(dataloader)
+            s0 = s0.squeeze(0).cpu().numpy()
             x = sample_euler_karras(s0, 
                                self.AMFineTuner.new_score_net, 
                                self.config.AMConfig.d_s, 
@@ -401,10 +401,10 @@ class OnlineFinetuner():
                                self.config.AMConfig.num_karras, 
                                self.config.AMConfig.eta, 
                                self.device)
+            
             generated_plans.append(x)
         return generated_plans
                 
-
 
     def finetune_planner(self):
         if self.accelerator.is_main_process:
@@ -701,11 +701,9 @@ class OnlineFinetuner():
                                   
 
             self.accelerator.wait_for_everyone()
-            """
             stats = torch.tensor([threshold], device = self.accelerator.device)
             stats = broadcast(stats, from_process=0)
             threshold = stats.tolist()[0]
-            """
             
             #set the new total reward model
             self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)

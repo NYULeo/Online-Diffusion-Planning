@@ -995,7 +995,7 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
     #prepare training
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True))
     critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
-    
+
     critic.train()
     target_critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
     target_critic.load_state_dict(critic.state_dict())
@@ -1870,18 +1870,18 @@ def rollout_parallel3(
     model.eval()
 
     planner_processor = Planner_Processor(env_name, specific_env)
-    #reset_seeds = list(range(seed_base, seed_base + num_envs))
+    reset_seeds = list(range(seed_base, seed_base + num_envs))
 
     def run_rollout(options_list: Optional[dict] = None):
         """Helper to run one batch of environments (avoids duplication)."""
         nonlocal total_steps
         
         if(options_list is not None):
-             #obs, info = vec_env.reset(seed=reset_seeds, options=options_list)
-             obs, info = vec_env.reset( options=options_list)
+             obs, info = vec_env.reset(seed=reset_seeds, options=options_list)
+             #obs, info = vec_env.reset(options=options_list)
         else:
-             #obs, info = vec_env.reset(seed=reset_seeds)
-             obs, info = vec_env.reset()
+             obs, info = vec_env.reset(seed=reset_seeds)
+             #obs, info = vec_env.reset()
         
         
         if isinstance(obs, dict):

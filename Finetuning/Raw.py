@@ -61,9 +61,9 @@ data = get_dataset('cube', 'double-play', task_id = 5, traj_length = None)
 trajs = data.get_trajectories()
 """
 
-
-a = np.array([1,2,3,4,5,6,7])
-print(np.quantile(a, 0.95))
+a = torch.tensor([[1,2,3,3]])
+a = a.squeeze(0)
+print(a)
 
 
 """
