@@ -686,7 +686,8 @@ def train_reward(trajs: List[TrajectoryDict], dataset_name: str, hidden_layers: 
            counter += 1
     save_reward_model(reward_net, dataset_name, specific_dataset, task_id, step)
     print(f"reward model saved")
-           
+
+"""       
 def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, 
                  batch_size=256, lr=1e-3, num_steps=10000,
                  ensemble_size=10, λ_reg=1e-3, num_hidden_layers=2, hidden_dim=256, step: int = 0, constraint_type: str = 'mahalanobis', quantile: float = 0.95, x_generated_plans: Optional[list] = None):
@@ -738,13 +739,7 @@ def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
         avg_loss = sum(losses).item() / ensemble_size
         total_loss += avg_loss
     
-    """
-    new_loader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=True, num_workers=8)
-    if(constraint_type == 'mahalanobis'):
-        threshold = compute_threshold_mahalanobis(ensemble, new_loader, quantile)
-    else:
-        threshold = compute_threshold_log_prob(ensemble, new_loader, quantile)
-    """
+    
     threshold = None
     if(x_generated_plans is not None):
         kernel_stats = get_kernel_stats(dataset_name, specific_dataset, step)
@@ -755,7 +750,10 @@ def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
          save_kernel_model(ckpt, dataset_name, specific_dataset, step, idx)
     print(f"Kernel model saved")
     return threshold
+"""
 
+
+"""
 def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str,
                  batch_size=256, lr=1e-3, num_steps=10000,
                  ensemble_size=10, λ_reg=1e-3, num_modes: Optional[int] = 8,   num_hidden_layers=2, hidden_dim=256, kernel_noise_floor: Optional[float] = 1e-4, step: int = 0,  constraint_type: str = 'mahalanobis', quantile: float = 0.95, x_generated_plans: Optional[List] = None):
@@ -809,34 +807,7 @@ def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_da
         avg_loss = sum(loss.item() for loss in losses) / ensemble_size
         total_loss += avg_loss
         
-        """
-        for m, opt, loss, scaler in zip(ensemble, optimizers, losses, scaler):
-            opt.zero_grad(set_to_none=True)
-            scaler.scale(loss).backward()
-            scaler.unscale_(opt)
-            torch.nn.utils.clip_grad_norm_(m.parameters(), max_norm=5.0)
-            scaler.step(opt)
-            scaler.update()
-        """
-
-    #new_loader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=True, num_workers=8)
-    
-    """
-    new_loader = DataLoader(
-        dataset,
-        batch_size=1024,  # larger eval batch can be much faster
-        shuffle=False,
-        pin_memory=(device.type == "cuda"),
-        num_workers=8,
-        persistent_workers=True,
-        prefetch_factor=4,
-    )
-    
-    if(constraint_type == 'mahalanobis'):
-         threshold = compute_threshold_mahalanobis_mog(ensemble, new_loader, quantile, device)
-    else:
-         threshold = compute_threshold_log_prob_mog(ensemble, new_loader, quantile, device)
-    """
+       
     threshold = None
     if(x_generated_plans is not None):
         kernel_stats = get_kernel_stats(dataset_name, specific_dataset, step)
@@ -847,8 +818,290 @@ def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_da
          save_kernel_model(ckpt, dataset_name, specific_dataset, step, idx)
     print(f"Kernel model saved")
     return threshold
+"""
 
-def compute_threshold_mog(kernels, kernel_stats, obs_dim, act_dim, x, constraint_type: str = 'log_density', quantile: float = 0.999, device: str = 'cuda'):
+def train_kernel(
+    trajs: List[TrajectoryDict],
+    dataset_name: str,
+    specific_dataset: str,
+    batch_size=256,
+    lr=1e-3,
+    num_steps=10000,
+    ensemble_size=10,
+    λ_reg=1e-3,
+    num_hidden_layers=2,
+    hidden_dim=256,
+    step: int = 0,
+    constraint_type: str = "mahalanobis",
+    quantile: float = 0.95,
+    x_generated_plans: Optional[list] = None,
+    accelerator=None,
+):
+    print(f"Training kernel for {dataset_name}_{specific_dataset}")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+
+    # distributed role info
+    if accelerator is None:
+        is_main, rank, world = True, 0, 1
+    else:
+        is_main = accelerator.is_main_process
+        rank = accelerator.process_index
+        world = accelerator.num_processes
+
+    # normalize constraint string
+    ctype = "log_density" if constraint_type in ("log_prob", "log_density") else "mahalanobis"
+
+    # -----------------------------
+    # Phase A: train on main only
+    # -----------------------------
+    ensemble = None
+    if is_main:
+        dataset = KernelDataset(trajs, dataset_name, specific_dataset, step)
+        loader = cycle(
+            DataLoader(
+                dataset,
+                batch_size=batch_size,
+                shuffle=True,
+                pin_memory=True,
+                num_workers=8,
+            )
+        )
+        ensemble = [
+            RobustTransitionKernel(obs_dim, act_dim, num_hidden_layers, hidden_dim).to(device)
+            for _ in range(ensemble_size)
+        ]
+        optimizers = [optim.Adam(m.parameters(), lr, weight_decay=1e-5) for m in ensemble]
+
+        for _ in range(1, num_steps + 1):
+            s, a, s_next = next(loader)
+            s, a, s_next = s.to(device), a.to(device), s_next.to(device)
+
+            losses, mus, log_stds = [], [], []
+            for m in ensemble:
+                mu, log_std = m(s, a)
+                mus.append(mu)
+                log_stds.append(log_std)
+                losses.append(m.gaussian_nll(s_next, mu, log_std))
+
+            mus_stack = torch.stack(mus, dim=0)
+            mu_mean = mus_stack.mean(dim=0)
+            disagreement = ((mus_stack - mu_mean.unsqueeze(0)) ** 2).mean(dim=0).detach()
+
+            for i, m in enumerate(ensemble):
+                penalty = (disagreement / (torch.exp(2 * log_stds[i]) + m.noise_floor)).sum(dim=-1).mean()
+                losses[i] = losses[i] + λ_reg * penalty
+
+            for i, (m, opt) in enumerate(zip(ensemble, optimizers)):
+                opt.zero_grad()
+                losses[i].backward()
+                opt.step()
+
+        # save trained kernels for all ranks to load
+        for idx, m in enumerate(ensemble):
+            save_kernel_model(copy.deepcopy(m).cpu(), dataset_name, specific_dataset, step, idx)
+        print("Kernel model saved")
+
+    if accelerator is not None:
+        accelerator.wait_for_everyone()
+
+    # ----------------------------------------
+    # Phase B: threshold by all GPUs in parallel
+    # ----------------------------------------
+    threshold = None
+    if x_generated_plans is not None:
+        # every rank loads saved kernels
+        kernel_state_dicts, _, _ = get_kernel(dataset_name, specific_dataset, step)
+        eval_ensemble = [
+            RobustTransitionKernel(obs_dim, act_dim, num_hidden_layers, hidden_dim).to(device)
+            for _ in range(len(kernel_state_dicts))
+        ]
+        for m, sd in zip(eval_ensemble, kernel_state_dicts):
+            m.load_state_dict(sd)
+            m.eval()
+
+        kernel_stats = get_kernel_stats(dataset_name, specific_dataset, step)
+
+        # shard plans across ranks
+        local_plans = x_generated_plans[rank::world]
+        local_values = []
+        for x in local_plans:
+            for j in range(1, len(x) - 1):
+                obs = torch.tensor(kernel_stats.norm_obs(x[j, :obs_dim].copy()), dtype=torch.float32).unsqueeze(0).to(device)
+                act = torch.tensor(x[j, obs_dim:obs_dim + act_dim].copy(), dtype=torch.float32).unsqueeze(0).to(device)
+                s_next = torch.tensor(kernel_stats.norm_obs(x[j + 1, :obs_dim].copy()), dtype=torch.float32).unsqueeze(0).to(device)
+
+                if ctype == "log_density":
+                    v = compute_log_density(eval_ensemble, obs, act, s_next).item()
+                else:
+                    v = compute_total_mahalanobis_score(eval_ensemble, obs, act, s_next).item()
+                local_values.append(v)
+
+        # gather local values from all ranks
+        if accelerator is not None:
+            gathered = accelerator.gather_for_metrics([local_values], use_gather_object=True)
+        else:
+            gathered = [local_values]
+
+        if is_main:
+            values = []
+            for chunk in gathered:
+                values.extend(chunk)
+            if ctype == "log_density":
+                threshold = float(np.quantile(values, 1 - quantile))
+            else:
+                threshold = float(np.quantile(values, quantile))
+            print(f"New Threshold for {ctype}: {threshold}")
+        else:
+            threshold = 0.0
+
+        # broadcast scalar threshold
+        if accelerator is not None and torch.distributed.is_available() and torch.distributed.is_initialized():
+            t = torch.tensor([threshold], device=device, dtype=torch.float32)
+            torch.distributed.broadcast(t, src=0)
+            threshold = float(t.item())
+
+    return threshold
+
+def train_kernel_mog(
+    trajs: List[TrajectoryDict],
+    dataset_name: str,
+    specific_dataset: str,
+    batch_size=256,
+    lr=1e-3,
+    num_steps=10000,
+    ensemble_size=10,
+    λ_reg=1e-3,
+    num_modes: Optional[int] = 8,
+    num_hidden_layers=2,
+    hidden_dim=256,
+    kernel_noise_floor: Optional[float] = 1e-4,
+    step: int = 0,
+    constraint_type: str = "mahalanobis",
+    quantile: float = 0.95,
+    x_generated_plans: Optional[List] = None,
+    accelerator=None,
+):
+    print(f"Training kernel for {dataset_name}_{specific_dataset}")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+
+    if accelerator is None:
+        is_main, rank, world = True, 0, 1
+    else:
+        is_main = accelerator.is_main_process
+        rank = accelerator.process_index
+        world = accelerator.num_processes
+
+    ctype = "log_density" if constraint_type in ("log_prob", "log_density") else "mahalanobis"
+
+    # -----------------------------
+    # Phase A: train on main only
+    # -----------------------------
+    if is_main:
+        dataset = KernelDataset(trajs, dataset_name, specific_dataset, step)
+        loader = cycle(
+            DataLoader(
+                dataset,
+                batch_size=batch_size,
+                shuffle=True,
+                pin_memory=True,
+                num_workers=8,
+                persistent_workers=True,
+                prefetch_factor=4,
+                drop_last=True,
+            )
+        )
+
+        ensemble = [
+            MoGTransitionKernel(obs_dim, act_dim, num_modes, num_hidden_layers, hidden_dim, kernel_noise_floor).to(device)
+            for _ in range(ensemble_size)
+        ]
+        optimizers = [optim.Adam(m.parameters(), lr, weight_decay=1e-5) for m in ensemble]
+
+        for _ in range(1, num_steps + 1):
+            s, a, s_next = next(loader)
+            s, a, s_next = s.to(device), a.to(device), s_next.to(device)
+
+            losses = []
+            for m in ensemble:
+                mu, log_std, weights = m(s, a)
+                loss = m.mog_nll(s_next, mu, log_std, weights)
+
+                mu_mean = mu.mean(dim=1)
+                disagreement = ((mu - mu_mean.unsqueeze(1)) ** 2).mean(dim=1).mean(dim=0)
+                var = torch.exp(2 * log_std) + m.noise_floor
+                penalty = (disagreement / (var.mean(dim=1) + 1e-6)).mean()
+                losses.append(loss + λ_reg * penalty)
+
+            for m, opt, loss in zip(ensemble, optimizers, losses):
+                opt.zero_grad()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(m.parameters(), max_norm=5.0)
+                opt.step()
+
+        for idx, m in enumerate(ensemble):
+            save_kernel_model(copy.deepcopy(m).cpu(), dataset_name, specific_dataset, step, idx)
+        print("Kernel model saved")
+
+    if accelerator is not None:
+        accelerator.wait_for_everyone()
+
+    # ----------------------------------------
+    # Phase B: threshold by all GPUs in parallel
+    # ----------------------------------------
+    threshold = None
+    if x_generated_plans is not None:
+        kernel_state_dicts, _, _ = get_kernel(dataset_name, specific_dataset, step)
+        eval_ensemble = [
+            MoGTransitionKernel(obs_dim, act_dim, num_modes, num_hidden_layers, hidden_dim, kernel_noise_floor).to(device)
+            for _ in range(len(kernel_state_dicts))
+        ]
+        for m, sd in zip(eval_ensemble, kernel_state_dicts):
+            m.load_state_dict(sd)
+            m.eval()
+
+        kernel_stats = get_kernel_stats(dataset_name, specific_dataset, step)
+
+        local_plans = x_generated_plans[rank::world]
+        local_values = []
+        for x in local_plans:
+            for j in range(1, len(x) - 1):
+                obs = torch.tensor(kernel_stats.norm_obs(x[j, :obs_dim].copy()), dtype=torch.float32).unsqueeze(0).to(device)
+                act = torch.tensor(x[j, obs_dim:obs_dim + act_dim].copy(), dtype=torch.float32).unsqueeze(0).to(device)
+                s_next = torch.tensor(kernel_stats.norm_obs(x[j + 1, :obs_dim].copy()), dtype=torch.float32).unsqueeze(0).to(device)
+
+                if ctype == "log_density":
+                    v = compute_log_density_mog(eval_ensemble, obs, act, s_next).item()
+                else:
+                    v = compute_total_mahalanobis_score_mog(eval_ensemble, obs, act, s_next).item()
+                local_values.append(v)
+
+        if accelerator is not None:
+            gathered = accelerator.gather_for_metrics([local_values], use_gather_object=True)
+        else:
+            gathered = [local_values]
+
+        if is_main:
+            values = []
+            for chunk in gathered:
+                values.extend(chunk)
+            if ctype == "log_density":
+                threshold = float(np.quantile(values, 1 - quantile))
+            else:
+                threshold = float(np.quantile(values, quantile))
+            print(f"New Threshold for {ctype}: {threshold}")
+        else:
+            threshold = 0.0
+
+        if accelerator is not None and torch.distributed.is_available() and torch.distributed.is_initialized():
+            t = torch.tensor([threshold], device=device, dtype=torch.float32)
+            torch.distributed.broadcast(t, src=0)
+            threshold = float(t.item())
+
+    return threshold
+
+def compute_threshold_mog(kernels, kernel_stats, obs_dim, act_dim, x, constraint_type: str = 'log_prob', quantile: float = 0.999, device: str = 'cuda'):
     #device = 'cuda' if torch.cuda.is_available() else 'cpu'
     values = []
     for i in range(len(x)):
@@ -856,12 +1109,12 @@ def compute_threshold_mog(kernels, kernel_stats, obs_dim, act_dim, x, constraint
            obs = torch.tensor(kernel_stats.norm_obs(x[i][j, :obs_dim].copy()), dtype = torch.float32).unsqueeze(0).to(device)
            act = torch.tensor(x[i][j, obs_dim:(obs_dim+act_dim)].copy(), dtype = torch.float32).unsqueeze(0).to(device)
            s_next = torch.tensor(kernel_stats.norm_obs(x[i][j+1, :obs_dim].copy()), dtype = torch.float32).unsqueeze(0).to(device)
-           if(constraint_type == 'log_density'):
+           if(constraint_type == 'log_prob'):
                value = compute_log_density_mog(kernels, obs, act, s_next).item()
            else:
                value = compute_total_mahalanobis_score_mog(kernels, obs, act, s_next).item()
            values.append(value)
-    if(constraint_type == 'log_density'):
+    if(constraint_type == 'log_prob'):
          threshold = np.quantile(values, (1 - quantile))
     elif(constraint_type == 'mahalanobis'):
          threshold = np.quantile(values, quantile)
@@ -869,7 +1122,7 @@ def compute_threshold_mog(kernels, kernel_stats, obs_dim, act_dim, x, constraint
          raise ValueError(f"Invalid constraint type: {constraint_type}")
     return threshold
 
-def compute_threshold(kernels, kernel_stats, obs_dim, act_dim, x, constraint_type: str = 'log_density', quantile: float = 0.999, device: str = 'cuda'):
+def compute_threshold(kernels, kernel_stats, obs_dim, act_dim, x, constraint_type: str = 'log_prob', quantile: float = 0.999, device: str = 'cuda'):
     #device = 'cuda' if torch.cuda.is_available() else 'cpu'
     values = []
     for i in range(len(x)):
@@ -877,12 +1130,12 @@ def compute_threshold(kernels, kernel_stats, obs_dim, act_dim, x, constraint_typ
            obs = torch.tensor(kernel_stats.norm_obs(x[i][j, :obs_dim].copy()), dtype = torch.float32).unsqueeze(0).to(device)
            act = torch.tensor(x[i][j, obs_dim:(obs_dim+act_dim)].copy(), dtype = torch.float32).unsqueeze(0).to(device)
            s_next = torch.tensor(kernel_stats.norm_obs(x[i][j+1, :obs_dim].copy()), dtype = torch.float32).unsqueeze(0).to(device)
-           if(constraint_type == 'log_density'):
+           if(constraint_type == 'log_prob'):
                 value = compute_log_density(kernels, obs, act, s_next).item()
            else:
                 value = compute_total_mahalanobis_score(kernels, obs, act, s_next).item()
            values.append(value)
-    if(constraint_type == 'log_density'):
+    if(constraint_type == 'log_prob'):
          threshold = np.quantile(values, (1 - quantile))
     elif(constraint_type == 'mahalanobis'):
          threshold = np.quantile(values, quantile)

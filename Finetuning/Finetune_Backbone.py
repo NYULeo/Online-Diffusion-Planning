@@ -7,7 +7,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 from dataclasses import dataclass
 from gymnasium.vector import AsyncVectorEnv
-from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs, check_Critic
+from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs, check_Critic, get_kernel
 #from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
 from Finetuning.comp_reward import RewardConfig, TotalReward, TotalReward_Critic, TotalReward_Critic_Mahalanobis, TotalReward_Mahalanobis
 from adjoint_matching import AdjointMatchingFineTuner, AdjointMatchingConfig
@@ -445,13 +445,13 @@ class OnlineFinetuner():
                 [local_generated], use_gather_object=True
          )
 
-         if self.accelerator.is_main_process:
-              generated_plans = []
-              for per_rank in gathered:
-                    generated_plans.extend(per_rank)
-              return generated_plans[:number_of_generated_plans]
-         return None  
-   
+         generated_plans = []
+         for per_rank in gathered:
+                generated_plans.extend(per_rank)
+
+         return generated_plans[:number_of_generated_plans]
+    
+    
 
     def finetune_planner(self):
         if self.accelerator.is_main_process:
@@ -687,7 +687,7 @@ class OnlineFinetuner():
                              specific_dataset = self.config.specific_dataset, 
                              goal = self.config.train_reward_config.train_goal,
                              task_id = self.config.train_reward_config.task_id)
-                  
+                  """
                   if self.config.kernel:
                       print(f"Starting Kernel Training")
                       if(self.config.train_kernel_config.type_kernel == 'robust'):
@@ -723,7 +723,8 @@ class OnlineFinetuner():
                                       constraint_type = self.config.RewardConfig.constraint_type,
                                       quantile = self.config.RewardConfig.quantile,
                                       x_generated_plans = x_generated_plans)
-                  
+                  """
+
                   if self.config.critic and update_critic:
                       print(f"Starting Critic Training")
                       #save_trajs(critic_buffer, self.config.dataset_name, self.config.specific_dataset, ((step+1) * self.config.AMConfig.per_round_steps))
@@ -746,12 +747,57 @@ class OnlineFinetuner():
                                    target_reward = self.config.train_reward_config.target_reward,
                                    task_id = self.config.train_reward_config.task_id)
                                     
-                                  
-
+            self.accelerator.wait_for_everyone()
+            if self.config.kernel:
+                      print(f"Starting Kernel Training")
+                      if(self.config.train_kernel_config.type_kernel == 'robust'):
+                          threshold = train_kernel(self.Train_Kernel_Buffer, 
+                             dataset_name = self.config.dataset_name, 
+                             specific_dataset = self.config.specific_dataset,
+                             batch_size = self.config.train_kernel_config.batch_size, 
+                             lr = self.config.train_kernel_config.lr, 
+                             num_steps = self.config.train_kernel_config.num_steps,
+                             ensemble_size = self.config.train_kernel_config.ensemble_size, 
+                             λ_reg = self.config.train_kernel_config.λ_reg, 
+                             num_hidden_layers = self.config.train_kernel_config.num_hidden_layers,
+                             hidden_dim = self.config.train_kernel_config.hidden_dim,
+                             step = ((step+1) * self.config.AMConfig.per_round_steps),
+                             constraint_type = self.config.RewardConfig.constraint_type,
+                             quantile = self.config.RewardConfig.quantile, 
+                             x_generated_plans = x_generated_plans,
+                             accelerator = self.accelerator)
+                      
+                      elif(self.config.train_kernel_config.type_kernel == 'mog'):
+                          threshold = train_kernel_mog(self.Train_Kernel_Buffer,
+                                      dataset_name = self.config.dataset_name,
+                                      specific_dataset = self.config.specific_dataset,
+                                      batch_size = self.config.train_kernel_config.batch_size,
+                                      lr = self.config.train_kernel_config.lr,
+                                      num_steps = self.config.train_kernel_config.num_steps,
+                                      ensemble_size = self.config.train_kernel_config.ensemble_size,
+                                      λ_reg = self.config.train_kernel_config.λ_reg,
+                                      num_modes = self.config.train_kernel_config.kernel_num_modes,
+                                      num_hidden_layers = self.config.train_kernel_config.num_hidden_layers,
+                                      hidden_dim = self.config.train_kernel_config.hidden_dim,
+                                      kernel_noise_floor = self.config.train_kernel_config.kernel_noise_floor,
+                                      step = ((step+1) * self.config.AMConfig.per_round_steps),
+                                      constraint_type = self.config.RewardConfig.constraint_type,
+                                      quantile = self.config.RewardConfig.quantile,
+                                      x_generated_plans = x_generated_plans,
+                                      accelerator = self.accelerator)
+                      
+                      if threshold is not None:
+                          if(self.config.RewardConfig.constraint_type == 'mahalanobis' ):
+                               self.config.RewardConfig.max_mahalanobis_score = threshold
+                          elif(self.config.RewardConfig.constraint_type == 'log_prob'):
+                               self.config.RewardConfig.min_log_prob = threshold
+                                        
+            """
             self.accelerator.wait_for_everyone()
             stats = torch.tensor([threshold], device = self.accelerator.device)
             stats = broadcast(stats, from_process=0)
             threshold = stats.tolist()[0]
+            """
             
             #set the new total reward model
             self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
@@ -761,11 +807,13 @@ class OnlineFinetuner():
                  self.config.kernel_model_checkpoint = 0
             self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             #if self.config.RewardConfig.max_mahalanobis_score < threshold: 
-        
+            
+            """
             if(self.config.RewardConfig.constraint_type == 'mahalanobis' ):
                  self.config.RewardConfig.max_mahalanobis_score = threshold
             elif(self.config.RewardConfig.constraint_type == 'log_prob'):
                  self.config.RewardConfig.min_log_prob = threshold
+            """
             
             
             #self.config.critic_model_checkpoint = 0
