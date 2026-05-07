@@ -79,8 +79,6 @@ class Train_Critic_Config:
 class FinetuningConfig():
     AMConfig: AdjointMatchingConfig | Acc_AdjointMatchingConfig
     RewardConfig: RewardConfig 
-    constraint_adapt: bool = True
-    number_of_generated_plans: int = 50
     AlphaConfig: AlphaSchedulerConfig
     dataset_name: str
     specific_dataset: str
