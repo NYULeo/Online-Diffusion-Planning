@@ -386,8 +386,9 @@ class OnlineFinetuner():
              critic_buffer = half_pretrained_trajs + half_buffer_trajs
         return critic_buffer
 
+    """
     def get_generated_plans(self, number_of_generated_plans: int):
-        dataloader = cycle(DataLoader(self.PlannerDataset, batch_size = 1, shuffle = False))
+        dataloader = cycle(DataLoader(self.PlannerDataset, batch_size = 12, shuffle = False))
         generated_plans = []
         for i in range(number_of_generated_plans):
             s0 = next(dataloader)
@@ -404,7 +405,53 @@ class OnlineFinetuner():
             
             generated_plans.append(x)
         return generated_plans
-                
+     """
+
+    def get_generated_plans(self, number_of_generated_plans: int):
+         # Build global s0 batch deterministically on all ranks
+         #  (all processes must run same code before split/gather)
+         loader = DataLoader(
+                 self.PlannerDataset,
+                 batch_size=number_of_generated_plans,
+                 shuffle=False,
+                 drop_last=False,
+          )
+         s0_batch = next(iter(loader))  # torch.Tensor, shape (N, d_s) if enough data
+          # Optional safety: trim/pad logic if dataset is smaller than N
+         s0_batch = s0_batch[:number_of_generated_plans]
+
+          #    Split s0 list across processes
+         with self.accelerator.split_between_processes(s0_batch) as local_s0_batch:
+            local_generated = []
+            for s0 in local_s0_batch:
+                 s0_np = s0.detach().cpu().numpy()
+                 x = sample_euler_karras(
+                    s0_np,
+                    self.AMFineTuner.new_score_net,
+                    self.config.AMConfig.d_s,
+                    self.config.AMConfig.d_a,
+                    self.config.AMConfig.horizon,
+                    self.config.AMConfig.diffusion_steps,
+                    self.config.AMConfig.num_karras,
+                    self.config.AMConfig.eta,
+                    self.device,
+                  )
+                 local_generated.append(x)  # each x: np.ndarray (H, d_s+d_a)
+
+         self.accelerator.wait_for_everyone()
+
+         # Gather python lists from all ranks
+         gathered = self.accelerator.gather_for_metrics(
+                [local_generated], use_gather_object=True
+         )
+
+         if self.accelerator.is_main_process:
+              generated_plans = []
+              for per_rank in gathered:
+                    generated_plans.extend(per_rank)
+              return generated_plans[:number_of_generated_plans]
+         return None  
+   
 
     def finetune_planner(self):
         if self.accelerator.is_main_process:
@@ -539,14 +586,15 @@ class OnlineFinetuner():
             
             self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
             self.accelerator.wait_for_everyone()
-            if self.accelerator.is_main_process:
-                if(self.config.RewardConfig.constraint_adapt == True):
-                      x_generated_plans = self.get_generated_plans(self.config.RewardConfig.number_of_generated_plans)
-                      print(f"Generated {len(x_generated_plans)} plans for cosntraint adaptation")
-                else:
-                      x_generated_plans = None
-            
+            #if self.accelerator.is_main_process:
+            if(self.config.RewardConfig.constraint_adapt == True):
+                x_generated_plans = self.get_generated_plans(self.config.RewardConfig.number_of_generated_plans)
+                if self.accelerator.is_main_process:
+                    print(f"Generated {len(x_generated_plans)} plans for cosntraint adaptation")
+            else:
+                    x_generated_plans = None
             self.accelerator.wait_for_everyone()
+
             if torch.cuda.is_available():
                   torch.cuda.synchronize()  
             self.accelerator.wait_for_everyone() 

@@ -447,7 +447,7 @@ if __name__ == "__main__":
                quantile = 0.999,
                min_log_prob = -110.0,
                constraint_adapt = True,
-               number_of_generated_plans = 100,
+               number_of_generated_plans = 32,
                #max_mahalanobis_score = 100.0,
                critic_gamma = 1.0,
                explore = False,
