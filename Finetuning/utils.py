@@ -747,7 +747,7 @@ def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
     """
     threshold = None
     if(x_generated_plans is not None):
-        _, kernel_stats, _, _ = get_kernel_stats(dataset_name, specific_dataset, step)
+        kernel_stats = get_kernel_stats(dataset_name, specific_dataset, step)
         threshold = compute_threshold(ensemble, kernel_stats, obs_dim, act_dim,  x_generated_plans, constraint_type, quantile, device)
         print(f"New Threshold for {constraint_type}: {threshold}")
     for idx, m in enumerate(ensemble):
@@ -839,7 +839,7 @@ def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_da
     """
     threshold = None
     if(x_generated_plans is not None):
-        _, kernel_stats, _, _ = get_kernel_stats(dataset_name, specific_dataset, step)
+        kernel_stats = get_kernel_stats(dataset_name, specific_dataset, step)
         threshold = compute_threshold_mog(ensemble, kernel_stats, obs_dim, act_dim,  x_generated_plans, constraint_type, quantile, device)
         print(f"New Threshold for {constraint_type}: {threshold}")
     for idx, m in enumerate(ensemble):

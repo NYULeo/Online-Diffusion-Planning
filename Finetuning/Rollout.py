@@ -289,12 +289,13 @@ def load_success_trajs(env_name, specific_env, task_id, step):
         trajs = pickle.load(f)
     return trajs
  
-def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None, task_id: Optional[int] = None, base_seed: int = 0, continual_rollout = False, chunk_size = 5):
+def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None, task_id: Optional[int] = None, base_seed: int = 0, continual_rollout = False, chunk_size = 5, device = None):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}, episode_length: {episode_length}")
+     #print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}, episode_length: {episode_length}")
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     device = "cuda" if torch.cuda.is_available() else "cpu"
-     print(f"Using device {device}")
+     #device = check_device()
+     #device = "cuda" if torch.cuda.is_available() else "cpu"
+     #print(f"Using device {device}")
      
      
      #env.reset(seed=1)  # Important: pass seed to env.reset
@@ -331,14 +332,14 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      #reset
      if(env_name == 'cube'):
         #s0, info = env.reset(seed = base_seed, options = dict( task_id=task_id))
-        #s0, info = env.reset(seed = base_seed)
-        s0, info = env.reset()
+        s0, info = env.reset(seed = base_seed)
+        #s0, info = env.reset()
      if(goal_cell is not None):
-        #s0, info = env.reset(seed = base_seed, options = {"goal_cell": goal_cell, "reset_cell": start_cell})
-        s0, info = env.reset( options = {"goal_cell": goal_cell, "reset_cell": start_cell})
+        s0, info = env.reset(seed = base_seed, options = {"goal_cell": goal_cell, "reset_cell": start_cell})
+        #s0, info = env.reset( options = {"goal_cell": goal_cell, "reset_cell": start_cell})
      else:
-        #s0, info = env.reset(seed = base_seed)
-        s0, info = env.reset()
+        s0, info = env.reset(seed = base_seed)
+        #s0, info = env.reset()
      
     
      """
@@ -401,7 +402,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
            #current_state = obs['observation'].copy()
            #print(f"Episode {i} reward: {reward}")
            if(terminated or truncated):
-                print(f"Episode {i} terminated or truncated")
+                #print(f"Episode {i} terminated or truncated")
                 break
      
      env.close()
@@ -428,7 +429,8 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      """
      #print(sum(traj['rewards']))
      #return traj
-     return sum(traj['rewards'])
+     return traj['rewards'][-1]
+     #return sum(traj['rewards'])
      #print(get_normalized_score([traj]))
 
 def load_kernel(env_name, specific_env, checkpoint_steps, kernel_config: Kernel_Config, device: str):
@@ -702,26 +704,30 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
-    #total_reward = 0.0
-    #for i in range(1, 11):
-    set_seed(3)
-    reward = rollout(
-            env_name, 
-            specific_train_dataset, 
-            horizon, 
-            steps_T = 200, 
-            num_karras = 10, 
-            eta = 0.8, 
-            episode_length = 3000, 
-            checkpoint_steps = 20, 
-            render = True,  
-            base_seed = 0, 
-            task_id = 4,
-            continual_rollout = True,
-            chunk_size = 31)
-        #total_reward += reward
-    
-    #print(f"Success Rate: {total_reward / 10 :.4f}")
+    total_reward = 0.0
+    device = check_device()
+    print(f"Using device {device}")
+    for i in range(1, 7):
+        set_seed(i)
+        for j in range(1, 7):
+            reward =  rollout(
+               env_name, 
+               specific_train_dataset, 
+               horizon, 
+               steps_T = 200, 
+               num_karras = 10, 
+               eta = 0.8, 
+               episode_length = 3000, 
+               checkpoint_steps = 0, 
+               render = True,  
+               base_seed = j, 
+               task_id = 4,
+               continual_rollout = True,
+               chunk_size = 31,
+               device = device)
+            total_reward += reward
+        print(f"seed {i} finished")
+    print(f"Success Rate: {total_reward / 49 :.4f}")
        
     
 
