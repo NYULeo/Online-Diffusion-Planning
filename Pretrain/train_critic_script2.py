@@ -111,7 +111,7 @@ if __name__ == '__main__':  # pragma: no cover
                 specific_dataset = specific_env,
                 hidden_layers = 4,
                 hidden_dim = 512,
-                checkpoint_step = 65000,
+                checkpoint_step = 0,
                 gamma = 0.99,
                 horizon = 32,
                 goal = None,
