@@ -61,9 +61,17 @@ data = get_dataset('cube', 'double-play', task_id = 5, traj_length = None)
 trajs = data.get_trajectories()
 """
 
-a = torch.tensor([[1,2,3,3]])
-a = a.squeeze(0)
-print(a)
+
+"""
+env_steps = [0, 1592, 1590, 1600, 1411, 1416, 1600, 1555, 1422, 1600, 1599, 1554]
+total_steps = [0]
+for i in range(1, len(env_steps)):
+    total_steps.append(total_steps[i-1] + env_steps[i])
+
+print(len(total_steps))
+print(len(env_steps))
+"""
+
 
 
 """
@@ -84,7 +92,6 @@ for traj in trajs:
     print(rews)
     exit()
 """
-
 
 
 

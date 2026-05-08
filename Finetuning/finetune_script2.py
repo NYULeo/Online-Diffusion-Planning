@@ -498,7 +498,7 @@ if __name__ == "__main__":
         kernel_model_checkpoint = 0,
         critic_model_checkpoint = 0,
         critic = True,
-        update_critic = False,
+        update_critic = True,
         kernel = True,
         update_kernel = False,
         buffer_size = 20000,

@@ -197,76 +197,47 @@ media.write_video("demo.mp4", frames, fps=50)
 """
 
 
-
-
 import matplotlib.pyplot as plt
-import numpy as np
 import seaborn as sns
+from matplotlib.ticker import FuncFormatter
 
-# Set style
+# Data
+"""
+env_steps = [0, 1592, 3182, 4782, 6193, 7609, 9209, 10764, 12186, 13786, 15385, 16939]
+success_rate = [6.12, 12.24, 8.16, 14.29, 8.16, 24.29, 18.37, 14.29, 4.08, 0.00, 0.00, 0.00]
+"""
+env_steps =    [0, 1592, 4782, 7609, 9209, 10764, 12186, 13786, 15385, 16939]
+success_rate = [6.12, 12.24, 14.29, 24.29, 18.37, 14.29, 4.08, 0.00, 0.00, 0.00]
+# Style
 sns.set_style("whitegrid")
-plt.rcParams['figure.figsize'] = (11, 6.5)
+fig, ax = plt.subplots(figsize=(11, 6.5))
 
-# Generate x values (same density as your plot)
-x = np.linspace(1, 30, 30)
+ax.plot(
+    env_steps,
+    success_rate,
+    color="#C44E9B",
+    linewidth=3.0,
+    marker="o",
+    markersize=7,
+    markeredgecolor="white",
+    markeredgewidth=0.8,
+    label="Success Rate",
+    zorder=5
+)
 
+# Optional: highlight area under curve
+ax.fill_between(env_steps, success_rate, 0, color="#C44E9B", alpha=0.15, zorder=2)
 
-normalized_scores = [
-    14.88,  # Round 1
-    21.06,  # Round 2
-    24.54,  # Round 3
-    24.69,  # Round 4
-    31.67,  # Round 5
-    31.69,  # Round 6
-    31.52,  # Round 7
-    32.32,  # Round 8
-    33.20,  # Round 9
-    32.97,  # Round 10
-    32.40,  # Round 11
-    32.28,  # Round 12
-    33.94,  # Round 13
-    33.68,  # Round 14
-    34.04,  # Round 15
-    34.14,  # Round 16
-    33.14,  # Round 17
-    33.02,  # Round 18
-    40.94,  # Round 19
-    44.28,  # Round 20
-    45.37,  # Round 21
-    46.57,  # Round 22
-    47.47,  # Round 23
-    47.92,  # Round 24
-    48.17,  # Round 25
-    48.21,  # Round 26
-    48.25,  # Round 27
-    48.30,  # Round 28
-    48.30,  # Round 29
-    48.32   # Round 30
-]
-
-fig, ax = plt.subplots()
-ax.plot(x, normalized_scores, color='#C44E9B', linewidth=3.2, marker='o', markersize=8, markeredgecolor='white', markeredgewidth=0.8, label='Our Method', zorder=5)
-#ax.fill_between(x, y1 - error1, y1 + error1, color='#C44E9B', alpha=0.22)
-#ax.plot(x, y2, color='#4A90E2', linewidth=3.2, marker='s', markersize=8, markeredgecolor='white', markeredgewidth=0.8, label='Series 2', zorder=5)
-#ax.fill_between(x, y2 - error2, y2 + error2, color='#4A90E2', alpha=0.25)
-
-indices = np.linspace(18, len(x)-6, 10, dtype=int)
-#ax.scatter(x[indices], y2[indices], color='#4A90E2', s=85, marker='s', edgecolor='white', linewidth=0.6, zorder=6)        # squares
-#ax.scatter(x[indices+2], y2[indices+2], color='#4A90E2', s=95, marker='^', edgecolor='white', linewidth=0.6, zorder=6)        # triangles  (fixed!)
-#ax.scatter(x[indices+5], y2[indices+5], color='#4A90E2', s=100, marker='*', edgecolor='white', linewidth=0.5, zorder=6)        # stars
-
-# Vertical gray shaded region
-#ax.axvspan(0.82, 1.18, color='gray', alpha=0.12, zorder=1)
-
-# Labels and limits
-ax.set_xlim(1, 30)
+# Axis formatting
+ax.set_xlim(min(env_steps), max(env_steps))
 ax.set_ylim(0, 50)
-ax.set_xlabel('X axis')
-ax.set_ylabel('Y axis')
+ax.set_xlabel("Environment Steps")
+ax.set_ylabel("Success Rate")
+ax.set_title("Cube Single")
 
-# Legend
-ax.legend(loc='upper right', frameon=True)
+# Show x-axis in k steps (e.g., 16.9k)
+ax.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x/1000:.1f}k"))
 
+ax.legend(loc="upper right", frameon=True)
 plt.tight_layout()
 plt.show()
-

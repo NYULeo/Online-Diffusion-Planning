@@ -4,6 +4,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
+from sympy.simplify.fu import I
 import torch
 import numpy as np
 import mediapy as media
@@ -704,14 +705,14 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
-    checkpoint = 55
+    checkpoint = 5
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}, checkpoint: {checkpoint}")
     for i in range(1, 8):
         set_seed(i)
         for j in range(1, 8):
-            reward =  rollout(
+            reward  =  rollout(
                env_name, 
                specific_train_dataset, 
                horizon, 
@@ -720,12 +721,13 @@ if __name__ == "__main__":
                eta = 0.8, 
                episode_length = 3000, 
                checkpoint_steps = checkpoint, 
-               render = False,  
+               render = True,  
                base_seed = j, 
                task_id = 4,
                continual_rollout = True,
                chunk_size = 31,
                device = device)
+             #print(reward)
             total_reward += reward
         print(f"seed {i} finished")
     print(f"Success Rate: {total_reward / 49 :.4f}")

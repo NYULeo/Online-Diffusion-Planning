@@ -309,7 +309,8 @@ class OnlineFinetuner():
         # Gather local trajectories from all processes
         gathered_trajs_list = self.accelerator.gather_for_metrics([local_trajs if local_trajs else []], use_gather_object=True)
         self.accelerator.wait_for_everyone()
-
+        
+        update_reward = False
         if self.accelerator.is_main_process:
             # Flatten and extend buffer only on main
             collected_trajs = []
@@ -325,8 +326,10 @@ class OnlineFinetuner():
             
             self.Train_Kernel_Buffer.extend(collected_trajs)
             success_trajs = get_success_trajs(collected_trajs)
-            self.Train_Buffer.extend(success_trajs)
-            self.Finetune_Buffer.extend(success_trajs)
+            if(len(success_trajs) > 0):
+                 self.Train_Buffer.extend(success_trajs)
+                 self.Finetune_Buffer.extend(success_trajs)
+                 update_reward = True
             if len(self.Finetune_Buffer) > self.config.buffer_size:
                  num_to_remove = len(self.Finetune_Buffer) - self.config.buffer_size
                  self.Finetune_Buffer = self.Finetune_Buffer[num_to_remove:] 
@@ -336,19 +339,23 @@ class OnlineFinetuner():
             buffer_for_sync = [self.Finetune_Buffer]
         else:
             buffer_for_sync = [None]
-    
+        
         # Broadcast full updated buffer to all processes
         synced_buffer = self.accelerator.gather_for_metrics(buffer_for_sync, use_gather_object=True)
         if synced_buffer[0] is not None:
              self.Finetune_Buffer = synced_buffer[0]
-    
-        # Recreate PlannerDataset consistently on all processes
+        flag = torch.tensor([1 if update_reward else 0], device=self.accelerator.device, dtype=torch.int64)
+        flag = broadcast(flag, from_process=0)   # accelerate.utils.broadcast
+        update_reward = bool(flag.item())
+
         self.PlannerDataset = PlannerDataset(
-              self.Finetune_Buffer,
-              self.config.AMConfig.horizon,
-              self.config.dataset_name,
-              self.config.specific_dataset,
-              self.config.finetune_buffer_cutoff_length)
+                 self.Finetune_Buffer,
+                 self.config.AMConfig.horizon,
+                 self.config.dataset_name,
+                 self.config.specific_dataset,
+                 self.config.finetune_buffer_cutoff_length
+         )
+        return update_reward
    
     def collect_critic_buffer(self, local_trajs):
           # ALL processes must participate in gather_for_metrics (collective operation)
@@ -657,7 +664,7 @@ class OnlineFinetuner():
             if self.accelerator.is_main_process:
                   print(f"Rollout Completed")
             
-            self.gather_and_sync_trajs_and_buffer(trajs)
+            update_reward = self.gather_and_sync_trajs_and_buffer(trajs)
             if self.config.critic:
                  critic_buffer, update_critic = self.collect_critic_buffer(trajs)
                  self.accelerator.wait_for_everyone()
@@ -680,10 +687,11 @@ class OnlineFinetuner():
                  print(f"Average Normalized Score: {avg_score:.2f}")
             self.accelerator.wait_for_everyone()  
             
-            threshold = 0.0
+            
             if self.accelerator.is_main_process:
                   print(f"Starting Reward Training")
-                  train_reward(self.Train_Buffer, 
+                  if update_reward:
+                      train_reward(self.Train_Buffer, 
                              dataset_name = self.config.dataset_name, 
                              hidden_layers = self.config.train_reward_config.hidden_layers,
                              hidden_dim = self.config.train_reward_config.hidden_dim,
@@ -810,7 +818,8 @@ class OnlineFinetuner():
             """
             
             #set the new total reward model
-            self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
+            if update_reward:
+                 self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             if(self.config.kernel and self.config.update_kernel):
                   self.config.kernel_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             else:
