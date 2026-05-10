@@ -73,23 +73,23 @@ if __name__ == '__main__':  # pragma: no cover
         check_cube_single_goal_reach(trajs, task_id)
    
 
-
+    
     train_critic(dataset_name = env_name,
                  specific_dataset = specific_env, 
                  hidden_layers = 4,
                  hidden_dim = 512,
                  batch_size = 256, 
-                 num_steps = 5000, 
+                 num_steps = 30000, 
                  gamma = 0.99, 
                  horizon = 32, 
-                 lr = 1e-05,
+                 lr = 2e-05,
                  min_lr = 1e-06,
                  tau = 0.005,
                  goal = None,
-                 sigma = 3.0,
+                 sigma = 5.0,
                  #alpha = 0.99,
                  #alpha = None,
-                 target_reward = 80.0,
+                 target_reward = 50.0,
                  trajs = trajs_2, 
                  task_id = task_id)
     
@@ -111,12 +111,12 @@ if __name__ == '__main__':  # pragma: no cover
                 specific_dataset = specific_env,
                 hidden_layers = 4,
                 hidden_dim = 512,
-                checkpoint_step = 5000,
+                checkpoint_step = 30000,
                 gamma = 0.99,
                 horizon = 32,
                 goal = None,
-                sigma = 3.0,
+                sigma = 5.0,
                 #alpha = 0.99,
-                target_reward = 80.0,
+                target_reward = 50.0,
                 trajs = trajs_2,
                 task_id = task_id)

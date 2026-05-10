@@ -700,19 +700,19 @@ if __name__ == "__main__":
     
   
     
-    
+    """
     #set_seed(26)
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
-    checkpoint = 5
+    checkpoint = 0
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}, checkpoint: {checkpoint}")
-    for i in range(1, 8):
-        set_seed(i)
-        for j in range(1, 8):
-            reward  =  rollout(
+    #for i in range(1, 8):
+    set_seed(1)
+    #for j in range(1, 8):
+    reward  =  rollout(
                env_name, 
                specific_train_dataset, 
                horizon, 
@@ -722,53 +722,55 @@ if __name__ == "__main__":
                episode_length = 3000, 
                checkpoint_steps = checkpoint, 
                render = True,  
-               base_seed = j, 
+               base_seed = 1, 
                task_id = 4,
                continual_rollout = True,
                chunk_size = 31,
                device = device)
              #print(reward)
-            total_reward += reward
-        print(f"seed {i} finished")
-    print(f"Success Rate: {total_reward / 49 :.4f}")
-       
+            #total_reward += reward
+        #print(f"seed {i} finished")
+    #print(f"Success Rate: {total_reward / 49 :.4f}")
+    """
     
 
-    """
+    
     from Finetuning.utils import rollout_parallel3
     #set_seed(1)
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
-    #total_success_trajs = []
+    task_id = 4
+    total_success_trajs = []
    
     
-    for i in range(0, 13):
-       checkpoint_step = i*5
-       total_success_rate = 0.0
-       for j in range(1, 51):
-          set_seed(j)
+    #for i in range(30, 60):
+       #checkpoint_step = i*5
+       #total_success_rate = 0.0
+    for i in range(60, 121):
+          set_seed(i)
           trajs, _, success_rate, _ = rollout_parallel3(env_name = env_name, 
                       specific_env = specific_train_dataset, 
-                      horizon = 32,
+                      horizon = horizon,
                       steps_T = 200, 
                       num_karras = 10, 
                       eta = 0.8, 
                       episode_length = 4000, 
-                      checkpoint_step = checkpoint_step,
+                      checkpoint_step = 0,
                       num_envs = 10, 
-                      task_id = 4, 
-                      seed_base = j, 
+                      task_id = task_id, 
+                      seed_base = 1, 
                       continual_rollout = True, 
-                      chunk_size = 32)
+                      chunk_size = 31)
           success_trajs = get_success_trajs(trajs)
-          success_rate = len(success_trajs) / len(trajs)
-          total_success_rate += success_rate
-       total_success_rate = total_success_rate / 50
-       print(f"Success Rate for checkpoint {checkpoint_step}: {total_success_rate:.4f}")
+          total_success_trajs.extend(success_trajs)
+          #success_rate = len(success_trajs) / len(trajs)
+          #total_success_rate += success_rate
+       #total_success_rate = total_success_rate / 50
+      # print(f"Success Rate for checkpoint {checkpoint_step}: {total_success_rate:.4f}")
      # print(len(total_success_trajs))
-    #save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 4)
-   """
+    save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 4)
+   
    
 
     """

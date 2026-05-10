@@ -369,7 +369,7 @@ class OnlineFinetuner():
                   if process_trajs:
                       critic_buffer.extend(process_trajs)
               critic_buffer = get_success_trajs(critic_buffer)
-              if(len(critic_buffer) > 2):
+              if(len(critic_buffer) > 1):
                   train_critic = True
               if self.config.train_critic_config.data_conservation:
                   critic_buffer = self.data_conservation_update(critic_buffer)
@@ -382,8 +382,7 @@ class OnlineFinetuner():
           train_critic = bool(flag.item())
           
           return critic_buffer, train_critic
-
-    
+   
     def data_conservation_update(self, critic_buffer):
         if(self.config.train_reward_config.task_id is not None):
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = self.config.train_buffer_cutoff_length)
@@ -667,7 +666,10 @@ class OnlineFinetuner():
             update_reward = self.gather_and_sync_trajs_and_buffer(trajs)
             if self.config.critic:
                  critic_buffer, update_critic = self.collect_critic_buffer(trajs)
+                 print(f"Number of trajectories for critic training: {len(critic_buffer)}")
+                 print(update_critic)
                  self.accelerator.wait_for_everyone()
+                 
             
             #collect the score and number of env stepsacross all processes
             gathered_scores = self.accelerator.gather_for_metrics(torch.tensor([score], device=self.device, dtype = torch.float32),  use_gather_object=False)
@@ -819,7 +821,8 @@ class OnlineFinetuner():
             
             #set the new total reward model
             if update_reward:
-                 self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
+                  self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
+
             if(self.config.kernel and self.config.update_kernel):
                   self.config.kernel_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             else:
@@ -829,9 +832,9 @@ class OnlineFinetuner():
                 if update_critic:
                      self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
                 else:
-                     self.config.kernel_model_checkpoint = 0
+                     self.config.critic_model_checkpoint = 0
             else:
-                 self.config.kernel_model_checkpoint = 0
+                 self.config.critic_model_checkpoint = 0
             #if self.config.RewardConfig.max_mahalanobis_score < threshold: 
             
             """
