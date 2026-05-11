@@ -600,7 +600,19 @@ def model_rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, che
 """
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
+    goals = {'task_1': np.array( [ 0.0,       -1.0,        0.199599]), 
+         'task_2': np.array([7.50000000e-01, 8.02418254e-18, 1.99598996e-01]),
+         'task_3': np.array([-7.50000000e-01,  1.21832368e-19,  1.99598996e-01]),
+         'task_4': np.array([0.75,     2.0,       0.199599]),
+         'task_5': np.array([ 0.75,     -2.0,        0.199599])}
     
+    trajs = load_success_trajs('cube', 'single-play', 4, 0)
+    new_trajs = []
+    for traj in trajs:
+        print(len(traj['observations']))
+        print(len(traj['actions']))
+        print(len(traj['rewards']))
+      
     """
     horizon = 32
     env_name = 'pointmaze'
@@ -699,18 +711,18 @@ if __name__ == "__main__":
 
     
   
-    
     """
+    
     #set_seed(26)
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
-    checkpoint = 0
+    checkpoint = 60
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}, checkpoint: {checkpoint}")
     #for i in range(1, 8):
-    set_seed(1)
+    set_seed(2)
     #for j in range(1, 8):
     reward  =  rollout(
                env_name, 
@@ -734,7 +746,7 @@ if __name__ == "__main__":
     """
     
 
-    
+    """
     from Finetuning.utils import rollout_parallel3
     #set_seed(1)
     horizon = 32
@@ -771,7 +783,7 @@ if __name__ == "__main__":
      # print(len(total_success_trajs))
     save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 4)
    
-   
+   """
 
     """
     env, _, _ = get_env(env_name, specific_train_dataset,  render_mode = 'rgb_array')
@@ -790,7 +802,7 @@ if __name__ == "__main__":
 
     
     
-    
+   
     
 
     

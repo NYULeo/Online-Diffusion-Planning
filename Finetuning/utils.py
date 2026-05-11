@@ -1189,9 +1189,9 @@ class CriticDataset(Dataset):
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
             rews = gaussian_filter1d(rews, sigma)
-            if(len(obs) > horizon):
-               rews = self.reward_processor(rews, horizon, gamma)
-               for t in range(len(obs)-horizon):
+            #if(len(obs) > horizon):
+            rews = self.reward_processor(rews, horizon, gamma)
+            for t in range(len(obs)):
                    obs_t = self.stats.norm_obs(obs[t])
                    r_t   = rews[t]
                    obs_next_t = self.stats.norm_obs(obs[min(t+horizon, len(obs)-1)])
@@ -2208,7 +2208,7 @@ def rollout_parallel3(
         for env_idx in range(num_envs):
             total_steps += len(observations[env_idx]) - 1
             trajs.append({
-                'observations': np.asarray(observations[env_idx]),
+                'observations': np.asarray(observations[env_idx][-1]),
                 'actions': np.asarray(acts[env_idx]),
                 'rewards': np.asarray(spare_reward_prcocessor(rewards[env_idx].copy()))  # FIXED
             })

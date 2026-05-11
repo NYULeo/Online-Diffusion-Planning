@@ -369,12 +369,13 @@ class CriticDataset(Dataset):
                 rews = ema_smooth(rews, alpha)
             elif(sigma is not None):
                 rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate = 200/sigma)
-            if(len(obs) > horizon):
-               rews = self.reward_processor(rews, horizon, gamma)
-               for t in range(len(obs)-horizon):
+            #if(len(obs) > horizon):
+            rews = self.reward_processor(rews, horizon, gamma)
+            #for t in range(len(obs)-horizon):
+            for t in range(len(obs)):
                    obs_t = self.stats.norm_obs(obs[t])
                    r_t   = rews[t]
-                   obs_next_t = self.stats.norm_obs(obs[min(t+horizon, len(obs)-1)])
+                   obs_next_t = self.stats.norm_obs(obs[min(t + horizon, len(obs) - 1)])
                    transitions.append((obs_t, r_t, obs_next_t))
            
         self.transitions = transitions
@@ -407,11 +408,11 @@ class CriticDataset(Dataset):
     def __getitem__(self, idx):
         s, r, s_next = self.transitions[idx]
         return (
-            torch.tensor(s, dtype = torch.float32),
-            torch.tensor(r, dtype = torch.float32),
-            torch.tensor(s_next, dtype = torch.float32)
-        )
-    
+                torch.tensor(s, dtype = torch.float32),
+                torch.tensor(r, dtype = torch.float32),
+                torch.tensor(s_next, dtype = torch.float32)
+            )
+
     def boost_signal(self, target_reward, rews):
         for t in range(len(rews)):
             if(rews[t] == 1):
@@ -483,6 +484,7 @@ def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, h
            with torch.no_grad():
               q_next = target_critic(s_next)
               target = r + ( (gamma**horizon) * q_next)
+              
 
            # Predicted V-values
            q_pred = critic(s)

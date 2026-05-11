@@ -460,7 +460,7 @@ if __name__ == "__main__":
                           num_steps = 5000, 
                           lr = 1e-04, 
                           sigma = 3.0, 
-                          target_reward = 80.0, 
+                          target_reward = 50.0, 
                           train_goal = None,
                           task_id = 4)
       
@@ -480,9 +480,9 @@ if __name__ == "__main__":
                             hidden_layers = 4,
                             hidden_dim = 512,
                             batch_size = 256,
-                            num_steps = 65000,
-                            lr = 1e-05,
-                            min_lr = 1e-06,
+                            num_steps = 60000,
+                            lr = 6e-05,
+                            min_lr = 9e-06,
                             tau = 0.005,
                             gamma = 0.99,
                             data_conservation = True)
@@ -520,9 +520,9 @@ if __name__ == "__main__":
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value
-        rollout_num_envs = 1, 
+        rollout_num_envs = 3, 
         continual_rollout = True,
-        num_rollout_processes = 30,
+        num_rollout_processes = 8,
         train_reward_config = TrainRewardConfig,
         train_kernel_config = TrainKernelConfig,
         train_critic_config = TrainCriticConfig) 

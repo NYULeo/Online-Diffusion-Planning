@@ -66,31 +66,31 @@ if __name__ == '__main__':  # pragma: no cover
     path = PROJECT_ROOT / "Finetuning" / "Rollouts" / env_name / specific_env /f"task_{task_id}" / f"trajs_task{task_id}_success_0.pkl"
     with open(path, 'rb') as f:
           trajs_2 = pickle.load(f)
+    
+    
     trajs =  trajs_1 + trajs_2
     if(specific_env == 'double-play'):
         check_cube_double_goal_reach(trajs, task_id)
     else:
         check_cube_single_goal_reach(trajs, task_id)
    
-
-    
     train_critic(dataset_name = env_name,
                  specific_dataset = specific_env, 
                  hidden_layers = 4,
                  hidden_dim = 512,
                  batch_size = 256, 
-                 num_steps = 30000, 
+                 num_steps = 60000, 
                  gamma = 0.99, 
                  horizon = 32, 
-                 lr = 2e-05,
-                 min_lr = 1e-06,
+                 lr = 6e-05,
+                 min_lr = 9e-06,
                  tau = 0.005,
                  goal = None,
-                 sigma = 5.0,
-                 #alpha = 0.99,
+                 sigma = 3.0,
+                 #alpha = None,
                  #alpha = None,
                  target_reward = 50.0,
-                 trajs = trajs_2, 
+                 trajs = trajs, 
                  task_id = task_id)
     
     data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
@@ -111,12 +111,12 @@ if __name__ == '__main__':  # pragma: no cover
                 specific_dataset = specific_env,
                 hidden_layers = 4,
                 hidden_dim = 512,
-                checkpoint_step = 30000,
+                checkpoint_step = 20000,
                 gamma = 0.99,
                 horizon = 32,
                 goal = None,
-                sigma = 5.0,
+                sigma = 3.0,
                 #alpha = 0.99,
                 target_reward = 50.0,
-                trajs = trajs_2,
+                trajs = trajs,
                 task_id = task_id)

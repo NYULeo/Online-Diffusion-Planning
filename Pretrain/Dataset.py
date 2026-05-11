@@ -528,12 +528,9 @@ class CubeDataset_Singletask:
 
         self.dataset_id = name_to_id[name]
 
-       
-      
         self.env, self.dataset, self.eval_dataset = ogbench.make_env_and_datasets(
                  self.dataset_id, render_mode="rgb_array"
             )
-
 
     def get_trajectories(self) -> List[Dict[str, np.ndarray]]:
        
@@ -543,30 +540,38 @@ class CubeDataset_Singletask:
 
         for i in range(N):
             # End of a natural episode (terminal or dataset end)
-            if self.dataset["terminals"][i] == 1 or i == N - 1:
-                obs_slice = self.dataset["observations"][last_start : i + 1]
-                act_slice = self.dataset["actions"][last_start : i + 1]
-                rews = np.zeros(len(obs_slice))
-                L = len(obs_slice)
-                if(self.traj_length is not None):
-                       index = L - self.traj_length
-                       if(index < 0):
-                            index = 0
-                else:
-                       index =  0
+            if self.dataset["rewards"][i] == 0 or self.dataset['terminals'][i] == 1:
+                     obs_slice = self.dataset["observations"][last_start : i]
+                     act_slice = self.dataset["actions"][last_start : i]
+                     rews = np.zeros(len(act_slice))
+                     L = len(obs_slice)
+                     if(self.traj_length is not None):
+                           index = L - self.traj_length
+                           if(index < 0):
+                                index = 0
+                     else:
+                            index =  0
+                
+                    
+                     if len(act_slice) < 3:
+                          last_start = i + 1
+                          continue
+                     
 
-                if len(act_slice) < 10:
-                    last_start = i + 1
-                    continue
-                if(self.dataset['masks'][i] == 0):
-                     rews[-1] = 1
-                     trajectory = {
+                     if(self.dataset['rewards'][i] == 0):
+                         rews[-1] = 1
+                         trajectory = {
                            "observations": obs_slice[index:],
                            "actions": act_slice[index:],
                            'rewards': rews[index:]
-                      }
-                     trajectories.append(trajectory)
-                     last_start = i + 1
+                          }
+                         
+
+                         
+                         trajectories.append(trajectory)
+                         last_start = i + 1
+                     else:
+                         last_start = i + 1
 
         return trajectories
 

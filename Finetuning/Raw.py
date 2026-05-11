@@ -92,8 +92,16 @@ for traj in trajs:
     print(rews)
     exit()
 """
+"""
+import ogbench
+env, dataset, eval_dataset = ogbench.make_env_and_datasets(
+                'cube-single-play-singletask-v0', render_mode="rgb_array"
+            )
 
+#for i in range(len(dataset['rewards'])):
+print((dataset['rewards'].shape))
+"""
 
-
-
-
+a = [1,2,3,4,5]
+a = a[:-1]
+print(a)
