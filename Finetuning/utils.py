@@ -211,7 +211,7 @@ def get_critic_model(dataset_name, specific_dataset, task_id: Optional[int] = No
     model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
     return model_state_dict, obs_dim
 
-def get_critic_stats(dataset_name, specific_dataset, task_id: Optional[int] = None,  step: int = 0):
+def get_critic_stats(dataset_name, specific_dataset, task_id: Optional[int] = None,  step: int = 0) -> SAStats:
     critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
     path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/{critic_name}_Critic_stats_{str(step)}.pkl'
     with open(path, 'rb') as f:
@@ -1156,9 +1156,25 @@ def check_Critic(dataset_name, specific_dataset, task_id: Optional[int] = None, 
     else:
         return False
          
+def update_critic_stats(dataset_name, specific_dataset, new_stats: SAStats, task_id: Optional[int] = None, old_step: int = 0, momentum: float = 0.005) -> SAStats:
+    old_stats = get_critic_stats(dataset_name, specific_dataset, task_id = task_id, step = old_step)
+    stats = SAStats()
+    stats.obs_mean = ((1 - momentum) * old_stats.obs_mean) + (momentum * new_stats.obs_mean)
+    stats.obs_std = ((1 - momentum) * old_stats.obs_std) + (momentum * new_stats.obs_std)
+    return stats
+
+def get_new_critic_stats(trajs: List[TrajectoryDict]) -> SAStats:
+    obs_all = []
+    for traj in trajs:
+        obs_all.append(traj['observations'])
+    obs_all = np.concatenate(obs_all, axis = 0)
+    stats = SAStats()
+    stats.obs_mean = obs_all.mean(axis=0)
+    stats.obs_std = obs_all.std(axis=0)+ 1e-8
+    return stats
 
 class CriticDataset(Dataset):
-    def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, task_id: Optional[int] = None,  step: int = 0, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
+    def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, task_id: Optional[int] = None, old_step: int = 0,  new_step: int = 0,  new_stats: Optional[SAStats] = None, momentum: float = 0.005, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
         # ----- gather raw obs/actions to fit stats -----
         """
         if(dataset_name == 'pointmaze'):
@@ -1172,9 +1188,12 @@ class CriticDataset(Dataset):
         obs_all = np.concatenate(obs_all, axis = 0)
         
         #get stats
-        self.stats = SAStats()
-        self.stats.obs_mean = obs_all.mean(axis=0)
-        self.stats.obs_std = obs_all.std(axis=0)+ 1e-8
+        if(new_stats is None):
+             self.stats = SAStats()
+             self.stats.obs_mean = obs_all.mean(axis=0)
+             self.stats.obs_std = obs_all.std(axis=0)+ 1e-8
+        else:
+             self.stats = update_critic_stats(dataset_name, specific_dataset, new_stats, task_id, old_step, momentum)
         allowed_values = [0.0, 1.0]
 
         transitions = []
@@ -1198,7 +1217,7 @@ class CriticDataset(Dataset):
                    transitions.append((obs_t, r_t, obs_next_t))
 
         self.transitions = transitions
-        self.save_stats(dataset_name, specific_dataset, task_id, step)
+        self.save_stats(dataset_name, specific_dataset, task_id, new_step)
     
     def save_stats(self, dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
         critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
@@ -1237,11 +1256,12 @@ class CriticDataset(Dataset):
         return new_rews
     
 
-def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, sigma: float, batch_size, num_steps, gamma, horizon, lr, min_lr, tau, step: int, goal = None, target_reward = 1.0, task_id: Optional[int] = None):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, sigma: float, batch_size, num_steps, gamma, horizon, lr, min_lr, tau, old_step: int, new_step: int,  new_stats: Optional[SAStats] = None, momentum: float = 0.005,  goal = None, target_reward = 1.0, task_id: Optional[int] = None):
+    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = check_device()
     #get information
-
-    dataset = CriticDataset(trajs, sigma, dataset_name, specific_dataset, task_id, step, goal, target_reward, horizon, gamma)
+    
+    dataset = CriticDataset(trajs, sigma, dataset_name, specific_dataset, task_id, old_step, new_step, new_stats,  momentum, goal, target_reward, horizon, gamma)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
     
     """
@@ -1250,8 +1270,12 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
     """
     #prepare training
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True))
-    critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
-
+    if(new_stats is None):
+        critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
+    else:
+        critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
+        critic_state_dict, _ = get_critic_model(dataset_name, specific_dataset, task_id = task_id, step = old_step)
+        critic.load_state_dict(critic_state_dict)
     critic.train()
     target_critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
     target_critic.load_state_dict(critic.state_dict())
@@ -1265,6 +1289,7 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
 
 
     print(f"Training critic for {dataset_name}-{specific_dataset}")
+    total_loss = 0.0
     for k in range(1, num_steps + 1):  # number of passes over dataset
            s, r, s_next = next(dataloader)
            s = s.to(device)
@@ -1279,18 +1304,21 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
            # Predicted V-values
            q_pred = critic(s)
            loss = ((q_pred - target) ** 2).mean()
+           total_loss += loss.item()
 
            optimizer.zero_grad()
            loss.backward()
            optimizer.step()
            scheduler.step()
-
+           if(k % 1000 == 0):
+                print(f"Critic Training step {k} loss: {total_loss/1000}")
+                total_loss = 0.0
            # Soft update target network
            for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):
                tgt_param.data.mul_(1 - tau)
                tgt_param.data.add_(tau * param.data)
     target_critic.eval()
-    save_critic(target_critic, dataset_name, specific_dataset, task_id, step)
+    save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
     print(f"critic model saved")
 
 def traj_cutoff(trajs, length):
@@ -2084,7 +2112,7 @@ def rollout_parallel3(
     device: torch.device = None,
     seed_base: int = 0,
     continual_rollout=False,
-    chunk_size=5,          # currently unused
+    chunk_size=10,          # currently unused
 ):
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -2174,7 +2202,7 @@ def rollout_parallel3(
                     )
                     if continual_rollout:
                         Temp_acts[env_idx] = [x[k, d_s:(d_s + d_a)].copy() 
-                                              for k in range(len(x)-1)]
+                                              for k in chunk_size]
                         action = Temp_acts[env_idx].pop(0)
                     else:
                         action = x[0, d_s:(d_s + d_a)].copy()

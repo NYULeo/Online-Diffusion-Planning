@@ -606,13 +606,7 @@ if __name__ == "__main__":
          'task_4': np.array([0.75,     2.0,       0.199599]),
          'task_5': np.array([ 0.75,     -2.0,        0.199599])}
     
-    trajs = load_success_trajs('cube', 'single-play', 4, 0)
-    new_trajs = []
-    for traj in trajs:
-        print(len(traj['observations']))
-        print(len(traj['actions']))
-        print(len(traj['rewards']))
-      
+   
     """
     horizon = 32
     env_name = 'pointmaze'
@@ -711,20 +705,20 @@ if __name__ == "__main__":
 
     
   
-    """
     
-    #set_seed(26)
+    
+
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
-    checkpoint = 60
+    checkpoint = 15
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}, checkpoint: {checkpoint}")
-    #for i in range(1, 8):
-    set_seed(2)
-    #for j in range(1, 8):
-    reward  =  rollout(
+    for i in range(1, 51):
+      set_seed(i)
+      #for j in range(1, 8):
+      reward  =  rollout(
                env_name, 
                specific_train_dataset, 
                horizon, 
@@ -733,17 +727,16 @@ if __name__ == "__main__":
                eta = 0.8, 
                episode_length = 3000, 
                checkpoint_steps = checkpoint, 
-               render = True,  
+               render = False,  
                base_seed = 1, 
                task_id = 4,
                continual_rollout = True,
-               chunk_size = 31,
+               chunk_size = 10,
                device = device)
-             #print(reward)
-            #total_reward += reward
-        #print(f"seed {i} finished")
-    #print(f"Success Rate: {total_reward / 49 :.4f}")
-    """
+      total_reward += reward
+      print(f"seed {i} finished")
+    print(f"Success Rate: {total_reward / 50 :.4f}")
+
     
 
     """

@@ -102,6 +102,77 @@ env, dataset, eval_dataset = ogbench.make_env_and_datasets(
 print((dataset['rewards'].shape))
 """
 
-a = [1,2,3,4,5]
-a = a[:-1]
-print(a)
+
+
+
+"""
+from Finetuning.Rollout import rollout
+from Finetuning.utils import check_device
+from Pretrain.utils import set_seed
+device = check_device()
+env_name = 'cube'
+specific_train_dataset = 'single-play'
+horizon = 32
+checkpoint = 15
+set_seed(777)
+reward  =  rollout(
+               env_name, 
+               specific_train_dataset, 
+               horizon, 
+               steps_T = 200, 
+               num_karras = 10, 
+               eta = 0.8, 
+               episode_length = 3000, 
+               checkpoint_steps = checkpoint, 
+               render = True,  
+               base_seed = 1, 
+               task_id = 4,
+               continual_rollout = True,
+               chunk_size = 10,
+               device = device)
+
+print(reward)
+"""
+
+from Finetuning.Rollout import load_success_trajs
+from Finetuning.utils import get_new_critic_stats, train_critic
+from Pretrain.utils import set_seed
+import random
+
+env_name = 'cube'
+specific_env = 'single-play'
+task_id = 4
+step = 0
+traj_length = 200
+trajs = load_success_trajs(env_name, specific_env, task_id, step)
+new_critic_stats = get_new_critic_stats(trajs)
+data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
+all_trajs = data.get_trajectories()
+half_size_1 = len(all_trajs) // 2
+half_pretrained_trajs = random.sample(all_trajs, half_size_1)
+half_size_2 = len(trajs) // 2
+half_buffer_trajs = random.sample(trajs, half_size_2)
+critic_buffer = half_pretrained_trajs + half_buffer_trajs
+set_seed(1)
+train_critic(critic_buffer, 
+             dataset_name = env_name, 
+             specific_dataset = specific_env, 
+             hidden_layers = 4,
+             hidden_dim = 512,
+             sigma = 3.0, 
+             batch_size = 256, 
+             num_steps = 10000, 
+             gamma = 0.99, 
+             horizon = 32, 
+             lr = 2e-05, 
+             min_lr = 5e-07,
+             tau = 0.005, 
+             old_step = 0,
+             new_step = 10, 
+             new_stats = new_critic_stats,
+             momentum = 0.005,
+             goal = None, 
+             target_reward = 50.0,
+             task_id = task_id)
+
+

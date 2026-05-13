@@ -480,12 +480,14 @@ if __name__ == "__main__":
                             hidden_layers = 4,
                             hidden_dim = 512,
                             batch_size = 256,
-                            num_steps = 60000,
-                            lr = 6e-05,
-                            min_lr = 9e-06,
+                            num_steps = 10000,
+                            lr = 2e-05,
+                            min_lr = 5e-07,
                             tau = 0.005,
                             gamma = 0.99,
-                            data_conservation = True)
+                            data_conservation = True,
+                            retrain_critic = False,
+                            momentum = 0.005)
     
     FTConfig = FinetuningConfig(
         AMConfig = AMConfig, 
@@ -522,6 +524,7 @@ if __name__ == "__main__":
         rollout_length = 4000,  # or your desired value
         rollout_num_envs = 3, 
         continual_rollout = True,
+        chunk_size = 10,
         num_rollout_processes = 8,
         train_reward_config = TrainRewardConfig,
         train_kernel_config = TrainKernelConfig,
