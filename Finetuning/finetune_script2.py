@@ -499,6 +499,7 @@ if __name__ == "__main__":
         reward_model_checkpoint = 0,
         kernel_model_checkpoint = 0,
         critic_model_checkpoint = 0,
+        offline = True,
         critic = True,
         update_critic = True,
         kernel = True,

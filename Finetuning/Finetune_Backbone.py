@@ -91,6 +91,7 @@ class FinetuningConfig():
     train_reward_config: Train_Reward_Config 
     train_kernel_config: Train_Kernel_Config 
     train_critic_config: Train_Critic_Config
+    offline: bool = False
     critic: bool = False
     update_critic: bool = True
     kernel: bool = False
@@ -488,6 +489,7 @@ class OnlineFinetuner():
             print(f"reward_model_checkpoint: {self.config.reward_model_checkpoint}")
             print(f"kernel_model_checkpoint: {self.config.kernel_model_checkpoint}")
             print('Finetuning Hyperparameters: ---------------------------------------------------------------')
+            print(f"Offline: {self.config.offline}")
             print(f"finetune_batch_size: {self.config.finetune_batch_size}")
             print(f"finetune_batch_per_sample: {self.config.finetune_batch_per_sample}")
             print(f"Finetuning Buffer Size: {self.config.buffer_size}")
@@ -703,6 +705,14 @@ class OnlineFinetuner():
                  print(f"Average Success Rate: {avg_success_rate:.2f}")
                  print(f"Average Normalized Score: {avg_score:.2f}")
             self.accelerator.wait_for_everyone()  
+            
+            if(self.config.offline):
+                if(self.accelerator.is_main_process):
+                     print(f"Finetuning round {step+1} completed")
+                     print()
+                self.accelerator.wait_for_everyone()
+                continue
+
             
             
             if self.accelerator.is_main_process:
