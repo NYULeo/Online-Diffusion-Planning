@@ -2278,8 +2278,7 @@ class AlphaSchedulerConfig:
     alpha_end: float
     total_steps: int
     decay: bool = True
-   
-   
+    
 class AlphaScheduler:
     def __init__(self, config: AlphaSchedulerConfig):
         self.alpha_start = config.alpha_start
@@ -2303,7 +2302,6 @@ class AlphaScheduler:
 
     def get_alpha(self):
         return self.current_alpha
-    
 
 def checktrajs(trajs):
     success = 0
