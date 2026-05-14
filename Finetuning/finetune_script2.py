@@ -523,7 +523,7 @@ if __name__ == "__main__":
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value
-        rollout_num_envs = 3, 
+        rollout_num_envs = 1, 
         continual_rollout = True,
         chunk_size = 10,
         num_rollout_processes = 8,

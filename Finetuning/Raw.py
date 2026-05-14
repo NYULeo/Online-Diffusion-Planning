@@ -112,7 +112,7 @@ print((dataset['rewards'].shape))
 
 
 
-
+"""
 from Finetuning.Rollout import rollout
 from Finetuning.utils import check_device
 from Pretrain.utils import set_seed
@@ -139,7 +139,7 @@ reward  =  rollout(
                device = device)
 
 print(reward)
-
+"""
 
 """
 from Finetuning.Rollout import load_success_trajs
