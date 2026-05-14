@@ -680,11 +680,12 @@ class OnlineFinetuner():
             update_reward = self.gather_and_sync_trajs_and_buffer(trajs)
             if self.config.critic:
                  critic_buffer, new_critic_stats = self.collect_critic_buffer(trajs)
-                 print(f"Number of trajectories for critic training: {len(critic_buffer)}")
-                 if(new_critic_stats is not None):
-                      print("Training Critic")
-                 else:
-                      print("Do not Train Critic")
+                 if self.accelerator.is_main_process:
+                     print(f"Number of trajectories for critic training: {len(critic_buffer)}")
+                     if(new_critic_stats is not None):
+                         print("Training Critic")
+                     else:
+                         print("Do not Train Critic")
                  self.accelerator.wait_for_everyone()
                  
             
