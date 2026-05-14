@@ -2202,7 +2202,7 @@ def rollout_parallel3(
                     )
                     if continual_rollout:
                         Temp_acts[env_idx] = [x[k, d_s:(d_s + d_a)].copy() 
-                                              for k in chunk_size]
+                                              for k in range(chunk_size)]
                         action = Temp_acts[env_idx].pop(0)
                     else:
                         action = x[0, d_s:(d_s + d_a)].copy()
