@@ -112,7 +112,7 @@ print((dataset['rewards'].shape))
 
 
 
-
+"""
 from Finetuning.Rollout import rollout
 from Finetuning.utils import check_device
 from Pretrain.utils import set_seed
@@ -139,10 +139,9 @@ reward  =  rollout(
                device = device)
 
 print(reward)
-
-
-
 """
+
+
 
 from Finetuning.Rollout import load_success_trajs
 from Finetuning.utils import get_new_critic_stats, train_critic
@@ -186,7 +185,7 @@ train_critic(critic_buffer,
              task_id = task_id)
 
 
-"""
+
 
 
 
