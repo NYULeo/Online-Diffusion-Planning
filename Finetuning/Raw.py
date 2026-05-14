@@ -20,7 +20,14 @@ import torch
 import pickle
 from scipy.ndimage import gaussian_filter1d
 from Pretrain.Dataset import get_dataset
+import ogbench
 
+goals = {'task_1': np.array( [ 0.0,       -1.0,        0.199599]), 
+         'task_2': np.array([7.50000000e-01, 8.02418254e-18, 1.99598996e-01]),
+         'task_3': np.array([-7.50000000e-01,  1.21832368e-19,  1.99598996e-01]),
+         'task_4': np.array([0.75,     2.0,       0.199599]),
+         'task_5': np.array([ 0.75,     -2.0,        0.199599])}
+    
 def check_cube_single_goal_reach(trajs, task_id):   
     goals = {'task_1': np.array( [ 0.0,       -1.0,        0.199599]), 
          'task_2': np.array([7.50000000e-01, 8.02418254e-18, 1.99598996e-01]),
@@ -105,7 +112,7 @@ print((dataset['rewards'].shape))
 
 
 
-"""
+
 from Finetuning.Rollout import rollout
 from Finetuning.utils import check_device
 from Pretrain.utils import set_seed
@@ -113,8 +120,8 @@ device = check_device()
 env_name = 'cube'
 specific_train_dataset = 'single-play'
 horizon = 32
-checkpoint = 15
-set_seed(777)
+checkpoint = 0
+set_seed(8)
 reward  =  rollout(
                env_name, 
                specific_train_dataset, 
@@ -128,10 +135,13 @@ reward  =  rollout(
                base_seed = 1, 
                task_id = 4,
                continual_rollout = True,
-               chunk_size = 10,
+               chunk_size = 32,
                device = device)
 
 print(reward)
+
+
+
 """
 
 from Finetuning.Rollout import load_success_trajs
@@ -174,5 +184,9 @@ train_critic(critic_buffer,
              goal = None, 
              target_reward = 50.0,
              task_id = task_id)
+
+
+"""
+
 
 

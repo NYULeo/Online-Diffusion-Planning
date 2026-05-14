@@ -566,8 +566,6 @@ class CubeDataset_Singletask:
                            'rewards': rews[index:]
                           }
                          
-
-                         
                          trajectories.append(trajectory)
                          last_start = i + 1
                      else:

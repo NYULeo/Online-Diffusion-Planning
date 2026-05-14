@@ -369,14 +369,14 @@ class CriticDataset(Dataset):
                 rews = ema_smooth(rews, alpha)
             elif(sigma is not None):
                 rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate = 200/sigma)
-            #if(len(obs) > horizon):
-            rews = self.reward_processor(rews, horizon, gamma)
-            #for t in range(len(obs)-horizon):
-            for t in range(len(obs)):
-                   obs_t = self.stats.norm_obs(obs[t])
-                   r_t   = rews[t]
-                   obs_next_t = self.stats.norm_obs(obs[min(t + horizon, len(obs) - 1)])
-                   transitions.append((obs_t, r_t, obs_next_t))
+            if(len(obs) > horizon):
+               rews = self.reward_processor(rews, horizon, gamma)
+               for t in range(len(obs)-horizon):
+               #for t in range(len(obs)):
+                     obs_t = self.stats.norm_obs(obs[t])
+                     r_t   = rews[t]
+                     obs_next_t = self.stats.norm_obs(obs[min(t + horizon, len(obs) - 1)])
+                     transitions.append((obs_t, r_t, obs_next_t))
            
         self.transitions = transitions
         self.save_stats(dataset_name, specific_dataset, task_id)

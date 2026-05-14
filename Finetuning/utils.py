@@ -1208,9 +1208,9 @@ class CriticDataset(Dataset):
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
             rews = gaussian_filter1d(rews, sigma)
-            #if(len(obs) > horizon):
-            rews = self.reward_processor(rews, horizon, gamma)
-            for t in range(len(obs)):
+            if(len(obs) > horizon):
+                rews = self.reward_processor(rews, horizon, gamma)
+                for t in range(len(obs)-horizon):
                    obs_t = self.stats.norm_obs(obs[t])
                    r_t   = rews[t]
                    obs_next_t = self.stats.norm_obs(obs[min(t+horizon, len(obs)-1)])
