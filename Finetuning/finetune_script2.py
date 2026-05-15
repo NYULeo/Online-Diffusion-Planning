@@ -263,6 +263,7 @@ if __name__ == "__main__":
                beta = 1.0, 
                #max_mahalanobis_score = 3.5,
                min_log_prob = 5.0,
+               constraint_adapt = False,
                quantile = 0.95,
                critic_gamma = 1.0,
                explore = False,
