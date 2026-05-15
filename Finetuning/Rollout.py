@@ -421,7 +421,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      print(f"total steps: {len(observations)}")
      print(f"number of plans: {number_of_plans}")
      traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(spare_reward_prcocessor(rewards))}
-     
+     print(sum(rewards))
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      #print(test_rollout_fit_for_model(traj, env_name, specific_env, checkpoint_steps, checkpoint_steps, checkpoint_steps, device=None))
      
@@ -700,11 +700,11 @@ if __name__ == "__main__":
             num_karras = 3, 
             eta = 0.8, 
             episode_length = 3000, 
-            checkpoint_steps = 50, 
+            checkpoint_steps = 40, 
             render = True,  
             base_seed = 1, 
             goal_cell = np.array([6, 1], dtype = int), 
-            start_cell = np.array([5, 6], dtype = int), 
+            start_cell = np.array([4, 4], dtype = int), 
             continual_rollout = True,
             chunk_size = 31)
     elapsed = time.perf_counter() - t0

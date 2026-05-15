@@ -9,6 +9,8 @@ import numpy as np
 import seaborn as sns
 import minari
 import sys
+
+from sympy import Max
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -186,9 +188,5 @@ train_critic(critic_buffer,
 
 
 
-env, dataset, eval_dataset = ogbench.make_env_and_datasets(
-                 "cube-single-play-singletask-task4-v0", render_mode="rgb_array"
-            )
-for i in range(len(dataset['terminals'])):
-    if(dataset['terminals'][i] == 1):
-        print(dataset['rewards'][i])
+data = minari.load_dataset('D4RL/pointmaze/medium-v2', download = True)
+print(data.storage.metadata.keys())
