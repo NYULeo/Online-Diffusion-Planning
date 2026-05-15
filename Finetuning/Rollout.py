@@ -704,7 +704,7 @@ if __name__ == "__main__":
             render = True,  
             base_seed = 1, 
             goal_cell = np.array([6, 1], dtype = int), 
-            start_cell = np.array([4, 4], dtype = int), 
+            start_cell = np.array([3, 4], dtype = int), 
             continual_rollout = True,
             chunk_size = 31)
     elapsed = time.perf_counter() - t0

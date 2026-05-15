@@ -1,6 +1,7 @@
 from optparse import Option
 from pathlib import Path
 
+from sympy import true
 from sympy.vector.coordsysrect import Str
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PRETRAIN_DIR = PROJECT_ROOT / "Pretrain"
@@ -244,11 +245,11 @@ class PointMazeDataset():
      def get_env(self, render_mode):
           gym.register_envs(gymnasium_robotics)
           if(self.name == 'medium'):
-              env = gym.make('PointMaze_Medium-v3', max_episode_steps = 8000, render_mode = render_mode, continuing_task=False)
+              env = gym.make('PointMaze_Medium-v3', max_episode_steps = 300, render_mode = render_mode, continuing_task=true)
           elif(self.name == 'large'):
-              env = gym.make('PointMaze_Large-v3', max_episode_steps = 8000, render_mode = render_mode, continuing_task=False)
+              env = gym.make('PointMaze_Large-v3', max_episode_steps = 300, render_mode = render_mode, continuing_task=true)
           elif(self.name == 'umaze'):
-              env = gym.make('PointMaze_Umaze-v3', max_episode_steps = 8000, render_mode = render_mode, continuing_task=False)
+              env = gym.make('PointMaze_Umaze-v3', max_episode_steps = 300, render_mode = render_mode, continuing_task=true)
           else:
               raise ValueError(f'Invalid dataset name')
           return env

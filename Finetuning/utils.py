@@ -2236,7 +2236,7 @@ def rollout_parallel3(
         for env_idx in range(num_envs):
             total_steps += len(observations[env_idx]) - 1
             trajs.append({
-                'observations': np.asarray(observations[env_idx][-1]),
+                'observations': np.asarray(observations[env_idx][:-1]),
                 'actions': np.asarray(acts[env_idx]),
                 'rewards': np.asarray(spare_reward_prcocessor(rewards[env_idx].copy()))  # FIXED
             })
