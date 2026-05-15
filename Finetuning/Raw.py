@@ -186,5 +186,9 @@ train_critic(critic_buffer,
 
 
 
-
-
+env, dataset, eval_dataset = ogbench.make_env_and_datasets(
+                 "cube-single-play-singletask-task4-v0", render_mode="rgb_array"
+            )
+for i in range(len(dataset['terminals'])):
+    if(dataset['terminals'][i] == 1):
+        print(dataset['rewards'][i])
