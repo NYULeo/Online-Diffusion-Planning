@@ -26,6 +26,7 @@ from gymnasium.wrappers import TimeLimit
 from typing import Optional
 #from utils import get_normalized_score, rollout_parallel3, get_current_state, get_trajs, spare_reward_prcocessor, compute_threshold_log_prob_mog, compute_threshold_mahalanobis_mog
 from dataclasses import dataclass
+import time
 
 
 
@@ -329,17 +330,18 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
 
      #get Processor
      planner_processor = Planner_Processor(env_name, specific_env)
-
+     
+     
      #reset
      if(env_name == 'cube'):
         #s0, info = env.reset(seed = base_seed, options = dict( task_id=task_id))
         s0, info = env.reset(seed = base_seed)
         #s0, info = env.reset()
      if(goal_cell is not None):
-        s0, info = env.reset(seed = base_seed, options = {"goal_cell": goal_cell, "reset_cell": start_cell})
+        s0 = env.reset(seed = base_seed, options = {"goal_cell": goal_cell, "reset_cell": start_cell})
         #s0, info = env.reset( options = {"goal_cell": goal_cell, "reset_cell": start_cell})
      else:
-        s0, info = env.reset(seed = base_seed)
+        s0 = env.reset(seed = base_seed)
         #s0, info = env.reset()
      
     
@@ -361,6 +363,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      Temp_states = []
      generated_state = None
      violation_scores = []
+     number_of_plans = 0
      for i in range(episode_length):
            if(continual_rollout):
                 if(len(Temp_acts) == 0):
@@ -371,6 +374,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
                          Temp_acts.append(x[k, d_s:(d_s+d_a)].copy())
                      for k in range(1, min(chunk_size, len(x))):
                          Temp_states.append(x[k, :d_s].copy())
+                     number_of_plans += 1
                 
                 action = Temp_acts[0]
                 Temp_acts = Temp_acts[1:]
@@ -414,7 +418,8 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
          print(np.mean(violation_scores))
          print(np.var(violation_scores))
      """
-     
+     print(f"total steps: {len(observations)}")
+     print(f"number of plans: {number_of_plans}")
      traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(spare_reward_prcocessor(rewards))}
      
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
@@ -624,7 +629,7 @@ if __name__ == "__main__":
             base_seed = 1, 
             goal_cell = np.array([6, 1], dtype = int), 
             start_cell = np.array([1, 6], dtype = int), 
-            continual_rollout = True,
+            continual_rollout = False,
             chunk_size = 10)
     """
     """
@@ -682,32 +687,36 @@ if __name__ == "__main__":
     """
     #score = rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 50, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([1, 5], dtype = int), base_seed = 0, continual_rollout = False)
     
-    """
+    
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
-    set_seed(10)
-    
+    set_seed(1)
+    t0 = time.perf_counter()
     rollout(env_name, 
-            specific_train_dataset, horizon, 
+            specific_train_dataset, 
+            horizon, 
             steps_T = 50, 
             num_karras = 3, 
             eta = 0.8, 
             episode_length = 3000, 
-            checkpoint_steps = 250, 
+            checkpoint_steps = 50, 
             render = True,  
             base_seed = 1, 
             goal_cell = np.array([6, 1], dtype = int), 
-            start_cell = np.array([5, 4], dtype = int), 
+            start_cell = np.array([5, 6], dtype = int), 
             continual_rollout = True,
-            chunk_size = 10)
-    """
+            chunk_size = 31)
+    elapsed = time.perf_counter() - t0
+    print(f"Elapsed: {elapsed:.3f}s")
+    
+
 
     
   
     
     
-
+    """
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
@@ -715,10 +724,10 @@ if __name__ == "__main__":
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}, checkpoint: {checkpoint}")
-    for i in range(1, 51):
-      set_seed(i)
+    #for i in range(1, 51):
+      #set_seed(i)
       #for j in range(1, 8):
-      reward  =  rollout(
+    reward  =  rollout(
                env_name, 
                specific_train_dataset, 
                horizon, 
@@ -733,10 +742,10 @@ if __name__ == "__main__":
                continual_rollout = True,
                chunk_size = 10,
                device = device)
-      total_reward += reward
-      print(f"seed {i} finished")
-    print(f"Success Rate: {total_reward / 50 :.4f}")
-
+      #total_reward += reward
+      #print(f"seed {i} finished")
+    #print(f"Success Rate: {total_reward / 50 :.4f}")
+   """
     
 
     """

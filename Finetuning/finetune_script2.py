@@ -252,7 +252,7 @@ if __name__ == "__main__":
     """
     
 
-    """
+    
     env_name = 'pointmaze'
     specific_env = 'medium'
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = True)
@@ -299,7 +299,8 @@ if __name__ == "__main__":
                             lr = 1e-05,
                             tau = 0.005,
                             gamma = 0.95,
-                            data_conservation = True)
+                            data_conservation = True,
+                            retrain_critic = False)
     
     
 
@@ -334,6 +335,7 @@ if __name__ == "__main__":
         rollout_length = 4000,  # or your desired value
         rollout_num_envs = 1, 
         continual_rollout = True,
+        chunk_size = 31,
         num_rollout_processes = 4,
         train_reward_config = TrainRewardConfig,
         train_kernel_config = TrainKernelConfig,
@@ -341,7 +343,7 @@ if __name__ == "__main__":
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-    """
+    
     
     
 
@@ -434,14 +436,13 @@ if __name__ == "__main__":
    """
 
     
-
-    
+ 
+    """
     env_name = 'cube'
     specific_env = 'single-play'
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = True)
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32)
 
-    #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
     RWConfig = RewardConfig(
                beta = 1.0, 
                quantile = 0.999,
@@ -533,5 +534,5 @@ if __name__ == "__main__":
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-    
+    """
     
