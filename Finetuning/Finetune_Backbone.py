@@ -717,8 +717,9 @@ class OnlineFinetuner():
             
             
             if self.accelerator.is_main_process:
-                  print(f"Starting Reward Training")
+                  #print(f"Starting Reward Training")
                   if update_reward:
+                      print(f"Starting Reward Training")
                       train_reward(self.Train_Buffer, 
                              dataset_name = self.config.dataset_name, 
                              hidden_layers = self.config.train_reward_config.hidden_layers,

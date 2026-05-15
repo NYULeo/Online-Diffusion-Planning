@@ -717,7 +717,7 @@ if __name__ == "__main__":
     set_seed(1)
     total_score = 0.0
     for i in range(1, 61):
-       # t0 = time.perf_counter()
+       #t0 = time.perf_counter()
        return_value = rollout(env_name, 
             specific_train_dataset, 
             horizon, 
@@ -725,7 +725,7 @@ if __name__ == "__main__":
             num_karras = 3, 
             eta = 0.8, 
             episode_length = 3000, 
-            checkpoint_steps = 40, 
+            checkpoint_steps = 60, 
             render = False,  
             base_seed = i, 
             goal_cell = np.array([6, 1], dtype = int), 
@@ -734,8 +734,8 @@ if __name__ == "__main__":
             continual_rollout = False,
             chunk_size = 1,
             device = device)
-        # print(get_normalized_score(return_value, min_score, max_score))
-        #elapsed = time.perf_counter() - t0
+       #print(get_normalized_score(return_value, min_score, max_score))
+       #elapsed = time.perf_counter() - t0
        total_score += get_normalized_score(return_value, min_score, max_score)
     print(total_score/60)
     #print(f"Elapsed: {elapsed:.3f}s")
