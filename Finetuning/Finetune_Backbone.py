@@ -688,7 +688,7 @@ class OnlineFinetuner():
                 #trajs = get_success_trajs(trajs)
                 #print(checktrajs(trajs)) 
             else:
-                trajs, score, total_steps = [], 0.0, 0.0, 0
+                trajs, score, total_steps = [], 0.0, 0
             
             self.accelerator.wait_for_everyone()                    
             
