@@ -667,6 +667,8 @@ class OnlineFinetuner():
                                              continual_rollout = self.config.continual_rollout,
                                              chunk_size = self.config.chunk_size)
                 """
+
+                
                 
                 trajs, score,  total_steps = rollout_parallel2(self.config.dataset_name, 
                                              self.config.specific_dataset, 
@@ -684,6 +686,23 @@ class OnlineFinetuner():
                                              seed_base = seed_base,
                                              continual_rollout = self.config.continual_rollout,
                                              chunk_size = self.config.chunk_size)
+                
+
+                """
+                trajs, score, total_steps = rollout_parallel(self.config.dataset_name, 
+                                         self.config.specific_dataset, 
+                                         horizon = self.config.AMConfig.horizon, 
+                                         steps_T = self.config.diffusion_steps, 
+                                         num_karras = self.config.AMConfig.num_karras, 
+                                         eta = self.config.AMConfig.eta, 
+                                         episode_length = self.config.rollout_length, 
+                                         checkpoint_step = ((step+1) * self.config.AMConfig.per_round_steps), 
+                                         num_envs = self.config.rollout_num_envs, 
+                                         goal_cell = self.config.train_reward_config.rollout_goal,
+                                         device = self.device,
+                                         start_cells = self.config.train_reward_config.rollout_start_cells,
+                                         seed_base = seed_base) 
+                """
        
                 #trajs = get_success_trajs(trajs)
                 #print(checktrajs(trajs)) 

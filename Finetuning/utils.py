@@ -1571,7 +1571,20 @@ def load_hyperparameters(filepath: str) -> Dict:
     return hyperparams
 
 
-def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs = 8, goal_cell = None, start_cells = None, device: torch.device = None, seed_base: int = 0):
+def rollout_parallel(
+    env_name, 
+    specific_env, 
+    horizon = 32, 
+    steps_T = 50, 
+    num_karras = 10, 
+    eta = 0.8, 
+    episode_length = 4000, 
+    checkpoint_step = 1000000, 
+    num_envs = 8, 
+    goal_cell = None, 
+    start_cells = None, 
+    device: torch.device = None, 
+    seed_base: int = 0):
      #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
      #print(f"Running {num_envs} environments in parallel")
      if device is None:
@@ -1863,7 +1876,14 @@ def rollout_parallel2(
             if all(done_envs):
                 #print("All environments completed!")
                 break
-     
+        
+        for env_idx in range(num_envs):
+                   total_steps += (len(observations[env_idx]) - 1)
+                   trajs.append({
+                      'observations': np.asarray(observations[env_idx].copy()),
+                      'actions': np.asarray(acts[env_idx].copy()),
+                      'rewards': np.asarray(spare_reward_prcocessor(rewards[env_idx].copy()))
+         }) 
      else:
         opt =  {"task_id": task_id}
         #s0_vec = vec_env.reset(seed = reset_seeds, options=[opt for _ in range(num_envs)])
@@ -1935,13 +1955,13 @@ def rollout_parallel2(
                     break
      
             # Find the trajectory with the maximum reward
-     for env_idx in range(num_envs):
+        for env_idx in range(num_envs):
                    total_steps += (len(observations[env_idx]) - 1)
                    trajs.append({
                       'observations': np.asarray(observations[env_idx].copy()),
                       'actions': np.asarray(acts[env_idx].copy()),
                       'rewards': np.asarray(spare_reward_prcocessor(rewards[env_idx].copy()))
-     })     
+        })     
      vec_env.close()
      valid, success_rate = checktrajs(trajs)
      print(f"valid: {valid}, success rate: {success_rate:.2f}")
