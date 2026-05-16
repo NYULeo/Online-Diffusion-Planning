@@ -725,8 +725,8 @@ if __name__ == "__main__":
             num_karras = 3, 
             eta = 0.8, 
             episode_length = 3000, 
-            checkpoint_steps = 40, 
-            render = False,  
+            checkpoint_steps = 0, 
+            render = True,  
             base_seed = i, 
             goal_cell = np.array([6, 1], dtype = int), 
             #start_cell = np.array([5, 4], dtype = int), 
@@ -734,7 +734,8 @@ if __name__ == "__main__":
             continual_rollout = False,
             chunk_size = 1,
             device = device)
-        # print(get_normalized_score(return_value, min_score, max_score))
+       #print(get_normalized_score(return_value, min_score, max_score))
+       exit()
         #elapsed = time.perf_counter() - t0
        total_score += get_normalized_score(return_value, min_score, max_score)
     print(total_score/60)

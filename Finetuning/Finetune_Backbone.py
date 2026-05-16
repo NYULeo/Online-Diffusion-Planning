@@ -392,15 +392,13 @@ class OnlineFinetuner():
           return critic_buffer, new_critic_stats
    
     def data_conservation_update(self, critic_buffer):
-        """
         if(self.config.train_reward_config.task_id is not None):
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = self.config.train_buffer_cutoff_length)
             trajs = dataset.get_trajectories()
         else:
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
             trajs = dataset.get_trajectories()
-        """
-        trajs = self.Train_Buffer.copy()
+        #trajs = self.Train_Buffer.copy()
         
         if(len(critic_buffer) < 2):
              critic_buffer.extend(trajs)

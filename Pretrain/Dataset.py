@@ -243,20 +243,20 @@ class PointMazeDataset():
           return self.dataset._action_space.shape[0]
     
      def get_env(self, render_mode):
-          """
+          
           gym.register_envs(gymnasium_robotics)
           if(self.name == 'medium'):
-              env = gym.make('PointMaze_Medium-v3', max_episode_steps = 600, render_mode = render_mode, continuing_task=true)
+              env = gym.make('PointMaze_Medium-v3', max_episode_steps = 2000, render_mode = render_mode, continuing_task=False)
           elif(self.name == 'large'):
-              env = gym.make('PointMaze_Large-v3', max_episode_steps = 600, render_mode = render_mode, continuing_task=true)
+              env = gym.make('PointMaze_Large-v3', max_episode_steps = 2000, render_mode = render_mode, continuing_task=False)
           elif(self.name == 'umaze'):
-              env = gym.make('PointMaze_Umaze-v3', max_episode_steps = 600, render_mode = render_mode, continuing_task=true)
+              env = gym.make('PointMaze_Umaze-v3', max_episode_steps = 2000, render_mode = render_mode, continuing_task=False)
           else:
               raise ValueError(f'Invalid dataset name')
-          #return env
+          return env
           #return self.dataset.recover_environment(render_mode = render_mode)
-          """
-          return self.dataset.recover_environment(render_mode = 'rgb_array', continuing_task=True, reset_target=False, eval_env=True)
+          
+          #return self.dataset.recover_environment(render_mode = 'rgb_array', continuing_task=True, reset_target=False, eval_env=True)
 
      def get_ref_max_score(self):
           return self.dataset.storage.metadata.get('ref_max_score')

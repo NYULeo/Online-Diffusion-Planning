@@ -339,7 +339,7 @@ if __name__ == "__main__":
         rollout_length = 4000,  # or your desired value
         rollout_num_envs = 1, 
         continual_rollout = True,
-        chunk_size = 31,
+        chunk_size = 32,
         num_rollout_processes = 4,
         train_reward_config = TrainRewardConfig,
         train_kernel_config = TrainKernelConfig,
