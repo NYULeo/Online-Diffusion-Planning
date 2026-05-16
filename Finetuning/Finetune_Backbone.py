@@ -579,7 +579,7 @@ class OnlineFinetuner():
                 num_workers = min(8, max(1, os.cpu_count() // (2 * world_size)))  # 
                 sampler = DistributedSampler(self.PlannerDataset, shuffle=True, drop_last=True)
                 sampler.set_epoch(step)
-                """
+                
                 dataloader = DataLoader(
                     self.PlannerDataset, 
                     self.config.finetune_batch_size, 
@@ -587,8 +587,9 @@ class OnlineFinetuner():
                     num_workers = (os.cpu_count() // 2),  
                     sampler = sampler,  
                     drop_last = True)
+                
+                
                 """
-
                 dataloader = DataLoader(
                     self.PlannerDataset,
                     self.config.finetune_batch_size,
@@ -598,6 +599,7 @@ class OnlineFinetuner():
                     num_workers = num_workers,
                     persistent_workers = True,
                     prefetch_factor = 4)
+                """
 
             else:
                 dataloader = DataLoader(
