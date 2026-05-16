@@ -445,7 +445,6 @@ class CubeDataset():
         return env
 """
 
-
 class CubeDataset:
     def __init__(self, name: str):
         
@@ -584,7 +583,6 @@ class CubeDataset_Singletask:
     def get_env(self, render_mode: str = "rgb_array"):
         env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
         return env
-
 
 
 

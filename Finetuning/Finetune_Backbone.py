@@ -251,7 +251,7 @@ class OnlineFinetuner():
         self.config.AMConfig.MaxEnt = self.config.MaxEnt
         self.config.AMConfig.Entropy_Scaling_Factor = self.config.Entropy_Scaling_Factor
        
-        self.accelerator = Accelerator(mixed_precision = 'bf16')
+        self.accelerator = Accelerator(mixed_precision = 'fp16')
         self.device = self.accelerator.device
         
         self.Initialize_BufferDataset()
