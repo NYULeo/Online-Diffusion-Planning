@@ -713,13 +713,11 @@ if __name__ == "__main__":
     data = get_dataset(env_name, specific_train_dataset)
     min_score = data.get_ref_min_score()
     max_score = data.get_ref_max_score()
-    print(min_score)
-    print(max_score)
-    exit()
+    
     device = check_device()
-    set_seed(1)
+    set_seed(10)
     total_score = 0.0
-    for i in range(4,11):
+    for i in range(1,11):
        # t0 = time.perf_counter()
        return_value = rollout(env_name, 
             specific_train_dataset, 
