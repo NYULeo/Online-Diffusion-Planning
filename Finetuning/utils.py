@@ -1723,8 +1723,24 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 50, num_kar
      #print(f"Average Normalized Score: {score:.2f}")
      return trajs, score, total_steps
 
-"""
-def rollout_parallel2(env_name, specific_env, horizon = 32, steps_T = 50, num_karras = 10, eta = 0.8, episode_length = 4000, checkpoint_step = 1000000, num_envs = 8, goal_cell: Optional[np.ndarray] = None, start_cells: Optional[List[np.ndarray]] = None, task_id: Optional[int] = None, device: torch.device = None, seed_base: int = 0, continual_rollout = False, chunk_size = 5):
+
+def rollout_parallel2(
+     env_name, 
+     specific_env, 
+     horizon = 32, 
+     steps_T = 50, 
+     num_karras = 10, 
+     eta = 0.8, 
+     episode_length = 4000, 
+     checkpoint_step = 1000000, 
+     num_envs = 8, 
+     goal_cell: Optional[np.ndarray] = None, 
+     start_cells: Optional[List[np.ndarray]] = None, 
+     task_id: Optional[int] = None, 
+     device: torch.device = None, 
+     seed_base: int = 0, 
+     continual_rollout = False, 
+     chunk_size = 5):
      #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
      #print(f"Running {num_envs} environments in parallel")
      if device is None:
@@ -1938,8 +1954,10 @@ def rollout_parallel2(env_name, specific_env, horizon = 32, steps_T = 50, num_ka
      #print(f"Average Normalized Score: {score:.2f}")
      return trajs, score, total_steps
 
-"""
 
+
+
+"""
 def rollout_parallel2(
     env_name, specific_env,
     horizon=32, steps_T=50, num_karras=10, eta=0.8,
@@ -1996,7 +2014,7 @@ def rollout_parallel2(
     reset_seeds = list(range(seed_base, seed_base + num_envs))
 
     def run_rollout(options_list):
-        """Helper to run one batch of environments (avoids duplication)."""
+      
         nonlocal total_steps
 
         obs, _ = vec_env.reset(seed=reset_seeds, options=options_list)
@@ -2097,8 +2115,7 @@ def rollout_parallel2(
         score = get_normalized_score(trajs)
 
     return trajs, score, success_rate, total_steps
-
-
+"""
 
 
 def rollout_parallel3(
