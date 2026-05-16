@@ -301,7 +301,7 @@ if __name__ == "__main__":
                             tau = 0.005,
                             gamma = 0.95,
                             data_conservation = True,
-                            retrain_critic = False)
+                            retrain_critic = True)
     
     
 

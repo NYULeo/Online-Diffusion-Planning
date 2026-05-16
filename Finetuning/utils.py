@@ -31,7 +31,7 @@ import torch.optim as optim
 from Pretrain.Transition_Kernel.Kernel_Net import MoGTransitionKernel, RobustTransitionKernel
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_total_mahalanobis_score, compute_log_density_mog, compute_log_density, compute_total_mahalanobis_score_mog
 #from Pretrain.Rewards.Reward_Backbone import get_reward_name
-from Pretrain.Dataset import KitchenDataset, PointMazeDataset, get_env, Planner_Processor
+from Pretrain.Dataset import KitchenDataset, PointMazeDataset, get_env, get_dataset, Planner_Processor
 from gymnasium.vector import AsyncVectorEnv
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 from Pretrain.Planners.Backbone.Dit import DiT1d
