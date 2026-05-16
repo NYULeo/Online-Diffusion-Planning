@@ -449,8 +449,11 @@ class TotalReward_Critic(nn.Module):
             c_s_next = grads_c[2].squeeze(0) * self.kernel_obs_inv_std_t
             c_s_grad, c_a_grad, c_s_next_grad = self.makeGrad(H, c_s, c_a, i, c_s_next)
 
-            gradient = gradient + ((1.0 / H) * (r_s_grad + r_a_grad)) - lam * ((1.0/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad))
-            total_reward = total_reward +  ((1.0 / H) * r.squeeze(0)) - lam * ((1.0/(H-1)) * c.squeeze(0))
+            #gradient = gradient + ((1.0 / H) * (r_s_grad + r_a_grad)) - lam * ((1.0/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad))
+            #total_reward = total_reward +  ((1.0 / H) * r.squeeze(0)) - lam * ((1.0/(H-1)) * c.squeeze(0))
+
+            gradient = gradient + ((r_s_grad + r_a_grad)) - lam * ((1.0/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad))
+            total_reward = total_reward +  (r.squeeze(0)) - lam * ((1.0/(H-1)) * c.squeeze(0))
 
         # last-step reward grad (kept)
         s = x[H - 1, :self.config.d_s]
@@ -485,8 +488,8 @@ class TotalReward_Critic(nn.Module):
         grad_critic = self.makeGrad_Critic(H, v_s, H - 1)
 
         # Preserve your current behavior (critic-only terminal contribution)
-        gradient = gradient +  ((1.0 / H) * (self.config.critic_gamma ** (H - 1)) * grad_critic)
-        total_reward = total_reward +  ((1.0 / H) * (self.config.critic_gamma ** (H - 1)) * v.squeeze(0))
+        gradient = gradient +  ( (self.config.critic_gamma ** (H - 1)) * grad_critic)
+        total_reward = total_reward +  ((self.config.critic_gamma ** (H - 1)) * v.squeeze(0))
 
         total_reward = total_reward + lam * self.config.delta
         return total_reward, gradient
@@ -561,7 +564,7 @@ class TotalReward_Mahalanobis(nn.Module):
         if(self.config.type_kernel == 'robust'):
              D2 = compute_total_mahalanobis_score(self.kernels, s, a, s_next)
         else:
-            D2 =  compute_total_mahalanobis_score_mog(self.kernels, s, a, s_next)
+             D2 =  compute_total_mahalanobis_score_mog(self.kernels, s, a, s_next)
         tau = self.config.max_mahalanobis_score   # should be your calibrated τ (e.g. 95th percentile)
         # Normalized deviation
         normalized = (D2/tau - 1)         # <0 → good, >0 → bad

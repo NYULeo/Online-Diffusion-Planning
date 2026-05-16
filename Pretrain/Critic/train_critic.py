@@ -333,6 +333,39 @@ class Critic_Test_Dataset(Dataset):
                  rews[t] = target_reward
         return rews
 
+
+def reward_filter(obs, rews, goal):
+    #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
+    for i in range(1, len(obs)):
+        pos = obs[i][:2] 
+        g = np.asarray(goal, dtype=np.float32).reshape(-1)
+        #goal_coord = np.asarray(goal_coord, dtype=np.float32).reshape(-1)  
+        dist = np.linalg.norm(pos - g) 
+        if (dist < 0.5):
+            rews[i-1] = 1.0
+        else:
+            rews[i-1] = 0.0
+    return rews
+
+
+
+"""
+def traj_filter_for_goal(trajs, goal):
+    new_trajs = []
+    for traj in trajs:
+        for i in range(len(traj['observations'])):
+            pos = traj['observations'][i][:2]
+            g = np.asarray(goal, dtype=np.float32).reshape(-1)
+            dist = np.linalg.norm(pos - g) 
+            if(dist < 0.5):
+                traj['rewards'][i-1] = 1.0
+"""             
+
+
+
+
+
+
 class CriticDataset(Dataset):
     def __init__(self, dataset_name: str, specific_dataset: str, trajs: List[TrajectoryDict], goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99, sigma: float = 7.0, alpha: Optional[float] = None, task_id: Optional[int] = None):
         

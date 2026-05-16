@@ -53,20 +53,21 @@ def check_cube_double_goal_reach(trajs, task_id):
 
 if __name__ == '__main__':  # pragma: no cover
     
+    """
     set_seed(1)
     env_name = 'cube'
     specific_env = 'double-play'
-    task_id = 2
+    task_id = 4
     traj_length = 500
     
     data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
     trajs_1 = data.get_trajectories()
     
-    """
+    
     path = PROJECT_ROOT / "Finetuning" / "Rollouts" /  env_name / specific_env /f"task_{task_id}" / f"trajs_task{task_id}_success_0.pkl"
     with open(path, 'rb') as f:
           trajs_2 = pickle.load(f)
-    """
+    
     
     trajs =  trajs_1
     if(specific_env == 'double-play'):
@@ -90,17 +91,17 @@ if __name__ == '__main__':  # pragma: no cover
                  #alpha = 0.99,
                  #alpha = None,
                  target_reward = 50.0,
-                 trajs = trajs, 
+                 trajs = trajs_2, 
                  task_id = task_id)
     
     data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
     trajs_1 = data.get_trajectories()
     
-    """
+    
     path = PROJECT_ROOT / "Finetuning" / "Rollouts" /  env_name / specific_env /f"task_{task_id}" / f"trajs_task{task_id}_success_0.pkl"
     with open(path, 'rb') as f:
           trajs_2 = pickle.load(f)
-    """
+    
 
     trajs =  trajs_1
     if(specific_env == 'double-play'):
@@ -123,7 +124,7 @@ if __name__ == '__main__':  # pragma: no cover
 
    
 
-    
+    """
     
     
    
@@ -185,22 +186,29 @@ if __name__ == '__main__':  # pragma: no cover
     
     
     #medium
-    """
+    set_seed(1)
+    env_name = 'pointmaze'
+    specific_env = 'medium'
+    data = get_dataset(env_name, specific_env)
+    trajs = data.get_trajectories()
     train_critic(dataset_name = env_name, 
                  specific_dataset = specific_env, 
+                 hidden_layers = 1,
+                 hidden_dim = 128,
                  sigma = 7.0, 
                  batch_size = 256, 
                  num_steps = 5000, 
                  gamma = 0.95, 
                  horizon = 32, 
                  lr = 1e-05, 
+                 min_lr = 1e-06,
                  tau = 0.005,
                  goal = np.array([[-2.5, -2.5]], dtype = np.float32),
                  target_reward = 20.0,
                  trajs = trajs)
     print('training complete')
    
-    
+    """
     test_critic(dataset_name = env_name, 
                 specific_dataset = specific_env, 
                 checkpoint_step = 5000, 
@@ -211,6 +219,7 @@ if __name__ == '__main__':  # pragma: no cover
                 target_reward = 20.0, 
                 trajs = trajs)
     """
+
     
 
 
