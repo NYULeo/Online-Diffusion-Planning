@@ -622,7 +622,7 @@ class OnlineFinetuner():
             
             if self.accelerator.is_main_process:
                  print(f"Finetuning round {step+1} started")
-                 print(f"Max Mahalanobis Score: {self.config.RewardConfig.max_mahalanobis_score}")
+                 #print(f"Max Mahalanobis Score: {self.config.RewardConfig.max_mahalanobis_score}")
             
             self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
             self.accelerator.wait_for_everyone()
