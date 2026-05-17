@@ -868,8 +868,8 @@ class OnlineFinetuner():
                              hidden_dim = self.config.train_kernel_config.hidden_dim,
                              step = ((step+1) * self.config.AMConfig.per_round_steps),
                              constraint_type = self.config.RewardConfig.constraint_type,
-                             quantile = self.config.RewardConfig.quantile, 
-                             x_generated_plans = x_generated_plans,
+                             #quantile = self.config.RewardConfig.quantile, 
+                             x_generated_plans = None,
                              accelerator = self.accelerator)
                       
                       elif(self.config.train_kernel_config.type_kernel == 'mog'):
@@ -887,8 +887,8 @@ class OnlineFinetuner():
                                       kernel_noise_floor = self.config.train_kernel_config.kernel_noise_floor,
                                       step = ((step+1) * self.config.AMConfig.per_round_steps),
                                       constraint_type = self.config.RewardConfig.constraint_type,
-                                      quantile = self.config.RewardConfig.quantile,
-                                      x_generated_plans = x_generated_plans,
+                                      #quantile = self.config.RewardConfig.quantile,
+                                      x_generated_plans = None,
                                       accelerator = self.accelerator)
                       
                       if threshold is not None:
