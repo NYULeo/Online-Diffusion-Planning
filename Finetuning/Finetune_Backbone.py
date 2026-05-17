@@ -8,11 +8,11 @@ os.chdir(project_root)
 from dataclasses import dataclass
 from gymnasium.vector import AsyncVectorEnv
 from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs, check_Critic, get_kernel, get_new_critic_stats
-#from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
-from Finetuning.comp_reward import RewardConfig, TotalReward, TotalReward_Critic, TotalReward_Critic_Mahalanobis, TotalReward_Mahalanobis
+from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
+#from Finetuning.comp_reward import RewardConfig, TotalReward, TotalReward_Critic, TotalReward_Critic_Mahalanobis, TotalReward_Mahalanobis
 from adjoint_matching import AdjointMatchingFineTuner, AdjointMatchingConfig
-#from acc_adjoint_matching import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
-from AM import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
+from acc_adjoint_matching import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
+#from AM import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
 from Finetuning.Rollout import rollout
 from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Dataset import get_PlannerName, get_dataset, Planner_Processor
@@ -288,8 +288,8 @@ class OnlineFinetuner():
                    self.config.dataset_name, 
                    self.config.specific_dataset, 
                    self.config.finetune_buffer_cutoff_length)
-
-   
+    
+    """
     def set_reward_model(self, device):
         if self.config.critic:
             critic_exist = check_Critic(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, step = self.config.critic_model_checkpoint)
@@ -310,7 +310,15 @@ class OnlineFinetuner():
                  self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, task_id = self.config.train_reward_config.task_id)
             else:
                  self.reward_model = TotalReward_Mahalanobis(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, task_id = self.config.train_reward_config.task_id)
-    
+    """
+
+    def set_reward_model(self, device):
+        if (not self.config.critic) or (self.config.reward_model_checkpoint == 0):
+                self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
+        else:
+                self.reward_model = TotalReward_Critic(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, self.config.critic_model_checkpoint)
+            
+                 
     def gather_and_sync_trajs_and_buffer(self, local_trajs):
         # Gather local trajectories from all processes
         gathered_trajs_list = self.accelerator.gather_for_metrics([local_trajs if local_trajs else []], use_gather_object=True)
@@ -433,6 +441,7 @@ class OnlineFinetuner():
         return generated_plans
      """
 
+    """
     def get_generated_plans(self, number_of_generated_plans: int):
          # Build global s0 batch deterministically on all ranks
          #  (all processes must run same code before split/gather)
@@ -476,7 +485,7 @@ class OnlineFinetuner():
                 generated_plans.extend(per_rank)
 
          return generated_plans[:number_of_generated_plans]
-    
+    """
     
 
     def finetune_planner(self):
@@ -618,6 +627,7 @@ class OnlineFinetuner():
             self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
             self.accelerator.wait_for_everyone()
             #if self.accelerator.is_main_process:
+            """
             if(self.config.RewardConfig.constraint_adapt == True):
                 x_generated_plans = self.get_generated_plans(self.config.RewardConfig.number_of_generated_plans)
                 if self.accelerator.is_main_process:
@@ -625,6 +635,7 @@ class OnlineFinetuner():
             else:
                     x_generated_plans = None
             self.accelerator.wait_for_everyone()
+            """
 
             if torch.cuda.is_available():
                   torch.cuda.synchronize()  

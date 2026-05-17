@@ -1281,11 +1281,13 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
     target_critic.load_state_dict(critic.state_dict())
     target_critic.eval()
     optimizer = optim.Adam(critic.parameters(), lr = lr)
+    """
     scheduler = optim.lr_scheduler.CosineAnnealingLR(
             optimizer,
             T_max = num_steps,   # one scheduler step per training step
             eta_min = min_lr
         )
+    """
 
 
     print(f"Training critic for {dataset_name}-{specific_dataset}")
@@ -1309,9 +1311,9 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
            optimizer.zero_grad()
            loss.backward()
            optimizer.step()
-           scheduler.step()
+           #scheduler.step()
            if(k % 1000 == 0):
-                print(f"Critic Training step {k} loss: {total_loss/1000}")
+                #print(f"Critic Training step {k} loss: {total_loss/1000}")
                 total_loss = 0.0
            # Soft update target network
            for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):
