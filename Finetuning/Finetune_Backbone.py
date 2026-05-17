@@ -867,7 +867,7 @@ class OnlineFinetuner():
                              num_hidden_layers = self.config.train_kernel_config.num_hidden_layers,
                              hidden_dim = self.config.train_kernel_config.hidden_dim,
                              step = ((step+1) * self.config.AMConfig.per_round_steps),
-                             constraint_type = self.config.RewardConfig.constraint_type,
+                             #constraint_type = self.config.RewardConfig.constraint_type,
                              #quantile = self.config.RewardConfig.quantile, 
                              x_generated_plans = None,
                              accelerator = self.accelerator)
