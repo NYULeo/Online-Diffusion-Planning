@@ -675,7 +675,8 @@ class Acc_AdjointMatchingFineTuner:
                         s0_rewards_tensor = torch.stack(s0_rewards)
                         reward_std_s0 = float(
                               #(torch.max(s0_rewards_tensor).item() - torch.min(s0_rewards_tensor).item()) + 1e-8
-                             (torch.max(s0_rewards_tensor).item() - torch.min(s0_rewards_tensor).item()) 
+                             #(torch.max(s0_rewards_tensor).item() - torch.min(s0_rewards_tensor).item()) 
+                             s0_rewards_tensor.std().item() 
                         )
                     else:
                         reward_std_s0 = 0.0
