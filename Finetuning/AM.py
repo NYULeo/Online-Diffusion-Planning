@@ -17,8 +17,8 @@ import numpy as np
 from Pretrain.Dataset import get_PlannerName
 from typing import Optional, Union
 from torch import Tensor
-#from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
-from Finetuning.comp_reward import RewardConfig, TotalReward, TotalReward_Critic
+from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
+#from Finetuning.comp_reward import RewardConfig, TotalReward, TotalReward_Critic
 from torch.utils.data import DataLoader
 from Pretrain.Planners.Backbone.UNet import TemporalUnet
 from Pretrain.Dataset import get_env
