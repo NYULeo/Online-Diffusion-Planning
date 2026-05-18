@@ -288,7 +288,7 @@ if __name__ == "__main__":
                             ensemble_size = 10,
                             num_hidden_layers = 2,
                             hidden_dim = 256,
-                            #type_kernel = 'robust',
+                            type_kernel = 'robust',
                             λ_reg = 1e-3)
     
     TrainCriticConfig = Train_Critic_Config(
