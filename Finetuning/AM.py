@@ -434,7 +434,7 @@ class Acc_AdjointMatchingFineTuner:
             reward_std = 1.0
         #current_lr = self.optimizer.param_groups[0]['lr']
         alpha = self.alpha_scheduler.get_alpha()
-        a0 =  (-1 * ((self.config.reward_scaling_factor/alpha)) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * (-1) * EntGrad)
+        a0 =  (-1 * ((self.config.reward_scaling_factor/alpha/reward_std)) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * (-1) * EntGrad)
         #a0 =  (-1 * ((self.config.reward_scaling_factor/alpha)/reward_std) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * (-1) * EntGrad)
         
         #max_norm = 5.0
@@ -466,7 +466,7 @@ class Acc_AdjointMatchingFineTuner:
         return a, reward
     
 
-    """
+    
     def adjoint_matching_loss(
         self,
         traj_x: List[torch.Tensor],
@@ -485,8 +485,9 @@ class Acc_AdjointMatchingFineTuner:
                 Loss = Loss + ((v_new - v_old)*(2/sigma) + (sigma * adjoint_i)).pow(2).mean()
         Loss = Loss / len(traj_x)
         return Loss
+    
+    
     """
-
     def adjoint_matching_loss(self, traj_x, adjoints):
         loss = 0.0
         clip_val = (self.config.reward_scaling_factor ** 2) * 1.6
@@ -501,6 +502,7 @@ class Acc_AdjointMatchingFineTuner:
                  term = torch.clamp(term, max=clip_val)
             loss = loss + term
         return loss / len(traj_x)
+    """
     
     
     def step(self, s0_batch: torch.Tensor, reward_model: Union[TotalReward, TotalReward_Critic]) -> Tuple[float, float, float]:
