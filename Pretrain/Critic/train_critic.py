@@ -34,7 +34,7 @@ def spare_reward_prcocessor(rewards):
     return np.array(new_rewards, dtype = np.float64) 
     #return np.array(new_rewards) 
 
-def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, min_lr,sigma, alpha, 
+def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, min_lr, sigma, alpha, 
                                 obs_dim, critic_net, optimizer, gamma, horizon, tau,
                                 specific_dataset: Optional[str] = None, 
                                 target_reward: Optional[float] = None,

@@ -11,8 +11,8 @@ from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDatase
 from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
 #from Finetuning.comp_reward import RewardConfig, TotalReward, TotalReward_Critic, TotalReward_Critic_Mahalanobis, TotalReward_Mahalanobis
 from adjoint_matching import AdjointMatchingFineTuner, AdjointMatchingConfig
-from acc_adjoint_matching import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
-#from AM import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
+#from acc_adjoint_matching import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
+from AM import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
 from Finetuning.Rollout import rollout
 from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Dataset import get_PlannerName, get_dataset, Planner_Processor
