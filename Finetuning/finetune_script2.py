@@ -8,10 +8,10 @@ os.chdir(project_root)
 from utils import AlphaSchedulerConfig
 from Finetune_Backbone import OnlineFinetuner, FinetuningConfig, Train_Critic_Config, Train_Kernel_Config, Train_Reward_Config
 from adjoint_matching import AdjointMatchingConfig
-from acc_adjoint_matching import Acc_AdjointMatchingConfig
-#from AM import Acc_AdjointMatchingConfig
-from traj_reward import RewardConfig
-#from comp_reward import RewardConfig
+#from acc_adjoint_matching import Acc_AdjointMatchingConfig
+from AM import Acc_AdjointMatchingConfig
+#from traj_reward import RewardConfig
+from comp_reward import RewardConfig
 import random
 import numpy as np
 import torch
@@ -261,13 +261,13 @@ if __name__ == "__main__":
     #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
     RWConfig = RewardConfig(
                beta = 1.0, 
-               #max_mahalanobis_score = 3.5,
+               max_mahalanobis_score = 3.5,
                min_log_prob = 5.0,
-               #constraint_adapt = False,
-               #quantile = 0.95,
+               constraint_adapt = False,
+               quantile = 0.95,
                critic_gamma = 1.0,
-               explore = False)
-               #constraint_type = 'log_prob') 
+               explore = False,
+               constraint_type = 'log_prob') 
 
     
     TrainRewardConfig = Train_Reward_Config(
@@ -289,7 +289,7 @@ if __name__ == "__main__":
                             ensemble_size = 10,
                             num_hidden_layers = 2,
                             hidden_dim = 256,
-                            #type_kernel = 'robust',
+                            type_kernel = 'robust',
                             λ_reg = 1e-3)
     
     TrainCriticConfig = Train_Critic_Config(
