@@ -411,8 +411,8 @@ class Acc_AdjointMatchingFineTuner:
         T = X_reversed[0]
         T_squeezed = T.squeeze(0).to(self.device)
         reward, gradient = reward_model(T_squeezed, self.Lam.get_lam())
-        #grad_norm = torch.norm(gradient, p=2).clamp(min=1e-8)
-        #gradient = gradient * (1.0 / grad_norm)
+        grad_norm = torch.norm(gradient, p=2).clamp(min=1e-8)
+        gradient = gradient * (1.0 / grad_norm)
         #print(f"Reward Gradeint Norm: {gradient.norm().item()}")
         if(self.config.MaxEnt):
             score = self.old_score_net(T, torch.tensor(0.0).unsqueeze(0).to(self.device))
