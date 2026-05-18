@@ -8,11 +8,11 @@ os.chdir(project_root)
 from dataclasses import dataclass
 from gymnasium.vector import AsyncVectorEnv
 from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs, check_Critic, get_kernel, get_new_critic_stats
-from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
-#from Finetuning.comp_reward import RewardConfig, TotalReward, TotalReward_Critic, TotalReward_Critic_Mahalanobis, TotalReward_Mahalanobis
+#from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
+from Finetuning.comp_reward import RewardConfig, TotalReward, TotalReward_Critic, TotalReward_Critic_Mahalanobis, TotalReward_Mahalanobis
 from adjoint_matching import AdjointMatchingFineTuner, AdjointMatchingConfig
-#from acc_adjoint_matching import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
-from AM import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
+from acc_adjoint_matching import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
+#from AM import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
 from Finetuning.Rollout import rollout
 from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Dataset import get_PlannerName, get_dataset, Planner_Processor
@@ -402,13 +402,15 @@ class OnlineFinetuner():
           return critic_buffer, new_critic_stats
    
     def data_conservation_update(self, critic_buffer):
+        """
         if(self.config.train_reward_config.task_id is not None):
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = self.config.train_buffer_cutoff_length)
             trajs = dataset.get_trajectories()
         else:
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
             trajs = dataset.get_trajectories()
-        #trajs = self.Train_Buffer.copy()
+        """
+        trajs = self.Train_Buffer.copy()
         
         if(len(critic_buffer) < 2):
              critic_buffer.extend(trajs)

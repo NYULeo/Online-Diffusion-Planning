@@ -8,10 +8,10 @@ os.chdir(project_root)
 from utils import AlphaSchedulerConfig
 from Finetune_Backbone import OnlineFinetuner, FinetuningConfig, Train_Critic_Config, Train_Kernel_Config, Train_Reward_Config
 from adjoint_matching import AdjointMatchingConfig
-#from acc_adjoint_matching import Acc_AdjointMatchingConfig
-from AM import Acc_AdjointMatchingConfig
-from traj_reward import RewardConfig
-#from comp_reward import RewardConfig
+from acc_adjoint_matching import Acc_AdjointMatchingConfig
+#from AM import Acc_AdjointMatchingConfig
+#from traj_reward import RewardConfig
+from comp_reward import RewardConfig
 import random
 import numpy as np
 import torch
@@ -261,12 +261,12 @@ if __name__ == "__main__":
     #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
     RWConfig = RewardConfig(
                beta = 1.0, 
-               #max_mahalanobis_score = 3.5,
+               max_mahalanobis_score = 3.5,
                min_log_prob = 5.0,
-               #constraint_adapt = False,
+               constraint_adapt = False,
                critic_gamma = 1.0,
-               explore = False)
-               #constraint_type = 'log_prob') 
+               explore = False,
+               constraint_type = 'log_prob') 
 
     
     TrainRewardConfig = Train_Reward_Config(
@@ -299,8 +299,8 @@ if __name__ == "__main__":
                             lr = 1e-05,
                             tau = 0.005,
                             gamma = 0.95,
-                            data_conservation = True)
-                            #retrain_critic = True)
+                            data_conservation = True,
+                            retrain_critic = True)
     
     
 
@@ -315,8 +315,8 @@ if __name__ == "__main__":
         kernel_model_checkpoint = 0,
         critic_model_checkpoint = 0,
         offline = False,
-        critic = False,
-        update_critic = False,
+        critic = True,
+        update_critic = True,
         kernel = True,
         update_kernel = True,
         buffer_size = 5500,

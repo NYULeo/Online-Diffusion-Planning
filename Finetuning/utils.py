@@ -1312,9 +1312,11 @@ def train_critic(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
            loss.backward()
            optimizer.step()
            #scheduler.step()
+           """
            if(k % 1000 == 0):
-                #print(f"Critic Training step {k} loss: {total_loss/1000}")
+                print(f"Critic Training step {k} loss: {total_loss/1000}")
                 total_loss = 0.0
+            """
            # Soft update target network
            for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):
                tgt_param.data.mul_(1 - tau)
