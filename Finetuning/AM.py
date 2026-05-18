@@ -647,6 +647,7 @@ class Acc_AdjointMatchingFineTuner:
              return avg_loss, avg_reward, total_avgC    
         return 0, 0, 0
     
+    """
     def step_acc(self, s0_batch: torch.Tensor, reward_model: Union[TotalReward, TotalReward_Critic]) -> Tuple[float, float, float]:
             base_reward_model = self.accelerator.unwrap_model(reward_model)
             with self.accelerator.split_between_processes(s0_batch) as local_s0:
@@ -674,9 +675,9 @@ class Acc_AdjointMatchingFineTuner:
                     if len(s0_rewards) > 0:
                         s0_rewards_tensor = torch.stack(s0_rewards)
                         reward_std_s0 = float(
-                              #(torch.max(s0_rewards_tensor).item() - torch.min(s0_rewards_tensor).item()) + 1e-8
+                             (torch.max(s0_rewards_tensor).item() - torch.min(s0_rewards_tensor).item()) + 1e-8
                              #(torch.max(s0_rewards_tensor).item() - torch.min(s0_rewards_tensor).item()) 
-                             s0_rewards_tensor.std().item() 
+                             #s0_rewards_tensor.std().item() 
                         )
                     else:
                         reward_std_s0 = 0.0
@@ -753,9 +754,109 @@ class Acc_AdjointMatchingFineTuner:
                  avg_reward = float(all_rewards.mean().item())
                  return avg_loss, avg_reward, total_avgC
             return 0, 0, 0
-   
+    """
 
-    
+    def step_acc(self, s0_batch: torch.Tensor, reward_model: Union[TotalReward, TotalReward_Critic]) -> Tuple[float, float, float]:
+        
+        base_reward_model = self.accelerator.unwrap_model(reward_model)
+
+        # ====================== Rollout Phase ======================
+        with self.accelerator.split_between_processes(s0_batch) as local_s0:
+            local_trajs = []           # list of individual trajectories
+            local_traj_stds = []       # per-s0 group std (GRPO)
+            local_final_Cs = []
+            local_rewards_for_log = []
+
+            for s0 in local_s0:
+                s0 = s0.to(self.device)
+                s0_trajs = []
+                s0_rewards = []
+
+                # Sample multiple trajectories for this s0 (the "group")
+                for _ in range(self.config.batch_per_sample):
+                    with self.accelerator.autocast():
+                        traj, reward = self.sample_Traj_karras(s0, base_reward_model)
+
+                    s0_trajs.append(traj)
+                    s0_rewards.append(reward)
+
+                    # Log final C value
+                    final_x = traj[-1].squeeze(0).to(self.device)
+                    C_val = base_reward_model.get_c(final_x)
+                    local_final_Cs.append(C_val)
+                    local_rewards_for_log.append(reward)
+
+                # === Per-s0 GRPO normalization (most important part) ===
+                if len(s0_rewards) > 1:
+                    s0_rewards_t = torch.stack(s0_rewards)
+                    std_s0 = s0_rewards_t.std(unbiased=False).item() + 1e-8
+                else:
+                    std_s0 = 1.0  # fallback for degenerate groups
+
+                # Attach the same std to every trajectory from this s0
+                for traj in s0_trajs:
+                    local_trajs.append(traj)
+                    local_traj_stds.append(std_s0)
+
+        self.accelerator.wait_for_everyone()
+
+        # ====================== Gather Logging Metrics Only ======================
+        local_Cs_det = torch.stack(local_final_Cs).detach() if local_final_Cs else torch.zeros(0, device=self.device)
+        local_log_rewards_det = torch.stack(local_rewards_for_log).detach() if local_rewards_for_log else torch.zeros(0, device=self.device)
+
+        all_final_Cs = self.accelerator.gather_for_metrics(local_Cs_det)
+        all_log_rewards = self.accelerator.gather_for_metrics(local_log_rewards_det)
+
+        if self.accelerator.is_main_process:
+            total_avgC = float(all_final_Cs.mean().item()) if len(all_final_Cs) > 0 else 0.0
+            avg_reward_log = float(all_log_rewards.mean().item()) if len(all_log_rewards) > 0 else 0.0
+        else:
+            total_avgC = 0.0
+            avg_reward_log = 0.0
+
+        # ====================== Loss Computation Phase ======================
+        local_loss_tensors = []
+        local_reward_values = []
+
+        for traj, std_s0 in zip(local_trajs, local_traj_stds):
+            traj_list = [traj[i] for i in range(traj.shape[0])]
+
+            with self.accelerator.autocast():
+                adjoint, reward = self.make_a(traj_list, reward_model, std_s0)
+                loss_tensor = self.adjoint_matching_loss(traj_list, adjoint)
+
+            local_loss_tensors.append(loss_tensor)
+            local_reward_values.append(reward)
+
+        if local_loss_tensors:
+            local_loss = torch.stack(local_loss_tensors).mean()
+            local_reward_mean = torch.stack(local_reward_values).mean()
+        else:
+            local_loss = torch.tensor(0.0, device=self.device, requires_grad=True)
+            local_reward_mean = torch.tensor(0.0, device=self.device)
+
+        # Reduce loss across all processes
+        global_loss = self.accelerator.reduce(local_loss, reduction="mean")
+
+        # ====================== Optimization Step ======================
+        self.optimizer.zero_grad()
+        self.new_score_net.zero_grad()
+        self.accelerator.backward(global_loss)
+        self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
+        self.optimizer.step()
+        self.scheduler.step()
+        self.alpha_scheduler.step_alpha()
+
+        self.accelerator.wait_for_everyone()
+
+        # ====================== Return Metrics ======================
+        if self.accelerator.is_main_process:
+            avg_loss = float(local_loss.detach().item())
+            avg_reward = float(local_reward_mean.detach().item())
+            return avg_loss, avg_reward, total_avgC
+
+        return 0.0, 0.0, total_avgC
+   
 
 
 

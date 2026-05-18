@@ -172,13 +172,13 @@ class TotalReward(nn.Module):
 
             r = self.reward_net(s_norm_reward, a)
             c = self.sigmoid(s_norm_kernel, a, s_next_norm_kernel)
-            total_reward = total_reward + (1.0 / H) * r.squeeze(0) - lam * ((1.0 / (H - 1)) * c.squeeze(0))
+            total_reward = total_reward + (1 / H) * r.squeeze(0) - lam * ((1 / (H - 1)) * c.squeeze(0))
 
         s = x[H - 1, :self.config.d_s]
         a = x[H - 1, self.config.d_s:].unsqueeze(0)
         s_norm_reward = self.reward_processor(s).unsqueeze(0)
         r = self.reward_net(s_norm_reward, a)
-        total_reward = total_reward + (1.0 / H) * r.squeeze(0)
+        total_reward = total_reward + (1 / H) * r.squeeze(0)
         total_reward = total_reward + lam * self.config.delta
         return total_reward
 
@@ -224,8 +224,8 @@ class TotalReward(nn.Module):
             c_s_next = grads_c[2].squeeze(0) * self.kernel_obs_inv_std_t
             c_s_grad, c_a_grad, c_s_next_grad = self.makeGrad(H, c_s, c_a, i, c_s_next)
 
-            gradient = gradient + (1.0 / H) * (r_s_grad + r_a_grad) - lam * (1.0 / (H - 1)) * (c_s_grad + c_a_grad + c_s_next_grad)
-            total_reward = total_reward + (1.0 / H) * r.squeeze(0) - lam * ((1.0 / (H - 1)) * c.squeeze(0))
+            gradient = gradient + (1 / H) * (r_s_grad + r_a_grad) - lam * (1 / (H - 1)) * (c_s_grad + c_a_grad + c_s_next_grad)
+            total_reward = total_reward + (1 / H) * r.squeeze(0) - lam * ((1 / (H - 1)) * c.squeeze(0))
 
         s = x[H - 1, :self.config.d_s]
         a = x[H - 1, self.config.d_s:].unsqueeze(0)
@@ -244,8 +244,8 @@ class TotalReward(nn.Module):
         r_a = grads_r[1].squeeze(0)
         r_s_grad, r_a_grad = self.makeGrad(H, r_s, r_a, H - 1)
 
-        gradient = gradient + (1.0 / H) * (r_s_grad + r_a_grad)
-        total_reward = total_reward + (1.0 / H) * r.squeeze(0)
+        gradient = gradient + (1 / H) * (r_s_grad + r_a_grad)
+        total_reward = total_reward + (1 / H) * r.squeeze(0)
         total_reward = total_reward + lam * self.config.delta
         return total_reward, gradient
 
