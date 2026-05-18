@@ -919,7 +919,7 @@ class OnlineFinetuner():
                   self.config.kernel_model_checkpoint = 0
             
             if(self.config.critic and self.config.update_critic):
-                if (new_critic_stats is not None):
+                if (new_critic_stats is not None) or (self.config.train_critic_config.retrain_critic):
                      self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
                      last_critic_update_step = ((step+1) * self.config.AMConfig.per_round_steps)
                 else:

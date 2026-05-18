@@ -39,6 +39,12 @@ from Pretrain.Critic.nets import Critic
 from Pretrain.Dataset import get_dataset
 import json
 
+class TrajectoryDict(TypedDict):
+    observations: np.ndarray
+    actions: np.ndarray  
+    rewards: np.ndarray
+
+
 def check_specific_dataset(dataset_name):
     if(dataset_name == 'kitchen'):
          return False
@@ -85,6 +91,58 @@ def reward_filter(obs, rews, goal):
             rews[i-1] = 0.0
     return rews
 
+"""
+def reward_filter2(traj: TrajectoryDict, goal) -> List[TrajectoryDict]:
+    last_step = 1
+    #i = 1
+    new_trajs = []
+    #while(i < len(traj['observations'])):
+    for i in range(1, len(traj['observations'])):
+        pos = traj['observations'][i][:2]
+        g = np.asarray(goal, dtype=np.float32).reshape(-1)
+        dist = np.linalg.norm(pos - g) 
+        if(dist < 0.5):
+            if((i - last_step) < 3):
+                last_step = i+1
+                continue
+            else:
+                rews = traj['rewards'][last_step:i-1]
+                rews[-1] = 1.0
+                new_trajs.append({'observations': traj['observations'][last_step:i-1], 'actions': traj['actions'][last_step:i-1], 'rewards': rews})
+                last_step = i+1
+    
+    return new_trajs
+"""
+
+def reward_filter_goals(trajs: List[TrajectoryDict], goal) -> List[TrajectoryDict]:
+    def reward_filter2(traj: TrajectoryDict, goal) -> List[TrajectoryDict]:
+        last_step = 1
+        #i = 1
+        new_trajs = []
+        new_rews = [0]*len(traj['rewards'])
+        traj['rewards'] = new_rews
+        
+        #while(i < len(traj['observations'])):
+        for i in range(1, len(traj['observations'])):
+          pos = traj['observations'][i][:2]
+          g = np.asarray(goal, dtype=np.float32).reshape(-1)
+          dist = np.linalg.norm(pos - g) 
+          if(dist < 0.5):
+              if((i - last_step) < 3):
+                  last_step = i+1
+                  continue
+              else:
+                  rews = traj['rewards'][last_step:i-1]
+                  rews[-1] = 1.0
+                  new_trajs.append({'observations': traj['observations'][last_step:i-1], 'actions': traj['actions'][last_step:i-1], 'rewards': rews})
+                  last_step = i+1
+        return new_trajs
+    
+    new_trajs = []
+    for traj in trajs:
+        new_trajs.extend(reward_filter2(traj, goal))
+    return new_trajs
+   
 def save_reward_model(reward_net, dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
     reward_net.eval()
     net_dict = reward_net.state_dict()
@@ -258,10 +316,6 @@ class Lambda:
 def function(x, beta: float):
     return (1/beta)* np.log(1 + np.exp(x*beta))
 
-class TrajectoryDict(TypedDict):
-    observations: np.ndarray
-    actions: np.ndarray  
-    rewards: np.ndarray
 
 def getName(env_name, specific_env):
      if(env_name == 'kitchen'):
@@ -1182,6 +1236,7 @@ class CriticDataset(Dataset):
             for traj in trajs:
                 traj['observations'] = traj['observations'][:,:2]
         """
+        
         obs_all = []
         for traj in trajs:
             obs_all.append(traj['observations'])
