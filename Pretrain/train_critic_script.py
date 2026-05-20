@@ -56,9 +56,9 @@ if __name__ == '__main__':  # pragma: no cover
     """
     set_seed(1)
     env_name = 'cube'
-    specific_env = 'double-play'
+    specific_env = 'single-play'
     task_id = 4
-    traj_length = 500
+    traj_length = 200
     
     data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
     trajs_1 = data.get_trajectories()
@@ -69,7 +69,7 @@ if __name__ == '__main__':  # pragma: no cover
           trajs_2 = pickle.load(f)
     
     
-    trajs =  trajs_1
+    trajs =  trajs_1 + trajs_2
     if(specific_env == 'double-play'):
         check_cube_double_goal_reach(trajs, task_id)
     else:
@@ -85,14 +85,16 @@ if __name__ == '__main__':  # pragma: no cover
                  horizon = 32, 
                  #lr = 3e-04, 
                  lr = 1e-05,
+                 min_lr = 1e-06,
                  tau = 0.005,
                  goal = None,
                  sigma = 8.0,
                  #alpha = 0.99,
                  #alpha = None,
                  target_reward = 50.0,
-                 trajs = trajs_2, 
+                 trajs = trajs, 
                  task_id = task_id)
+    
     
     data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
     trajs_1 = data.get_trajectories()
@@ -121,10 +123,10 @@ if __name__ == '__main__':  # pragma: no cover
                 target_reward = 50.0,
                 trajs = trajs,
                 task_id = task_id)
-
+    """
    
 
-    """
+    
     
     
    
@@ -148,28 +150,30 @@ if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     env_name = 'pointmaze'
     specific_env = 'large'
-    data = get_dataset(env_name, specific_env)
+    data = get_dataset(env_name, specific_env,  goal = np.array([[4.0, -3.0]], dtype = np.float32))
     trajs = data.get_trajectories()
+    
     train_critic(dataset_name = env_name,
                  specific_dataset = specific_env, 
-                 hidden_layers = 3,
-                 hidden_dim = 128,
-                 batch_size = 512, 
-                 num_steps = 10000, 
+                 hidden_layers = 4,
+                 hidden_dim = 256,
+                 batch_size = 256, 
+                 num_steps = 30000, 
                  gamma = 0.99, 
-                 horizon = 20, 
-                 lr = 3e-05, 
+                 horizon = 32, 
+                 lr = 5e-05, 
+                 min_lr = 1e-06,
                  tau = 0.005,
-                 goal = np.array([[4.0, -3.0]], dtype = np.float32),
-                 #sigma = 7.0,
-                 alpha = 0.999,
-                 #alpha = None,
-                 target_reward = 25.0,
+                 sigma = 3.0,
+                 #sigma = None,
+                 #alpha = 0.999999,
+                 alpha = None,
+                 target_reward = 50.0,
                  trajs = trajs)
+    """
     
-
     
-    
+    """
     test_critic(dataset_name = env_name, 
                 specific_dataset = specific_env, 
                 hidden_layers = 3, 
@@ -189,25 +193,28 @@ if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     env_name = 'pointmaze'
     specific_env = 'medium'
-    data = get_dataset(env_name, specific_env)
+    data = get_dataset(env_name, specific_env, goal = np.array([[-2.5, -2.5]], dtype = np.float32))
     trajs = data.get_trajectories()
     train_critic(dataset_name = env_name, 
                  specific_dataset = specific_env, 
-                 hidden_layers = 1,
+                 hidden_layers = 3,
                  hidden_dim = 128,
-                 sigma = 7.0, 
                  batch_size = 256, 
-                 num_steps = 5000, 
-                 gamma = 0.95, 
+                 num_steps = 30000, 
+                 gamma = 0.99, 
                  horizon = 32, 
                  lr = 1e-05, 
                  min_lr = 1e-06,
                  tau = 0.005,
-                 goal = np.array([[-2.5, -2.5]], dtype = np.float32),
+                 sigma = 2.0,
+                 alpha = None,
                  target_reward = 20.0,
                  trajs = trajs)
     print('training complete')
-   
+
+
+
+
     """
     test_critic(dataset_name = env_name, 
                 specific_dataset = specific_env, 

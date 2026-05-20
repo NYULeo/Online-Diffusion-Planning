@@ -452,8 +452,8 @@ class TotalReward_Critic(nn.Module):
             #gradient = gradient + ((1.0 / H) * (r_s_grad + r_a_grad)) - lam * ((1.0/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad))
             #total_reward = total_reward +  ((1.0 / H) * r.squeeze(0)) - lam * ((1.0/(H-1)) * c.squeeze(0))
 
-            gradient = gradient + ((r_s_grad + r_a_grad)) - lam * ((1.0/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad))
-            total_reward = total_reward +  (r.squeeze(0)) - lam * ((1.0/(H-1)) * c.squeeze(0))
+            gradient = gradient + ((r_s_grad + r_a_grad)) - lam * ((1/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad))
+            total_reward = total_reward +  (r.squeeze(0)) - lam * ((1/(H-1)) * c.squeeze(0))
 
         # last-step reward grad (kept)
         s = x[H - 1, :self.config.d_s]

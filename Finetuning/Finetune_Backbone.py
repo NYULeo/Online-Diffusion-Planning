@@ -267,7 +267,6 @@ class OnlineFinetuner():
         self.Train_Kernel_Buffer = []
         
         if(self.config.train_reward_config.task_id is not None):
-            #trajs = get_trajs(self.config.dataset_name, self.config.specific_dataset, 0, self.config.train_reward_config.task_id)
             dataset_reward = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = self.config.train_buffer_cutoff_length)
             trajs_reward = dataset_reward.get_trajectories()
             dataset_kernel = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id)
@@ -275,6 +274,16 @@ class OnlineFinetuner():
             self.Finetune_Buffer.extend(trajs_reward)
             self.Train_Buffer.extend(trajs_reward)
             self.Train_Kernel_Buffer.extend(trajs_kernel)
+        
+        elif(self.config.train_reward_config.train_goal is not None):
+            dataset_reward = get_dataset(self.config.dataset_name, self.config.specific_dataset, goal = self.config.train_reward_config.train_goal)
+            trajs_reward = dataset_reward.get_trajectories()
+            dataset_kernel = get_dataset(self.config.dataset_name, self.config.specific_dataset)
+            trajs_kernel = dataset_kernel.get_trajectories()
+            self.Finetune_Buffer.extend(trajs_reward)
+            self.Train_Buffer.extend(trajs_reward)
+            self.Train_Kernel_Buffer.extend(trajs_kernel)
+        
         else:
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
             trajs = dataset.get_trajectories()
@@ -314,11 +323,10 @@ class OnlineFinetuner():
 
     def set_reward_model(self, device):
         if (not self.config.critic) or (self.config.reward_model_checkpoint == 0):
-                self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
+            self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
         else:
-                self.reward_model = TotalReward_Critic(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, self.config.critic_model_checkpoint)
-            
-                 
+            self.reward_model = TotalReward_Critic(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, self.config.critic_model_checkpoint)
+                    
     def gather_and_sync_trajs_and_buffer(self, local_trajs):
         # Gather local trajectories from all processes
         gathered_trajs_list = self.accelerator.gather_for_metrics([local_trajs if local_trajs else []], use_gather_object=True)
@@ -561,22 +569,7 @@ class OnlineFinetuner():
         
         if self.accelerator.is_main_process:
              save_hyperparameters(self.config)
-        """
-        if self.accelerator.is_main_process:
-             print(f"Starting Rollout")
-             trajs, score, _ = rollout_parallel(self.config.dataset_name, 
-                                         self.config.specific_dataset, 
-                                         horizon = self.config.AMConfig.horizon, 
-                                         steps_T = self.config.diffusion_steps, 
-                                         num_karras = self.config.AMConfig.num_karras, 
-                                         eta = self.config.AMConfig.eta, 
-                                         episode_length = self.config.rollout_length, 
-                                         checkpoint_step = 0, 
-                                         num_envs = 4, 
-                                         goal_cell = self.config.train_reward_config.rollout_goal)
-             print(f"Total Number of Environment Steps: {0}")
-             print(f"Average Normalized Score: {score:.2f}")
-        """
+        
         self.accelerator.wait_for_everyone()
         
         rank = self.accelerator.process_index
@@ -649,45 +642,9 @@ class OnlineFinetuner():
             
             num_rollout_procs = self.config.num_rollout_processes
             do_rollout = (num_rollout_procs is None) or (rank < num_rollout_procs)
-            #seed_base = rank * num_envs_per_process
-            """
-            trajs, score, total_steps = rollout_parallel(self.config.dataset_name, 
-                                         self.config.specific_dataset, 
-                                         horizon = self.config.AMConfig.horizon, 
-                                         steps_T = self.config.diffusion_steps, 
-                                         num_karras = self.config.AMConfig.num_karras, 
-                                         eta = self.config.AMConfig.eta, 
-                                         episode_length = self.config.rollout_length, 
-                                         checkpoint_step = ((step+1) * self.config.AMConfig.per_round_steps), 
-                                         num_envs = self.config.rollout_num_envs, 
-                                         goal_cell = self.config.train_reward_config.rollout_goal,
-                                         device = self.device,
-                                         start_cells = self.config.train_reward_config.rollout_start_cells,
-                                         seed_base = seed_base) 
-            """ 
             if do_rollout:
                 seed_base = rank * num_envs_per_process
-                """
-                trajs, score, success_rate, total_steps = rollout_parallel3(self.config.dataset_name, 
-                                             self.config.specific_dataset, 
-                                             horizon = self.config.AMConfig.horizon, 
-                                             steps_T = self.config.diffusion_steps, 
-                                             num_karras = self.config.AMConfig.num_karras, 
-                                             eta = self.config.AMConfig.eta, 
-                                             episode_length = self.config.rollout_length, 
-                                             checkpoint_step = ((step+1) * self.config.AMConfig.per_round_steps), 
-                                             num_envs = self.config.rollout_num_envs, 
-                                             goal_cell = self.config.train_reward_config.rollout_goal,
-                                             device = self.device,
-                                             start_cells = self.config.train_reward_config.rollout_start_cells,
-                                             task_id = self.config.train_reward_config.task_id,
-                                             seed_base = seed_base,
-                                             continual_rollout = self.config.continual_rollout,
-                                             chunk_size = self.config.chunk_size)
-                """
-
-                
-                
+               
                 trajs, score,  total_steps = rollout_parallel2(self.config.dataset_name, 
                                              self.config.specific_dataset, 
                                              horizon = self.config.AMConfig.horizon, 
@@ -705,25 +662,6 @@ class OnlineFinetuner():
                                              continual_rollout = self.config.continual_rollout,
                                              chunk_size = self.config.chunk_size)
                 
-
-                """
-                trajs, score, total_steps = rollout_parallel(self.config.dataset_name, 
-                                         self.config.specific_dataset, 
-                                         horizon = self.config.AMConfig.horizon, 
-                                         steps_T = self.config.diffusion_steps, 
-                                         num_karras = self.config.AMConfig.num_karras, 
-                                         eta = self.config.AMConfig.eta, 
-                                         episode_length = self.config.rollout_length, 
-                                         checkpoint_step = ((step+1) * self.config.AMConfig.per_round_steps), 
-                                         num_envs = self.config.rollout_num_envs, 
-                                         goal_cell = self.config.train_reward_config.rollout_goal,
-                                         device = self.device,
-                                         start_cells = self.config.train_reward_config.rollout_start_cells,
-                                         seed_base = seed_base) 
-                """
-       
-                #trajs = get_success_trajs(trajs)
-                #print(checktrajs(trajs)) 
             else:
                 trajs, score, total_steps = [], 0.0, 0
             

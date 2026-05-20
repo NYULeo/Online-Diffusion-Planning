@@ -143,50 +143,131 @@ reward  =  rollout(
 print(reward)
 """
 
-"""
+
 from Finetuning.Rollout import load_success_trajs
-from Finetuning.utils import get_new_critic_stats, train_critic
+from Finetuning.utils import train_critic, test_critic
 from Pretrain.utils import set_seed
-import random
 
 env_name = 'cube'
 specific_env = 'single-play'
 task_id = 4
 step = 0
 traj_length = 200
-trajs = load_success_trajs(env_name, specific_env, task_id, step)
-new_critic_stats = get_new_critic_stats(trajs)
-data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
-all_trajs = data.get_trajectories()
-half_size_1 = len(all_trajs) // 2
-half_pretrained_trajs = random.sample(all_trajs, half_size_1)
-half_size_2 = len(trajs) // 2
-half_buffer_trajs = random.sample(trajs, half_size_2)
-critic_buffer = half_pretrained_trajs + half_buffer_trajs
+
 set_seed(1)
-train_critic(critic_buffer, 
+trajs = load_success_trajs(env_name, specific_env, task_id, step)
+test_critic(dataset_name = env_name, 
+            specific_dataset = specific_env, 
+            hidden_layers = 4, 
+            hidden_dim = 512, 
+            checkpoint_step = 0, 
+            gamma = 0.99, 
+            horizon = 32,  
+            sigma = 3.0, 
+            target_reward = 80.0, 
+            trajs = trajs,
+            task_id = task_id)
+
+trajs = load_success_trajs(env_name, specific_env, task_id, step)
+train_critic(trajs, 
              dataset_name = env_name, 
              specific_dataset = specific_env, 
-             hidden_layers = 4,
-             hidden_dim = 512,
-             sigma = 3.0, 
+             hidden_layers = 4, 
+             hidden_dim = 512, 
+             sigma = 3.0,
              batch_size = 256, 
              num_steps = 10000, 
              gamma = 0.99, 
+             lam = 0.95, 
              horizon = 32, 
-             lr = 2e-05, 
-             min_lr = 5e-07,
+             lr = 5e-05, 
+             min_lr = 5e-06, 
              tau = 0.005, 
-             old_step = 0,
+             old_step = 0, 
              new_step = 10, 
-             new_stats = new_critic_stats,
-             momentum = 0.005,
-             goal = None, 
-             target_reward = 50.0,
+             momentum = 0.005, 
+             target_reward = 80.0,
              task_id = task_id)
+
+trajs = load_success_trajs(env_name, specific_env, task_id, step)
+test_critic(dataset_name = env_name, 
+            specific_dataset = specific_env, 
+            hidden_layers = 4, 
+            hidden_dim = 512, 
+            checkpoint_step = 10, 
+            gamma = 0.99, 
+            horizon = 32,  
+            sigma = 3.0, 
+            target_reward = 80.0, 
+            trajs = trajs,
+            task_id = task_id)
+
+
+
+"""
+from Finetuning.Rollout import get_success_trajs
+from Finetuning.utils import train_critic
+from Pretrain.utils import set_seed
+from Finetuning.utils import test_critic
+env_name = 'pointmaze'
+specific_env = 'medium'
+save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info_0.pkl'
+with open(save_path, 'rb') as f:
+        trajs = pickle.load(f)
+trajs = get_success_trajs(trajs)
+
+set_seed(1)
+test_critic(dataset_name = env_name, 
+            specific_dataset = specific_env, 
+            hidden_layers = 3, 
+            hidden_dim = 128, 
+            checkpoint_step = 0, 
+            gamma = 0.99, 
+            horizon = 32,  
+            sigma = 2.0, 
+            target_reward = 20.0, 
+            trajs = trajs)
+
+with open(save_path, 'rb') as f:
+        trajs = pickle.load(f)
+trajs = get_success_trajs(trajs)
+
+
+train_critic(trajs, 
+             dataset_name = env_name, 
+             specific_dataset = specific_env, 
+             hidden_layers = 3, 
+             hidden_dim = 128, 
+             sigma = 2.0,
+             batch_size = 256, 
+             num_steps = 5000, 
+             gamma = 0.99, 
+             lam = 0.95, 
+             horizon = 32, 
+             lr = 1e-05, 
+             min_lr = 1e-06, 
+             tau = 0.005, 
+             old_step = 0, 
+             new_step = 10, 
+             momentum = 0.005, 
+             target_reward = 20.0)
+
+with open(save_path, 'rb') as f:
+        trajs = pickle.load(f)
+trajs = get_success_trajs(trajs)
+
+
+test_critic(dataset_name = env_name, 
+            specific_dataset = specific_env, 
+            hidden_layers = 3, 
+            hidden_dim = 128, 
+            checkpoint_step = 10, 
+            gamma = 0.99, 
+            horizon = 32,  
+            sigma = 2.0, 
+            target_reward = 20.0, 
+            trajs = trajs)
+
 """
 
 
-
-data = minari.load_dataset('D4RL/pointmaze/medium-v2', download = True)
-print(data.storage.metadata.keys())

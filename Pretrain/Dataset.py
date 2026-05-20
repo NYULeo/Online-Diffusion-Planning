@@ -23,10 +23,14 @@ try:
 except ModuleNotFoundError:
     from utils import SAStats
 import os
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, TypedDict
 import numpy as np
 from itertools import permutations
 
+class TrajectoryDict(TypedDict):
+    observations: np.ndarray
+    actions: np.ndarray  
+    rewards: np.ndarray
 
 
 def determine_stride(dataset_name, specific_dataset):
@@ -38,8 +42,8 @@ def determine_stride(dataset_name, specific_dataset):
 #-------------------------------------------------------------------------------------#
 #------------------------------------- Dataset ---------------------------------------#
 #-------------------------------------------------------------------------------------#
-def get_env(env_name, specific_env, render_mode = None, task_id: Optional[int] = None, episode_length: Optional[int] = None):
-    data = get_dataset(env_name, specific_env, task_id, episode_length)
+def get_env(env_name, specific_env, render_mode = None, task_id: Optional[int] = None, goal: Optional[np.array] = None, episode_length: Optional[int] = None):
+    data = get_dataset(env_name, specific_env, task_id, goal,episode_length)
     env = data.get_env(render_mode)
     d_s = data.get_state_dim()
     d_a = data.get_action_dim()
@@ -60,11 +64,11 @@ def merger(traj_1, traj_2):
      else:
           return None   
 
-def get_dataset(name: str, specific_name: str, task_id: Optional[int] = None, traj_length: Optional[int] = None):
+def get_dataset(name: str, specific_name: str, task_id: Optional[int] = None, goal: Optional[np.array] = None, traj_length: Optional[int] = None):
        if(name == 'kitchen'):
             return KitchenDataset(specific_name)
        elif(name == 'pointmaze'):
-            return PointMazeDataset(specific_name)
+            return PointMazeDataset(specific_name, goal)
        elif(name == 'antmaze'): 
             return AntMazeDataset(specific_name)
        elif(name == 'cube'):
@@ -178,8 +182,12 @@ class KitchenDataset():
           return self.dataset.total_steps
      
 class PointMazeDataset():
-     def __init__(self, name: str):
+     def __init__(self, name: str, goal: Optional[np.array] = None):
           self.name = name
+          if(goal is not None):
+               self.goal = goal
+          else:
+               self.goal = None
           if name == 'open_dense':
                self.dataset = minari.load_dataset('D4RL/pointmaze/open-dense-v2', download = True)
           elif name == 'umaze':
@@ -222,7 +230,7 @@ class PointMazeDataset():
                         'actions': actions,
                         'rewards': rewards
                       }
-                    
+                    """
                     if(len(trajectories) != 0):
                         Temp = merger(trajectories[len(trajectories)-1], trajectory)
                         if(Temp is not None):
@@ -232,8 +240,12 @@ class PointMazeDataset():
                             trajectories.append(trajectory)
                     else:
                          trajectories.append(trajectory)
+                    """
                     
-                    #trajectories.append(trajectory)
+                    trajectories.append(trajectory)
+          
+          if (self.goal is not None):
+               trajectories = self.reward_filter_goals(trajectories, self.goal)
           return trajectories
      
      def get_state_dim(self):
@@ -242,6 +254,35 @@ class PointMazeDataset():
      def get_action_dim(self):
           return self.dataset._action_space.shape[0]
     
+     def reward_filter_goals(self, trajs: List[TrajectoryDict], goal) -> List[TrajectoryDict]:
+        def reward_filter2(traj: TrajectoryDict, goal) -> List[TrajectoryDict]:
+          last_step = 1
+          new_trajs = []
+          new_rews = [0]*len(traj['rewards'])
+          traj['rewards'] = new_rews
+        
+          for i in range(1, len(traj['observations'])):
+              pos = traj['observations'][i][:2]
+              g = np.asarray(goal, dtype=np.float32).reshape(-1)
+              dist = np.linalg.norm(pos - g) 
+              if(dist < 0.5):
+                if((i - last_step) < 50):
+                    continue
+                else:
+                    rews = traj['rewards'][last_step:i-1]
+                    rews[-1] = 1.0
+                    new_trajs.append({'observations': traj['observations'][last_step:i-1], 'actions': traj['actions'][last_step:i-1], 'rewards': rews})
+                    last_step = i+1
+          return new_trajs
+
+        new_trajs = []
+        for traj in trajs:
+            new_trajs.extend(reward_filter2(traj, goal))
+        new_trajs2 = []
+        for traj in new_trajs:
+            new_trajs2.append({'observations': traj['observations'][-300:], 'actions': traj['actions'][-300:], 'rewards': traj['rewards'][-300:]})
+        return new_trajs2
+
      def get_env(self, render_mode):
           
           gym.register_envs(gymnasium_robotics)
@@ -354,97 +395,6 @@ class AntMazeDataset():
 
      def get_total_steps(self):
           return self.dataset.total_steps
-
-"""
-class CubeDataset():
-     def __init__(self, name: str, task_id: Optional[int] = None):
-          self.name = name
-          name_to_id = {
-                    "single-play": "cube-single-play-v0",
-                    "single-noisy": "cube-single-noisy-v0",
-                    "double-play": "cube-double-play-v0",
-                    "double-noisy": "cube-double-noisy-v0",
-                    "triple-play": "cube-triple-play-v0",
-                    "triple-noisy": "cube-triple-noisy-v0",
-                    "quadruple-play": "cube-quadruple-play-v0",
-                    "quadruple-noisy": "cube-quadruple-noisy-v0"
-          }
-          if name not in name_to_id:
-                raise ValueError(f"Invalid Dataset name: {name}")
-          self.dataset_id = name_to_id[name]
-          self.env, self.dataset, self.eval_dataset = ogbench.make_env_and_datasets(
-                     self.dataset_id, render_mode="rgb_array"
-          )
-          if(task_id is not None):
-               goal_xyzs = self.env.unwrapped.task_infos[task_id - 1]["goal_xyzs"]
-               self.goal = goal_xyzs.reshape(-1)   
-               self.goal_dim = len(self.goal)
-          else:
-               self.goal = None 
-               self.goal_dim = None
-     
-     def extract_cube_pos_vec(self, obs_vec, goal_dim):
-          # goal_dim = 3 * num_cubes
-          num_cubes = goal_dim // 3
-          obs_vec = np.asarray(obs_vec, dtype=np.float32).reshape(-1)
-          pos_parts = []
-          for k in range(num_cubes):
-               start = 19 + 9 * k   # each cube block is [pos(3), quat(4), cos, sin]
-               pos_parts.append(obs_vec[start:start+3])
-          return np.concatenate(pos_parts, axis=0)  # shape (3*num_cubes,)
-     
-     def reached_goal_cube(self, goal_vec, pos_vec, tol=0.04):
-          goal = np.asarray(goal_vec, dtype=np.float32).reshape(-1, 3)
-          pos = np.asarray(pos_vec, dtype=np.float32).reshape(-1, 3)
-          if goal.shape != pos.shape:
-               raise ValueError(f"Shape mismatch: goal {goal.shape}, pos {pos.shape}")
-          dist = np.linalg.norm(pos - goal, axis = 1)
-          return bool(np.all(dist <= tol))
-
-     def get_trajectories(self):
-          trajectories = []
-          last_start = 0
-          #N = len(self.dataset['observations'])
-          for i in range(len(self.dataset['observations'])):
-               if self.dataset['terminals'][i] == 1 or i == len(self.dataset['observations']) - 1:
-                   obs_slice = self.dataset['observations'][last_start:i+1]   # include terminal
-                   act_slice = self.dataset['actions'][last_start:i+1]
-                   
-                   # keep same shape convention used elsewhere: len(obs) = len(act) + 1
-                   if len(act_slice) < 10:
-                         last_start = i + 1
-                         continue
-                   if(self.goal is not None):
-                         rews = np.zeros(len(act_slice))
-                         final_state = self.extract_cube_pos_vec(self.dataset['next_observations'][i], self.goal_dim)
-                         if(self.reached_goal_cube(self.goal, final_state)):
-                              rews[-1] = 1
-                         trajectory = {
-                             'observations': obs_slice,
-                             'actions': act_slice,
-                             'rewards': rews
-                         }
-                   else:
-                        trajectory = {
-                           'observations': obs_slice,
-                           'actions': act_slice,
-                         }
-
-                   trajectories.append(trajectory)
-                   last_start = i + 1
-          
-          return trajectories
-     
-     def get_state_dim(self):
-        return int(self.dataset["observations"].shape[-1])
-    
-     def get_action_dim(self):
-        return int(self.dataset["actions"].shape[-1])
-
-     def get_env(self, render_mode):
-        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
-        return env
-"""
 
 class CubeDataset:
     def __init__(self, name: str):

@@ -3,22 +3,87 @@ from pathlib import Path
 import copy
 import pickle
 from typing import Optional, List
-
 import numpy as np
 from sympy.integrals.meijerint import _rewrite_single
 import torch
 import torch.optim as optim
 from scipy.ndimage import gaussian_filter1d
 from torch.utils.data import Dataset, DataLoader
-
 from Finetuning.utils import TrajectoryDict, get_trajs, getName, check_device
 from Pretrain.Dataset import get_dataset, get_env
 from Pretrain.utils import set_seed, SAStats, cycle, ema_smooth
 from Pretrain.Critic.nets import Critic, CriticEnsemble
+import torch.nn.functional as F
+import torch.nn as nn
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]   # Online-Diffusion-Planning/
 PRETRAIN_DIR = PROJECT_ROOT / "Pretrain"
 FINETUNE_DIR = PROJECT_ROOT / "Finetuning"
+
+
+import numpy as np
+import torch
+
+class RunningMeanStd:
+    """
+    Maintains running mean and standard deviation for online normalization.
+    Very useful for stabilizing value function training.
+    """
+    def __init__(self, epsilon: float = 1e-8):
+        self.mean = 0.0
+        self.var = 1.0
+        self.std = 1.0
+        self.count = 0
+        self.epsilon = epsilon
+
+    def update(self, x):
+        """
+        Update statistics with new batch of data.
+        x can be torch.Tensor or numpy array.
+        """
+        if isinstance(x, torch.Tensor):
+            x = x.detach().cpu().numpy()
+        
+        x = np.asarray(x).flatten()
+        batch_count = len(x)
+        
+        if batch_count == 0:
+            return
+        
+        batch_mean = np.mean(x)
+        batch_var = np.var(x)
+        
+        if self.count == 0:
+            self.mean = batch_mean
+            self.var = batch_var
+        else:
+            delta = batch_mean - self.mean
+            total_count = self.count + batch_count
+            
+            self.mean = (self.count * self.mean + batch_count * batch_mean) / total_count
+            
+            self.var = (self.count * self.var + batch_count * batch_var +
+                       (self.count * batch_count * delta ** 2) / total_count) / total_count
+        
+        self.std = np.sqrt(self.var + self.epsilon)
+        self.count += batch_count
+
+    def normalize(self, x):
+        """Normalize input tensor/array"""
+        if isinstance(x, torch.Tensor):
+            x = x.clone()
+            return (x - self.mean) / (self.std + self.epsilon)
+        else:
+            return (np.asarray(x) - self.mean) / (self.std + self.epsilon)
+
+    def denormalize(self, x):
+        """Denormalize (useful when using the value for policy)"""
+        if isinstance(x, torch.Tensor):
+            return x * (self.std + self.epsilon) + self.mean
+        else:
+            return np.asarray(x) * (self.std + self.epsilon) + self.mean
+
 
 def spare_reward_prcocessor(rewards):
     Temp = []
@@ -126,6 +191,7 @@ def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, min_lr,
     print(f"Critic pretraining hyperparameters saved to {filepath}", flush=True)
 
 
+
 def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
      if(env_name == 'kitchen'):
           if(specific_env == 'complete'):
@@ -167,39 +233,6 @@ def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
-"""
-def reward_filter(obs, rews, goal):
-    #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
-    target_goals = goal
-    for i in range(1, len(obs)):
-        goal_coord = np.floor(obs[i][:2]) + 0.5
-        #goal_coord = np.round(goal_coord, 1)  
-        if np.any(np.all(np.equal(goal_coord, target_goals), axis=1)):
-            rews[i-1] = 1
-        else:
-            rews[i-1] = 0
-    return rews
-"""
-
-
-def reward_filter(obs, rews, goal):
-    #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
-    for i in range(1, len(obs)):
-        pos = obs[i][:2] 
-        g = np.asarray(goal, dtype=np.float32).reshape(-1)
-        #goal_coord = np.asarray(goal_coord, dtype=np.float32).reshape(-1)  
-        dist = np.linalg.norm(pos - g) 
-        if (dist < 0.5):
-            rews[i-1] = 1.0
-        else:
-            rews[i-1] = 0.0
-    return rews
-
-"""
-def obs_filter(obs):
-    obs = obs[:, 2]
-    return obs
-"""
 
 def save_critic(model, dataset_name, specific_dataset, step, task_id: Optional[int] = None):
     model.eval()
@@ -281,101 +314,9 @@ def get_critic_stats(dataset_name, specific_dataset, task_id: Optional[int] = No
 
 
 
-class Critic_Test_Dataset(Dataset):
-    def __init__(self, dataset_name: str, specific_dataset: str, trajs, sigma: Optional[float] = None, alpha: Optional[float] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
-        # ----- gather raw obs/actions to fit stats -----
-        """
-        if(dataset_name == 'pointmaze'):
-           trajs = copy.deepcopy(trajs)
-           for traj in trajs:
-                traj['observations'] = traj['observations'][:,:2]
-        """
-        
-        self.stats = get_critic_stats(dataset_name, specific_dataset, task_id)
-        allowed_values = [0, 1]
-
-        transitions = []
-        for traj in trajs:
-            obs = traj['observations']
-            rews = traj['rewards']
-            rews = spare_reward_prcocessor(rews)
-            if( goal is not None):
-                rews = reward_filter(obs, rews, goal)
-            if(not np.all(np.isin(rews, allowed_values))):
-                raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
-            if(target_reward is not None):
-                rews = self.boost_signal(target_reward, rews)
-            
-            if(alpha is not None):
-                rews = ema_smooth(rews, alpha)
-            elif(sigma is not None):
-                rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate = 200/sigma)
-
-            for t in range(len(obs)):
-                 obs_t = self.stats.norm_obs(obs[t])
-                 r_t   = np.sum(rews[t:])
-                 transitions.append((obs_t, r_t))
-        self.transitions = transitions
-    
-    def __len__(self):
-        return len(self.transitions)
-
-    def __getitem__(self, idx):
-        s, r = self.transitions[idx]
-        return (
-            torch.tensor(s, dtype = torch.float32),
-            torch.tensor(r, dtype = torch.float32)
-        )
-    
-    def boost_signal(self, target_reward, rews):
-        for t in range(len(rews)):
-            if(rews[t] == 1):
-                 rews[t] = target_reward
-        return rews
-
-
-def reward_filter(obs, rews, goal):
-    #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
-    for i in range(1, len(obs)):
-        pos = obs[i][:2] 
-        g = np.asarray(goal, dtype=np.float32).reshape(-1)
-        #goal_coord = np.asarray(goal_coord, dtype=np.float32).reshape(-1)  
-        dist = np.linalg.norm(pos - g) 
-        if (dist < 0.5):
-            rews[i-1] = 1.0
-        else:
-            rews[i-1] = 0.0
-    return rews
-
-
-
-"""
-def traj_filter_for_goal(trajs, goal):
-    new_trajs = []
-    for traj in trajs:
-        for i in range(len(traj['observations'])):
-            pos = traj['observations'][i][:2]
-            g = np.asarray(goal, dtype=np.float32).reshape(-1)
-            dist = np.linalg.norm(pos - g) 
-            if(dist < 0.5):
-                traj['rewards'][i-1] = 1.0
-"""             
-
-
-
-
-
-
 class CriticDataset(Dataset):
-    def __init__(self, dataset_name: str, specific_dataset: str, trajs: List[TrajectoryDict], goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99, sigma: float = 7.0, alpha: Optional[float] = None, task_id: Optional[int] = None):
+    def __init__(self, dataset_name: str, specific_dataset: str, trajs: List[TrajectoryDict], target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99, sigma: float = 7.0, alpha: Optional[float] = None, task_id: Optional[int] = None):
         
-        
-        """
-        if(dataset_name == 'pointmaze'):
-           trajs = copy.deepcopy(trajs)
-           for traj in trajs:
-                traj['observations'] = traj['observations'][:,:2]
-        """
         obs_all = []
         for traj in trajs:
             obs_all.append(traj['observations'])
@@ -391,40 +332,34 @@ class CriticDataset(Dataset):
         for traj in trajs:
             obs = traj['observations']
             rews = traj['rewards']
-            rews = spare_reward_prcocessor(rews)
+            #rews = spare_reward_prcocessor(rews)
             if(not np.all(np.isin(rews, allowed_values))):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
-            if( goal is not None):
-                rews = reward_filter(obs, rews, goal)
+            
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
             if(alpha is not None):
                 rews = ema_smooth(rews, alpha)
             elif(sigma is not None):
                 rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate = 200/sigma)
-            if(len(obs) > horizon):
-               rews = self.reward_processor(rews, horizon, gamma)
-               for t in range(len(obs)-horizon):
-               #for t in range(len(obs)):
+            #if(len(obs) > horizon):
+            rews = self.reward_processor(rews, horizon, gamma)
+            #for t in range(len(obs)-horizon+1):
+            for t in range(len(obs)):
                      obs_t = self.stats.norm_obs(obs[t])
                      r_t   = rews[t]
                      obs_next_t = self.stats.norm_obs(obs[min(t + horizon, len(obs) - 1)])
-                     transitions.append((obs_t, r_t, obs_next_t))
+                     if(t + horizon < len(obs)):
+                        done = False
+                     else:
+                        done = True
+                     transitions.append((obs_t, r_t, obs_next_t, done))
+
            
         self.transitions = transitions
         self.save_stats(dataset_name, specific_dataset, task_id)
         
-    """
-    def save_stats(self, dataset_name, specific_dataset):
-        name = get_CriticName(dataset_name, specific_dataset)
-        stats_name =  str(name) + f'_Critic_stats.pkl'
-        stats_dir = f'./Pretrain/Critic/{dataset_name}/{specific_dataset}/Stats/'
-        os.makedirs(stats_dir, exist_ok=True)
-        savepath = os.path.join(stats_dir, stats_name)
-        with open(savepath, 'wb') as f:
-              pickle.dump(self.stats, f)
-        print(f"saved stats to {savepath}")
-    """
+   
     def save_stats(self, dataset_name, specific_dataset, task_id: Optional[int] = None):
         name = get_CriticName(dataset_name, specific_dataset, task_id)
         stats_name =  str(name) + f'_Critic_stats.pkl'
@@ -439,11 +374,12 @@ class CriticDataset(Dataset):
         return len(self.transitions)#
 
     def __getitem__(self, idx):
-        s, r, s_next = self.transitions[idx]
+        s, r, s_next, done = self.transitions[idx]
         return (
                 torch.tensor(s, dtype = torch.float32),
                 torch.tensor(r, dtype = torch.float32),
-                torch.tensor(s_next, dtype = torch.float32)
+                torch.tensor(s_next, dtype = torch.float32),
+                torch.tensor(done, dtype = torch.float32)
             )
 
     def boost_signal(self, target_reward, rews):
@@ -463,13 +399,13 @@ class CriticDataset(Dataset):
             #new_rews.append(np.sum(rews[t:]))
         return new_rews
 
-def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, gamma, horizon, lr, min_lr, tau, goal, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward = 1.0, trajs: List[TrajectoryDict] = None, task_id: Optional[int] = None):
+def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, gamma, horizon, lr, min_lr, tau, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward = 1.0, trajs: List[TrajectoryDict] = None, task_id: Optional[int] = None):
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = check_device()
 
 
 
-    dataset = CriticDataset(dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma, sigma, alpha, task_id)
+    dataset = CriticDataset(dataset_name, specific_dataset, trajs, target_reward, horizon, gamma, sigma, alpha, task_id)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
 
     
@@ -486,51 +422,32 @@ def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, h
             eta_min = min_lr
         )
 
-    save_critic_hyperparameters(
-            dataset_name=dataset_name,
-            batch_size=batch_size,
-            num_steps=num_steps,
-            lr=lr,
-            min_lr = min_lr,
-            sigma=sigma,
-            alpha=alpha,
-            obs_dim=obs_dim,
-            critic_net=critic,
-            optimizer=optimizer,
-            gamma=gamma,
-            horizon=horizon,
-            tau=tau,
-            specific_dataset=specific_dataset,
-            target_reward=target_reward,
-            goal=goal,
-            task_id = task_id)  
-   
     print(f"Training critic for {dataset_name}-{specific_dataset}")
+    #return_rms = RunningMeanStd(epsilon = 1e-8)
     total_loss = 0.0
     for k in range(1, num_steps + 1):  # number of passes over dataset
-           s, r, s_next = next(dataloader)
-           s = s.to(device)
-           r = r.to(device)
-           s_next = s_next.to(device)
+           s, r, s_next, done = next(dataloader)   # r is now n-step return
+           s, r, s_next, done = s.to(device), r.to(device), s_next.to(device), done.to(device)
 
            # Compute target V-values
            with torch.no_grad():
               q_next = target_critic(s_next)
-              target = r + ( (gamma**horizon) * q_next)
-              
-
+              target = r +  ( (gamma**horizon) * q_next * (1 - done.float()) )
+             
            # Predicted V-values
            q_pred = critic(s)
-           loss = ((q_pred - target) ** 2).mean()
+           #loss = ((q_pred - target) ** 2).mean()
+           loss = F.smooth_l1_loss(q_pred, target, beta = 1.0)
            total_loss += loss.item()
 
            optimizer.zero_grad()
            loss.backward()
+           torch.nn.utils.clip_grad_norm_(critic.parameters(), max_norm=1.0)
            optimizer.step()
            scheduler.step()
            
-           if(k % 1000 == 0):
-                avg_loss = total_loss/1000
+           if(k % 2000 == 0):
+                avg_loss = total_loss/2000
                 print(f"Average Loss: {avg_loss:.4f}")
                 total_loss = 0.0
            # Soft update target network
@@ -547,38 +464,122 @@ def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, h
     save_stats_to_finetuning(stats, dataset_name, specific_dataset, task_id)
     print(f"critic model saved")
 
+class Critic_Test_Dataset(Dataset):
+    def __init__(self, 
+                 dataset_name: str, 
+                 specific_dataset: str, 
+                 trajs: List[TrajectoryDict],
+                 sigma: Optional[float] = None,
+                 task_id: Optional[int] = None,
+                 target_reward: Optional[float] = None,
+                 horizon: int = 32,
+                 gamma: float = 0.99):
+        
+        self.stats = get_critic_stats(dataset_name, specific_dataset, task_id)
+        self.horizon = horizon
+        self.gamma = gamma
 
-def test_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, checkpoint_step, gamma, horizon, goal = None,  sigma: Optional[float] = None, alpha: Optional[float] = None,  target_reward = 1.0, trajs: Optional[List[TrajectoryDict]] = None, task_id: Optional[int] = None):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dataset = Critic_Test_Dataset(dataset_name, specific_dataset, trajs, sigma, alpha, goal, task_id, target_reward, horizon, gamma)
-    batch_size = 100
-    dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True)
-    model_state_dict, obs_dim = get_critic_model(dataset_name, specific_dataset, checkpoint_step, task_id)
+        transitions = []
+        for traj in trajs:
+            obs = traj['observations']
+            rews = traj['rewards'].copy()
+
+            if not np.all(np.isin(rews, [0.0, 1.0])):
+                raise ValueError(f"Rewards must be either 0 or 1, but got {rews}")
+
+            if target_reward is not None:
+                rews = self.boost_signal(target_reward, rews)
+            if sigma is not None:
+                rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate=200/sigma)
+
+            for t in range(len(obs) - horizon):        # consistent with training
+                obs_t = self.stats.norm_obs(obs[t])
+                rews_chunk = rews[t : t + horizon]
+                transitions.append((obs_t, rews_chunk))
+
+        self.transitions = transitions
+        print(f"Test dataset created: {len(self.transitions)} samples (horizon={horizon})")
+
+    def boost_signal(self, target_reward, rews):
+        rews = rews.copy()
+        rews[rews == 1.0] = target_reward
+        return rews
+
+    def __len__(self):
+        return len(self.transitions)
+
+    def __getitem__(self, idx):
+        obs_t, rews_chunk = self.transitions[idx]
+        return (
+            torch.tensor(obs_t, dtype=torch.float32),
+            torch.tensor(rews_chunk, dtype=torch.float32)
+        )
+
+def test_critic(dataset_name: str,
+                specific_dataset: str,
+                hidden_layers: int,
+                hidden_dim: int,
+                checkpoint_step: int,
+                gamma: float = 0.99,
+                horizon: int = 32,
+                sigma: Optional[float] = None,
+                target_reward: float = 1.0,
+                trajs: List[TrajectoryDict] = None,
+                task_id: Optional[int] = None):
     
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    dataset = Critic_Test_Dataset(
+        dataset_name, specific_dataset, trajs,
+        sigma, task_id, target_reward, horizon, gamma
+    )
+
+    dataloader = DataLoader(dataset, batch_size=100, shuffle=False, drop_last=False)
+
+    # Load model
+    model_state_dict, obs_dim = get_critic_model(dataset_name, specific_dataset, task_id, checkpoint_step)
     model = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
     model.load_state_dict(model_state_dict)
     model.eval()
-    
-    print(f"Testing critic for {dataset_name}-{specific_dataset} at checkpoint step {checkpoint_step}")
+
     total_loss = 0.0
-    Rewards = []
-    for s, r in dataloader:
-           s = s.to(device)
-           r = r.to(device)
-           pred = model(s)
-           total_loss += ((pred - r)**2).mean().item()
-           Rewards.extend(pred.detach().cpu().numpy())
-    avg_loss = total_loss/len(dataloader)
-    print(f"Average Loss: {avg_loss:.4f}")
-    Rewards = np.array(Rewards)
-    mean_R = Rewards.mean()
-    std_R = Rewards.std()
-    max_R = Rewards.max()
-    min_R = Rewards.min()
-    print(f"mean Critic Value: {mean_R:.4f}")
-    print(f'std Critic Value: {std_R:.4f}')
-    print(f"max Critic Value: {max_R:.4f}")
-    print(f"min Critic Value: {min_R:.4f}")
+    all_preds = []
+    all_targets = []
+
+    print(f"Testing critic at checkpoint {checkpoint_step} (consistent with training)...")
+
+    with torch.no_grad():
+        for s, rews_chunk in dataloader:
+            s = s.to(device)
+            rews_chunk = rews_chunk.to(device)          # (B, horizon)
+
+            pred = model(s)                             # V(s) - shape (B, 1) or (B,)
+
+            if pred.dim() == 2:
+                pred = pred.squeeze(1)
+
+            # Compute same style target as training: n-step return
+            target = torch.zeros_like(pred)
+            for i in range(rews_chunk.shape[1]):
+                target += (gamma ** i) * rews_chunk[:, i]
+
+            loss = F.smooth_l1_loss(pred, target, beta=1.0)
+            total_loss += loss.item() * s.size(0)
+
+            all_preds.extend(pred.cpu().numpy())
+            all_targets.extend(target.cpu().numpy())
+
+    avg_loss = total_loss / len(dataset)
+    mae = np.mean(np.abs(np.array(all_preds) - np.array(all_targets)))
+
+    print(f"Test Results (Checkpoint {checkpoint_step}):")
+    print(f"   Smooth L1 Loss : {avg_loss:.4f}")
+    print(f"   MAE            : {mae:.4f}")
+    print(f"   Mean Pred      : {np.mean(all_preds):.3f}")
+    print(f"   Mean Target    : {np.mean(all_targets):.3f}")
+    print(f"   Pred Std       : {np.std(all_preds):.3f}")
+
+    return avg_loss, mae
 
 
 

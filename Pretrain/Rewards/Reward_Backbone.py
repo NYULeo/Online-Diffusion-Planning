@@ -29,6 +29,13 @@ from sympy import Predicate, factorint
 import torch.nn.functional as F
 import numpy as np
 import json
+from typing import TypedDict, List
+
+class TrajectoryDict(TypedDict):
+    observations: np.ndarray
+    actions: np.ndarray  
+    rewards: np.ndarray
+
 
 def check_specifc_dataset(dataset_name):
     if(dataset_name == 'kitchen'):
@@ -46,7 +53,6 @@ def get_trajs(env_name, specific_env, step, task_id: Optional[int] = None):
     with open(path, 'rb') as f:
         trajs = pickle.load(f)
     return trajs
-
 
 def getName(env_name, specific_env, task_id: Optional[int] = None):
      if(env_name == 'kitchen'):
@@ -193,7 +199,6 @@ def save_reward_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, 
     
     print(f"Reward pretraining hyperparameters saved to {filepath}", flush=True)
 
-
 def reward_filter(obs, rews, goal):
     #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
     for i in range(1, len(obs)):
@@ -207,19 +212,6 @@ def reward_filter(obs, rews, goal):
             rews[i-1] = 0
     return rews
 
-"""
-def reward_filter(obs, rews, goal):
-    #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
-    target_goals = goal
-    for i in range(1, len(obs)):
-        goal_coord = np.floor(obs[i][:2]) + 0.5
-        #goal_coord = np.round(goal_coord, 1)  
-        if np.any(np.all(np.equal(goal_coord, target_goals), axis=1)):
-            rews[i-1] = 1
-        else:
-            rews[i-1] = 0
-    return rews
-"""
 def save_to_finetuning(reward_net, dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
     reward_net.eval()
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
@@ -271,42 +263,6 @@ def load_model( dataset_name, specific_dataset: Optional[str] = None, task_id: O
     state_dict = torch.load(load_path, weights_only=True, map_location='cpu')
     return state_dict
 
-"""
-def get_reward_name(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
-    if(dataset_name == 'kitchen'):
-         name = 'Kitchen_Reward'
-         return name
-
-    elif(dataset_name == 'pointmaze'):
-         if(specific_dataset is None): 
-             raise ValueError(f"Invalid dataset name: {dataset_name}")
-         elif(specific_dataset == 'large'):
-              name = 'PointMaze_Large_Reward'
-         elif(specific_dataset == 'medium'):
-              name = 'PointMaze_Medium_Reward'
-         elif(specific_dataset == 'umaze'):
-              name = 'PointMaze_Umaze_Reward'
-         else: 
-              raise ValueError(f"Invalid dataset name: {specific_dataset}")
-         return name
-
-    elif(dataset_name == 'cube'):
-         if(specific_dataset is None): 
-             raise ValueError(f"Invalid dataset name: {dataset_name}")
-         elif(specific_dataset == 'single'):
-             name = f'Cube_Single_Reward_task{task_id}'
-         elif(specific_dataset == 'double'):
-             name = f'Cube_Single_Reward_double_task{task_id}'
-         elif(specific_dataset == 'triple'):
-             name = f'Cube_Single_Reward_task{task_id}'
-         else: 
-              raise ValueError(f"Invalid dataset name: {specific_dataset}")
-         return name
-    
-    else:
-         raise ValueError(f"Invalid dataset name: {dataset_name}")
-"""
-
 def check_trajs_exit(env_name, specific_env, task_id, step):
     from pathlib import Path
     if(task_id is not None):
@@ -320,7 +276,7 @@ def check_trajs_exit(env_name, specific_env, task_id, step):
              trajs = pickle.load(f)
         return trajs
     
-def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None, traj_length: Optional[int] = None):
+def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None, goal: Optional[np.array] = None, traj_length: Optional[int] = None):
     from Dataset import KitchenDataset, PointMazeDataset, CubeDataset
     if(dataset_name == 'kitchen'):
          data_1 = KitchenDataset('complete')
@@ -337,13 +293,13 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
          if(specific_dataset is None): 
              raise ValueError(f"Invalid dataset name: {dataset_name}")
          elif(specific_dataset == 'large'):
-              data = PointMazeDataset('large')
+              data = PointMazeDataset('large', goal)
               name = '2DMaze_Reward_large'
          elif(specific_dataset == 'medium'):
-              data = PointMazeDataset('medium')
+              data = PointMazeDataset('medium', goal)
               name = '2DMaze_Reward_medium'
          elif(specific_dataset == 'umaze'):
-              data = PointMazeDataset('umaze')
+              data = PointMazeDataset('umaze', goal)
               name = '2DMaze_Reward_umaze'
          else: 
               raise ValueError(f"Invalid dataset name: {specific_dataset}")
@@ -377,10 +333,45 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
     else:
          raise ValueError(f"Invalid dataset name: {dataset_name}")
          
+def reward_filter_goals(trajs: List[TrajectoryDict], goal) -> List[TrajectoryDict]:
+    def reward_filter2(traj: TrajectoryDict, goal) -> List[TrajectoryDict]:
+        last_step = 1
+        #i = 1
+        new_trajs = []
+        new_rews = [0]*len(traj['rewards'])
+        traj['rewards'] = new_rews
+        
+        #while(i < len(traj['observations'])):
+        for i in range(1, len(traj['observations'])):
+          pos = traj['observations'][i][:2]
+          g = np.asarray(goal, dtype=np.float32).reshape(-1)
+          dist = np.linalg.norm(pos - g) 
+          if(dist < 0.5):
+              
+              if((i - last_step) < 70):
+                  #last_step = i+1
+                  continue
+              else:
+                 rews = traj['rewards'][last_step:i-1]
+                 rews[-1] = 1.0
+                 new_trajs.append({'observations': traj['observations'][last_step:i-1], 'actions': traj['actions'][last_step:i-1], 'rewards': rews})
+                 last_step = i+1
+        return new_trajs
+    
+    new_trajs = []
+    for traj in trajs:
+        new_trajs.extend(reward_filter2(traj, goal))
+    new_trajs2 = []
+    for traj in new_trajs:
+        new_trajs2.append({'observations':traj['observations'][-200:], 'actions': traj['actions'][-200:], 'rewards': traj['rewards'][-200:]})
+    return new_trajs2
+
+
 
 class RewardDataset(Dataset):
-    def __init__(self, trajs, reward_name, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, goal: Optional[np.array] = None):
+    def __init__(self, trajs, reward_name, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None):
             
+    
         # ----- gather raw obs/actions to fit stats -----
         obs_list, act_list = [], []
         for traj in trajs:
@@ -397,14 +388,11 @@ class RewardDataset(Dataset):
         self.stats.obs_std = obs_all.std(axis=0)+ 1e-8
         
         transitions = []
-        Total = 0
-        Zero = 0
         for traj in trajs:
             obs = np.asarray(traj['observations'])
             acts = np.asarray(traj['actions'])
             rews = np.asarray(traj['rewards'])
-            if(goal is not None):
-                 rews = reward_filter(obs, rews, goal)
+           
             if(not np.all(np.isin(rews, allowed_values))):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
             if(target_reward is not None):
@@ -418,9 +406,6 @@ class RewardDataset(Dataset):
                 a_t   = acts[t]
                 r_t   = rews[t]
                 transitions.append((obs_t, a_t, r_t))
-                Total += 1
-                if(r_t == 0.0):
-                    Zero += 1
             
         self.transitions = transitions
         self.save_stats(reward_name)
@@ -451,17 +436,17 @@ class RewardDataset(Dataset):
             torch.tensor(r, dtype=torch.float32),
         )
     
-def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, save_freq, lr, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None, traj_length: Optional[int] = None, trajs: Optional[list] = None):
+def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, save_freq, lr, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, task_id: Optional[int] = None, goal: Optional[np.array] = None,traj_length: Optional[int] = None, trajs: Optional[list] = None):
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = check_device()
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     if(trajs is  None): 
-         trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+         trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, goal, traj_length)
     else:
-         train_trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+         train_trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, goal, traj_length)
          trajs = trajs + train_trajs
     print(f"Training reward approximator for {dataset_name} Dataset") 
-    dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward, goal)
+    dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward)
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
     reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
     optimizer = optim.AdamW(reward_net.parameters(), lr = lr, weight_decay = 1e-4)
@@ -469,24 +454,7 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
         SD = specific_dataset
     else:
         SD = None
-    save_reward_hyperparameters(
-        dataset_name, 
-        batch_size, 
-        num_steps, 
-        lr, 
-        sigma,
-        alpha,
-        obs_dim,
-        act_dim, 
-        reward_name, 
-        optimizer, 
-        reward_net, 
-        filepath = None,
-        specific_dataset = specific_dataset, 
-        target_reward = target_reward, 
-        goal = goal,
-        task_id = task_id
-    )
+    
     total_loss = 0
     step = 0
     for i in range(num_steps):
@@ -635,8 +603,6 @@ class test_dataset(Dataset):
             obs = np.asarray(traj['observations'])        
             acts = np.asarray(traj['actions'])
             rews = np.asarray(traj['rewards'])
-            if(goal is not None):
-                 rews = reward_filter(obs, rews, goal)
             if(not np.all(np.isin(rews, allowed_values))):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
             if(target_reward is not None):

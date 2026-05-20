@@ -44,6 +44,7 @@ import os
 from Finetuning.utils import get_critic_model, get_critic_stats, get_reward_model, get_reward_stats
 from Pretrain.Critic.nets import Critic, CriticEnsemble
 from Pretrain.Dataset import get_env
+from Pretrain.Critic.train_critic import RunningMeanStd
 # Assuming project_root, MATPLOTLIB_AVAILABLE, get_pretrained_reward, etc., are defined elsewhere
 
 
@@ -526,7 +527,7 @@ def critic_heatmap(STEP, env_name, specific_env, hidden_layers, hidden_dim, num_
     OUTPUT_FILE = f"{STEP}_heatmap.png"
 
     print(f'Ploting the heatmap for checkpoint: {STEP}')
-    
+    return_rms = RunningMeanStd(epsilon=1e-8)
     # ================== Load Environment ==================
     env, _, _ = get_env(env_name, specific_env)
     env = env.unwrapped
@@ -721,6 +722,7 @@ def critic_heatmap(STEP, env_name, specific_env, hidden_layers, hidden_dim, num_
             
 
             r = model(obs_norm)  # [B]
+            #r = return_rms.denormalize(r)
             reward_map_goal[start:end] = r.detach().cpu().numpy()
 
             grads = torch.autograd.grad(r.sum(), batch_obs, create_graph=False)[0]  # [B,4]
@@ -1141,7 +1143,7 @@ def plot_critic_heatmap(
     import matplotlib.pyplot as plt
     import minari
     import torch
-   
+    return_rms = RunningMeanStd(epsilon=1e-8)
     """
     dataset = minari.load_dataset(dataset_id, download=True)
     env = dataset.recover_environment().unwrapped
@@ -1211,6 +1213,7 @@ def plot_critic_heatmap(
 
             obs_norm = (batch_obs - obs_mean_t) / obs_std_t
             r = model(obs_norm)
+            #r = return_rms.denormalize(r)
             reward_map[start:end] = r.cpu().numpy()
 
     reward_map = reward_map.reshape(resolution, resolution)
@@ -1273,15 +1276,15 @@ def plot_critic_heatmap(
 
 if __name__ == '__main__':
     # Example usage
-    step = 0
+    step = 10
     env_name = 'pointmaze'
-    specific_env = 'large'
+    specific_env = 'medium'
     hidden_layers_reward = 2
     hidden_dim_reward = 128
     hidden_layers_critic = 3
     hidden_dim_critic = 128
     num_heads_critic = 5
-    while(step <= 0):
+    while(step <= 10):
          np.random.seed(0)
          random.seed(0)
          critic_heatmap(step, env_name, specific_env, hidden_layers_critic, hidden_dim_critic)

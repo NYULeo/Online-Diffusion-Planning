@@ -270,12 +270,12 @@ if __name__ == "__main__":
 
     
     TrainRewardConfig = Train_Reward_Config(
-                          hidden_layers = 1,
-                          hidden_dim = 32,
+                          hidden_layers = 2,
+                          hidden_dim = 128,
                           batch_size = 256, 
                           num_steps = 400, 
                           lr = 1e-4, 
-                          sigma = 7.0, 
+                          sigma = 2.0, 
                           target_reward = 20.0, 
                           train_goal = np.array([[-2.5, -2.5]], dtype = np.float32),
                           rollout_goal = np.array([[6, 1]]),
@@ -292,7 +292,7 @@ if __name__ == "__main__":
                             λ_reg = 1e-3)
     
     TrainCriticConfig = Train_Critic_Config(
-                            hidden_layers = 1,
+                            hidden_layers = 3,
                             hidden_dim = 128,
                             batch_size = 256,
                             num_steps = 5000,
@@ -315,8 +315,8 @@ if __name__ == "__main__":
         kernel_model_checkpoint = 0,
         critic_model_checkpoint = 0,
         offline = False,
-        critic = True,
-        update_critic = True,
+        critic = False,
+        update_critic = False,
         kernel = True,
         update_kernel = True,
         buffer_size = 5500,

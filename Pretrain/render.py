@@ -94,14 +94,12 @@ def check_speration(trajs):
 
 if __name__ == "__main__":
      set_seed(1)
-     #data = get_dataset('kitchen', 'partial')
-    # trajs = data.get_trajectories()
-     #trajs = get_trajs('kitchen', 'partial', step = 0)
-     #trajs = get_trajs('kitchen', 'partial', step = 50)
-     data = get_dataset('antmaze', 'large_play')
+     data = get_dataset('pointmaze', 'medium', goal = np.array([[-2.5, -2.5]], dtype = np.float32))
      trajs = data.get_trajectories()
-     #print(len(trajs))
-     render('antmaze', 'large_play', trajs[800])
+     for traj in trajs:
+        print(len(traj['observations']))
+        print(len(traj['actions']))
+        print(len(traj['rewards']))
 
 
 
