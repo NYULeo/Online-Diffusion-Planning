@@ -206,7 +206,7 @@ if __name__ == '__main__':  # pragma: no cover
                  lr = 1e-05, 
                  min_lr = 1e-06,
                  tau = 0.005,
-                 sigma = 3.0,
+                 sigma = 7.0,
                  target_reward = 20.0,
                  trajs = trajs)
     print('training complete')
