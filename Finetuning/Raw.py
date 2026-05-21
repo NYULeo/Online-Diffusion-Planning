@@ -143,7 +143,7 @@ reward  =  rollout(
 print(reward)
 """
 
-
+"""
 from Finetuning.Rollout import load_success_trajs
 from Finetuning.utils import train_critic, test_critic
 from Pretrain.utils import set_seed
@@ -201,10 +201,10 @@ test_critic(dataset_name = env_name,
             target_reward = 80.0, 
             trajs = trajs,
             task_id = task_id)
-
-
-
 """
+
+
+
 from Finetuning.Rollout import get_success_trajs
 from Finetuning.utils import train_critic
 from Pretrain.utils import set_seed
@@ -219,12 +219,12 @@ trajs = get_success_trajs(trajs)
 set_seed(1)
 test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
-            hidden_layers = 3, 
+            hidden_layers = 1, 
             hidden_dim = 128, 
             checkpoint_step = 0, 
             gamma = 0.99, 
             horizon = 32,  
-            sigma = 2.0, 
+            sigma = 3.0, 
             target_reward = 20.0, 
             trajs = trajs)
 
@@ -236,9 +236,9 @@ trajs = get_success_trajs(trajs)
 train_critic(trajs, 
              dataset_name = env_name, 
              specific_dataset = specific_env, 
-             hidden_layers = 3, 
+             hidden_layers = 1, 
              hidden_dim = 128, 
-             sigma = 2.0,
+             sigma = 3.0,
              batch_size = 256, 
              num_steps = 5000, 
              gamma = 0.99, 
@@ -259,15 +259,15 @@ trajs = get_success_trajs(trajs)
 
 test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
-            hidden_layers = 3, 
+            hidden_layers = 1, 
             hidden_dim = 128, 
             checkpoint_step = 10, 
             gamma = 0.99, 
             horizon = 32,  
-            sigma = 2.0, 
+            sigma = 3.0, 
             target_reward = 20.0, 
             trajs = trajs)
 
-"""
+
 
 

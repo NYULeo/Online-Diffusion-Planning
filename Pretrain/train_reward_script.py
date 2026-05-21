@@ -44,13 +44,13 @@ if __name__ == '__main__':
     set_seed(1)
     train_reward(
     dataset_name = 'pointmaze',
-    hidden_layers = 2,
-    hidden_dim = 128,
+    hidden_layers = 1,
+    hidden_dim = 32,
     batch_size = 256, 
     num_steps = 400, 
     save_freq = 200,  
     lr = 1e-4,
-    sigma = 6.0,
+    sigma = 3.0,
     target_reward = 20.0,
     specific_dataset = 'medium',
     goal = np.array([[-2.5, -2.5]], dtype = np.float32))

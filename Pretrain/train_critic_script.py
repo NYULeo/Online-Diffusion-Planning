@@ -197,7 +197,7 @@ if __name__ == '__main__':  # pragma: no cover
     trajs = data.get_trajectories()
     train_critic(dataset_name = env_name, 
                  specific_dataset = specific_env, 
-                 hidden_layers = 3,
+                 hidden_layers = 1,
                  hidden_dim = 128,
                  batch_size = 256, 
                  num_steps = 50000, 
@@ -206,8 +206,7 @@ if __name__ == '__main__':  # pragma: no cover
                  lr = 1e-05, 
                  min_lr = 1e-06,
                  tau = 0.005,
-                 sigma = 6.0,
-                 alpha = None,
+                 sigma = 3.0,
                  target_reward = 20.0,
                  trajs = trajs)
     print('training complete')
