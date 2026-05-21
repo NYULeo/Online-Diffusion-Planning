@@ -1333,8 +1333,14 @@ def train_critic(trajs: List[TrajectoryDict],
                  batch_size, 
                  num_steps, 
                  gamma, lam, horizon, 
-                 lr, min_lr, tau, old_step: int, new_step: int, momentum: float = 0.005, 
-                 target_reward = 1.0, task_id: Optional[int] = None):
+                 lr, 
+                 min_lr, 
+                 tau, 
+                 old_step: int, 
+                 new_step: int, 
+                 momentum: float = 0.005, 
+                 target_reward = 1.0, 
+                 task_id: Optional[int] = None):
     device = check_device()
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
     critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
@@ -1734,16 +1740,6 @@ def get_expert_score(dataset_name):
          return score
     else:
          return None
-"""
-def get_current_state(s0, env_name):
-    if(env_name == 'antmaze'):
-        return np.concatenate([
-               s0['observation'],
-               s0['achieved_goal']
-           ])
-    else:
-        return s0['observation']
-"""
 
 def get_current_state(s0, env_name):
     if env_name == 'antmaze':

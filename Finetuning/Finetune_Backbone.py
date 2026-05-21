@@ -2,6 +2,8 @@ import sys
 import os
 
 from ogbench.locomaze import task_id
+
+from Pretrain import train_critic_script2
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -73,8 +75,8 @@ class Train_Critic_Config:
     min_lr: float = 1e-05
     tau: float = 0.005
     gamma: float = 1.0
+    lam: float = 0.95
     data_conservation: bool = False
-    retrain_critic: bool = False
     momentum: float = 0.005
 
 @dataclass
@@ -383,8 +385,7 @@ class OnlineFinetuner():
           # ALL processes must participate in gather_for_metrics (collective operation)
           gathered_trajs_list = self.accelerator.gather_for_metrics([local_trajs if local_trajs else []], use_gather_object=True)
           self.accelerator.wait_for_everyone()
-          #train_critic = False
-          new_critic_stats = None
+          update_critic = False
           # Only main process needs to process the gathered data
           if self.accelerator.is_main_process:
               critic_buffer = []
@@ -393,21 +394,13 @@ class OnlineFinetuner():
                       critic_buffer.extend(process_trajs)
               critic_buffer = get_success_trajs(critic_buffer)
               if(len(critic_buffer) > 1):
-                  #train_critic = True
-                  new_critic_stats = get_new_critic_stats(critic_buffer)
+                  update_critic = True
               if self.config.train_critic_config.data_conservation:
                   critic_buffer = self.data_conservation_update(critic_buffer)
-              #return critic_buffer, train_critic
           else:
-              #return None, train_critic  # Other processes don't need the buffer
               critic_buffer = None
-          """
-          flag = torch.tensor([1 if train_critic else 0], device=self.accelerator.device, dtype=torch.int64)
-          flag = broadcast(flag, from_process=0)  # accelerate.utils.broadcast
-          train_critic = bool(flag.item())
-          """
           
-          return critic_buffer, new_critic_stats
+          return critic_buffer, update_critic
    
     def data_conservation_update(self, critic_buffer):
         """
@@ -672,10 +665,10 @@ class OnlineFinetuner():
             
             update_reward = self.gather_and_sync_trajs_and_buffer(trajs)
             if self.config.critic:
-                 critic_buffer, new_critic_stats = self.collect_critic_buffer(trajs)
+                 critic_buffer, update_critic = self.collect_critic_buffer(trajs)
                  if self.accelerator.is_main_process:
                      print(f"Number of trajectories for critic training: {len(critic_buffer)}")
-                     if(new_critic_stats is not None):
+                     if(update_critic):
                          print("Training Critic")
                      else:
                          print("Do not Train Critic")
@@ -764,12 +757,11 @@ class OnlineFinetuner():
                                       x_generated_plans = x_generated_plans)
                   """
 
-                  if self.config.critic and self.config.update_critic and (new_critic_stats is not None):
+                  if self.config.critic and self.config.update_critic and update_critic:
                       print(f"Starting Critic Training")
                       #save_trajs(critic_buffer, self.config.dataset_name, self.config.specific_dataset, ((step+1) * self.config.AMConfig.per_round_steps))
                       print(f"Number of trajectories of Critic Training: {len(critic_buffer)}")
-                      if(self.config.train_critic_config.retrain_critic):
-                           new_critic_stats = None
+                      
                       train_critic(critic_buffer, 
                                    dataset_name = self.config.dataset_name, 
                                    specific_dataset = self.config.specific_dataset, 
@@ -779,15 +771,14 @@ class OnlineFinetuner():
                                    batch_size = self.config.train_critic_config.batch_size, 
                                    num_steps = self.config.train_critic_config.num_steps, 
                                    gamma = self.config.train_critic_config.gamma, 
+                                   lam = self.config.train_critic_config.lam,
                                    horizon = self.config.AMConfig.horizon, 
                                    lr = self.config.train_critic_config.lr, 
                                    min_lr = self.config.train_critic_config.min_lr,
                                    tau = self.config.train_critic_config.tau, 
                                    old_step = last_critic_update_step,
                                    new_step = ((step+1) * self.config.AMConfig.per_round_steps), 
-                                   new_stats = new_critic_stats,
                                    momentum = self.config.train_critic_config.momentum,
-                                   goal = self.config.train_reward_config.train_goal, 
                                    target_reward = self.config.train_reward_config.target_reward,
                                    task_id = self.config.train_reward_config.task_id)
                                     
@@ -857,7 +848,7 @@ class OnlineFinetuner():
                   self.config.kernel_model_checkpoint = 0
             
             if(self.config.critic and self.config.update_critic):
-                if (new_critic_stats is not None) or (self.config.train_critic_config.retrain_critic):
+                if (update_critic):
                      self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
                      last_critic_update_step = ((step+1) * self.config.AMConfig.per_round_steps)
                 else:

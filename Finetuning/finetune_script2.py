@@ -299,8 +299,8 @@ if __name__ == "__main__":
                             lr = 1e-05,
                             tau = 0.005,
                             gamma = 0.95,
-                            data_conservation = True,
-                            retrain_critic = True)
+                            lam = 0.95,
+                            data_conservation = True)
     
     
 
@@ -315,10 +315,10 @@ if __name__ == "__main__":
         kernel_model_checkpoint = 0,
         critic_model_checkpoint = 0,
         offline = False,
-        critic = False,
-        update_critic = False,
-        kernel = False,
-        update_kernel = False,
+        critic = True,
+        update_critic = True,
+        kernel = True,
+        update_kernel = True,
         buffer_size = 5500,
         finetune_buffer_cutoff_length = None,
         train_buffer_cutoff_length = None,
