@@ -64,11 +64,11 @@ def merger(traj_1, traj_2):
      else:
           return None   
 
-def get_dataset(name: str, specific_name: str, task_id: Optional[int] = None, goal: Optional[np.array] = None, traj_length: Optional[int] = None):
+def get_dataset(name: str, specific_name: str, task_id: Optional[int] = None, goal: Optional[np.array] = None, traj_length: Optional[int] = None, mode: Optional[str] = None):
        if(name == 'kitchen'):
             return KitchenDataset(specific_name)
        elif(name == 'pointmaze'):
-            return PointMazeDataset(specific_name, goal)
+            return PointMazeDataset(specific_name, goal, mode)
        elif(name == 'antmaze'): 
             return AntMazeDataset(specific_name)
        elif(name == 'cube'):
@@ -182,8 +182,12 @@ class KitchenDataset():
           return self.dataset.total_steps
      
 class PointMazeDataset():
-     def __init__(self, name: str, goal: Optional[np.array] = None):
+     def __init__(self, name: str, goal: Optional[np.array] = None, mode: Optional[str] = None):
           self.name = name
+          if(mode is not None):
+              self.mode = mode
+          else:
+              self.mode = 'reward'
           if(goal is not None):
                self.goal = goal
           else:
@@ -231,22 +235,26 @@ class PointMazeDataset():
                         'rewards': rewards
                       }
                     
-                    if(len(trajectories) != 0):
-                        Temp = merger(trajectories[len(trajectories)-1], trajectory)
-                        if(Temp is not None):
-                            trajectories.pop()
-                            trajectories.append(Temp)
-                        else:
-                            trajectories.append(trajectory)
+                    if(self.mode != 'critic'):
+                       if(len(trajectories) != 0):
+                           Temp = merger(trajectories[len(trajectories)-1], trajectory)
+                           if(Temp is not None):
+                               trajectories.pop()
+                               trajectories.append(Temp)
+                           else:
+                               trajectories.append(trajectory)
+                       else:
+                           trajectories.append(trajectory)
                     else:
-                         trajectories.append(trajectory)
-                    
-                    
-                    #trajectories.append(trajectory)
+                        trajectories.append(trajectory)
           
           if (self.goal is not None):
-               #trajectories = self.reward_filter_goals(trajectories, self.goal)
-               trajectories = self.reward_filter(trajectories, self.goal)
+               if(self.mode == 'critic'):
+                   trajectories = self.reward_filter_goals(trajectories, self.goal)
+               elif(self.mode == 'reward'):
+                   trajectories = self.reward_filter(trajectories, self.goal)
+               else:
+                   raise ValueError(f"Invalid mode: {self.mode}")
           return trajectories
      
      def get_state_dim(self):
@@ -267,7 +275,7 @@ class PointMazeDataset():
               g = np.asarray(goal, dtype=np.float32).reshape(-1)
               dist = np.linalg.norm(pos - g) 
               if(dist < 0.5):
-                if((i - last_step) < 50):
+                if((i - last_step) < 10):
                     continue
                 else:
                     rews = traj['rewards'][last_step:i-1]
@@ -279,17 +287,14 @@ class PointMazeDataset():
         new_trajs = []
         for traj in trajs:
             new_trajs.extend(reward_filter2(traj, goal))
-        new_trajs2 = []
-        for traj in new_trajs:
-            new_trajs2.append({'observations': traj['observations'][-300:], 'actions': traj['actions'][-300:], 'rewards': traj['rewards'][-300:]})
-        return new_trajs2
+        return new_trajs
      
      def reward_filter(self, trajs: List[TrajectoryDict], goal) -> List[TrajectoryDict]:
           new_trajs = []
           for traj in trajs:
                new_rews = [0]*len(traj['rewards'])
                traj['rewards'] = new_rews
-               for i in range(len(traj['observations'])):
+               for i in range(1, len(traj['observations'])):
                      pos = traj['observations'][i][:2] 
                      g = np.asarray(goal, dtype=np.float32).reshape(-1)
                      #goal_coord = np.asarray(goal_coord, dtype=np.float32).reshape(-1)  
@@ -312,11 +317,11 @@ class PointMazeDataset():
               env = gym.make('PointMaze_Umaze-v3', max_episode_steps = 2000, render_mode = render_mode, continuing_task=False)
           else:
               raise ValueError(f'Invalid dataset name')
-          return env
+          #return env
           
           #return self.dataset.recover_environment(render_mode = render_mode)
           
-          #return self.dataset.recover_environment(render_mode = 'rgb_array', continuing_task=True, reset_target=False, eval_env=True)
+          return self.dataset.recover_environment(render_mode = 'rgb_array', continuing_task=True, reset_target=False, eval_env=True)
 
      def get_ref_max_score(self):
           return self.dataset.storage.metadata.get('ref_max_score')
@@ -991,5 +996,4 @@ visualize_clusters(vectors, assignments, stats['cluster_centers'], "Kitchen Rewa
 """
 
 """Count training windows for horizon 32 vs 70 on pointmaze large."""
-
 
