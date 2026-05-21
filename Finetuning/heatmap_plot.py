@@ -1276,7 +1276,7 @@ def plot_critic_heatmap(
 
 if __name__ == '__main__':
     # Example usage
-    step = 0
+    step = 80
     env_name = 'pointmaze'
     specific_env = 'medium'
     hidden_layers_reward = 1
@@ -1284,12 +1284,12 @@ if __name__ == '__main__':
     hidden_layers_critic = 1
     hidden_dim_critic = 128
     num_heads_critic = 5
-    while(step <= 0):
+    while(step <= 80):
          np.random.seed(0)
          random.seed(0)
-         #critic_heatmap(step, env_name, specific_env, hidden_layers_critic, hidden_dim_critic)
+         critic_heatmap(step, env_name, specific_env, hidden_layers_critic, hidden_dim_critic)
          #critic_heatmap(step, env_name, specific_env, hidden_layers_critic, hidden_dim_critic, num_heads_critic)
-         #plot_critic_heatmap(step, env_name, specific_env, hidden_layers_critic, hidden_dim_critic)
+         plot_critic_heatmap(step, env_name, specific_env, hidden_layers_critic, hidden_dim_critic)
          plot_reward_heatmap(step, env_name, specific_env, hidden_layers_reward, hidden_dim_reward)
          reward_heatmap(step, env_name, specific_env, hidden_layers_reward, hidden_dim_reward)
 
