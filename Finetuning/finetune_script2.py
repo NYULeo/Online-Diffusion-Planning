@@ -275,7 +275,7 @@ if __name__ == "__main__":
                           batch_size = 256, 
                           num_steps = 400, 
                           lr = 1e-4, 
-                          sigma = 2.0, 
+                          sigma = 6.0, 
                           target_reward = 20.0, 
                           train_goal = np.array([[-2.5, -2.5]], dtype = np.float32),
                           rollout_goal = np.array([[6, 1]]),

@@ -602,10 +602,9 @@ class RewardDataset(Dataset):
         )
     
     def boost_signal(self, target_reward, rews):
-        for t in range(len(rews)):
-            if(rews[t] == 1):
-                 rews[t] = target_reward
-        return rews
+         rews = np.asarray(rews, dtype=np.float64).copy()
+         rews[rews == 1.0] = target_reward
+         return rews
 """
 class CriticDataset(Dataset):
     def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, step: int, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
@@ -1321,9 +1320,8 @@ class CriticDataset(Dataset):
         return len(self.transitions)
 
     def boost_signal(self, target_reward, rews):
-        for t in range(len(rews)):
-            if(rews[t] == 1):
-                 rews[t] = target_reward
+        rews = np.asarray(rews, dtype=np.float64).copy()
+        rews[rews == 1.0] = target_reward
         return rews
 
 def train_critic(trajs: List[TrajectoryDict], 

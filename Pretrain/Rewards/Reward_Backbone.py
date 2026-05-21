@@ -420,9 +420,8 @@ class RewardDataset(Dataset):
         print(f"saved stats to {savepath}")
     
     def boost_signal(self, target_reward, rews):
-        for t in range(len(rews)):
-            if(rews[t] == 1):
-                 rews[t] = target_reward
+        rews = np.asarray(rews, dtype=np.float64).copy()
+        rews[rews == 1.0] = target_reward
         return rews
 
     def __len__(self):

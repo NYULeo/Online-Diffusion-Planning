@@ -50,7 +50,7 @@ if __name__ == '__main__':
     num_steps = 400, 
     save_freq = 200,  
     lr = 1e-4,
-    sigma = 2.0,
+    sigma = 6.0,
     target_reward = 20.0,
     specific_dataset = 'medium',
     goal = np.array([[-2.5, -2.5]], dtype = np.float32))
