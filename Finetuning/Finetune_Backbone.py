@@ -1,9 +1,5 @@
 import sys
 import os
-
-from ogbench.locomaze import task_id
-
-from Pretrain import train_critic_script2
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -96,7 +92,7 @@ class FinetuningConfig():
     offline: bool = False
     critic: bool = False
     update_critic: bool = True
-    kernel: bool = False
+    kernel: bool = True
     update_kernel: bool = True
     buffer_size: int = 100000
     finetune_buffer_cutoff_length: Optional[int] = None
@@ -299,32 +295,9 @@ class OnlineFinetuner():
                    self.config.dataset_name, 
                    self.config.specific_dataset, 
                    self.config.finetune_buffer_cutoff_length)
-    
-    """
-    def set_reward_model(self, device):
-        if self.config.critic:
-            critic_exist = check_Critic(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, step = self.config.critic_model_checkpoint)
-            if(not critic_exist):
-                if(self.config.RewardConfig.constraint_type == 'log_prob'):
-                    self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, task_id = self.config.train_reward_config.task_id)
-                else:
-                    self.reward_model = TotalReward_Mahalanobis(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, task_id = self.config.train_reward_config.task_id)
-            else:
-                print(f"Critic exists at step {self.config.critic_model_checkpoint}")
-                if(self.config.RewardConfig.constraint_type == 'log_prob'):
-                    self.reward_model = TotalReward_Critic(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, self.config.critic_model_checkpoint, task_id = self.config.train_reward_config.task_id)
-                else:
-                    self.reward_model = TotalReward_Critic_Mahalanobis(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, self.config.critic_model_checkpoint, task_id = self.config.train_reward_config.task_id)
-        
-        else:
-            if(self.config.RewardConfig.constraint_type == 'log_prob'):
-                 self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, task_id = self.config.train_reward_config.task_id)
-            else:
-                 self.reward_model = TotalReward_Mahalanobis(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, task_id = self.config.train_reward_config.task_id)
-    """
 
     def set_reward_model(self, device):
-        if (not self.config.critic) or (self.config.reward_model_checkpoint == 0):
+        if (not self.config.critic) :
             self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint)
         else:
             self.reward_model = TotalReward_Critic(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, self.config.critic_model_checkpoint)
