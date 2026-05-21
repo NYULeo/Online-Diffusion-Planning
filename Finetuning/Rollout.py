@@ -716,7 +716,7 @@ if __name__ == "__main__":
     max_score = data.get_ref_max_score()
     
     device = check_device()
-    set_seed(1)
+    set_seed(8)
     total_score = 0.0
     for i in range(1,11):
        # t0 = time.perf_counter()
@@ -727,11 +727,11 @@ if __name__ == "__main__":
             num_karras = 3, 
             eta = 0.8, 
             episode_length = 3000, 
-            checkpoint_steps = 130, 
+            checkpoint_steps = 10, 
             render = True,  
             base_seed = 1, 
             goal_cell = np.array([6, 1], dtype = int), 
-            start_cell = np.array([3, 2], dtype = int), 
+            start_cell = np.array([2, 4], dtype = int), 
             #start_cell = None,
             continual_rollout = True,
             chunk_size = 31,

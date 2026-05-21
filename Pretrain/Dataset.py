@@ -287,7 +287,9 @@ class PointMazeDataset():
      def reward_filter(self, trajs: List[TrajectoryDict], goal) -> List[TrajectoryDict]:
           new_trajs = []
           for traj in trajs:
-               for i in range(1, len(traj['observations'])):
+               new_rews = [0]*len(traj['rewards'])
+               traj['rewards'] = new_rews
+               for i in range(len(traj['observations'])):
                      pos = traj['observations'][i][:2] 
                      g = np.asarray(goal, dtype=np.float32).reshape(-1)
                      #goal_coord = np.asarray(goal_coord, dtype=np.float32).reshape(-1)  
