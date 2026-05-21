@@ -230,7 +230,7 @@ class PointMazeDataset():
                         'actions': actions,
                         'rewards': rewards
                       }
-                    """
+                    
                     if(len(trajectories) != 0):
                         Temp = merger(trajectories[len(trajectories)-1], trajectory)
                         if(Temp is not None):
@@ -240,12 +240,13 @@ class PointMazeDataset():
                             trajectories.append(trajectory)
                     else:
                          trajectories.append(trajectory)
-                    """
                     
-                    trajectories.append(trajectory)
+                    
+                    #trajectories.append(trajectory)
           
           if (self.goal is not None):
-               trajectories = self.reward_filter_goals(trajectories, self.goal)
+               #trajectories = self.reward_filter_goals(trajectories, self.goal)
+               trajectories = self.reward_filter(trajectories, self.goal)
           return trajectories
      
      def get_state_dim(self):
@@ -282,6 +283,21 @@ class PointMazeDataset():
         for traj in new_trajs:
             new_trajs2.append({'observations': traj['observations'][-300:], 'actions': traj['actions'][-300:], 'rewards': traj['rewards'][-300:]})
         return new_trajs2
+     
+     def reward_filter(self, trajs: List[TrajectoryDict], goal) -> List[TrajectoryDict]:
+          new_trajs = []
+          for traj in trajs:
+               for i in range(1, len(traj['observations'])):
+                     pos = traj['observations'][i][:2] 
+                     g = np.asarray(goal, dtype=np.float32).reshape(-1)
+                     #goal_coord = np.asarray(goal_coord, dtype=np.float32).reshape(-1)  
+                     dist = np.linalg.norm(pos - g) 
+                     if (dist < 0.5):
+                           traj['rewards'][i-1] = 1
+                     else:
+                           traj['rewards'][i-1] = 0
+               new_trajs.append(traj)
+          return new_trajs
 
      def get_env(self, render_mode):
           
