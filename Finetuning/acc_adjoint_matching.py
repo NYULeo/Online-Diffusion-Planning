@@ -689,10 +689,7 @@ class Acc_AdjointMatchingFineTuner:
         while step < self.config.per_round_steps:
              conds = next(dataloader)
              loss, avg_reward, avg_C = self.step(conds, reward_model)
-             """
-             for cond in conds:
-                 self.Initial_Conds.append(cond[:2].detach().cpu().numpy().copy())
-             """
+             
              self.accelerator.wait_for_everyone()
              
              if self.accelerator.is_main_process:
