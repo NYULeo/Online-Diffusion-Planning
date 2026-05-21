@@ -44,10 +44,10 @@ if __name__ == '__main__':
     set_seed(1)
     train_reward(
     dataset_name = 'pointmaze',
-    hidden_layers = 2,
-    hidden_dim = 128,
+    hidden_layers = 1,
+    hidden_dim = 32,
     batch_size = 256, 
-    num_steps = 600, 
+    num_steps = 400, 
     save_freq = 200,  
     lr = 1e-4,
     sigma = 7.0,
