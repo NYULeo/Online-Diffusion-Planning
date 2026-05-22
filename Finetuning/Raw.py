@@ -66,7 +66,15 @@ def check_cube_double_goal_reach(trajs, task_id):
 env, dataset, eval_dataset = ogbench.make_env_and_datasets(
                  "cube-single-play-singletask-task4-v0", render_mode="rgb_array"
             )
+total_dist = 0.0
+count = 0
+for i in range(len(dataset['observations'])):
+    if(dataset['masks'][i] == 0):
+        count += 1
+        position = dataset['observations'][i+1][19:22]
+        total_dist += np.linalg.norm(position - goals[f"task_{4}"])
 
+print(total_dist/count)
 
 """
 path = f'./Finetuning/Rollouts/cube/single-play/task_4/trajs_task4_success_0.pkl'

@@ -445,6 +445,9 @@ if __name__ == "__main__":
     
     env_name = 'cube'
     specific_env = 'single-play'
+    task_id = 4
+    finetune_buffer_cutoff_length = 50,
+    train_buffer_cutoff_length = 200,
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = True)
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32)
 
@@ -465,7 +468,7 @@ if __name__ == "__main__":
                           sigma = 3.0, 
                           target_reward = 80.0, 
                           train_goal = None,
-                          task_id = 4)
+                          task_id = task_id)
       
     TrainKernelConfig = Train_Kernel_Config(
                             batch_size = 512, 
@@ -507,8 +510,8 @@ if __name__ == "__main__":
         kernel = True,
         update_kernel = False,
         buffer_size = 20000,
-        finetune_buffer_cutoff_length = 50,
-        train_buffer_cutoff_length = 200,
+        finetune_buffer_cutoff_length = finetune_buffer_cutoff_length,
+        train_buffer_cutoff_length = train_buffer_cutoff_length,
         finetune_steps = 300,
         finetune_rounds = 30,
         diffusion_steps = 200,
