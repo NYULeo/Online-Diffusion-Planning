@@ -475,14 +475,14 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
            #loss = F.smooth_l1_loss(pred, r, beta = 1.0)
            #loss = reward_net.loss(s, a, r)
            loss.backward()
-           torch.nn.utils.clip_grad_norm_(reward_net.parameters(), max_norm=1.0)
+           torch.nn.utils.clip_grad_norm_(reward_net.parameters(), max_norm = 1.0)
            optimizer.step()
            scheduler.step()
            total_loss += loss.item()
            step += 1
 
-           if step % 200 == 0:
-              avg_loss = total_loss / 200
+           if step % 500 == 0:
+              avg_loss = total_loss / 500
               print(f"Step {step}, loss {avg_loss:.4f}")
               total_loss = 0
         
