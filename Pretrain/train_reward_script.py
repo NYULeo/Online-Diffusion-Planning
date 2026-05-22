@@ -96,6 +96,7 @@ if __name__ == '__main__':
         num_steps = 10000,
         save_freq = 500,
         lr = 1e-04,
+        min_lr = 1e-05,
         sigma = 3.0,
         #alpha = 0.99,
         target_reward = 80.0,

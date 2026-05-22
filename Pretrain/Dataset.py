@@ -534,7 +534,7 @@ class CubeDataset_Singletask:
                      
 
                      if(self.dataset['rewards'][i] == 0):
-                         rews[-1] = 1
+                         rews[-1] = 1.0
                          trajectory = {
                            "observations": obs_slice[index:],
                            "actions": act_slice[index:],

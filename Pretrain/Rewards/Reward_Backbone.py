@@ -435,7 +435,7 @@ class RewardDataset(Dataset):
             torch.tensor(r, dtype=torch.float32),
         )
     
-def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, save_freq, lr, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, task_id: Optional[int] = None, goal: Optional[np.array] = None,traj_length: Optional[int] = None, trajs: Optional[list] = None):
+def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, save_freq, lr, min_lr, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, task_id: Optional[int] = None, goal: Optional[np.array] = None,traj_length: Optional[int] = None, trajs: Optional[list] = None):
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = check_device()
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
@@ -454,6 +454,11 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
     else:
         SD = None
     
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max = num_steps,   # one scheduler step per training step
+            eta_min = min_lr
+        )
     total_loss = 0
     step = 0
     for i in range(num_steps):
@@ -472,6 +477,7 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
            loss.backward()
            torch.nn.utils.clip_grad_norm_(reward_net.parameters(), max_norm=1.0)
            optimizer.step()
+           scheduler.step()
            total_loss += loss.item()
            step += 1
 
