@@ -10,8 +10,8 @@ from Finetune_Backbone import OnlineFinetuner, FinetuningConfig, Train_Critic_Co
 from adjoint_matching import AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig
 #from AM import Acc_AdjointMatchingConfig
-from traj_reward import RewardConfig
-#from comp_reward import RewardConfig
+#from traj_reward import RewardConfig
+from traj_reward2 import RewardConfig
 import random
 import numpy as np
 import torch
@@ -262,11 +262,10 @@ if __name__ == "__main__":
     RWConfig = RewardConfig(
                beta = 1.0, 
                #max_mahalanobis_score = 3.5,
+               type_kernel = 'robust',
                min_log_prob = 5.0,
-               #constraint_adapt = False,
                critic_gamma = 1.0,
-               explore = False)
-               #constraint_type = 'log_prob') 
+               explore = False) 
 
     
     TrainRewardConfig = Train_Reward_Config(
@@ -505,7 +504,7 @@ if __name__ == "__main__":
         reward_model_checkpoint = 0,
         kernel_model_checkpoint = 0,
         critic_model_checkpoint = 0,
-        offline = True,
+        offline = False,
         critic = True,
         update_critic = True,
         kernel = True,

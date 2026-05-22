@@ -36,7 +36,7 @@ class RewardConfig:
     device = None
     d_s: int = 0 
     d_a: int = 0
-    type_kernel: str = 'robust' or 'mog',
+    type_kernel: str = 'robust',
     constraint_type: str = 'mahalanobis' or 'log_prob'
     num_hidden_layers_kernel: int = 2
     hidden_dim_kernel: int = 256
