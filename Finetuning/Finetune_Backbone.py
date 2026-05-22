@@ -586,20 +586,12 @@ class OnlineFinetuner():
             
             if self.accelerator.is_main_process:
                  print(f"Finetuning round {step+1} started")
-                 #print(f"Max Mahalanobis Score: {self.config.RewardConfig.max_mahalanobis_score}")
+                
             
             self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
             self.accelerator.wait_for_everyone()
-            #if self.accelerator.is_main_process:
-            """
-            if(self.config.RewardConfig.constraint_adapt == True):
-                x_generated_plans = self.get_generated_plans(self.config.RewardConfig.number_of_generated_plans)
-                if self.accelerator.is_main_process:
-                    print(f"Generated {len(x_generated_plans)} plans for cosntraint adaptation")
-            else:
-                    x_generated_plans = None
-            self.accelerator.wait_for_everyone()
-            """
+            
+            
 
             if torch.cuda.is_available():
                   torch.cuda.synchronize()  
@@ -635,11 +627,12 @@ class OnlineFinetuner():
                 trajs, score, success_rate, total_steps = [], 0.0, 0.0, 0
             
             self.accelerator.wait_for_everyone()                    
-            
             if self.accelerator.is_main_process:
                   print(f"Rollout Completed")
             
             update_reward = self.gather_and_sync_trajs_and_buffer(trajs)
+            self.accelerator.wait_for_everyone()
+
             if self.config.critic:
                  critic_buffer, update_critic = self.collect_critic_buffer(trajs)
                  if self.accelerator.is_main_process:
@@ -756,9 +749,9 @@ class OnlineFinetuner():
                                    new_step = ((step+1) * self.config.AMConfig.per_round_steps), 
                                    momentum = self.config.train_critic_config.momentum,
                                    target_reward = self.config.train_reward_config.target_reward,
-                                   task_id = self.config.train_reward_config.task_id)
-                                    
+                                   task_id = self.config.train_reward_config.task_id)                        
             self.accelerator.wait_for_everyone()
+            
             if self.config.kernel and self.config.update_kernel:
                       if self.accelerator.is_main_process:
                            print(f"Starting Kernel Training")
@@ -810,7 +803,7 @@ class OnlineFinetuner():
             stats = broadcast(stats, from_process=0)
             threshold = stats.tolist()[0]
             """
-            
+            self.accelerator.wait_for_everyone()
             #set the new total reward model
             if update_reward:
                   self.config.reward_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)

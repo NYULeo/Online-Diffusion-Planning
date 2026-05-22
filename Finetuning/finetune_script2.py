@@ -513,7 +513,7 @@ if __name__ == "__main__":
         finetune_buffer_cutoff_length = finetune_buffer_cutoff_length,
         train_buffer_cutoff_length = train_buffer_cutoff_length,
         finetune_steps = 300,
-        finetune_rounds = 150,
+        finetune_rounds = 100,
         diffusion_steps = 200,
         karras_percent = 0.05,
         Loss_Clip_percent = 0.75,
@@ -528,7 +528,7 @@ if __name__ == "__main__":
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value
-        rollout_num_envs = 1, 
+        rollout_num_envs = 5, 
         continual_rollout = True,
         chunk_size = 10,
         num_rollout_processes = 8,
