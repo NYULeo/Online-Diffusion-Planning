@@ -41,6 +41,7 @@ class Train_Reward_Config:
     batch_size: int = 32
     num_steps: int = 1000
     lr: float = 2e-4
+    min_lr: float = 1e-5
     sigma: float = 7.0
     target_reward: Optional[float] = None
     train_goal: Optional[np.ndarray] = None
@@ -688,6 +689,7 @@ class OnlineFinetuner():
                              batch_size = self.config.train_reward_config.batch_size, 
                              num_steps = self.config.train_reward_config.num_steps, 
                              lr = self.config.train_reward_config.lr, 
+                             min_lr = self.config.train_reward_config.min_lr,
                              sigma = self.config.train_reward_config.sigma, 
                              step = ((step+1) * self.config.AMConfig.per_round_steps), 
                              target_reward = self.config.train_reward_config.target_reward, 

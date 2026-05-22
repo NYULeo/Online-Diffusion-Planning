@@ -252,7 +252,7 @@ if __name__ == "__main__":
     """
     
 
-    
+    """
     env_name = 'pointmaze'
     specific_env = 'medium'
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = True)
@@ -274,6 +274,7 @@ if __name__ == "__main__":
                           batch_size = 256, 
                           num_steps = 400, 
                           lr = 1e-4, 
+                          min_lr = 1e-4,
                           sigma = 7.0, 
                           target_reward = 20.0, 
                           train_goal = np.array([[-2.5, -2.5]], dtype = np.float32),
@@ -348,7 +349,7 @@ if __name__ == "__main__":
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
     
-    
+    """
     
 
 
@@ -441,7 +442,7 @@ if __name__ == "__main__":
 
     
  
-    """
+    
     env_name = 'cube'
     specific_env = 'single-play'
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = True)
@@ -459,7 +460,8 @@ if __name__ == "__main__":
                           hidden_dim = 512,
                           batch_size = 256, 
                           num_steps = 10000, 
-                          lr = 1e-04, 
+                          lr = 5e-05,
+                          min_lr = 8e-06,
                           sigma = 3.0, 
                           target_reward = 80.0, 
                           train_goal = None,
@@ -499,7 +501,7 @@ if __name__ == "__main__":
         reward_model_checkpoint = 0,
         kernel_model_checkpoint = 0,
         critic_model_checkpoint = 0,
-        offline = False,
+        offline = True,
         critic = True,
         update_critic = True,
         kernel = True,
@@ -533,5 +535,5 @@ if __name__ == "__main__":
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-    """
+    
     

@@ -684,7 +684,7 @@ class CriticDataset(Dataset):
             new_rews.append(R)
         return new_rews
 """
-def train_reward(trajs: List[TrajectoryDict], dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, lr, sigma, step, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None):
+def train_reward(trajs: List[TrajectoryDict], dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, lr, min_lr, sigma, step, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
     print(f"Training reward approximator for {dataset_name}_{specific_dataset} Dataset") 
@@ -694,6 +694,11 @@ def train_reward(trajs: List[TrajectoryDict], dataset_name: str, hidden_layers: 
     optimizer = optim.AdamW(reward_net.parameters(), lr = lr, weight_decay = 1e-4)
     total_loss = 0
     counter = 0
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max = num_steps,   # one scheduler step per training step
+            eta_min = min_lr
+        )
     for i in range(num_steps):
            s, a, r = next(dataloader)
            s = s.to(device)
@@ -705,7 +710,9 @@ def train_reward(trajs: List[TrajectoryDict], dataset_name: str, hidden_layers: 
            pred = reward_net(s, a)
            loss = F.mse_loss(pred, r)
            loss.backward()
+           torch.nn.utils.clip_grad_norm_(reward_net.parameters(), max_norm = 1.0)
            optimizer.step()
+           scheduler.step()
            total_loss += loss.item()
            counter += 1
     save_reward_model(reward_net, dataset_name, specific_dataset, task_id, step)
