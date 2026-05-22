@@ -71,6 +71,8 @@ if __name__ == '__main__':  # pragma: no cover
     
     
     trajs =  trajs_1 + trajs_2
+    check_cube_single_goal_reach(trajs, task_id)
+    exit()
     if(specific_env == 'double-play'):
         check_cube_double_goal_reach(trajs, task_id)
     else:

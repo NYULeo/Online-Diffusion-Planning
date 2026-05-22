@@ -789,14 +789,14 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 10
+    checkpoint = 15
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}, checkpoint: {checkpoint}")
     #for i in range(1, 51):
     
     set_seed(1)
-    for j in range(20, 100):
+    for j in range(99, 100):
        reward  =  rollout(
                env_name, 
                specific_train_dataset, 
@@ -811,7 +811,7 @@ if __name__ == "__main__":
                #goal_cell = np.array([6, 1], dtype = int), 
                task_id = task_id,
                continual_rollout = True,
-               chunk_size = 10,
+               chunk_size = 31,
                device = device)
        total_reward += reward
        exit()

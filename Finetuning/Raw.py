@@ -23,7 +23,7 @@ import pickle
 from scipy.ndimage import gaussian_filter1d
 from Pretrain.Dataset import get_dataset
 import ogbench
-
+from Finetuning.Rollout import load_success_trajs
 goals = {'task_1': np.array( [ 0.0,       -1.0,        0.199599]), 
          'task_2': np.array([7.50000000e-01, 8.02418254e-18, 1.99598996e-01]),
          'task_3': np.array([-7.50000000e-01,  1.21832368e-19,  1.99598996e-01]),
@@ -62,19 +62,6 @@ def check_cube_double_goal_reach(trajs, task_id):
 
 
 
-
-env, dataset, eval_dataset = ogbench.make_env_and_datasets(
-                 "cube-single-play-singletask-task4-v0", render_mode="rgb_array"
-            )
-total_dist = 0.0
-count = 0
-for i in range(len(dataset['observations'])):
-    if(dataset['masks'][i] == 0):
-        count += 1
-        position = dataset['observations'][i+1][19:22]
-        total_dist += np.linalg.norm(position - goals[f"task_{4}"])
-
-print(total_dist/count)
 
 """
 path = f'./Finetuning/Rollouts/cube/single-play/task_4/trajs_task4_success_0.pkl'
@@ -158,7 +145,7 @@ reward  =  rollout(
 print(reward)
 """
 
-"""
+
 from Finetuning.Rollout import load_success_trajs
 from Finetuning.utils import train_critic, test_critic
 from Pretrain.utils import set_seed
@@ -170,6 +157,41 @@ step = 0
 traj_length = 200
 
 set_seed(1)
+"""
+trajs = load_success_trajs(env_name, specific_env, task_id, step)
+test_critic(dataset_name = env_name, 
+            specific_dataset = specific_env, 
+            hidden_layers = 4, 
+            hidden_dim = 512, 
+            checkpoint_step = 0, 
+            gamma = 0.99, 
+            horizon = 32,  
+            sigma = 3.0, 
+            target_reward = 80.0, 
+            trajs = trajs,
+            task_id = task_id)
+"""
+trajs = load_success_trajs(env_name, specific_env, task_id, step)
+train_critic(trajs, 
+             dataset_name = env_name, 
+             specific_dataset = specific_env, 
+             hidden_layers = 4, 
+             hidden_dim = 512, 
+             sigma = 3.0,
+             batch_size = 256, 
+             num_steps = 20000, 
+             gamma = 0.99, 
+             lam = 0.95, 
+             horizon = 32, 
+             lr = 5e-05, 
+             min_lr = 1e-06, 
+             tau = 0.005, 
+             old_step = None, 
+             new_step = 0, 
+             momentum = 0.005, 
+             target_reward = 80.0,
+             task_id = task_id)
+
 trajs = load_success_trajs(env_name, specific_env, task_id, step)
 test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
@@ -183,40 +205,6 @@ test_critic(dataset_name = env_name,
             trajs = trajs,
             task_id = task_id)
 
-trajs = load_success_trajs(env_name, specific_env, task_id, step)
-train_critic(trajs, 
-             dataset_name = env_name, 
-             specific_dataset = specific_env, 
-             hidden_layers = 4, 
-             hidden_dim = 512, 
-             sigma = 3.0,
-             batch_size = 256, 
-             num_steps = 10000, 
-             gamma = 0.99, 
-             lam = 0.95, 
-             horizon = 32, 
-             lr = 5e-05, 
-             min_lr = 5e-06, 
-             tau = 0.005, 
-             old_step = 0, 
-             new_step = 10, 
-             momentum = 0.005, 
-             target_reward = 80.0,
-             task_id = task_id)
-
-trajs = load_success_trajs(env_name, specific_env, task_id, step)
-test_critic(dataset_name = env_name, 
-            specific_dataset = specific_env, 
-            hidden_layers = 4, 
-            hidden_dim = 512, 
-            checkpoint_step = 10, 
-            gamma = 0.99, 
-            horizon = 32,  
-            sigma = 3.0, 
-            target_reward = 80.0, 
-            trajs = trajs,
-            task_id = task_id)
-"""
 
 
 

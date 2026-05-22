@@ -67,7 +67,7 @@ if __name__ == '__main__':  # pragma: no cover
     with open(path, 'rb') as f:
           trajs_2 = pickle.load(f)
     
-    
+    trajs = trajs_1 + trajs_2
     train_critic(dataset_name = env_name,
                  specific_dataset = specific_env, 
                  hidden_layers = 4,
@@ -81,7 +81,7 @@ if __name__ == '__main__':  # pragma: no cover
                  tau = 0.005,
                  sigma = 3.0,
                  target_reward = 80.0,
-                 trajs = trajs_1, 
+                 trajs = trajs, 
                  task_id = task_id)
 
 

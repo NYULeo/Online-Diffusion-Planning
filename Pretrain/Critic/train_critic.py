@@ -435,7 +435,7 @@ def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, h
              
            # Predicted V-values
            q_pred = critic(s)
-           #loss = ((q_pred - target) ** 2).mean()
+           loss = ((q_pred - target) ** 2).mean()
            loss = F.smooth_l1_loss(q_pred, target, beta = 1.0)
            total_loss += loss.item()
 
