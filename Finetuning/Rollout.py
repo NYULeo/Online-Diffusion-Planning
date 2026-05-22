@@ -789,14 +789,15 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 15
+    checkpoint = 10
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}, checkpoint: {checkpoint}")
     #for i in range(1, 51):
+    
     set_seed(1)
-    #for j in range(1, 8):
-    reward  =  rollout(
+    for j in range(20, 100):
+       reward  =  rollout(
                env_name, 
                specific_train_dataset, 
                horizon, 
@@ -806,15 +807,17 @@ if __name__ == "__main__":
                episode_length = 3000, 
                checkpoint_steps = checkpoint, 
                render = True,  
-               base_seed = 13, 
+               base_seed = j, 
+               #goal_cell = np.array([6, 1], dtype = int), 
                task_id = task_id,
                continual_rollout = True,
                chunk_size = 10,
                device = device)
-      #total_reward += reward
+       total_reward += reward
+       exit()
       #print(f"seed {i} finished")
     #print(f"Success Rate: {total_reward / 50 :.4f}")
-
+    #print(get_normalized_score(total_reward/10, min_score, max_score))
     
 
     """

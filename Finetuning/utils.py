@@ -2114,7 +2114,7 @@ def rollout_parallel2(
                       current_state = current_states[env_idx]
                       current_state_norm = planner_processor.preprocess(current_state)
                       x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
-                      for k in range(len(x)):
+                      for k in range(chunk_size):
                           Temp_acts[env_idx].append(x[k, d_s:(d_s+d_a)].copy())
                     
                    actions[env_idx] = Temp_acts[env_idx][0].copy()

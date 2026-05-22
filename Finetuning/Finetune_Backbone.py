@@ -614,7 +614,7 @@ class OnlineFinetuner():
             if do_rollout:
                 seed_base = rank * num_envs_per_process
                
-                trajs, score,  total_steps = rollout_parallel2(self.config.dataset_name, 
+                trajs, score, success_rate, total_steps = rollout_parallel2(self.config.dataset_name, 
                                              self.config.specific_dataset, 
                                              horizon = self.config.AMConfig.horizon, 
                                              steps_T = self.config.diffusion_steps, 
@@ -632,7 +632,7 @@ class OnlineFinetuner():
                                              chunk_size = self.config.chunk_size)
                 
             else:
-                trajs, score, total_steps = [], 0.0, 0
+                trajs, score, success_rate, total_steps = [], 0.0, 0.0, 0
             
             self.accelerator.wait_for_everyone()                    
             
@@ -653,19 +653,18 @@ class OnlineFinetuner():
             
             #collect the score and number of env stepsacross all processes
             gathered_scores = self.accelerator.gather_for_metrics(torch.tensor([score], device=self.device, dtype = torch.float32),  use_gather_object=False)
-            #gathered_success_rates = self.accelerator.gather_for_metrics(torch.tensor([success_rate], device=self.device, dtype = torch.float32), use_gather_object=False)
+            gathered_success_rates = self.accelerator.gather_for_metrics(torch.tensor([success_rate], device=self.device, dtype = torch.float32), use_gather_object=False)
             gathered_steps = self.accelerator.gather_for_metrics(torch.tensor([total_steps], device=self.device, dtype = torch.int64),  use_gather_object=False)
             if self.accelerator.is_main_process:
                  total_steps = gathered_steps.int().sum().item()
                  num_rollout = (num_rollout_procs if num_rollout_procs is not None 
                                else self.accelerator.num_processes)
                  rollout_scores = gathered_scores.float()[:num_rollout]
-                 #rollout_success_rates = gathered_success_rates.float()[:num_rollout]
+                 rollout_success_rates = gathered_success_rates.float()[:num_rollout]
                  avg_score = rollout_scores.float().mean().item()
-                 #avg_success_rate = rollout_success_rates.float().mean().item()
-                 #avg_score = gathered_scores.float().mean().item()
+                 avg_success_rate = rollout_success_rates.float().mean().item()
                  print(f"Total Number of Environment Steps: {total_steps}")
-                 #print(f"Average Success Rate: {avg_success_rate:.2f}")
+                 print(f"Average Success Rate: {avg_success_rate:.2f}")
                  print(f"Average Normalized Score: {avg_score:.2f}")
             self.accelerator.wait_for_everyone()  
             
