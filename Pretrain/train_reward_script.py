@@ -90,7 +90,7 @@ if __name__ == '__main__':
     
     train_reward(
         dataset_name = dataset_name,
-        hidden_layers = 3,
+        hidden_layers = 4,
         hidden_dim = 512, 
         batch_size = 256,
         num_steps = 10000,
@@ -113,7 +113,7 @@ if __name__ == '__main__':
     
     test_Model(
         dataset_name = dataset_name, 
-        hidden_layers = 3, 
+        hidden_layers = 4, 
         hidden_dim = 512,
         specific_dataset = specific_dataset, 
         trajs = trajs,
