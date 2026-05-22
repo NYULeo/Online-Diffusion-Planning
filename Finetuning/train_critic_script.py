@@ -40,8 +40,7 @@ if __name__ == '__main__':  # pragma: no cover
        
         
        trajs = load_success_trajs(env_name, specific_env, task_id, step)
-       print(len(trajs))
-       exit()
+       
        train_critic(trajs, 
              dataset_name = env_name, 
              specific_dataset = specific_env, 
