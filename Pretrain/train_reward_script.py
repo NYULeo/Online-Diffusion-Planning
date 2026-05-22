@@ -81,7 +81,7 @@ if __name__ == '__main__':
     dataset_name = 'cube'
     specific_dataset = 'single'
     task_id = 4
-    traj_length = 200
+    traj_length = None
 
     path = f'./Finetuning/Rollouts/{dataset_name}/{specific_dataset}-play/task_{task_id}/trajs_task{task_id}_success_0.pkl'
     with open(path, 'rb') as f:
@@ -90,12 +90,12 @@ if __name__ == '__main__':
     
     train_reward(
         dataset_name = dataset_name,
-        hidden_layers = 4,
+        hidden_layers = 3,
         hidden_dim = 512, 
         batch_size = 256,
         num_steps = 10000,
         save_freq = 500,
-        lr = 1e-04,
+        lr = 5e-05,
         min_lr = 1e-05,
         sigma = 3.0,
         #alpha = 0.99,
@@ -113,7 +113,7 @@ if __name__ == '__main__':
     
     test_Model(
         dataset_name = dataset_name, 
-        hidden_layers = 4, 
+        hidden_layers = 3, 
         hidden_dim = 512,
         specific_dataset = specific_dataset, 
         trajs = trajs,
