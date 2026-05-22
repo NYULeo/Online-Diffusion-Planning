@@ -332,7 +332,7 @@ def load_success_trajs(env_name, specific_env, task_id, step):
     with open(save_path, 'rb') as f:
         trajs = pickle.load(f)
     return trajs
- 
+
 def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None, task_id: Optional[int] = None, base_seed: int = 0, continual_rollout = False, chunk_size = 5, device = None, selector: Optional[Selector] = None):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      #print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}, episode_length: {episode_length}")
@@ -345,11 +345,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', task_id = task_id, episode_length = None)
      #env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', episode_length = episode_length)
      #np.random.seed(base_seed)
-     """
-     if hasattr(env, 'action_space'):
-        env.action_space.seed(base_seed)
-        env.unwrapped._permute_blocks = False
-     """
+     
     
     # 2. Reset environment with both seed and task_id
      #env.reset(seed=base_seed)   # Important first reset
@@ -375,29 +371,19 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      
      #reset
      if(env_name == 'cube'):
-        #s0, info = env.reset(seed = base_seed, options = dict( task_id=task_id))
-        s0, info = env.reset(seed = base_seed)
+         s0, info = env.reset(seed = base_seed, options = dict( task_id=task_id))
+         #s0, info = env.reset(seed = base_seed)
         #s0, info = env.reset()
-     if(goal_cell is not None and start_cell is not None):
-        s0 = env.reset(seed = base_seed, options = {"goal_cell": goal_cell, "reset_cell": start_cell})
+     elif(goal_cell is not None and start_cell is not None):
+         s0 = env.reset(seed = base_seed, options = {"goal_cell": goal_cell, "reset_cell": start_cell})
         #s0, info = env.reset( options = {"goal_cell": goal_cell, "reset_cell": start_cell})
      elif(goal_cell is not None):
          s0 = env.reset(seed = base_seed, options = {"goal_cell": goal_cell})
      else:
-        s0 = env.reset(seed = base_seed)
+         s0 = env.reset(seed = base_seed)
         #s0, info = env.reset()
      
-     #check(env)
-     #exit()
-     """
-     if(env_name == 'antmaze'):
-          current_state = np.concatenate([
-               s0[0]['observation'],
-               s0[0]['achieved_goal']
-           ])
-     else:
-         current_state = s0[0]['observation']
-     """
+     
      current_state = get_current_state(s0[0], env_name)
      frames = []
      observations = []
@@ -493,6 +479,8 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
     
      return sum(traj['rewards'])
      #print(get_normalized_score([traj]))
+ 
+
 
 def load_kernel(env_name, specific_env, checkpoint_steps, kernel_config: Kernel_Config, device: str):
     from Pretrain.Transition_Kernel.Kernel_Backbone import MoGTransitionKernel
@@ -743,6 +731,7 @@ if __name__ == "__main__":
    
     #min_score = 13.13
     #max_score = 277.39
+    """
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
@@ -789,13 +778,13 @@ if __name__ == "__main__":
     print(total_score/100)
     #print(f"Elapsed: {elapsed:.3f}s")
     
-
+    """
 
     
   
     
     
-    """
+    
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
@@ -804,8 +793,8 @@ if __name__ == "__main__":
     device = check_device()
     print(f"Using device {device}, checkpoint: {checkpoint}")
     #for i in range(1, 51):
-      #set_seed(i)
-      #for j in range(1, 8):
+    set_seed(1)
+    #for j in range(1, 8):
     reward  =  rollout(
                env_name, 
                specific_train_dataset, 
@@ -815,7 +804,7 @@ if __name__ == "__main__":
                eta = 0.8, 
                episode_length = 3000, 
                checkpoint_steps = checkpoint, 
-               render = False,  
+               render = True,  
                base_seed = 1, 
                task_id = 4,
                continual_rollout = True,
@@ -824,7 +813,7 @@ if __name__ == "__main__":
       #total_reward += reward
       #print(f"seed {i} finished")
     #print(f"Success Rate: {total_reward / 50 :.4f}")
-   """
+
     
 
     """
@@ -840,7 +829,7 @@ if __name__ == "__main__":
     #for i in range(30, 60):
        #checkpoint_step = i*5
        #total_success_rate = 0.0
-    for i in range(60, 121):
+    for i in range(1, 121):
           set_seed(i)
           trajs, _, success_rate, _ = rollout_parallel3(env_name = env_name, 
                       specific_env = specific_train_dataset, 
@@ -857,14 +846,15 @@ if __name__ == "__main__":
                       chunk_size = 31)
           success_trajs = get_success_trajs(trajs)
           total_success_trajs.extend(success_trajs)
+          exit()
           #success_rate = len(success_trajs) / len(trajs)
           #total_success_rate += success_rate
        #total_success_rate = total_success_rate / 50
       # print(f"Success Rate for checkpoint {checkpoint_step}: {total_success_rate:.4f}")
      # print(len(total_success_trajs))
-    save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 4)
-   
+    #save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 4)
    """
+
 
     """
     env, _, _ = get_env(env_name, specific_train_dataset,  render_mode = 'rgb_array')

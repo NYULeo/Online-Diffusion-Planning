@@ -54,7 +54,7 @@ def check_cube_double_goal_reach(trajs, task_id):
 
 if __name__ == '__main__':  # pragma: no cover
     
-    """
+    
     set_seed(1)
     env_name = 'cube'
     specific_env = 'single-play'
@@ -124,7 +124,7 @@ if __name__ == '__main__':  # pragma: no cover
                 target_reward = 50.0,
                 trajs = trajs,
                 task_id = task_id)
-    """
+    
    
 
     

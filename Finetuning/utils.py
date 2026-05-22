@@ -1957,9 +1957,9 @@ def rollout_parallel2(
      torch.manual_seed(12345 + rank + seed_base)
      
      # Create environment factory function
-     _, d_s, d_a = get_env(env_name, specific_env)
+     _, d_s, d_a = get_env(env_name, specific_env, task_id = task_id)
      def make_env():
-         env, _, _ = get_env(env_name, specific_env)
+         env, _, _ = get_env(env_name, specific_env, task_id = task_id)
          return env
      
      # Create vectorized environment
@@ -2072,13 +2072,14 @@ def rollout_parallel2(
                    trajs.append({
                       'observations': np.asarray(observations[env_idx].copy()),
                       'actions': np.asarray(acts[env_idx].copy()),
-                      'rewards': np.asarray(spare_reward_prcocessor(rewards[env_idx].copy()))
+                      'rewards': np.asarray(rewards[env_idx].copy())
          }) 
      else:
         opt =  {"task_id": task_id}
         #s0_vec = vec_env.reset(seed = reset_seeds, options=[opt for _ in range(num_envs)])
         #current_states = s0_vec[0]['observation']
         obs0, _ = vec_env.reset(seed=reset_seeds, options=[opt for _ in range(num_envs)])
+        #obs0, _ = vec_env.reset(seed=reset_seeds)
         if isinstance(obs0, dict):
               current_states = obs0['observation']
         else:
@@ -2150,7 +2151,7 @@ def rollout_parallel2(
                    trajs.append({
                       'observations': np.asarray(observations[env_idx].copy()),
                       'actions': np.asarray(acts[env_idx].copy()),
-                      'rewards': np.asarray(spare_reward_prcocessor(rewards[env_idx].copy()))
+                      'rewards': np.asarray(rewards[env_idx].copy())
         })     
      vec_env.close()
      valid, success_rate = checktrajs(trajs)

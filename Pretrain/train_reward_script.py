@@ -102,9 +102,10 @@ if __name__ == '__main__':
         specific_dataset = specific_dataset,
         task_id = task_id,
         traj_length = traj_length,
-        trajs = trajs
+        trajs = None
     )
     
+    """
     path = f'./Finetuning/Rollouts/{dataset_name}/{specific_dataset}-play/task_{task_id}/trajs_task{task_id}_success_0.pkl'
     with open(path, 'rb') as f:
           trajs = pickle.load(f)
@@ -122,6 +123,7 @@ if __name__ == '__main__':
         traj_length = traj_length,
         save_freq = 5000, 
         num_steps = 5000)
+    """
 
 
 
