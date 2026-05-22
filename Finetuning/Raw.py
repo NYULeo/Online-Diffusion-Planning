@@ -61,6 +61,13 @@ def check_cube_double_goal_reach(trajs, task_id):
     print(f"Task {task_id} average distance: {average_dist}")
 
 
+
+
+env, dataset, eval_dataset = ogbench.make_env_and_datasets(
+                 "cube-single-play-singletask-task4-v0", render_mode="rgb_array"
+            )
+
+
 """
 path = f'./Finetuning/Rollouts/cube/single-play/task_4/trajs_task4_success_0.pkl'
 with open(path, 'rb') as f:
@@ -205,6 +212,9 @@ test_critic(dataset_name = env_name,
 
 
 
+
+"""
+
 from Finetuning.Rollout import get_success_trajs
 from Finetuning.utils import train_critic
 from Pretrain.utils import set_seed
@@ -270,5 +280,5 @@ test_critic(dataset_name = env_name,
             target_reward = 20.0, 
             trajs = trajs)
 
-
+"""
 
