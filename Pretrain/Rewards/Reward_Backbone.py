@@ -466,9 +466,11 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
            optimizer.zero_grad()
            #pred = reward_net(torch.cat([s, a], dim = 1))
            pred = reward_net(s, a)
-           loss = F.mse_loss(pred, r)
+           #loss = F.mse_loss(pred, r)
+           loss = F.smooth_l1_loss(pred, r, beta = 1.0)
            #loss = reward_net.loss(s, a, r)
            loss.backward()
+           torch.nn.utils.clip_grad_norm_(reward_net.parameters(), max_norm=1.0)
            optimizer.step()
            total_loss += loss.item()
            step += 1

@@ -997,3 +997,10 @@ visualize_clusters(vectors, assignments, stats['cluster_centers'], "Kitchen Rewa
 
 """Count training windows for horizon 32 vs 70 on pointmaze large."""
 
+data = get_dataset('cube', 'single-play', task_id = 4)
+trajs = data.get_trajectories()
+
+for traj in trajs:
+     print(len(traj['observations']))
+     print(len(traj['actions']))
+     print(len(traj['rewards']))
