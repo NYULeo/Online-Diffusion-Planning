@@ -503,7 +503,7 @@ if __name__ == "__main__":
         critic_model_checkpoint = 0,
         offline = True,
         critic = True,
-        update_critic = True,
+        update_critic = False,
         kernel = True,
         update_kernel = False,
         buffer_size = 20000,
