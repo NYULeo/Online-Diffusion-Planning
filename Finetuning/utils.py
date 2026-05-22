@@ -2154,8 +2154,8 @@ def rollout_parallel2(
                       'rewards': np.asarray(rewards[env_idx].copy())
         })     
      vec_env.close()
-     valid, success_rate = checktrajs(trajs)
-     print(f"valid: {valid}, success rate: {success_rate:.2f}")
+     success_rate = check_success_rate(trajs)
+     print(f"success rate: {success_rate:.2f}")
      if(goal_cell is None):
             expert_score = get_expert_score(env_name)
             score = get_normalized_score(trajs, expert_score)
@@ -2163,7 +2163,7 @@ def rollout_parallel2(
             score = get_normalized_score(trajs)
      #save_trajs(trajs, env_name, specific_env, checkpoint_step)
      #print(f"Average Normalized Score: {score:.2f}")
-     return trajs, score, total_steps
+     return trajs, score, success_rate, total_steps
 
 
 
@@ -2549,6 +2549,13 @@ def checktrajs(trajs):
     success_rate = success / len(trajs)
     return True, success_rate
 
+def check_success_rate(trajs: List[TrajectoryDict]):
+    success = 0
+    for traj in trajs:
+        if(traj['rewards'][-1] == 1):
+            success += 1
+    return success / len(trajs)
+ 
 
 def check_device():
     if torch.backends.mps.is_available():

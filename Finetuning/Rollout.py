@@ -788,6 +788,7 @@ if __name__ == "__main__":
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
+    task_id = 4
     checkpoint = 15
     total_reward = 0.0
     device = check_device()
@@ -805,8 +806,8 @@ if __name__ == "__main__":
                episode_length = 3000, 
                checkpoint_steps = checkpoint, 
                render = True,  
-               base_seed = 1, 
-               task_id = 4,
+               base_seed = 12, 
+               task_id = task_id,
                continual_rollout = True,
                chunk_size = 10,
                device = device)
