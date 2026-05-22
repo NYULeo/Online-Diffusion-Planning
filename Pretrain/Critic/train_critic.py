@@ -345,7 +345,7 @@ class CriticDataset(Dataset):
             #if(len(obs) > horizon):
             rews = self.reward_processor(rews, horizon, gamma)
             #for t in range(len(obs)-horizon+1):
-            for t in range(len(obs)):
+            for t in range(len(rews)):
                      obs_t = self.stats.norm_obs(obs[t])
                      r_t   = rews[t]
                      obs_next_t = self.stats.norm_obs(obs[min(t + horizon, len(obs) - 1)])

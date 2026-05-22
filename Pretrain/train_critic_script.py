@@ -12,6 +12,7 @@ from Pretrain.Critic.train_critic import train_critic
 from Pretrain.utils import set_seed
 from Pretrain.Dataset import get_dataset
 from Pretrain.Critic.train_critic import test_critic
+from Finetuning.utils import get_success_trajs
 
 
 def check_cube_single_goal_reach(trajs, task_id):   
@@ -193,8 +194,16 @@ if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     env_name = 'pointmaze'
     specific_env = 'medium'
-    data = get_dataset(env_name, specific_env, goal = np.array([[-2.5, -2.5]], dtype = np.float32))
+    
+    data = get_dataset(env_name, specific_env, goal = np.array([[-2.5, -2.5]], dtype = np.float32), mode = 'critic')
     trajs = data.get_trajectories()
+    
+    """
+    path = PROJECT_ROOT / "Finetuning" / "Rollouts" /  env_name / specific_env / f"Generated_trajs_Info_0.pkl"
+    with open(path, 'rb') as f:
+          trajs = pickle.load(f)
+    trajs = get_success_trajs(trajs)
+    """
     train_critic(dataset_name = env_name, 
                  specific_dataset = specific_env, 
                  hidden_layers = 1,
@@ -206,7 +215,7 @@ if __name__ == '__main__':  # pragma: no cover
                  lr = 1e-05, 
                  min_lr = 1e-06,
                  tau = 0.005,
-                 sigma = 7.0,
+                 sigma = 3.0,
                  target_reward = 20.0,
                  trajs = trajs)
     print('training complete')

@@ -216,11 +216,12 @@ with open(save_path, 'rb') as f:
         trajs = pickle.load(f)
 trajs = get_success_trajs(trajs)
 
+
 set_seed(1)
 test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
-            hidden_layers = 1, 
-            hidden_dim = 128, 
+            hidden_layers = 3, 
+            hidden_dim = 256, 
             checkpoint_step = 0, 
             gamma = 0.99, 
             horizon = 32,  
@@ -236,9 +237,9 @@ trajs = get_success_trajs(trajs)
 train_critic(trajs, 
              dataset_name = env_name, 
              specific_dataset = specific_env, 
-             hidden_layers = 1, 
-             hidden_dim = 128, 
-             sigma = 3.0,
+             hidden_layers = 3, 
+             hidden_dim = 256, 
+             sigma = 7.0,
              batch_size = 256, 
              num_steps = 5000, 
              gamma = 0.99, 
@@ -252,6 +253,7 @@ train_critic(trajs,
              momentum = 0.005, 
              target_reward = 20.0)
 
+
 with open(save_path, 'rb') as f:
         trajs = pickle.load(f)
 trajs = get_success_trajs(trajs)
@@ -259,15 +261,14 @@ trajs = get_success_trajs(trajs)
 
 test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
-            hidden_layers = 1, 
-            hidden_dim = 128, 
+            hidden_layers = 3, 
+            hidden_dim = 256, 
             checkpoint_step = 10, 
             gamma = 0.99, 
             horizon = 32,  
             sigma = 3.0, 
             target_reward = 20.0, 
             trajs = trajs)
-
 
 
 

@@ -293,13 +293,13 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
          if(specific_dataset is None): 
              raise ValueError(f"Invalid dataset name: {dataset_name}")
          elif(specific_dataset == 'large'):
-              data = PointMazeDataset('large', goal)
+              data = PointMazeDataset('large', goal, mode = 'reward')
               name = '2DMaze_Reward_large'
          elif(specific_dataset == 'medium'):
-              data = PointMazeDataset('medium', goal)
+              data = PointMazeDataset('medium', goal, mode = 'reward')
               name = '2DMaze_Reward_medium'
          elif(specific_dataset == 'umaze'):
-              data = PointMazeDataset('umaze', goal)
+              data = PointMazeDataset('umaze', goal, mode = 'reward')
               name = '2DMaze_Reward_umaze'
          else: 
               raise ValueError(f"Invalid dataset name: {specific_dataset}")

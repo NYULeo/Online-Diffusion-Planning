@@ -1205,7 +1205,7 @@ class Critic_Buffer():
                        gamma: float = 0.99,
                        lam: float = 0.95,
                        task_id: Optional[int] = None,
-                       old_step: int = 0,  
+                       old_step: Optional[int] = None,  
                        new_step: int = 0, 
                        momentum: float = 0.005):
         self.horizon = horizon
@@ -1264,7 +1264,7 @@ class CriticDataset(Dataset):
                        target_reward: Optional[float] = None,
                        horizon: int = 32,
                        task_id: Optional[int] = None, 
-                       old_step: int = 0,  
+                       old_step: Optional[int] = None,  
                        new_step: int = 0, 
                        momentum: float = 0.005):
         # ----- gather raw obs/actions to fit stats -----
@@ -1277,7 +1277,10 @@ class CriticDataset(Dataset):
         stats = SAStats()
         stats.obs_mean = obs_all.mean(axis=0)
         stats.obs_std = obs_all.std(axis=0)+ 1e-8
-        self.stats = update_critic_stats(dataset_name, specific_dataset, stats, task_id, old_step, momentum)
+        if(old_step is not None):
+             self.stats = update_critic_stats(dataset_name, specific_dataset, stats, task_id, old_step, momentum)
+        else:
+             self.stats = stats
         allowed_values = [0.0, 1.0]
 
         transitions = []
@@ -1336,17 +1339,17 @@ def train_critic(trajs: List[TrajectoryDict],
                  lr, 
                  min_lr, 
                  tau, 
-                 old_step: int, 
-                 new_step: int, 
+                 old_step: Optional[int] = None, 
+                 new_step: int = 0, 
                  momentum: float = 0.005, 
                  target_reward = 1.0, 
                  task_id: Optional[int] = None):
     device = check_device()
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
     critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
-    critic_state_dict, _ = get_critic_model(dataset_name, specific_dataset, task_id = task_id, step = old_step)
-    critic.load_state_dict(critic_state_dict)
-    critic.train()
+    if(old_step is not None):
+        critic_state_dict, _ = get_critic_model(dataset_name, specific_dataset, task_id = task_id, step = old_step)
+        critic.load_state_dict(critic_state_dict)
     target_critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
     target_critic.load_state_dict(critic.state_dict())
     target_critic.eval()
@@ -1356,6 +1359,7 @@ def train_critic(trajs: List[TrajectoryDict],
             T_max = num_steps,   # one scheduler step per training step
             eta_min = min_lr
         )
+    critic.train()
     buffer = Critic_Buffer(
             dataset_name=dataset_name,
             specific_dataset=specific_dataset,

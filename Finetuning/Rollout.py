@@ -776,17 +776,13 @@ if __name__ == "__main__":
             eta = 0.8, 
             episode_length = 3000, 
             checkpoint_steps = 80, 
-            render = True,  
+            render = False,  
             base_seed = i, 
             goal_cell = np.array([6, 1], dtype = int), 
-            #start_cell = np.array([5, 4], dtype = int), 
-            #start_cell = None,
             continual_rollout = False,
             chunk_size = 31,
             device = device,
             selector = None)
-       #print(return_value)
-       #print(get_normalized_score(return_value, min_score, max_score))
        total_score += get_normalized_score(return_value, min_score, max_score)
        #exit()
       

@@ -38,7 +38,7 @@ def check_cube_single_goal_reach(trajs, task_id):
 
 
 
-
+"""
 
 if __name__ == '__main__':
     set_seed(1)
@@ -55,7 +55,7 @@ if __name__ == '__main__':
     specific_dataset = 'medium',
     goal = np.array([[-2.5, -2.5]], dtype = np.float32))
 
-
+"""
 """
 if __name__ == '__main__':
     set_seed(1)
@@ -74,7 +74,7 @@ if __name__ == '__main__':
 
 """
 
-"""
+
 if __name__ == '__main__':
     set_seed(1)
     
@@ -122,7 +122,7 @@ if __name__ == '__main__':
         traj_length = traj_length,
         save_freq = 5000, 
         num_steps = 5000)
-"""
+
 
 
 

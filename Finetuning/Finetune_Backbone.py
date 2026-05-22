@@ -274,7 +274,7 @@ class OnlineFinetuner():
             self.Train_Kernel_Buffer.extend(trajs_kernel)
         
         elif(self.config.train_reward_config.train_goal is not None):
-            dataset_reward = get_dataset(self.config.dataset_name, self.config.specific_dataset, goal = self.config.train_reward_config.train_goal)
+            dataset_reward = get_dataset(self.config.dataset_name, self.config.specific_dataset, goal = self.config.train_reward_config.train_goal, mode = 'reward')
             trajs_reward = dataset_reward.get_trajectories()
             dataset_kernel = get_dataset(self.config.dataset_name, self.config.specific_dataset)
             trajs_kernel = dataset_kernel.get_trajectories()
@@ -380,10 +380,12 @@ class OnlineFinetuner():
         if(self.config.train_reward_config.task_id is not None):
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = self.config.train_buffer_cutoff_length)
             trajs = dataset.get_trajectories()
-        else:
+        elif(self.config.train_reward_config.train_goal is not None):
+            dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset, goal = self.config.train_reward_config.train_goal, mode = 'critic')
+            trajs = dataset.get_trajectories()
+        else: 
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
             trajs = dataset.get_trajectories()
-        
         #trajs = self.Train_Buffer.copy()
         
         if(len(critic_buffer) < 2):
