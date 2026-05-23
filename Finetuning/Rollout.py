@@ -459,8 +459,9 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
          print(np.mean(violation_scores))
          print(np.var(violation_scores))
      """
-     print(f"total steps: {len(observations)}")
-     print(f"number of plans: {number_of_plans}")
+     #print(f"total steps: {len(observations)}")
+     #print(f"number of plans: {number_of_plans}")
+     rewards = spare_reward_prcocessor(rewards)
      traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(rewards)}
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      #print(test_rollout_fit_for_model(traj, env_name, specific_env, checkpoint_steps, checkpoint_steps, checkpoint_steps, device=None))
@@ -477,7 +478,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      #return traj
      
     
-     return sum(traj['rewards'])
+     return rewards[-1], len(observations)
      #print(get_normalized_score([traj]))
  
 
@@ -575,6 +576,8 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
    
      #return len(traj['rewards'])
      #print(get_normalized_score([traj]))
+
+
 
 
 """
@@ -731,14 +734,13 @@ if __name__ == "__main__":
    
     #min_score = 13.13
     #max_score = 277.39
-    
+    """
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
     data = get_dataset(env_name, specific_train_dataset)
     min_score = data.get_ref_min_score()
     max_score = data.get_ref_max_score()
-    
     RConfig = RewardConfig(
                beta = 1.0, 
                #max_mahalanobis_score = 3.5,
@@ -755,9 +757,11 @@ if __name__ == "__main__":
     selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
     device = check_device()
     set_seed(1)
-    total_score = 0.0
-    for i in range(1,101):
-       return_value = rollout(env_name, 
+    total_return = 0
+    i = 1
+    total_steps = 0
+    while(True):
+       return_value, steps = rollout(env_name, 
             specific_train_dataset, 
             horizon, 
             steps_T = 50, 
@@ -768,36 +772,44 @@ if __name__ == "__main__":
             render = True,  
             base_seed = i, 
             goal_cell = np.array([6, 1], dtype = int), 
-            continual_rollout = False,
-            chunk_size = 31,
+            continual_rollout = True,
+            chunk_size = 10,
             device = device,
             selector = None)
-       total_score += get_normalized_score(return_value, min_score, max_score)
-       exit()
-      
-    print(total_score/100)
-    #print(f"Elapsed: {elapsed:.3f}s")
+       total_steps += steps
+       #print(total_steps)
+       print(return_value)
+       if(total_steps > 10000):
+           break
+       else:
+           total_return += return_value
+           i += 1
+    print(total_return)
+    print(get_normalized_score(total_return, min_score, max_score))
     
+    #print(f"Elapsed: {elapsed:.3f}s")
+    """
     
 
     
   
     
     
-    """
+    
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 15
+    checkpoint = 10
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}, checkpoint: {checkpoint}")
     #for i in range(1, 51):
     
     set_seed(1)
-    for j in range(99, 100):
-       reward  =  rollout(
+    total_return = 0
+    for j in range(1, 51):
+        return_value, steps = rollout(
                env_name, 
                specific_train_dataset, 
                horizon, 
@@ -811,15 +823,16 @@ if __name__ == "__main__":
                #goal_cell = np.array([6, 1], dtype = int), 
                task_id = task_id,
                continual_rollout = True,
-               chunk_size = 31,
+               chunk_size = 6,
                device = device)
-       total_reward += reward
-       exit()
+        total_return += return_value
+        print(return_value)
+        exit()
       #print(f"seed {i} finished")
     #print(f"Success Rate: {total_reward / 50 :.4f}")
     #print(get_normalized_score(total_reward/10, min_score, max_score))
-    """
-
+    print(total_return/50)
+    
     """
     from Finetuning.utils import rollout_parallel3
     #set_seed(1)

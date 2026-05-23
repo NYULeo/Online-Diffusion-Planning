@@ -62,7 +62,6 @@ def check_cube_double_goal_reach(trajs, task_id):
 
 
 
-
 """
 path = f'./Finetuning/Rollouts/cube/single-play/task_4/trajs_task4_success_0.pkl'
 with open(path, 'rb') as f:
