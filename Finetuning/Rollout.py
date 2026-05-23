@@ -731,7 +731,7 @@ if __name__ == "__main__":
    
     #min_score = 13.13
     #max_score = 277.39
-    """
+    
     horizon = 32
     env_name = 'pointmaze'
     specific_train_dataset = 'medium'
@@ -765,7 +765,7 @@ if __name__ == "__main__":
             eta = 0.8, 
             episode_length = 3000, 
             checkpoint_steps = 80, 
-            render = False,  
+            render = True,  
             base_seed = i, 
             goal_cell = np.array([6, 1], dtype = int), 
             continual_rollout = False,
@@ -773,18 +773,18 @@ if __name__ == "__main__":
             device = device,
             selector = None)
        total_score += get_normalized_score(return_value, min_score, max_score)
-       #exit()
+       exit()
       
     print(total_score/100)
     #print(f"Elapsed: {elapsed:.3f}s")
     
-    """
+    
 
     
   
     
     
-    
+    """
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
@@ -818,7 +818,7 @@ if __name__ == "__main__":
       #print(f"seed {i} finished")
     #print(f"Success Rate: {total_reward / 50 :.4f}")
     #print(get_normalized_score(total_reward/10, min_score, max_score))
-    
+    """
 
     """
     from Finetuning.utils import rollout_parallel3

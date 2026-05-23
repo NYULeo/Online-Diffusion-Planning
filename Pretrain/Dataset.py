@@ -317,11 +317,11 @@ class PointMazeDataset():
               env = gym.make('PointMaze_Umaze-v3', max_episode_steps = 2000, render_mode = render_mode, continuing_task=False)
           else:
               raise ValueError(f'Invalid dataset name')
-          return env
+          #return env
           
           #return self.dataset.recover_environment(render_mode = render_mode)
           
-          #return self.dataset.recover_environment(render_mode = 'rgb_array', continuing_task=True, reset_target=False, eval_env=True)
+          return self.dataset.recover_environment(render_mode = 'rgb_array', continuing_task=True, reset_target=False, eval_env=True)
 
      def get_ref_max_score(self):
           return self.dataset.storage.metadata.get('ref_max_score')

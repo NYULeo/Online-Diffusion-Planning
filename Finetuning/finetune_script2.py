@@ -252,7 +252,7 @@ if __name__ == "__main__":
     """
     
 
-    
+    """
     env_name = 'pointmaze'
     specific_env = 'medium'
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = True)
@@ -348,7 +348,7 @@ if __name__ == "__main__":
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-    
+    """
 
     
 
@@ -442,7 +442,7 @@ if __name__ == "__main__":
 
     
  
-    """
+    
     env_name = 'cube'
     specific_env = 'single-play'
     task_id = 4
@@ -487,8 +487,8 @@ if __name__ == "__main__":
                             hidden_dim = 512,
                             batch_size = 256,
                             num_steps = 10000,
-                            lr = 2e-05,
-                            min_lr = 5e-07,
+                            lr = 1e-05,
+                            min_lr = 1e-06,
                             tau = 0.005,
                             gamma = 0.99,
                             data_conservation = True,
@@ -513,7 +513,7 @@ if __name__ == "__main__":
         finetune_buffer_cutoff_length = finetune_buffer_cutoff_length,
         train_buffer_cutoff_length = train_buffer_cutoff_length,
         finetune_steps = 300,
-        finetune_rounds = 100,
+        finetune_rounds = 60,
         diffusion_steps = 200,
         karras_percent = 0.05,
         Loss_Clip_percent = 0.75,
@@ -528,7 +528,7 @@ if __name__ == "__main__":
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value
-        rollout_num_envs = 5, 
+        rollout_num_envs = 3, 
         continual_rollout = True,
         chunk_size = 10,
         num_rollout_processes = 8,
@@ -538,5 +538,5 @@ if __name__ == "__main__":
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-    """
+    
     
