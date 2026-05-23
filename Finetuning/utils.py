@@ -271,6 +271,20 @@ def get_trajs(env_name, specific_env, step, task_id: Optional[int] = None):
         trajs = pickle.load(f)
     return trajs
 
+def save_success_trajs_for_reward(trajs, env_name, specific_env, task_id, step):
+    save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{task_id}/trajs_task{task_id}_success_{step}.pkl'
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    with open(save_path, 'wb') as f:
+        pickle.dump(trajs, f)
+    print("trajectories saved")
+
+def load_success_trajs(env_name, specific_env, task_id, step):
+    save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{task_id}/trajs_task{task_id}_success_{step}.pkl'
+    with open(save_path, 'rb') as f:
+        trajs = pickle.load(f)
+    return trajs
+
+
 class Lambda:
     def __init__(self, lam: float, beta: float, eta_lam: float):
         self.lam = lam
@@ -2158,7 +2172,7 @@ def rollout_parallel2(
                    trajs.append({
                       'observations': np.asarray(observations[env_idx].copy()),
                       'actions': np.asarray(acts[env_idx].copy()),
-                      'rewards': np.asarray(np.asarray(spare_reward_prcocessor(rewards[env_idx].copy())))
+                      'rewards': np.asarray(rewards[env_idx].copy())
         })     
      vec_env.close()
      success_rate = check_success_rate(trajs)
