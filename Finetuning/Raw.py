@@ -61,6 +61,8 @@ def check_cube_double_goal_reach(trajs, task_id):
     print(f"Task {task_id} average distance: {average_dist}")
 
 
+
+
 """
 path = f'./Finetuning/Rollouts/cube/single-play/task_4/trajs_task4_success_0.pkl'
 with open(path, 'rb') as f:

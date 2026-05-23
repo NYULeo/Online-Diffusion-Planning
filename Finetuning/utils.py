@@ -77,7 +77,7 @@ def spare_reward_prcocessor(rewards):
             new_rewards[i] = 1.0
         else:
             new_rewards[i] = 0.0
-    return np.array(new_rewards, dtype = np.float64) 
+    return new_rewards
 
 def reward_filter(obs, rews, goal):
     #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
@@ -305,7 +305,6 @@ class Lambda:
 def function(x, beta: float):
     return (1/beta)* np.log(1 + np.exp(x*beta))
 
-
 def getName(env_name, specific_env):
      if(env_name == 'kitchen'):
         
@@ -363,7 +362,6 @@ def getName(env_name, specific_env):
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
-
 def getName2(env_name, specific_env):
      if(env_name == 'kitchen'):
         
@@ -400,7 +398,6 @@ def getName2(env_name, specific_env):
               raise ValueError(f"Invalid Dataset name: {specific_env}")
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
-
 
 def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
      if(env_name == 'kitchen'):
@@ -442,7 +439,6 @@ def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
              raise ValueError(f"Invalid cube dataset name: {specific_env}")
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
-
 
 def get_RewardName(env_name, specific_env, task_id: Optional[int] = None):
      if(env_name == 'kitchen'):
@@ -494,7 +490,6 @@ def get_RewardName(env_name, specific_env, task_id: Optional[int] = None):
               raise ValueError(f"Invalid cube dataset name: {specific_env}")
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
-
 
 class KernelDataset(Dataset):
     def __init__(self, trajectories: List[TrajectoryDict], dataset_name: str, specific_dataset: str, step: int):
@@ -724,7 +719,7 @@ def train_reward(trajs: List[TrajectoryDict], dataset_name: str, hidden_layers: 
            pred = reward_net(s, a)
            loss = F.mse_loss(pred, r)
            loss.backward()
-           torch.nn.utils.clip_grad_norm_(reward_net.parameters(), max_norm = 1.0)
+           #torch.nn.utils.clip_grad_norm_(reward_net.parameters(), max_norm = 1.0)
            optimizer.step()
            scheduler.step()
            total_loss += loss.item()
@@ -796,7 +791,6 @@ def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_datase
     print(f"Kernel model saved")
     return threshold
 """
-
 
 """
 def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str,
@@ -1559,7 +1553,7 @@ def traj_cutoff(trajs, length):
 def get_success_trajs(trajs):
     success_trajs = []
     for traj in trajs:
-        if(traj['rewards'][-1] == 1):
+        if(traj['rewards'][-1] == 1.0):
             success_trajs.append(traj)
     return success_trajs
 
@@ -1735,7 +1729,6 @@ def karras_beta_schedule(
 
     return t, beta, sigma
 
-
 def clip_actions(x: torch.Tensor, d_s: int) -> torch.Tensor:
     actions = torch.clamp(x[..., d_s:], -1.0, 1.0)
     x[..., d_s:] = actions
@@ -1780,7 +1773,6 @@ def load_hyperparameters(filepath: str) -> Dict:
     with open(filepath, 'r') as f:
         hyperparams = json.load(f)
     return hyperparams
-
 
 def rollout_parallel(
     env_name, 
@@ -1946,7 +1938,6 @@ def rollout_parallel(
      #save_trajs(trajs, env_name, specific_env, checkpoint_step)
      #print(f"Average Normalized Score: {score:.2f}")
      return trajs, score, total_steps
-
 
 def rollout_parallel2(
      env_name, 
@@ -2577,7 +2568,6 @@ def check_success_rate(trajs: List[TrajectoryDict]):
             success += 1
     return success / len(trajs)
  
-
 def check_device():
     if torch.backends.mps.is_available():
         device = torch.device("mps")
@@ -2589,8 +2579,7 @@ def check_device():
         device = torch.device("cpu")
         print("⚠️  Falling back to CPU (no GPU acceleration)")
     return device 
-
-            
+      
 def compute_threshold_mahalanobis(kernels, dataloader, quantile):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     all_D2_total = []
