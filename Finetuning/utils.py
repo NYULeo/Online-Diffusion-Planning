@@ -2163,7 +2163,7 @@ def rollout_parallel2(
                    trajs.append({
                       'observations': np.asarray(observations[env_idx].copy()),
                       'actions': np.asarray(acts[env_idx].copy()),
-                      'rewards': np.asarray(rewards[env_idx].copy())
+                      'rewards': np.asarray(spare_reward_prcocessor(rewards[env_idx].copy()))
         })     
      vec_env.close()
      success_rate = check_success_rate(trajs)
