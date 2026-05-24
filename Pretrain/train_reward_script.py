@@ -130,11 +130,11 @@ if __name__ == '__main__':
 
 """
 
-from Pretrain.Dataset import get_dataset 
+
 if __name__ == '__main__':
     set_seed(1)
     
-    dataset_name = 'pointmaze'
+    dataset_name = 'ogpointmaze'
     specific_dataset = 'medium'
     task_id = 1
     
@@ -148,8 +148,8 @@ if __name__ == '__main__':
         batch_size = 256,
         num_steps = 12000,
         save_freq = 2000,
-        lr = 1e-05,
-        min_lr = 1e-05,
+        lr = 1e-04,
+        min_lr = 1e-04,
         sigma = 7.0,
         #alpha = 0.99,
         target_reward = 50.0,
