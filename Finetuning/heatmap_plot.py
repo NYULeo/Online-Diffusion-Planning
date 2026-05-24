@@ -1287,11 +1287,11 @@ if __name__ == '__main__':
     while(step <= 0):
          np.random.seed(0)
          random.seed(0)
-         critic_heatmap(step, env_name, specific_env, hidden_layers_critic, hidden_dim_critic)
+         #critic_heatmap(step, env_name, specific_env, hidden_layers_critic, hidden_dim_critic)
          #critic_heatmap(step, env_name, specific_env, hidden_layers_critic, hidden_dim_critic, num_heads_critic)
-         plot_critic_heatmap(step, env_name, specific_env, hidden_layers_critic, hidden_dim_critic)
-         #plot_reward_heatmap(step, env_name, specific_env, hidden_layers_reward, hidden_dim_reward)
-         #reward_heatmap(step, env_name, specific_env, hidden_layers_reward, hidden_dim_reward)
+         #plot_critic_heatmap(step, env_name, specific_env, hidden_layers_critic, hidden_dim_critic)
+         plot_reward_heatmap(step, env_name, specific_env, hidden_layers_reward, hidden_dim_reward)
+         reward_heatmap(step, env_name, specific_env, hidden_layers_reward, hidden_dim_reward)
 
          step += 10
     print('Done')
