@@ -141,7 +141,7 @@ if __name__ == '__main__':
 
     
    
-    
+    """
     train_reward(
         dataset_name = dataset_name,
         hidden_layers = 1,
@@ -159,7 +159,7 @@ if __name__ == '__main__':
         traj_length = None,
         trajs = None
     )
-
+    """
     test_Model(dataset_name = dataset_name, 
                hidden_layers = 1, 
                hidden_dim = 32, 
