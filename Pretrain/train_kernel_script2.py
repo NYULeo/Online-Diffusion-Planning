@@ -112,8 +112,7 @@ if __name__ == '__main__':  # pragma: no cover
     dataset = 'ogpointmaze'
     specific_dataset = 'medium'
     
-    #train_kernel(dataset_name = 'kitchen', batch_size = 256, lr = 1e-4, num_steps =  50000, ensemble_size=10, λ_reg=1e-3)
-    #train_kernel(dataset_name = 'pointmaze', specific_dataset ='medium', batch_size = 256, lr = 3e-4, num_steps = 50000, ensemble_size=10, λ_reg=1e-3)
+
     train_kernel(dataset_name = dataset, 
                  specific_dataset = specific_dataset, 
                  batch_size = 256, 

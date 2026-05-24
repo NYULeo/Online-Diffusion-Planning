@@ -147,13 +147,13 @@ if __name__ == '__main__':
         hidden_layers = 1,
         hidden_dim = 32, 
         batch_size = 256,
-        num_steps = 20000,
+        num_steps = 16000,
         save_freq = 2000,
-        lr = 1e-04,
-        min_lr = 1e-04,
+        lr = 5e-05,
+        min_lr = 5e-05,
         sigma = 7.0,
         #alpha = 0.99,
-        target_reward = 100.0,
+        target_reward = 80.0,
         specific_dataset = specific_dataset,
         task_id = task_id,
         traj_length = None,
@@ -167,11 +167,11 @@ if __name__ == '__main__':
                trajs = None, 
                sigma = 7.0, 
                alpha = None, 
-               target_reward = 100.0,
+               target_reward = 80.0,
                goal= None, 
                task_id = task_id, 
                traj_length = None, 
                save_freq = 2000, 
-               num_steps = 20000)
+               num_steps = 16000)
 
 
