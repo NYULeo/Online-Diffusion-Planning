@@ -119,8 +119,18 @@ if __name__ == '__main__':  # pragma: no cover
                  batch_size = 256, 
                  lr = 3e-4, 
                  num_steps = 1000, 
-                 save_freq = 500, 
+                 save_freq = 200, 
                  ensemble_size = 10, 
                  hidden_layers = 2, 
                  hidden_dim = 256,
                  λ_reg = 1e-3)
+    
+    test_kernel(dataset_name = dataset, 
+                specific_dataset = specific_dataset,
+                trajs = None,
+                save_freq = 200, 
+                num_steps = 1000, 
+                hidden_layers = 2, 
+                hidden_dim = 256, 
+                ensemble_size = 10, 
+                quantile = 0.999)
