@@ -680,10 +680,10 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
     print(f"Target reward: {target_reward}, Sigma: {sigma}, Alpha: {alpha}")
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     if(trajs is None): 
-        train_Trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+        train_Trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, goal, traj_length)
         dataset = RewardDataset(train_Trajs, reward_name, sigma, alpha, target_reward, goal)
     else:
-        train_trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+        train_trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, goal, traj_length)
         trajs = trajs + train_trajs
         dataset = test_dataset(trajs, reward_name, sigma, alpha, target_reward, goal)
     print(f"Testing the reward model on {len(dataset)} samples")

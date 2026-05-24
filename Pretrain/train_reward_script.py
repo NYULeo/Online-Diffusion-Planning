@@ -140,24 +140,38 @@ if __name__ == '__main__':
     
 
     
-    
+   
     
     train_reward(
         dataset_name = dataset_name,
-        hidden_layers = 2,
-        hidden_dim = 128, 
+        hidden_layers = 1,
+        hidden_dim = 32, 
         batch_size = 256,
         num_steps = 5000,
         save_freq = 1000,
-        lr = 1e-05,
-        min_lr = 1e-06,
+        lr = 1e-04,
+        min_lr = 1e-04,
         sigma = 7.0,
         #alpha = 0.99,
-        target_reward = 20.0,
+        target_reward = 50.0,
         specific_dataset = specific_dataset,
         task_id = task_id,
         traj_length = None,
         trajs = None
     )
+
+    test_Model(dataset_name = dataset_name, 
+               hidden_layers = 1, 
+               hidden_dim = 32, 
+               specific_dataset  = specific_dataset, 
+               trajs = None, 
+               sigma = 7.0, 
+               alpha = None, 
+               target_reward = 50.0,
+               goal= None, 
+               task_id = task_id, 
+               traj_length = None, 
+               save_freq = 500, 
+               num_step = 5000)
 
 
