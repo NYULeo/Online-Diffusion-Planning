@@ -94,12 +94,38 @@ def check_speration(trajs):
 
 if __name__ == "__main__":
      set_seed(1)
-     data = get_dataset('pointmaze', 'medium', goal = np.array([[-2.5, -2.5]], dtype = np.float32))
+     dataset_name = 'ogpointmaze'
+     specific_dataset = 'medium'
+     task_id = 1
+     env, _, _ = get_env(dataset_name, specific_dataset, render_mode = 'rgb_array')
+     data = get_dataset(dataset_name, specific_dataset, task_id, mode = 'critic' )
+     
      trajs = data.get_trajectories()
-     for traj in trajs:
-        print(len(traj['observations']))
-        print(len(traj['actions']))
-        print(len(traj['rewards']))
+     
+     traj = trajs[2]
+     #env = gym.make("antmaze-medium-v0") 
+     obs0 = traj["observations"][0]
+     
+     
+     obs, _  = env.reset(seed=0)  # optional fixed seed for determinism
+     
+     
+     frames = []
+     rewards = []
+     for i in range(len(traj['actions'])):
+          action = traj['actions'][i]
+            #action = np.clip(action, -1.0, 1.0)
+          _, reward, terminated, truncated, _ = env.step(action)
+          rewards.append(reward)
+          frames.append(env.render())
+          if terminated or truncated:
+               break
+     print(sum(spare_reward_checker(rewards)))
+     print(len(frames))
+     #print(rewards)
+     #print(len(frames))
+     media.write_video("demo2.mp4", frames, fps=50)
+     env.close()
 
 
 

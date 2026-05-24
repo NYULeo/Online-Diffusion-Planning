@@ -598,6 +598,7 @@ class OnlineFinetuner():
                  print(f"Finetuning round {step+1} started")
                 
             
+            #self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
             self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
             self.accelerator.wait_for_everyone()
             

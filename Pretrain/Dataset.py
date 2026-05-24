@@ -43,7 +43,7 @@ def determine_stride(dataset_name, specific_dataset):
 #------------------------------------- Dataset ---------------------------------------#
 #-------------------------------------------------------------------------------------#
 def get_env(env_name, specific_env, render_mode = None, task_id: Optional[int] = None, goal: Optional[np.array] = None, episode_length: Optional[int] = None):
-    data = get_dataset(env_name, specific_env, task_id, goal,episode_length)
+    data = get_dataset(env_name, specific_env, task_id, goal, episode_length)
     env = data.get_env(render_mode)
     d_s = data.get_state_dim()
     d_a = data.get_action_dim()
@@ -587,6 +587,7 @@ class OGPointmazeDataset:
         self.env, self.dataset, self.eval_dataset = ogbench.make_env_and_datasets(
                  self.dataset_id, render_mode="rgb_array"
             )
+       
 
 
     def get_trajectories(self) -> List[Dict[str, np.ndarray]]:

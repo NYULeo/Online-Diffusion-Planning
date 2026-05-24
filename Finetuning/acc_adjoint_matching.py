@@ -189,16 +189,18 @@ class Acc_AdjointMatchingFineTuner:
               p.requires_grad_(False)
         self.old_score_net.eval()
     
-    def reset_old_score_net(self, old_score_net: DiT1d):
-
+    def reset_old_score_net(self, old_planner_checkpoint: int):
+        state_dict = get_planner(self.config.dataset_name, self.config.specific_dataset, old_planner_checkpoint)
         #state_dict = get_pretrained_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
         if( self.config.dataset_name == 'kitchen'):
               self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
         elif (self.config.dataset_name == 'pointmaze'):
               self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
+        elif (self.config.dataset_name == 'cube'):
+              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
         else:
               raise ValueError(f"Invalid Environment: {self.config.dataset_name}")
-        self.old_score_net.load_state_dict(old_score_net.state_dict())
+        self.old_score_net.load_state_dict(state_dict)
         for p in self.old_score_net.parameters():
               p.requires_grad_(False)
         self.old_score_net.eval()
@@ -657,9 +659,9 @@ class Acc_AdjointMatchingFineTuner:
 
 
     
-    def finetune_planner(self, dataloader: DataLoader, reward_model: Union[TotalReward, TotalReward_Critic], round: int, old_score_net: Optional[DiT1d] = None):
-        if old_score_net is not None:
-            self.reset_old_score_net(old_score_net)
+    def finetune_planner(self, dataloader: DataLoader, reward_model: Union[TotalReward, TotalReward_Critic], round: int, old_planner_checkpoint: Optional[int] = None):
+        if old_planner_checkpoint is not None:
+            self.reset_old_score_net(old_planner_checkpoint)
             self.set_new_score_net()
         reward_model.eval()
         
