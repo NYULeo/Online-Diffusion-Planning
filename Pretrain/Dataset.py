@@ -789,6 +789,17 @@ def get_PlannerName(env_name, specific_env):
               return 'Cube_QuadrupleNoisy_Planner'
          else:
               raise ValueError(f"Invalid cube dataset name: {specific_env}")
+     elif(env_name == 'ogpointmaze'):
+         if specific_env == 'medium':
+              return 'OG2DMaze_Medium_Planner'
+         elif specific_env == 'large':
+              return 'OG2DMaze_Large_Planner'
+         elif specific_env == 'giant':
+              return 'OG2DMaze_Giant_Planner'
+         
+         else:
+              raise ValueError(f"Invalid ogpointmaze dataset name: {specific_env}")
+
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 

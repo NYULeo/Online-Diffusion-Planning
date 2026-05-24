@@ -599,6 +599,16 @@ def getName(env_name, specific_env):
             return 'Cube_QuadrupleNoisy'
          else:
             raise ValueError(f"Invalid cube dataset name: {specific_env}")
+
+     elif(env_name == 'ogpointmaze'):
+         if specific_env == 'medium':
+             return 'OG2DMaze_Medium'
+         elif specific_env == 'large':
+            return 'OG2DMaze_Large'
+         elif specific_env == 'giant':
+            return 'OG2DMaze_Giant'
+         else:
+            raise ValueError(f"Invalid ogpointmaze dataset name: {specific_env}")
      else:
            raise ValueError(f"Invalid environment name: {env_name}")
 
