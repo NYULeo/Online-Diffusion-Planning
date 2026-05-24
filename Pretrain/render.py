@@ -98,8 +98,8 @@ if __name__ == "__main__":
      specific_dataset = 'medium'
      task_id = 1
      env, _, _ = get_env(dataset_name, specific_dataset, render_mode = 'rgb_array')
-     data = get_dataset(dataset_name, specific_dataset, task_id, mode = 'critic' )
-     
+     data = get_dataset(dataset_name, specific_dataset, task_id = task_id, mode = 'critic')
+     count = 0
      trajs = data.get_trajectories()
      
      traj = trajs[2]
@@ -109,7 +109,9 @@ if __name__ == "__main__":
      
      obs, _  = env.reset(seed=0)  # optional fixed seed for determinism
      
-     
+     print(obs)
+     print(obs0)
+     exit()
      frames = []
      rewards = []
      for i in range(len(traj['actions'])):

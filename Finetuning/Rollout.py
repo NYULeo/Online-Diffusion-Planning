@@ -480,8 +480,6 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      return sum(rewards), len(observations)
      #print(get_normalized_score([traj]))
  
-
-
 def load_kernel(env_name, specific_env, checkpoint_steps, kernel_config: Kernel_Config, device: str):
     from Pretrain.Transition_Kernel.Kernel_Backbone import MoGTransitionKernel
     from Finetuning.utils import get_kernel, get_kernel_stats
@@ -801,7 +799,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 20
+    checkpoint = 15
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}, checkpoint: {checkpoint}")
@@ -809,7 +807,7 @@ if __name__ == "__main__":
     
     set_seed(1)
     total_return = 0
-    for j in range(5, 51):
+    for j in range(0, 51):
         return_value, steps = rollout(
                env_name, 
                specific_train_dataset, 
@@ -824,7 +822,7 @@ if __name__ == "__main__":
                #goal_cell = np.array([6, 1], dtype = int), 
                task_id = task_id,
                continual_rollout = True,
-               chunk_size = 31,
+               chunk_size = 20,
                device = device)
         total_return += return_value
         print(return_value)
