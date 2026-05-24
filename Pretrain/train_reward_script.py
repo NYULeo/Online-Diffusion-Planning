@@ -130,30 +130,29 @@ if __name__ == '__main__':
 
 """
 
-
+from Pretrain.Dataset import get_dataset 
 if __name__ == '__main__':
     set_seed(1)
     
-    dataset_name = 'ogpointmaze'
+    dataset_name = 'pointmaze'
     specific_dataset = 'medium'
     task_id = 1
     
-
     
-   
+    
     
     train_reward(
         dataset_name = dataset_name,
         hidden_layers = 1,
         hidden_dim = 32, 
         batch_size = 256,
-        num_steps = 16000,
+        num_steps = 12000,
         save_freq = 2000,
-        lr = 1e-04,
-        min_lr = 1e-04,
-        sigma = 10.0,
+        lr = 5e-05,
+        min_lr = 5e-05,
+        sigma = 7.0,
         #alpha = 0.99,
-        target_reward = 80.0,
+        target_reward = 50.0,
         specific_dataset = specific_dataset,
         task_id = task_id,
         traj_length = None,
@@ -165,13 +164,13 @@ if __name__ == '__main__':
                hidden_dim = 32, 
                specific_dataset  = specific_dataset, 
                trajs = None, 
-               sigma = 10.0, 
+               sigma = 7.0, 
                alpha = None, 
-               target_reward = 80.0,
+               target_reward = 50.0,
                goal= None, 
                task_id = task_id, 
                traj_length = None, 
                save_freq = 2000, 
-               num_steps = 16000)
+               num_steps = 12000)
 
 
