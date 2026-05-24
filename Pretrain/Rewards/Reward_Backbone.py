@@ -717,6 +717,7 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
          avg_mean_loss = total_mean_loss / len(dataloader)
          avg_reward = total_reward / len(dataloader)
          print(f"model {num}, Loss {avg_mean_loss:.4f}, Reward: {avg_reward:.4f}")
+         
          Rewards = np.array(Rewards)
          mean_R = Rewards.mean()
          std_R = Rewards.std()
@@ -726,6 +727,7 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
          print(f'std_reward: {std_R:.4f}')
          print(f"max_reward: {max_R:.4f}")
          print(f"min_reward: {min_R:.4f}")
+        
          num += save_freq
 
 def get_pretrained_reward(dataset_name, checkpoints, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):

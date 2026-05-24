@@ -141,25 +141,25 @@ if __name__ == '__main__':
 
     
    
-    """
+    
     train_reward(
         dataset_name = dataset_name,
         hidden_layers = 1,
         hidden_dim = 32, 
         batch_size = 256,
-        num_steps = 16000,
+        num_steps = 20000,
         save_freq = 2000,
         lr = 1e-04,
         min_lr = 1e-04,
         sigma = 7.0,
         #alpha = 0.99,
-        target_reward = 50.0,
+        target_reward = 100.0,
         specific_dataset = specific_dataset,
         task_id = task_id,
         traj_length = None,
         trajs = None
     )
-    """
+    
     test_Model(dataset_name = dataset_name, 
                hidden_layers = 1, 
                hidden_dim = 32, 
@@ -167,11 +167,11 @@ if __name__ == '__main__':
                trajs = None, 
                sigma = 7.0, 
                alpha = None, 
-               target_reward = 50.0,
+               target_reward = 100.0,
                goal= None, 
                task_id = task_id, 
                traj_length = None, 
                save_freq = 2000, 
-               num_steps = 16000)
+               num_steps = 20000)
 
 
