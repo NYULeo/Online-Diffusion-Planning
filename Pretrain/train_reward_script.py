@@ -73,7 +73,7 @@ if __name__ == '__main__':
     goal = np.array([[4.0, -3.0]], dtype = np.float32))
 
 """
-
+"""
 
 if __name__ == '__main__':
     set_seed(1)
@@ -128,8 +128,36 @@ if __name__ == '__main__':
 
 
 
+"""
 
 
+if __name__ == '__main__':
+    set_seed(1)
+    
+    dataset_name = 'ogpointmaze'
+    specific_dataset = 'medium'
+    task_id = 1
+    
 
+    
+    
+    
+    train_reward(
+        dataset_name = dataset_name,
+        hidden_layers = 1,
+        hidden_dim = 32, 
+        batch_size = 256,
+        num_steps = 1000,
+        save_freq = 500,
+        lr = 1e-04,
+        min_lr = 1e-04,
+        sigma = 7.0,
+        #alpha = 0.99,
+        target_reward = 20.0,
+        specific_dataset = specific_dataset,
+        task_id = task_id,
+        traj_length = None,
+        trajs = None
+    )
 
 

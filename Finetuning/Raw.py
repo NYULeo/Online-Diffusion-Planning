@@ -64,16 +64,6 @@ def check_cube_double_goal_reach(trajs, task_id):
 
 
 """
-path = f'./Finetuning/Rollouts/cube/single-play/task_4/trajs_task4_success_0.pkl'
-with open(path, 'rb') as f:
-    trajs = pickle.load(f)
-
-data = get_dataset('cube', 'double-play', task_id = 5, traj_length = None)
-trajs = data.get_trajectories()
-"""
-
-
-"""
 env_steps = [0, 1592, 1590, 1600, 1411, 1416, 1600, 1555, 1422, 1600, 1599, 1554]
 total_steps = [0]
 for i in range(1, len(env_steps)):

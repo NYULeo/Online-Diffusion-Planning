@@ -51,7 +51,7 @@ if __name__ == '__main__':  # pragma: no cover
     
 
 
-    
+    """
     dataset = 'cube'
     specific_dataset = 'single-play'
     trajs = load_success_trajs(dataset, specific_dataset, task_id = 4, step = 0)
@@ -72,7 +72,7 @@ if __name__ == '__main__':  # pragma: no cover
          hidden_dim = 514,
          λ_reg = 1e-3,
          noise_floor = 5e-4)
-
+    """
    
     """
     test_kernel_mog(dataset_name = dataset,
@@ -90,27 +90,6 @@ if __name__ == '__main__':  # pragma: no cover
     """
     
     
-    print("Testing Kernel on Generated trajs: ")
-    dataset = 'cube'
-    specific_dataset = 'single-play'
-    kernel_config = Kernel_Config(type_kernel = 'mog',
-                                  kernel_num_modes = 10,
-                                  kernel_noise_floor = 5e-4,
-                                  num_hidden_layers = 4,
-                                  hidden_dim = 514,
-                                  ensemble_size = 10)
-    Test_Kernel_on_Generated_Trajs(
-        env_name = dataset, 
-        specific_env = specific_dataset, 
-        horizon = 32, 
-        kernel_config = kernel_config,
-        steps_T = 200, 
-        num_karras = 10, 
-        eta = 0.8, 
-        time = 500, 
-        planner_checkpoint = 0,
-        kernel_checkpoint = 0,
-        task_id = 4)
     
       
     
@@ -130,4 +109,18 @@ if __name__ == '__main__':  # pragma: no cover
                 ensemble_size = 10)
     """
     
+    dataset = 'ogpointmaze'
+    specific_dataset = 'medium'
     
+    #train_kernel(dataset_name = 'kitchen', batch_size = 256, lr = 1e-4, num_steps =  50000, ensemble_size=10, λ_reg=1e-3)
+    #train_kernel(dataset_name = 'pointmaze', specific_dataset ='medium', batch_size = 256, lr = 3e-4, num_steps = 50000, ensemble_size=10, λ_reg=1e-3)
+    train_kernel(dataset_name = dataset, 
+                 specific_dataset = specific_dataset, 
+                 batch_size = 256, 
+                 lr = 3e-4, 
+                 num_steps = 1000, 
+                 save_freq = 500, 
+                 ensemble_size = 10, 
+                 hidden_layers = 2, 
+                 hidden_dim = 256,
+                 λ_reg = 1e-3)

@@ -6,7 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(project_root)
 from typing import Optional
-from Dataset import CubeDataset_Singletask, KitchenDataset, PointMazeDataset, get_dataset, get_env, CubeDataset
+from Dataset import CubeDataset_Singletask, KitchenDataset, PointMazeDataset, get_dataset, get_env, CubeDataset, OGPointmazeDataset_Singletask
 import random
 from torch.utils.data import Dataset, DataLoader
 import torch
@@ -37,13 +37,12 @@ class TrajectoryDict(TypedDict):
     rewards: np.ndarray
 
 
+
 def check_specifc_dataset(dataset_name):
     if(dataset_name == 'kitchen'):
          return False
-    elif(dataset_name == 'pointmaze'):
-         return True
-    elif(dataset_name == 'cube'):
-         return True
+    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze']:
+        return True
 
 def get_trajs(env_name, specific_env, step, task_id: Optional[int] = None):
     if(task_id is not None):
@@ -102,6 +101,17 @@ def getName(env_name, specific_env, task_id: Optional[int] = None):
               return f'Cube_Quadruple_Task{task_id}'
          else:
               raise ValueError(f"Invalid cube dataset name: {specific_env}")
+     elif(env_name == 'ogpointmaze'):
+         if(task_id is None):
+            raise ValueError('Task ID is required for ogpointmaze dataset')
+         if specific_env == 'medium':
+              return f'OG2DMaze_medium_task{task_id}'
+         elif specific_env == 'large'  :
+              return f'OG2DMaze_large_task{task_id}'
+         elif specific_env == 'giant':
+              return  f'OG2DMaze_giant_task{task_id}'
+         else:
+              raise ValueError(f"Invalid ogpointmaze dataset name: {specific_env}")
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
@@ -301,6 +311,25 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
          elif(specific_dataset == 'umaze'):
               data = PointMazeDataset('umaze', goal, mode = 'reward')
               name = '2DMaze_Reward_umaze'
+         else: 
+              raise ValueError(f"Invalid dataset name: {specific_dataset}")
+         obs_dim = data.get_state_dim()
+         act_dim = data.get_action_dim()
+         trajs = data.get_trajectories()
+         return trajs, name, obs_dim, act_dim
+
+    elif(dataset_name == 'ogpointmaze'):
+         if(specific_dataset is None): 
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+         elif(specific_dataset == 'medium'):
+              data = OGPointmazeDataset_Singletask('medium', task_id, mode = 'reward')
+              name = 'OG2DMaze_Reward_medium'
+         elif(specific_dataset == 'large'):
+              data = OGPointmazeDataset_Singletask('large', task_id, mode = 'reward')
+              name = 'OG2DMaze_Reward_large'
+         elif(specific_dataset == 'giant'):
+              data = OGPointmazeDataset_Singletask('giant', task_id, mode = 'reward')
+              name = 'OG2DMaze_Reward_giant'
          else: 
               raise ValueError(f"Invalid dataset name: {specific_dataset}")
          obs_dim = data.get_state_dim()

@@ -10,7 +10,7 @@ import torch
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
-from Pretrain.Dataset import CubeDataset_Singletask, KitchenDataset, PointMazeDataset, CubeDataset
+from Pretrain.Dataset import CubeDataset_Singletask, KitchenDataset, OGPointmazeDataset, OGPointmazeDataset_Singletask, PointMazeDataset, CubeDataset
 from .Kernel_Net import  RobustTransitionKernel, MoGTransitionKernel
 from sympy import factorint
 import pickle
@@ -28,7 +28,7 @@ import json
 def check_specifc_dataset(dataset_name):
     if(dataset_name == 'kitchen'):
          return False
-    elif dataset_name in ['pointmaze', 'cube']:
+    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze']:
         return True
 
 def getName(env_name, specific_env):
@@ -75,6 +75,16 @@ def getName(env_name, specific_env):
                return 'Cube_Triple'
           elif specific_env == 'quadruple':
                return 'Cube_Quadruple'
+          else:
+               raise ValueError(f"Invalid cube dataset name: {specific_env}")
+
+     elif(env_name == 'ogpointmaze'):
+          if specific_env == 'medium':
+               return 'OG2DMaze_medium'
+          elif specific_env == 'large':
+               return 'OG2DMaze_large'
+          elif specific_env == 'giant':
+               return 'OG2DMaze_giant'
           else:
                raise ValueError(f"Invalid cube dataset name: {specific_env}")
      else:
@@ -370,6 +380,36 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
         obs_dim = data_1.get_state_dim()
         act_dim = data_1.get_action_dim()
         return trajs, name, obs_dim, act_dim
+
+    elif(dataset_name == 'ogpointmaze'):
+        
+        if(specific_dataset is None): 
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+        elif(specific_dataset == 'medium'):
+             data_1 = OGPointmazeDataset('medium')
+             if(task_id is not None):
+                 data_2 = OGPointmazeDataset_Singletask('medium', task_id, mode = 'reward')
+             name = 'OG2DMaze_Kernel_medium'
+        elif(specific_dataset == 'large'):
+             data_1 =  OGPointmazeDataset('large')
+             if(task_id is not None):
+                 data_2 = OGPointmazeDataset_Singletask('large', task_id, mode = 'reward')
+             name = 'OG2DMaze_Kernel_large'
+        elif(specific_dataset == 'giant'):
+             data_1 = OGPointmazeDataset('giant')
+             if(task_id is not None):
+                 data_2 = OGPointmazeDataset_Singletask('giant', task_id, mode = 'reward')
+             name = 'Cube_Kernel_giant'
+        else: 
+            raise ValueError(f"Invalid dataset name: {specific_dataset}")
+        if(task_id is not None):
+            trajs = data_1.get_trajectories() + data_2.get_trajectories() 
+        else:
+            trajs = data_1.get_trajectories()
+        obs_dim = data_1.get_state_dim()
+        act_dim = data_1.get_action_dim()
+        return trajs, name, obs_dim, act_dim
+
     else:
         raise ValueError(f"Invalid Dataset Name: {dataset_name}")   
              
