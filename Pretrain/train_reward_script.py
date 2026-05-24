@@ -144,11 +144,11 @@ if __name__ == '__main__':
     
     train_reward(
         dataset_name = dataset_name,
-        hidden_layers = 1,
+        hidden_layers = 2,
         hidden_dim = 128, 
         batch_size = 256,
-        num_steps = 2000,
-        save_freq = 500,
+        num_steps = 5000,
+        save_freq = 1000,
         lr = 1e-05,
         min_lr = 1e-06,
         sigma = 7.0,
