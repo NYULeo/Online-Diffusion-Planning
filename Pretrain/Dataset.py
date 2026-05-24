@@ -200,6 +200,8 @@ class PointMazeDataset():
                self.dataset = minari.load_dataset('D4RL/pointmaze/large-dense-v2', download = True)
           elif name == 'medium':
                self.dataset = minari.load_dataset('D4RL/pointmaze/medium-v2', download = True)
+          elif name == 'medium_dense':
+               self.dataset = minari.load_dataset('D4RL/pointmaze/medium-dense-v2', download = True)
           elif name == 'umaze_dense':
                self.dataset = minari.load_dataset('D4RL/pointmaze/umaze-dense-v2', download = True)
           elif name == 'large':
@@ -309,17 +311,18 @@ class PointMazeDataset():
      def get_env(self, render_mode):
           
           gym.register_envs(gymnasium_robotics)
+
           if(self.name == 'medium'):
-              env = gym.make('PointMaze_Medium-v3', max_episode_steps = 1000, render_mode = render_mode, continuing_task=False)
+              env = gym.make('PointMaze_Medium-v3', max_episode_steps = 600, render_mode = render_mode, continuing_task=False)
           elif(self.name == 'large'):
-              env = gym.make('PointMaze_Large-v3', max_episode_steps = 1000, render_mode = render_mode, continuing_task=False)
+              env = gym.make('PointMaze_Large-v3', max_episode_steps = 800, render_mode = render_mode, continuing_task=False)
           elif(self.name == 'umaze'):
-              env = gym.make('PointMaze_Umaze-v3', max_episode_steps = 1000, render_mode = render_mode, continuing_task=False)
+              env = gym.make('PointMaze_Umaze-v3', max_episode_steps = 600, render_mode = render_mode, continuing_task=False)
           else:
               raise ValueError(f'Invalid dataset name')
           return env
           
-          #return self.dataset.recover_environment(render_mode = render_mode)
+        
           
           #return self.dataset.recover_environment(render_mode = 'rgb_array', continuing_task=True, reset_target=False, eval_env=True)
 

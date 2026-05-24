@@ -650,7 +650,7 @@ if __name__ == "__main__":
             continual_rollout = False,
             chunk_size = 10)
     """
-    """
+    
     horizon = 70
     env_name = 'pointmaze'
     specific_train_dataset = 'large'
@@ -668,8 +668,8 @@ if __name__ == "__main__":
             goal_cell = np.array([7, 10], dtype = int), 
             start_cell = np.array([1, 1], dtype = int), 
             continual_rollout = True,
-            chunk_size = 10)
-    """
+            chunk_size = 40)
+    exit()
     """
     horizon = 32
     env_name = 'kitchen'

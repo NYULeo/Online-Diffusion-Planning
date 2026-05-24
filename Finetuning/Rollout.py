@@ -340,12 +340,11 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      #device = check_device()
      #device = "cuda" if torch.cuda.is_available() else "cpu"
      #print(f"Using device {device}")
-     
+     import minari
      #env.reset(seed=1)  # Important: pass seed to env.reset
      env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', task_id = task_id, episode_length = None)
      #env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', episode_length = episode_length)
      #np.random.seed(base_seed)
-     
     
     # 2. Reset environment with both seed and task_id
      #env.reset(seed=base_seed)   # Important first reset
@@ -477,8 +476,8 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      #print(sum(traj['rewards']))
      #return traj
      
-    
-     return rewards[-1], len(observations)
+     #return rewards[-1], len(observations)
+     return sum(rewards), len(observations)
      #print(get_normalized_score([traj]))
  
 
@@ -756,7 +755,7 @@ if __name__ == "__main__":
                explore = False)
     selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
     device = check_device()
-    set_seed(1)
+    set_seed(2)
     total_return = 0
     i = 1
     total_steps = 0
@@ -768,16 +767,17 @@ if __name__ == "__main__":
             num_karras = 3, 
             eta = 0.8, 
             episode_length = 3000, 
-            checkpoint_steps = 80, 
+            checkpoint_steps = 50, 
             render = True,  
             base_seed = i, 
             goal_cell = np.array([6, 1], dtype = int), 
-            continual_rollout = True,
-            chunk_size = 10,
+            start_cell = np.array([4, 6], dtype = int),
+            continual_rollout = False,
+            chunk_size = 31,
             device = device,
             selector = None)
        total_steps += steps
-       #print(total_steps)
+       print(total_steps)
        print(return_value)
        exit()
        if(total_steps > 10000):
@@ -801,7 +801,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 5
+    checkpoint = 10
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}, checkpoint: {checkpoint}")
@@ -809,7 +809,7 @@ if __name__ == "__main__":
     
     set_seed(1)
     total_return = 0
-    for j in range(4, 51):
+    for j in range(14, 51):
         return_value, steps = rollout(
                env_name, 
                specific_train_dataset, 
@@ -824,7 +824,7 @@ if __name__ == "__main__":
                #goal_cell = np.array([6, 1], dtype = int), 
                task_id = task_id,
                continual_rollout = True,
-               chunk_size = 31,
+               chunk_size = 20,
                device = device)
         total_return += return_value
         print(return_value)

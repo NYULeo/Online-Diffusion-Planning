@@ -452,6 +452,8 @@ def get_RewardName(env_name, specific_env, task_id: Optional[int] = None):
                return 'PointMaze_LargeDense'
           elif specific_env== 'medium':
                return 'PointMaze_Medium'
+          elif specific_env == 'medium_dense':
+               return 'PointMaze_MediumDense'
           elif specific_env == 'umaze_dense':
                return 'PointMaze_UmazeDense'
           elif specific_env == 'large':
@@ -2564,7 +2566,7 @@ def checktrajs(trajs):
 def check_success_rate(trajs: List[TrajectoryDict]):
     success = 0
     for traj in trajs:
-        if(traj['rewards'][-1] == 1):
+        if(traj['rewards'][-1] == 1.0):
             success += 1
     return success / len(trajs)
  
