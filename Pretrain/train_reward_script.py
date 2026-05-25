@@ -73,7 +73,7 @@ if __name__ == '__main__':
     goal = np.array([[4.0, -3.0]], dtype = np.float32))
 
 """
-"""
+
 
 if __name__ == '__main__':
     set_seed(1)
@@ -97,9 +97,9 @@ if __name__ == '__main__':
         save_freq = 2000,
         lr = 5e-05,
         min_lr = 8e-06,
-        sigma = 3.0,
+        sigma = 5.0,
         #alpha = 0.99,
-        target_reward = 80.0,
+        target_reward = 200.0,
         specific_dataset = specific_dataset,
         task_id = task_id,
         traj_length = traj_length,
@@ -117,9 +117,9 @@ if __name__ == '__main__':
         hidden_dim = 512,
         specific_dataset = specific_dataset, 
         trajs = trajs,
-        sigma = 3.0,
+        sigma = 5.0,
         #alpha = 0.99, 
-        target_reward = 80.0,
+        target_reward = 200.0,
         task_id = task_id,
         traj_length = traj_length,
         save_freq = 10000, 
@@ -128,9 +128,9 @@ if __name__ == '__main__':
 
 
 
+
+
 """
-
-
 if __name__ == '__main__':
     set_seed(1)
     
@@ -173,4 +173,4 @@ if __name__ == '__main__':
                save_freq = 2000, 
                num_steps = 12000)
 
-
+"""
