@@ -23,10 +23,35 @@ import gymnasium as gym
 import gymnasium_robotics
 from Pretrain.Dataset import get_dataset
 from gymnasium.wrappers import TimeLimit
-from typing import Optional
+from typing import Optional, List
 #from utils import get_normalized_score, rollout_parallel3, get_current_state, get_trajs, spare_reward_prcocessor, compute_threshold_log_prob_mog, compute_threshold_mahalanobis_mog
 from dataclasses import dataclass
 import time
+from Finetuning.traj_reward import TotalReward_Critic, RewardConfig, TotalReward
+class Selector():
+    def __init__(self, env_name, specific_env, RConfig: RewardConfig, reward_checkpoint: int, kernel_checkpoint: Optional[int] = None, critic_checkpoint: Optional[int] = None):
+         self.env_name = env_name
+         self.specific_env = specific_env
+         self.RConfig = RConfig
+         self.reward_checkpoint = reward_checkpoint
+         self.kernel_checkpoint = kernel_checkpoint
+         self.critic_checkpoint = critic_checkpoint
+         self.device = check_device()
+         self.lam = 0.05
+         if(critic_checkpoint is not None):
+            self.model = TotalReward_Critic(self.device, RConfig, env_name, specific_env, self.reward_checkpoint, self.kernel_checkpoint, self.critic_checkpoint)
+         else:
+            self.model = TotalReward(self.device, RConfig, env_name, specific_env, self.reward_checkpoint, self.kernel_checkpoint)
+         self.model.eval()
+    
+    def select_plan(self, plans: List[np.ndarray]) -> np.ndarray:
+         rewards = []
+         with torch.no_grad():
+            for plan in plans:
+             plan_tensor = torch.from_numpy(plan).float().to(self.device) 
+             reward = self.model.predict(plan_tensor, self.lam)
+             rewards.append(reward.item())
+         return plans[rewards.index(max(rewards))].copy()
 
 def check(env):
     print("Reward type:", getattr(env, 'reward_type', 'Not found'))
@@ -305,25 +330,19 @@ def load_success_trajs(env_name, specific_env, task_id, step):
     with open(save_path, 'rb') as f:
         trajs = pickle.load(f)
     return trajs
- 
-def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None, task_id: Optional[int] = None, base_seed: int = 0, continual_rollout = False, chunk_size = 5, device = None):
+
+def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None, task_id: Optional[int] = None, base_seed: int = 0, continual_rollout = False, chunk_size = 5, device = None, selector: Optional[Selector] = None):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      #print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}, episode_length: {episode_length}")
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      #device = check_device()
      #device = "cuda" if torch.cuda.is_available() else "cpu"
      #print(f"Using device {device}")
-     
-     
+     import minari
      #env.reset(seed=1)  # Important: pass seed to env.reset
      env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', task_id = task_id, episode_length = None)
      #env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', episode_length = episode_length)
      #np.random.seed(base_seed)
-     """
-     if hasattr(env, 'action_space'):
-        env.action_space.seed(base_seed)
-        env.unwrapped._permute_blocks = False
-     """
     
     # 2. Reset environment with both seed and task_id
      #env.reset(seed=base_seed)   # Important first reset
@@ -338,6 +357,8 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
            model = DiT1d(in_dim = (d_s), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
      elif(env_name == 'cube'):
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     elif(env_name == 'ogpointmaze'):
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
      else:
           raise ValueError(f"Invalid Environment: {env_name}")
      model.load_state_dict(state_dict)
@@ -349,29 +370,22 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      
      #reset
      if(env_name == 'cube'):
-        #s0, info = env.reset(seed = base_seed, options = dict( task_id=task_id))
-        s0, info = env.reset(seed = base_seed)
+         s0, info = env.reset(seed = base_seed, options = dict( task_id=task_id))
+         #s0, info = env.reset(seed = base_seed)
         #s0, info = env.reset()
-     if(goal_cell is not None and start_cell is not None):
-        s0 = env.reset(seed = base_seed, options = {"goal_cell": goal_cell, "reset_cell": start_cell})
+     elif(env_name == 'ogpointmaze'):
+         s0, info = env.reset(seed = base_seed, options = dict( task_id=task_id))
+
+     elif(goal_cell is not None and start_cell is not None):
+         s0 = env.reset(seed = base_seed, options = {"goal_cell": goal_cell, "reset_cell": start_cell})
         #s0, info = env.reset( options = {"goal_cell": goal_cell, "reset_cell": start_cell})
      elif(goal_cell is not None):
          s0 = env.reset(seed = base_seed, options = {"goal_cell": goal_cell})
      else:
-        s0 = env.reset(seed = base_seed)
+         s0 = env.reset(seed = base_seed)
         #s0, info = env.reset()
      
-     #check(env)
-     #exit()
-     """
-     if(env_name == 'antmaze'):
-          current_state = np.concatenate([
-               s0[0]['observation'],
-               s0[0]['achieved_goal']
-           ])
-     else:
-         current_state = s0[0]['observation']
-     """
+     
      current_state = get_current_state(s0[0], env_name)
      frames = []
      observations = []
@@ -386,8 +400,13 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
            if(continual_rollout):
                 if(len(Temp_acts) == 0):
                      current_state_norm = planner_processor.preprocess(current_state)
-                     #x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
-                     x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                     if(selector is None):
+                         x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                     else:
+                         Plans = []
+                         for j in range(30):
+                              Plans.append(sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device))
+                         x = selector.select_plan(Plans)
                      for k in range(min(chunk_size, len(x))):
                          Temp_acts.append(x[k, d_s:(d_s+d_a)].copy())
                      for k in range(1, min(chunk_size, len(x))):
@@ -408,7 +427,13 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
            else:
                 current_state_norm = planner_processor.preprocess(current_state)
                 #x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
-                x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                if(selector is None):
+                    x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                else:
+                    Plans = []
+                    for j in range(30):
+                        Plans.append(sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device))
+                    x = selector.select_plan(Plans)
                 action = x[0, d_s:(d_s+d_a)].copy()
                 generated_state = x[1, :d_s].copy()
                 obs, reward, terminated, truncated, info = env.step(action)
@@ -436,10 +461,10 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
          print(np.mean(violation_scores))
          print(np.var(violation_scores))
      """
-     print(f"total steps: {len(observations)}")
-     print(f"number of plans: {number_of_plans}")
-     traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(spare_reward_prcocessor(rewards))}
-     #print(sum(rewards))
+     #print(f"total steps: {len(observations)}")
+     #print(f"number of plans: {number_of_plans}")
+     rewards = spare_reward_prcocessor(rewards)
+     traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(rewards)}
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      #print(test_rollout_fit_for_model(traj, env_name, specific_env, checkpoint_steps, checkpoint_steps, checkpoint_steps, device=None))
      
@@ -453,10 +478,11 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      """
      #print(sum(traj['rewards']))
      #return traj
-     return sum(rewards)
-     #return sum(traj['rewards'])
+     
+     #return rewards[-1], len(observations)
+     return sum(rewards), len(observations)
      #print(get_normalized_score([traj]))
-
+ 
 def load_kernel(env_name, specific_env, checkpoint_steps, kernel_config: Kernel_Config, device: str):
     from Pretrain.Transition_Kernel.Kernel_Backbone import MoGTransitionKernel
     from Finetuning.utils import get_kernel, get_kernel_stats
@@ -550,7 +576,6 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
    
      #return len(traj['rewards'])
      #print(get_normalized_score([traj]))
-
 
 
 """
@@ -651,24 +676,26 @@ if __name__ == "__main__":
             chunk_size = 10)
     """
     
-    horizon = 70
+    horizon = 32
     env_name = 'pointmaze'
-    specific_train_dataset = 'large'
+    specific_train_dataset = 'medium'
     set_seed(1)
     
-    rollout(env_name, 
+    return_value, steps = rollout(env_name, 
             specific_train_dataset, horizon, 
-            steps_T = 200, 
-            num_karras = 10, 
+            steps_T = 50, 
+            num_karras = 3, 
             eta = 0.8, 
             episode_length = 3000, 
-            checkpoint_steps = 0, 
+            checkpoint_steps = 80, 
             render = True,  
             base_seed = 1, 
-            goal_cell = np.array([7, 10], dtype = int), 
-            start_cell = np.array([1, 1], dtype = int), 
+            goal_cell = np.array([6, 1], dtype = int), 
+            start_cell = np.array([6, 5], dtype = int), 
             continual_rollout = True,
-            chunk_size = 40)
+            chunk_size = 31)
+    print(steps)
+    print(return_value)
     exit()
     """
     horizon = 32
