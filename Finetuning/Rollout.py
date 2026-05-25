@@ -359,6 +359,8 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
            model = DiT1d(in_dim = (d_s), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
      elif(env_name == 'cube'):
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     elif(env_name == 'ogpointmaze'):
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
      else:
           raise ValueError(f"Invalid Environment: {env_name}")
      model.load_state_dict(state_dict)
@@ -373,6 +375,9 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
          s0, info = env.reset(seed = base_seed, options = dict( task_id=task_id))
          #s0, info = env.reset(seed = base_seed)
         #s0, info = env.reset()
+     elif(env_name == 'ogpointmaze'):
+         s0, info = env.reset(seed = base_seed, options = dict( task_id=task_id))
+
      elif(goal_cell is not None and start_cell is not None):
          s0 = env.reset(seed = base_seed, options = {"goal_cell": goal_cell, "reset_cell": start_cell})
         #s0, info = env.reset( options = {"goal_cell": goal_cell, "reset_cell": start_cell})
@@ -794,7 +799,7 @@ if __name__ == "__main__":
   
     
     
-    
+    """
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
@@ -831,7 +836,48 @@ if __name__ == "__main__":
     #print(f"Success Rate: {total_reward / 50 :.4f}")
     #print(get_normalized_score(total_reward/10, min_score, max_score))
     print(total_return/50)
+    """
+
+    horizon = 80
+    env_name = 'ogpointmaze'
+    specific_train_dataset = 'medium'
+    task_id = 1
+    checkpoint = 0
+    total_reward = 0.0
+    device = check_device()
+    print(f"Using device {device}, checkpoint: {checkpoint}")
+    #for i in range(1, 51):
     
+    set_seed(1)
+    #total_return = 0
+    #for j in range(0, 51):
+    return_value, steps = rollout(
+               env_name, 
+               specific_train_dataset, 
+               horizon, 
+               steps_T = 200, 
+               num_karras = 10, 
+               eta = 0.8, 
+               episode_length = 3000, 
+               checkpoint_steps = checkpoint, 
+               render = True,  
+               base_seed = 1, 
+               #goal_cell = np.array([6, 1], dtype = int), 
+               task_id = task_id,
+               continual_rollout = False,
+               chunk_size = 30,
+               device = device)
+        #total_return += return_value
+    print(return_value)
+    print(steps)
+    exit()
+      #print(f"seed {i} finished")
+    #print(f"Success Rate: {total_reward / 50 :.4f}")
+    #print(get_normalized_score(total_reward/10, min_score, max_score))
+    print(total_return/50)
+    
+
+
     """
     from Finetuning.utils import rollout_parallel3
     #set_seed(1)

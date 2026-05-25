@@ -45,7 +45,6 @@ class TrajectoryDict(TypedDict):
     actions: np.ndarray  
     rewards: np.ndarray
 
-
 def check_specific_dataset(dataset_name):
     if(dataset_name == 'kitchen'):
          return False
@@ -91,7 +90,6 @@ def reward_filter(obs, rews, goal):
         else:
             rews[i-1] = 0.0
     return rews
-
 
 def reward_filter_goals(trajs: List[TrajectoryDict], goal) -> List[TrajectoryDict]:
     def reward_filter2(traj: TrajectoryDict, goal) -> List[TrajectoryDict]:
@@ -284,7 +282,6 @@ def load_success_trajs(env_name, specific_env, task_id, step):
         trajs = pickle.load(f)
     return trajs
 
-
 class Lambda:
     def __init__(self, lam: float, beta: float, eta_lam: float):
         self.lam = lam
@@ -326,6 +323,7 @@ def getName(env_name, specific_env):
                return 'PointMaze_Open'
           else:
               raise ValueError(f"Invalid specific environment: {specific_env}")
+
      elif(env_name == 'antmaze'):
           if specific_env == 'medium_play':
                return 'AntMaze_MediumPlay'
@@ -359,13 +357,25 @@ def getName(env_name, specific_env):
                 return 'Cube_QuadruplePlay'
           elif specific_env == 'quadruple-noisy':
                 return 'Cube_QuadrupleNoisy'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
+
+     elif(env_name == 'ogpointmaze'):
+          if specific_env == 'medium':
+                return 'OG2DMaze_Medium'
+          elif specific_env == 'large':
+                return 'OG2DMaze_Large'
+          elif specific_env == 'giant':
+                return 'OG2DMaze_Giant'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
 def getName2(env_name, specific_env):
      if(env_name == 'kitchen'):
-        
           return 'Kitchen'
+
      elif(env_name == 'pointmaze'):
           if specific_env == 'umaze':
                return 'PointMaze_Umaze'
@@ -375,6 +385,7 @@ def getName2(env_name, specific_env):
                return 'PointMaze_Medium'
           else:
               raise ValueError(f"Invalid specific environment: {specific_env}")
+
      elif(env_name == 'antmaze'):
           if specific_env == 'medium':
                return 'AntMaze_Medium'
@@ -384,7 +395,7 @@ def getName2(env_name, specific_env):
                return 'AntMaze_Umaze'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
-     
+
      elif(env_name == 'cube'):
           if specific_env == 'single':
                 return 'Cube_Single'
@@ -394,6 +405,16 @@ def getName2(env_name, specific_env):
                 return 'Cube_Triple'
           elif specific_env == 'quadruple':
                 return 'Cube_Quadruple'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
+
+     elif(env_name == 'ogpointmaze'):
+          if specific_env == 'medium':
+                return 'OG2DMaze_Medium'
+          elif specific_env == 'large':
+                return 'OG2DMaze_Large'
+          elif specific_env == 'giant':
+                return 'OG2DMaze_Giant'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
      else:
@@ -418,6 +439,7 @@ def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
               return 'PointMaze_Unmaze'
          else:
               raise ValueError(f"Invalid specific environment: {specific_env}")
+
      elif(env_name == 'cube'):
          if specific_env == 'single-play':
               return f'Cube_SinglePlay_task{task_id}'
@@ -437,6 +459,18 @@ def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
              return f'Cube_QuadrupleNoisy_task{task_id}'
          else:
              raise ValueError(f"Invalid cube dataset name: {specific_env}")
+
+     elif(env_name == 'ogpointmaze'):
+         if(task_id is None):
+              raise ValueError('Task ID is required for cube dataset')
+         if(specific_env == 'medium'):
+              return f'OG2DMaze_Medium_task{task_id}'
+         elif(specific_env == 'large'):
+              return f'OG2DMaze_Large_task{task_id}'
+         elif(specific_env == 'giant'):
+              return f'OG2DMaze_Giant_task{task_id}'
+         else:
+              raise ValueError(f"Invalid specific environment: {specific_env}")
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
@@ -477,6 +511,7 @@ def get_RewardName(env_name, specific_env, task_id: Optional[int] = None):
                return 'AntMaze_Umaze'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
+
      elif(env_name == 'cube'):
          if(task_id is None):
             raise ValueError('Task ID is required for cube dataset')
@@ -490,6 +525,18 @@ def get_RewardName(env_name, specific_env, task_id: Optional[int] = None):
               return f'Cube_Quadruple_Task{task_id}'
          else:
               raise ValueError(f"Invalid cube dataset name: {specific_env}")
+     
+     elif(env_name == 'ogpointmaze'):
+         if(task_id is None):
+            raise ValueError('Task ID is required for cube dataset')
+         if(specific_env == 'medium'):
+              return f'OG2DMaze_Medium_task{task_id}'
+         elif(specific_env == 'large'):
+              return f'OG2DMaze_Large_task{task_id}'
+         elif(specific_env == 'giant'):
+              return f'OG2DMaze_Giant_task{task_id}'
+         else:
+              raise ValueError(f"Invalid specific environment: {specific_env}")
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
@@ -616,85 +663,7 @@ class RewardDataset(Dataset):
          rews = np.asarray(rews, dtype=np.float64).copy()
          rews[rews == 1.0] = target_reward
          return rews
-"""
-class CriticDataset(Dataset):
-    def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, step: int, goal: Optional[np.array] = None, target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99):
-        # ----- gather raw obs/actions to fit stats -----
-        if(dataset_name == 'pointmaze'):
-            trajs = copy.deepcopy(trajs) 
-            for traj in trajs:
-                traj['observations'] = traj['observations'][:,:2]
-        
-        obs_all = []
-        for traj in trajs:
-            obs_all.append(traj['observations'])
-        obs_all = np.concatenate(obs_all, axis = 0)
-        
-        #get stats
-        self.stats = SAStats()
-        self.stats.obs_mean = obs_all.mean(axis=0)
-        self.stats.obs_std = obs_all.std(axis=0)+ 1e-8
-        allowed_values = [0.0, 1.0]
 
-        transitions = []
-        for traj in trajs:
-            obs = traj['observations']      
-            rews = traj['rewards']
-            rews = spare_reward_prcocessor(rews)
-            if(not np.all(np.isin(rews, allowed_values))):
-                raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
-            if( goal is not None):
-                rews = reward_filter(obs, rews, goal)
-            if(target_reward is not None):
-                rews = self.boost_signal(target_reward, rews)
-            rews = gaussian_filter1d(rews, sigma)
-            if(len(obs) > horizon):
-               rews = self.reward_processor(rews, horizon, gamma)
-               for t in range(len(obs)-horizon):
-                   obs_t = self.stats.norm_obs(obs[t])
-                   r_t   = rews[t]
-                   obs_next_t = self.stats.norm_obs(obs[min(t+horizon, len(obs)-1)])
-                   transitions.append((obs_t, r_t, obs_next_t))
-
-        self.transitions = transitions
-        self.save_stats(dataset_name, specific_dataset, step)
-    
-    def save_stats(self, dataset_name, specific_dataset, step):
-        name = getName(dataset_name, specific_dataset)
-        stats_name =  str(name) + f'_Critic_stats_{str(step)}.pkl'
-        stats_dir = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/'
-        os.makedirs(stats_dir, exist_ok=True)
-        savepath = os.path.join(stats_dir, stats_name)
-        with open(savepath, 'wb') as f:
-              pickle.dump(self.stats, f)
-        print(f"saved stats to {savepath}")
-
-    def __len__(self):
-        return len(self.transitions)
-
-    def __getitem__(self, idx):
-        s, r, s_next = self.transitions[idx]
-        return (
-            torch.tensor(s, dtype=torch.float32),
-            torch.tensor(r, dtype=torch.float32),
-            torch.tensor(s_next, dtype=torch.float32),
-        )
-    
-    def boost_signal(self, target_reward, rews):
-        for t in range(len(rews)):
-            if(rews[t] == 1):
-                 rews[t] = target_reward
-        return rews
-    
-    def reward_processor(self, rews, horizon, gamma):
-        new_rews = []
-        for t in range(len(rews)):
-            R = 0.0
-            for i in range(t, min(t + horizon, len(rews))):
-                R += (gamma**(i-t))*rews[i]
-            new_rews.append(R)
-        return new_rews
-"""
 def train_reward(trajs: List[TrajectoryDict], dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, lr, min_lr, sigma, step, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
@@ -728,138 +697,6 @@ def train_reward(trajs: List[TrajectoryDict], dataset_name: str, hidden_layers: 
            counter += 1
     save_reward_model(reward_net, dataset_name, specific_dataset, task_id, step)
     print(f"reward model saved")
-
-"""       
-def train_kernel(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, 
-                 batch_size=256, lr=1e-3, num_steps=10000,
-                 ensemble_size=10, λ_reg=1e-3, num_hidden_layers=2, hidden_dim=256, step: int = 0, constraint_type: str = 'mahalanobis', quantile: float = 0.95, x_generated_plans: Optional[list] = None):
-    # Prepare dataset / dataloader
-    print(f"Training kernel for {dataset_name}_{specific_dataset}")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #print("Using device:", device)
-    _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
-    dataset = KernelDataset(trajs, dataset_name, specific_dataset, step)
-    loader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
-                              pin_memory=True, num_workers=8))
-    # Create ensemble of models
-    ensemble = [RobustTransitionKernel(obs_dim, act_dim, num_hidden_layers, hidden_dim).to(device) for _ in range(ensemble_size)]
-    optimizers = [optim.Adam(m.parameters(), lr, weight_decay=1e-5) for m in ensemble]
-    total_loss = 0.0
-    for k in range(1, num_steps + 1):
-        s, a, s_next = next(loader)
-        s = s.to(device)
-        a = a.to(device)
-        s_next = s_next.to(device)
-        # For each model in ensemble, compute loss
-        losses = []
-        mus = []
-        log_stds = []
-        for m in ensemble:
-            mu, log_std = m(s, a)
-            mus.append(mu)
-            log_stds.append(log_std)
-            loss = m.gaussian_nll(s_next, mu, log_std)
-            losses.append(loss)
-        # optional: variance‐disagreement inflation
-        # compute mean of mus
-        mus_stack = torch.stack(mus, dim=0)  # (K, B, obs_dim)
-        mu_mean = mus_stack.mean(dim=0)      # (B, obs_dim)
-        # disagreement = average squared deviation
-        disagreement = ((mus_stack - mu_mean.unsqueeze(0)) ** 2).mean(dim=0) 
-        disagreement_detached = disagreement.detach()
-        # inflate each model’s loss by penalizing small variance in high disagreement dims
-        for i, m in enumerate(ensemble):
-            penalty = (disagreement_detached / (torch.exp(2 * log_stds[i]) + m.noise_floor)).sum(dim=-1).mean()
-            losses[i] = losses[i] + λ_reg * penalty
-
-        # Backprop & optimize each model
-        for i, (m, opt) in enumerate(zip(ensemble, optimizers)):
-            opt.zero_grad()
-            losses[i].backward()
-            opt.step()
-
-        avg_loss = sum(losses).item() / ensemble_size
-        total_loss += avg_loss
-    
-    
-    threshold = None
-    if(x_generated_plans is not None):
-        kernel_stats = get_kernel_stats(dataset_name, specific_dataset, step)
-        threshold = compute_threshold(ensemble, kernel_stats, obs_dim, act_dim,  x_generated_plans, constraint_type, quantile, device)
-        print(f"New Threshold for {constraint_type}: {threshold}")
-    for idx, m in enumerate(ensemble):
-         ckpt = copy.deepcopy(m).cpu()
-         save_kernel_model(ckpt, dataset_name, specific_dataset, step, idx)
-    print(f"Kernel model saved")
-    return threshold
-"""
-
-"""
-def train_kernel_mog(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str,
-                 batch_size=256, lr=1e-3, num_steps=10000,
-                 ensemble_size=10, λ_reg=1e-3, num_modes: Optional[int] = 8,   num_hidden_layers=2, hidden_dim=256, kernel_noise_floor: Optional[float] = 1e-4, step: int = 0,  constraint_type: str = 'mahalanobis', quantile: float = 0.95, x_generated_plans: Optional[List] = None):
-    # Prepare dataset / dataloader
-    print(f"Training kernel for {dataset_name}_{specific_dataset}")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #print("Using device:", device)
-    _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
-    dataset = KernelDataset(trajs, dataset_name, specific_dataset, step)
-    loader = cycle(DataLoader(dataset,
-                                  batch_size=batch_size, 
-                                  shuffle=True,
-                                  pin_memory=True, 
-                                  num_workers=8, 
-                                  persistent_workers=True, 
-                                  prefetch_factor=4, 
-                                  drop_last=True))
-    # Create ensemble of models
-    ensemble = [MoGTransitionKernel(obs_dim, act_dim, num_modes, num_hidden_layers, hidden_dim, kernel_noise_floor).to(device) for _ in range(ensemble_size)]
-    optimizers = [optim.Adam(m.parameters(), lr, weight_decay=1e-5) for m in ensemble]
-    total_loss = 0.0
-
-    for k in range(1, num_steps + 1):
-        s, a, s_next = next(loader)
-        s = s.to(device)
-        a = a.to(device)
-        s_next = s_next.to(device)
-        # For each model in ensemble, compute loss
-        losses = []
-        #mus = []
-        #log_stds = []
-        for m in ensemble:
-            mu, log_std, weights = m(s, a)
-            loss = m.mog_nll(s_next, mu, log_std, weights)
-            # === Optional: disagreement regularization ===
-            # Average over modes for disagreement calculation
-            mu_mean = mu.mean(dim=1)                    # (B, obs_dim)
-            disagreement = ((mu - mu_mean.unsqueeze(1)) ** 2).mean(dim=1).mean(dim=0)
-            var = torch.exp(2 * log_std) + m.noise_floor
-            penalty = (disagreement / (var.mean(dim=1) + 1e-6)).mean()
-            loss = loss + λ_reg * penalty
-            losses.append(loss)
-        # Backprop
-        
-        for m, opt, loss in zip(ensemble, optimizers, losses):
-            opt.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(m.parameters(), max_norm=5.0)
-            opt.step()
-        # Logging
-        avg_loss = sum(loss.item() for loss in losses) / ensemble_size
-        total_loss += avg_loss
-        
-       
-    threshold = None
-    if(x_generated_plans is not None):
-        kernel_stats = get_kernel_stats(dataset_name, specific_dataset, step)
-        threshold = compute_threshold_mog(ensemble, kernel_stats, obs_dim, act_dim,  x_generated_plans, constraint_type, quantile, device)
-        print(f"New Threshold for {constraint_type}: {threshold}")
-    for idx, m in enumerate(ensemble):
-         ckpt = copy.deepcopy(m).cpu()
-         save_kernel_model(ckpt, dataset_name, specific_dataset, step, idx)
-    print(f"Kernel model saved")
-    return threshold
-"""
 
 def train_kernel(
     trajs: List[TrajectoryDict],
@@ -2179,170 +2016,6 @@ def rollout_parallel2(
      #print(f"Average Normalized Score: {score:.2f}")
      return trajs, score, success_rate, total_steps
 
-
-
-
-"""
-def rollout_parallel2(
-    env_name, specific_env,
-    horizon=32, steps_T=50, num_karras=10, eta=0.8,
-    episode_length=4000, checkpoint_step=1000000,
-    num_envs=8,
-    goal_cell: Optional[np.ndarray] = None,
-    start_cells: Optional[List[np.ndarray]] = None,
-    task_id: Optional[int] = None,
-    device: torch.device = None,
-    seed_base: int = 0,
-    continual_rollout=False,
-    chunk_size=5,          # currently unused
-):
-    if device is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    trajs = []
-    total_steps = 0
-
-    # Seeding
-    rank = int(os.environ.get("RANK", 0))
-    np.random.seed(12345 + rank + seed_base)
-    torch.manual_seed(12345 + rank + seed_base)
-
-    # Environment & Vector Env
-    _, d_s, d_a = get_env(env_name, specific_env)
-
-    def make_env():
-        env, _, _ = get_env(env_name, specific_env)
-        return env
-
-    vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
-
-    # Load model
-    state_dict = get_planner(env_name, specific_env, checkpoint_step)
-
-    if env_name in ['kitchen', 'pointmaze', 'cube']:
-        model = DiT1d(
-            in_dim=(d_s + d_a), emb_dim=128, d_model=256,
-            n_heads=256//64, depth=2, timestep_emb_type="fourier"
-        ).to(device)
-    elif env_name == 'antmaze':
-        model = DiT1d(
-            in_dim=d_s, emb_dim=128, d_model=256,
-            n_heads=256//64, depth=2, timestep_emb_type="fourier"
-        ).to(device)
-    else:
-        raise ValueError(f"Invalid Environment: {env_name}")
-
-    model.load_state_dict(state_dict)
-    model.eval()
-
-    planner_processor = Planner_Processor(env_name, specific_env)
-    reset_seeds = list(range(seed_base, seed_base + num_envs))
-
-    def run_rollout(options_list):
-      
-        nonlocal total_steps
-
-        obs, _ = vec_env.reset(seed=reset_seeds, options=options_list)
-        if isinstance(obs, dict):
-            current_states = obs['observation']
-        else:
-            current_states = obs
-
-        all_rewards = [0.0] * num_envs
-        done_envs = [False] * num_envs
-        observations = [[] for _ in range(num_envs)]
-        acts = [[] for _ in range(num_envs)]
-        rewards = [[] for _ in range(num_envs)]
-        Temp_acts = [[] for _ in range(num_envs)]
-
-        for env_idx in range(num_envs):
-            observations[env_idx].append(current_states[env_idx].copy())
-
-        for i in range(episode_length):
-            actions = np.zeros((num_envs, d_a))
-
-            for env_idx in range(num_envs):
-                if done_envs[env_idx]:
-                    continue
-
-                current_state = current_states[env_idx]
-                current_state_norm = planner_processor.preprocess(current_state)
-
-                if continual_rollout and len(Temp_acts[env_idx]) > 0:
-                    action = Temp_acts[env_idx].pop(0)
-                else:
-                    x = sample_euler_karras(
-                        current_state_norm, model, d_s, d_a,
-                        horizon, steps_T, num_karras, eta, device
-                    )
-                    if continual_rollout:
-                        Temp_acts[env_idx] = [x[k, d_s:(d_s + d_a)].copy() 
-                                              for k in range(len(x))]
-                        action = Temp_acts[env_idx].pop(0)
-                    else:
-                        action = x[0, d_s:(d_s + d_a)].copy()
-
-                actions[env_idx] = action
-
-            # Step
-            obs_vec, rewards_vec, terminated_vec, truncated_vec, _ = vec_env.step(actions)
-
-            # Consistent observation extraction
-            obs_batch = obs_vec['observation'] if isinstance(obs_vec, dict) else obs_vec
-
-            # Update
-            for env_idx in range(num_envs):
-                if done_envs[env_idx]:
-                    continue
-
-                observations[env_idx].append(obs_batch[env_idx].copy())
-                acts[env_idx].append(actions[env_idx].copy())
-                rewards[env_idx].append(rewards_vec[env_idx])
-                all_rewards[env_idx] += rewards_vec[env_idx]
-                current_states[env_idx] = obs_batch[env_idx].copy()
-
-                if terminated_vec[env_idx] or truncated_vec[env_idx]:
-                    done_envs[env_idx] = True
-
-            if all(done_envs):
-                break
-
-        # Append finished trajectories
-        for env_idx in range(num_envs):
-            total_steps += len(observations[env_idx]) - 1
-            trajs.append({
-                'observations': np.asarray(observations[env_idx]),
-                'actions': np.asarray(acts[env_idx]),
-                'rewards': np.asarray(spare_reward_prcocessor(rewards[env_idx].copy()))  # FIXED
-            })
-
-    # ====================== Main Logic ======================
-    if start_cells is not None and len(start_cells) > 0:
-        for start_cell in start_cells:
-            opt = {
-                "goal_cell": goal_cell.copy() if goal_cell is not None else None,
-                "reset_cell": start_cell.copy() if start_cell is not None else None,
-            }
-            run_rollout([opt] * num_envs)
-    else:
-        opt = {"task_id": task_id}
-        run_rollout([opt] * num_envs)
-
-    vec_env.close()
-
-    valid, success_rate = checktrajs(trajs)
-    print(f"valid: {valid}, success rate: {success_rate:.2f}")
-
-    if goal_cell is None:
-        expert_score = get_expert_score(env_name)
-        score = get_normalized_score(trajs, expert_score)
-    else:
-        score = get_normalized_score(trajs)
-
-    return trajs, score, success_rate, total_steps
-"""
-
-
 def rollout_parallel3(
     env_name, specific_env,
     horizon=32, steps_T=50, num_karras=10, eta=0.8,
@@ -2508,10 +2181,6 @@ def rollout_parallel3(
 
     return trajs, score, success_rate, total_steps
 
-
-
-
-
 import math
 from dataclasses import dataclass
 @dataclass
@@ -2607,33 +2276,6 @@ def compute_threshold_mahalanobis(kernels, dataloader, quantile):
     print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
     return tau
 
-"""
-def compute_threshold_mahalanobis_mog(kernels, dataloader, quantile):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    all_D2_total = []
-    for i, (s, a, s_next) in enumerate(dataloader):
-        s = s.to(device)
-        a = a.to(device)
-        s_next = s_next.to(device)
-        #compute total mahalanobis distance
-        with torch.no_grad():
-            D2_total = compute_total_mahalanobis_score_mog(kernels, s, a, s_next)
-        all_D2_total.extend(D2_total.detach().cpu().numpy())
-    
-    all_D2_total = np.array(all_D2_total)
-    mean_D2_total = float(all_D2_total.mean())
-    min_D2_total = float(all_D2_total.min())
-    max_D2_total = float(all_D2_total.max())
-    var_D2_total = float(all_D2_total.var())
-    tau = float(np.quantile(all_D2_total, quantile))
-    print(f"mean_D2_total = {mean_D2_total:.4f}")
-    print(f"min_D2_total = {min_D2_total:.4f}")
-    print(f"max_D2_total = {max_D2_total:.4f}")
-    print(f"variance_D2_total = {var_D2_total:.4f}")
-    print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
-    return tau
-"""
-
 def compute_threshold_mahalanobis_mog(kernels, dataloader, quantile, device):
     chunks = []
     with torch.no_grad():
@@ -2651,33 +2293,6 @@ def compute_threshold_mahalanobis_mog(kernels, dataloader, quantile, device):
     print(f"variance_D2_total = {all_vals.var(unbiased=False).item():.4f}")
     print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
     return tau
-
-"""
-def compute_threshold_log_prob_mog(kernels, dataloader, quantile):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    all_log_density_total = []
-    for i, (s, a, s_next) in enumerate(dataloader):
-        s = s.to(device)
-        a = a.to(device)
-        s_next = s_next.to(device)
-        #compute total mahalanobis distance
-        with torch.no_grad():
-            log_density_total = compute_log_density_mog(kernels, s, a, s_next)
-        all_log_density_total.extend(log_density_total.detach().cpu().numpy())
-    
-    all_log_density_total = np.array(all_log_density_total)
-    mean_log_density_total = float(all_log_density_total.mean())
-    min_log_density_total = float(all_log_density_total.min())
-    max_log_density_total = float(all_log_density_total.max())
-    var_log_density_total = float(all_log_density_total.var())
-    tau = float(np.quantile(all_log_density_total, 1 - quantile))
-    print(f"mean_D2_total = {mean_log_density_total:.4f}")
-    print(f"min_D2_total = {min_log_density_total:.4f}")
-    print(f"max_D2_total = {max_log_density_total:.4f}")
-    print(f"variance_D2_total = {var_log_density_total:.4f}")
-    print(f"τ ({(1 - quantile)*100:.0f}th percentile) : {tau:.4f}")
-    return tau
-"""
 
 def compute_threshold_log_prob(kernels, dataloader, quantile):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
