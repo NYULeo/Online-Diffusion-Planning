@@ -631,7 +631,10 @@ class OGPointmazeDataset_Singletask:
         
         self.name = name
         self.traj_length = traj_length
-        self.mode = mode
+        if(mode is not None):
+              self.mode = mode
+        else:
+              self.mode = 'reward'
         name_to_id = {
             "medium": f"pointmaze-medium-navigate-singletask-task{task_id}-v0",
             "large": f"pointmaze-large-navigate-singletask-task{task_id}-v0",
