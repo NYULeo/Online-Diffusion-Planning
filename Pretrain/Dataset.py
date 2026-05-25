@@ -719,7 +719,7 @@ class OGPointmazeDataset_Singletask:
         return int(self.dataset["actions"].shape[-1])
 
     def get_env(self, render_mode: str = "rgb_array"):
-        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
+        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode = render_mode, max_episode_steps = 2000)
         return env
 
 

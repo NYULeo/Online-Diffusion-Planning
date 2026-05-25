@@ -1829,6 +1829,8 @@ def rollout_parallel2(
          model = DiT1d(in_dim = d_s, emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
      elif env_name == 'cube':
          model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+     elif env_name == 'ogpointmaze':
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
      else:
          raise ValueError(f"Invalid Environment: {env_name}")
      model.load_state_dict(state_dict)

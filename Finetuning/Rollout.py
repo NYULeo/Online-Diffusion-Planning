@@ -333,14 +333,29 @@ def load_success_trajs(env_name, specific_env, task_id, step):
         trajs = pickle.load(f)
     return trajs
 
-def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None, task_id: Optional[int] = None, base_seed: int = 0, continual_rollout = False, chunk_size = 5, device = None, selector: Optional[Selector] = None):
+def rollout(env_name, 
+            specific_env, 
+            horizon, 
+            steps_T, 
+            num_karras, eta, 
+            episode_length, 
+            checkpoint_steps, 
+            render = False, 
+            goal_cell: Optional[np.ndarray] = None, 
+            start_cell: Optional[np.ndarray] = None,
+            task_id: Optional[int] = None, 
+            base_seed: int = 0, 
+            continual_rollout = False, 
+            chunk_size = 5, 
+            device = None, 
+            selector: Optional[Selector] = None):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      #print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}, episode_length: {episode_length}")
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      #device = check_device()
      #device = "cuda" if torch.cuda.is_available() else "cpu"
      #print(f"Using device {device}")
-     import minari
+
      #env.reset(seed=1)  # Important: pass seed to env.reset
      env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', task_id = task_id, episode_length = None)
      #env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', episode_length = episode_length)
@@ -848,24 +863,24 @@ if __name__ == "__main__":
     print(f"Using device {device}, checkpoint: {checkpoint}")
     #for i in range(1, 51):
     
-    set_seed(1)
+    set_seed(34)
     #total_return = 0
     #for j in range(0, 51):
     return_value, steps = rollout(
                env_name, 
                specific_train_dataset, 
                horizon, 
-               steps_T = 200, 
-               num_karras = 10, 
-               eta = 0.8, 
+               steps_T = 60, 
+               num_karras = 5, 
+               eta = 0.2, 
                episode_length = 3000, 
                checkpoint_steps = checkpoint, 
                render = True,  
                base_seed = 1, 
                #goal_cell = np.array([6, 1], dtype = int), 
                task_id = task_id,
-               continual_rollout = False,
-               chunk_size = 30,
+               continual_rollout = True,
+               chunk_size = 80,
                device = device)
         #total_return += return_value
     print(return_value)
