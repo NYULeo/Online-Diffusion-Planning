@@ -489,7 +489,7 @@ if __name__ == "__main__":
                             num_steps = 10000,
                             lr = 1e-05,
                             min_lr = 1e-06,
-                            horizon = 150,
+                            horizon = 50,
                             tau = 0.005,
                             gamma = 0.99,
                             data_conservation = True,
