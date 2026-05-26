@@ -442,14 +442,14 @@ if __name__ == "__main__":
 
     
     
-    """
+    
     env_name = 'cube'
     specific_env = 'single-play'
     task_id = 4
     finetune_buffer_cutoff_length = 20
     train_buffer_cutoff_length = 200
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = True)
-    AMConfig = Acc_AdjointMatchingConfig(horizon = 32)
+    AMConfig = Acc_AdjointMatchingConfig(horizon = 32, eta = 0.2)
 
     RWConfig = RewardConfig(
                beta = 1.0, 
@@ -513,9 +513,9 @@ if __name__ == "__main__":
         finetune_buffer_cutoff_length = finetune_buffer_cutoff_length,
         train_buffer_cutoff_length = train_buffer_cutoff_length,
         finetune_steps = 300,
-        finetune_rounds = 60,
+        finetune_rounds = 30,
         diffusion_steps = 200,
-        karras_percent = 0.05,
+        karras_percent = 0.1,
         Loss_Clip_percent = 0.75,
         finetune_batch_size = 16,
         finetune_batch_per_sample = 3,
@@ -528,9 +528,9 @@ if __name__ == "__main__":
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value
-        rollout_num_envs = 6, 
+        rollout_num_envs = 8, 
         continual_rollout = True,
-        chunk_size = 20,
+        chunk_size = 15,
         num_rollout_processes = 8,
         train_reward_config = TrainRewardConfig,
         train_kernel_config = TrainKernelConfig,
@@ -538,9 +538,9 @@ if __name__ == "__main__":
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
+    
+
     """
-
-
     env_name = 'ogpointmaze'
     specific_env = 'medium'
     task_id = 1
@@ -635,4 +635,4 @@ if __name__ == "__main__":
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
     
-    
+    """
