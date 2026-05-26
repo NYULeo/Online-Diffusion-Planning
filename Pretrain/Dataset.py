@@ -319,7 +319,7 @@ class PointMazeDataset():
           gym.register_envs(gymnasium_robotics)
 
           if(self.name == 'medium'):
-              env = gym.make('PointMaze_Medium-v3', max_episode_steps = 300, render_mode = render_mode, continuing_task=False)
+              env = gym.make('PointMaze_Medium-v3', max_episode_steps = 600, render_mode = render_mode, continuing_task=False)
           elif(self.name == 'large'):
               env = gym.make('PointMaze_Large-v3', max_episode_steps = 800, render_mode = render_mode, continuing_task=False)
           elif(self.name == 'umaze'):
