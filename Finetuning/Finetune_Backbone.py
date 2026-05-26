@@ -264,7 +264,11 @@ class OnlineFinetuner():
         self.Finetune_Buffer = []
         self.Train_Buffer = []
         self.Train_Kernel_Buffer = []
-        self.Base_Critic_Buffer = []
+        if(self.config.critic and self.config.update_critic):
+             self.Base_Critic_Buffer = []
+        else:
+             self.Base_Critic_Buffer = None
+
         if(self.config.train_reward_config.task_id is not None):
             dataset_reward = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = self.config.train_buffer_cutoff_length)
             trajs_reward = dataset_reward.get_trajectories()
@@ -273,8 +277,9 @@ class OnlineFinetuner():
             self.Finetune_Buffer.extend(trajs_reward)
             self.Train_Buffer.extend(trajs_reward)
             self.Train_Kernel_Buffer.extend(trajs_kernel)
-            success_trajs = load_success_trajs(self.config.dataset_name, self.config.specific_dataset, self.config.train_reward_config.task_id, step = 0)
-            self.Base_Critic_Buffer.extend(success_trajs)
+            if(self.Base_Critic_Buffer is not None):
+                success_trajs = load_success_trajs(self.config.dataset_name, self.config.specific_dataset, self.config.train_reward_config.task_id, step = 0)
+                self.Base_Critic_Buffer.extend(success_trajs)
 
         elif(self.config.train_reward_config.train_goal is not None):
             dataset_reward = get_dataset(self.config.dataset_name, self.config.specific_dataset, goal = self.config.train_reward_config.train_goal, mode = 'reward')
@@ -286,7 +291,8 @@ class OnlineFinetuner():
             self.Finetune_Buffer.extend(trajs_reward)
             self.Train_Buffer.extend(trajs_reward)
             self.Train_Kernel_Buffer.extend(trajs_kernel)
-            self.Base_Critic_Buffer.extend(trajs_critic)
+            if(self.Base_Critic_Buffer is not None):
+                self.Base_Critic_Buffer.extend(trajs_critic)
         
         else:
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
@@ -294,7 +300,8 @@ class OnlineFinetuner():
             self.Finetune_Buffer.extend(trajs)
             self.Train_Buffer.extend(trajs)
             self.Train_Kernel_Buffer.extend(trajs)
-            self.Base_Critic_Buffer.extend(trajs)
+            if(self.Base_Critic_Buffer is not None):
+                self.Base_Critic_Buffer.extend(trajs)
 
         self.PlannerDataset = PlannerDataset(
                    self.Finetune_Buffer, 
