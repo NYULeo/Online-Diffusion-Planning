@@ -447,7 +447,7 @@ if __name__ == "__main__":
     specific_env = 'single-play'
     task_id = 4
     finetune_buffer_cutoff_length = None
-    train_buffer_cutoff_length = 200
+    train_buffer_cutoff_length = None
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = False)
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32, eta = 0.2)
 
@@ -486,9 +486,10 @@ if __name__ == "__main__":
                             hidden_layers = 4,
                             hidden_dim = 512,
                             batch_size = 256,
-                            num_steps = 5000,
+                            num_steps = 10000,
                             lr = 1e-05,
                             min_lr = 1e-06,
+                            horizon = 200,
                             tau = 0.005,
                             gamma = 0.99,
                             data_conservation = True,
@@ -518,7 +519,7 @@ if __name__ == "__main__":
         karras_percent = 0.1,
         Loss_Clip_percent = 0.75,
         finetune_batch_size = 16,
-        finetune_batch_per_sample = 5,
+        finetune_batch_per_sample = 6,
         finetune_lr = 2e-05,
         initial_lam = 0.05,
         eta_lam = 0.5,

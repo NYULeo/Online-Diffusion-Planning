@@ -73,6 +73,7 @@ class Train_Critic_Config:
     tau: float = 0.005
     gamma: float = 1.0
     lam: float = 0.95
+    horizon: int = 200
     data_conservation: bool = False
     momentum: float = 0.005
 
@@ -761,7 +762,7 @@ class OnlineFinetuner():
                                    lam = self.config.train_critic_config.lam,
                                    #horizon = self.config.AMConfig.horizon,
                                    #horizon = self.config.chunk_size,
-                                   horizon = 40,
+                                   horizon = self.config.train_critic_config.horizon,
                                    lr = self.config.train_critic_config.lr, 
                                    min_lr = self.config.train_critic_config.min_lr,
                                    tau = self.config.train_critic_config.tau, 

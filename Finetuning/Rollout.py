@@ -827,7 +827,7 @@ if __name__ == "__main__":
     
     set_seed(1)
     total_return = 0
-    for j in range(48, 51):
+    for j in range(18, 69):
         return_value, steps = rollout(
                env_name, 
                specific_train_dataset, 
