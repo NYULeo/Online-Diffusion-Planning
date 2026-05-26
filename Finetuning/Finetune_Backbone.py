@@ -380,7 +380,7 @@ class OnlineFinetuner():
                   if process_trajs:
                       critic_buffer.extend(process_trajs)
               success_trajs = get_success_trajs(critic_buffer)
-              if(len(critic_buffer) > 1):
+              if(len(success_trajs) > 1):
                   update_critic = True
               if self.config.train_critic_config.data_conservation:
                   critic_buffer = self.data_conservation_update(success_trajs)
