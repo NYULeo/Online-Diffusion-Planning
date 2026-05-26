@@ -614,7 +614,7 @@ if __name__ == "__main__":
         karras_percent = 0.1,
         Loss_Clip_percent = 0.75,
         finetune_batch_size = 12,
-        finetune_batch_per_sample = 6,
+        finetune_batch_per_sample = 3,
         finetune_lr = 2e-05,
         initial_lam = 0.05,
         eta_lam = 0.5,
