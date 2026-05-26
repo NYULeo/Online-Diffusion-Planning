@@ -446,9 +446,9 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_env = 'single-play'
     task_id = 4
-    finetune_buffer_cutoff_length = 20
+    finetune_buffer_cutoff_length = None
     train_buffer_cutoff_length = 200
-    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = True)
+    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = False)
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32, eta = 0.2)
 
     RWConfig = RewardConfig(
@@ -504,27 +504,27 @@ if __name__ == "__main__":
         reward_model_checkpoint = 0,
         kernel_model_checkpoint = 0,
         critic_model_checkpoint = 0,
-        offline = True,
-        critic = False,
-        update_critic = False,
-        kernel = False,
+        offline = False,
+        critic = True,
+        update_critic = True,
+        kernel = True,
         update_kernel = False,
         buffer_size = 20000,
         finetune_buffer_cutoff_length = finetune_buffer_cutoff_length,
         train_buffer_cutoff_length = train_buffer_cutoff_length,
-        finetune_steps = 300,
+        finetune_steps = 90,
         finetune_rounds = 30,
-        diffusion_steps = 200,
+        diffusion_steps = 20,
         karras_percent = 0.1,
         Loss_Clip_percent = 0.75,
         finetune_batch_size = 16,
         finetune_batch_per_sample = 3,
         finetune_lr = 2e-05,
         initial_lam = 0.05,
-        eta_lam = 0.5,
+        eta_lam = 0.2,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
-        reward_scaling_factor = 50,
+        reward_scaling_factor = 30,
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value

@@ -33,6 +33,7 @@ if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'cube'
        specific_env = 'single-play'
+       horizon = 32
        task_id = 4
        traj_length = 200
        step = 0
@@ -51,7 +52,7 @@ if __name__ == '__main__':  # pragma: no cover
              num_steps = 15000, 
              gamma = 0.99, 
              lam = 0.95, 
-             horizon = 40, 
+             horizon = horizon, 
              lr = 1e-05, 
              min_lr = 1e-06, 
              tau = 0.005, 
@@ -68,7 +69,7 @@ if __name__ == '__main__':  # pragma: no cover
             hidden_dim = 512, 
             checkpoint_step = step, 
             gamma = 0.99, 
-            horizon = 40,  
+            horizon = horizon,  
             sigma = 3.0, 
             target_reward = 80.0, 
             trajs = trajs,
