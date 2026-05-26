@@ -35,7 +35,6 @@ if __name__ == '__main__':  # pragma: no cover
        specific_env = 'single-play'
        horizon = 50
        task_id = 4
-       traj_length = 200
        step = 0
       
        
