@@ -449,7 +449,7 @@ if __name__ == "__main__":
     finetune_buffer_cutoff_length = 50
     train_buffer_cutoff_length = 200
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 90, decay = False)
-    AMConfig = Acc_AdjointMatchingConfig(horizon = 32, eta = 0.2)
+    AMConfig = Acc_AdjointMatchingConfig(horizon = 32, eta = 0.1)
 
     RWConfig = RewardConfig(
                beta = 1.0, 
@@ -515,7 +515,7 @@ if __name__ == "__main__":
         train_buffer_cutoff_length = train_buffer_cutoff_length,
         finetune_steps = 90,
         finetune_rounds = 30,
-        diffusion_steps = 30,
+        diffusion_steps = 10,
         karras_percent = 0.1,
         Loss_Clip_percent = 0.75,
         finetune_batch_size = 16,
