@@ -74,7 +74,7 @@ if __name__ == '__main__':
 
 """
 
-
+"""
 if __name__ == '__main__':
     set_seed(1)
     
@@ -127,12 +127,12 @@ if __name__ == '__main__':
         save_freq = 30000, 
         num_steps = 30000)
     
-
-
-
-
-
 """
+
+
+
+
+
 if __name__ == '__main__':
     set_seed(1)
     
@@ -175,4 +175,4 @@ if __name__ == '__main__':
                save_freq = 2000, 
                num_steps = 12000)
 
-"""
+

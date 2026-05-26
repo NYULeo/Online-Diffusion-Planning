@@ -80,11 +80,11 @@ def getName(env_name, specific_env):
 
      elif(env_name == 'ogpointmaze'):
           if specific_env == 'medium':
-               return 'OG2DMaze_medium'
+               return 'OG2DMaze_Medium'
           elif specific_env == 'large':
-               return 'OG2DMaze_large'
+               return 'OG2DMaze_Large'
           elif specific_env == 'giant':
-               return 'OG2DMaze_giant'
+               return 'OG2DMaze_Giant'
           else:
                raise ValueError(f"Invalid cube dataset name: {specific_env}")
      else:

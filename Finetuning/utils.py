@@ -528,11 +528,11 @@ def get_RewardName(env_name, specific_env, task_id: Optional[int] = None):
          if(task_id is None):
             raise ValueError('Task ID is required for cube dataset')
          if(specific_env == 'medium'):
-              return f'OG2DMaze_Medium_task{task_id}'
+              return f'OG2DMaze_Medium_Task{task_id}'
          elif(specific_env == 'large'):
-              return f'OG2DMaze_Large_task{task_id}'
+              return f'OG2DMaze_Large_Task{task_id}'
          elif(specific_env == 'giant'):
-              return f'OG2DMaze_Giant_task{task_id}'
+              return f'OG2DMaze_Giant_Task{task_id}'
          else:
               raise ValueError(f"Invalid specific environment: {specific_env}")
      else:

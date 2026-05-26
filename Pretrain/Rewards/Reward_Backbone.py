@@ -105,11 +105,11 @@ def getName(env_name, specific_env, task_id: Optional[int] = None):
          if(task_id is None):
             raise ValueError('Task ID is required for ogpointmaze dataset')
          if specific_env == 'medium':
-              return f'OG2DMaze_medium_task{task_id}'
+              return f'OG2DMaze_Medium_Task{task_id}'
          elif specific_env == 'large'  :
-              return f'OG2DMaze_large_task{task_id}'
+              return f'OG2DMaze_Large_Task{task_id}'
          elif specific_env == 'giant':
-              return  f'OG2DMaze_giant_task{task_id}'
+              return  f'OG2DMaze_Giant_Task{task_id}'
          else:
               raise ValueError(f"Invalid ogpointmaze dataset name: {specific_env}")
      else:
