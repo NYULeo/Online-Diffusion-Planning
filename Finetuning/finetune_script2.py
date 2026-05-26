@@ -514,7 +514,7 @@ if __name__ == "__main__":
         train_buffer_cutoff_length = train_buffer_cutoff_length,
         finetune_steps = 90,
         finetune_rounds = 30,
-        diffusion_steps = 20,
+        diffusion_steps = 30,
         karras_percent = 0.1,
         Loss_Clip_percent = 0.75,
         finetune_batch_size = 16,

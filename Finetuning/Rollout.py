@@ -813,7 +813,7 @@ if __name__ == "__main__":
     
   
     
-    """
+    
     
     horizon = 32
     env_name = 'cube'
@@ -851,7 +851,7 @@ if __name__ == "__main__":
     #print(f"Success Rate: {total_reward / 50 :.4f}")
     #print(get_normalized_score(total_reward/10, min_score, max_score))
     print(total_return/50)
-    """
+    
 
     horizon = 80
     env_name = 'ogpointmaze'
