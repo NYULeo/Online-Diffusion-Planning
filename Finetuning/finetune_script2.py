@@ -521,7 +521,7 @@ if __name__ == "__main__":
         finetune_batch_per_sample = 5,
         finetune_lr = 2e-05,
         initial_lam = 0.05,
-        eta_lam = 0.2,
+        eta_lam = 0.5,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
         reward_scaling_factor = 30,
