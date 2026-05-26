@@ -48,10 +48,8 @@ class TrajectoryDict(TypedDict):
 def check_specific_dataset(dataset_name):
     if(dataset_name == 'kitchen'):
          return False
-    elif(dataset_name == 'cube'):
-         return True
-    elif(dataset_name == 'pointmaze'):
-         return True
+    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze']:
+        return True
 
 def reward_name_converter(specific_dataset):
     if(specific_dataset == 'single-play' or specific_dataset == 'single-noise'):

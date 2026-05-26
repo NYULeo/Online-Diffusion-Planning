@@ -25,7 +25,7 @@ except ModuleNotFoundError:
     from utils import SAStats, cycle, check_device
 import json
 
-def check_specifc_dataset(dataset_name):
+def check_specific_dataset(dataset_name):
     if(dataset_name == 'kitchen'):
          return False
     elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze']:
@@ -667,7 +667,7 @@ def train_mog_kernel(
         specific_dataset=specific_dataset
     )
 
-    SD = specific_dataset if check_specifc_dataset(dataset_name) else None
+    SD = specific_dataset if check_specific_dataset(dataset_name) else None
 
     step = 0
     total_loss = 0.0
@@ -767,7 +767,7 @@ def train_kernel(dataset_name, specific_dataset: str = None,
         λ_reg,
         specific_dataset=specific_dataset
     )
-    if(check_specifc_dataset(dataset_name)):
+    if(check_specific_dataset(dataset_name)):
         SD = specific_dataset
     else:
         SD = None

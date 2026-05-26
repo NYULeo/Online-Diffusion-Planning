@@ -190,8 +190,6 @@ def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, min_lr,
     
     print(f"Critic pretraining hyperparameters saved to {filepath}", flush=True)
 
-
-
 def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
      if(env_name == 'kitchen'):
           if(specific_env == 'complete'):
@@ -233,7 +231,6 @@ def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
-
 def save_critic(model, dataset_name, specific_dataset, step, task_id: Optional[int] = None):
     model.eval()
     name = get_CriticName(dataset_name, specific_dataset, task_id)
@@ -263,16 +260,6 @@ def save_to_finetuning(critic_net, dataset_name, specific_dataset, task_id: Opti
     torch.save(net_dict, save_path)
     print(f"critic model save to {save_path}")
 
-"""
-def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str] = None):
-    name = getName(dataset_name, specific_dataset)
-    os.makedirs(f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/', exist_ok=True)
-    savepath = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/{name}_Critic_stats_{str(0)}.pkl'
-    with open(savepath, 'wb') as f:
-        pickle.dump(stats, f)
-    print(f"saved stats to {savepath}")
-"""
-
 def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
     name = get_CriticName(dataset_name, specific_dataset, task_id)
     ft_stats_dir = FINETUNE_DIR / "Critics" / dataset_name / specific_dataset / "Stats"
@@ -282,14 +269,6 @@ def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str
         pickle.dump(stats, f)
     print(f"saved stats to {savepath}")
 
-"""
-def get_critic_model(dataset_name, specific_dataset, step):
-    _, obs_dim, _ = get_env(dataset_name, specific_dataset)
-    name = get_CriticName(dataset_name, specific_dataset)
-    path = f'./Pretrain/Critic/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl'
-    model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
-    return model_state_dict, obs_dim
-"""
 def get_critic_model(dataset_name, specific_dataset, step, task_id: Optional[int] = None):
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
     name = get_CriticName(dataset_name, specific_dataset, task_id)
@@ -297,22 +276,12 @@ def get_critic_model(dataset_name, specific_dataset, step, task_id: Optional[int
     model_state_dict = torch.load(path, weights_only=True, map_location="cpu")
     return model_state_dict, obs_dim
 
-"""
-def get_critic_stats(dataset_name, specific_dataset):
-    name = get_CriticName(dataset_name, specific_dataset)
-    path = f'./Pretrain/Critic/{dataset_name}/{specific_dataset}/Stats/{name}_Critic_stats.pkl'
-    with open(path, 'rb') as f:
-        stats = pickle.load(f)
-    return stats 
-"""
 def get_critic_stats(dataset_name, specific_dataset, task_id: Optional[int] = None):
     name = get_CriticName(dataset_name, specific_dataset, task_id)
     path = PRETRAIN_DIR / "Critic" / dataset_name / specific_dataset / "Stats" / f"{name}_Critic_stats.pkl"
     with open(path, "rb") as f:
         stats = pickle.load(f)
     return stats
-
-
 
 class CriticDataset(Dataset):
     def __init__(self, dataset_name: str, specific_dataset: str, trajs: List[TrajectoryDict], target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99, sigma: float = 7.0, alpha: Optional[float] = None, task_id: Optional[int] = None):

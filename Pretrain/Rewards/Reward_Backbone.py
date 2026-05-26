@@ -38,7 +38,7 @@ class TrajectoryDict(TypedDict):
 
 
 
-def check_specifc_dataset(dataset_name):
+def check_specific_dataset(dataset_name):
     if(dataset_name == 'kitchen'):
          return False
     elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze']:
@@ -478,7 +478,7 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
     reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
     optimizer = optim.AdamW(reward_net.parameters(), lr = lr, weight_decay = 1e-4)
-    if(check_specifc_dataset(dataset_name)):
+    if(check_specific_dataset(dataset_name)):
         SD = specific_dataset
     else:
         SD = None
@@ -560,7 +560,7 @@ def train_reward_pos_weight(
 
     reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
     optimizer = optim.AdamW(reward_net.parameters(), lr=lr, weight_decay=1e-4)
-    if(check_specifc_dataset(dataset_name)):
+    if(check_specific_dataset(dataset_name)):
         SD = specific_dataset
     else:
         SD = None
