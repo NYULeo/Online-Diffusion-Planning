@@ -448,7 +448,7 @@ if __name__ == "__main__":
     task_id = 4
     finetune_buffer_cutoff_length = 50
     train_buffer_cutoff_length = 200
-    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = False)
+    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 90, decay = False)
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32, eta = 0.2)
 
     RWConfig = RewardConfig(
@@ -525,7 +525,7 @@ if __name__ == "__main__":
         eta_lam = 0.5,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
-        reward_scaling_factor = 30,
+        reward_scaling_factor = 40,
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value
