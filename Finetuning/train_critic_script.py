@@ -49,7 +49,7 @@ if __name__ == '__main__':  # pragma: no cover
              hidden_dim = 512, 
              sigma = 3.0,
              batch_size = 256, 
-             num_steps = 1000, 
+             num_steps = 10000, 
              gamma = 0.99, 
              lam = 0.95, 
              horizon = horizon, 

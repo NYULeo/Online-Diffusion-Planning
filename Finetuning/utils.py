@@ -1243,7 +1243,7 @@ def train_critic(trajs: List[TrajectoryDict],
            optimizer.step()
            scheduler.step()
            
-           if(k % 200 == 0):
+           if(k % 1000 == 0):
                 print(f"Critic Training step {k} loss: {total_loss/200}")
                 total_loss = 0.0
             
