@@ -254,8 +254,8 @@ class OnlineFinetuner():
        
         #self.accelerator = Accelerator(mixed_precision = 'bf16')
         self.accelerator = Accelerator(
-                  mixed_precision='bf16',
-                  gradient_accumulation_steps=self.config.gradient_accumulate_every,
+               mixed_precision='bf16',
+               gradient_accumulation_steps=self.config.gradient_accumulate_every,
         )
         self.device = self.accelerator.device
         
@@ -386,12 +386,12 @@ class OnlineFinetuner():
           update_critic = False
           # Only main process needs to process the gathered data
           if self.accelerator.is_main_process:
-              critic_buffer = []
+              total_trajs = []
               for process_trajs in gathered_trajs_list:
                   if process_trajs:
-                      critic_buffer.extend(process_trajs)
+                      total_trajs.extend(process_trajs)
               """
-              success_trajs = get_success_trajs(critic_buffer)
+              success_trajs = get_success_trajs(total_trajs)
               if(len(success_trajs) > 1):
                   update_critic = True
               if self.config.train_critic_config.data_conservation:
@@ -401,11 +401,13 @@ class OnlineFinetuner():
               self.Base_Critic_Buffer.extend(success_trajs.copy())
               """
               update_critic = True
+              success_trajs = get_success_trajs(total_trajs)
               if self.config.train_critic_config.data_conservation:
-                  critic_buffer = self.data_conservation_update(critic_buffer)
+                  critic_buffer = self.data_conservation_update(total_trajs)
               else:
-                  critic_buffer = critic_buffer
-              self.Base_Critic_Buffer.extend(critic_buffer.copy())
+                  critic_buffer = total_trajs
+              self.Base_Critic_Buffer.extend(total_trajs.copy())
+              critic_buffer.extend(success_trajs)
           else:
               critic_buffer = None
           
