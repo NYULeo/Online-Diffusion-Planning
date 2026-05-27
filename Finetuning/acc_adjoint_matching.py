@@ -51,7 +51,7 @@ class Acc_AdjointMatchingConfig:
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     step_start_ema = 50
     ema_decay = 0.99
-    update_ema_every = 2
+    update_ema_every = 6
     finetune_lr: float = 1e-4
     finetune_total_steps: int = 500
     per_round_steps: int = 100
@@ -630,20 +630,24 @@ class Acc_AdjointMatchingFineTuner:
        
         
         # 5. Backward and optimizer step only on main process or all processes
+        """
         self.optimizer.zero_grad()
         self.new_score_net.zero_grad()
         self.accelerator.backward(global_loss)
-        """
-        total_grad_norm = 0.0
-        for param in self.accelerator.unwrap_model(self.new_score_net).parameters():
-            if param.grad is not None:
-                total_grad_norm += param.grad.data.norm(2).item() ** 2
-        total_grad_norm = total_grad_norm ** (1. / 2)
-        """
         self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
         self.optimizer.step()
         self.scheduler.step()
         self.alpha_scheduler.step_alpha()
+        """
+        # 5. Backward and (maybe) optimizer step under accelerate accumulation
+        with self.accelerator.accumulate(self.new_score_net):
+            self.accelerator.backward(global_loss)
+            if self.accelerator.sync_gradients:
+                self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
+                self.optimizer.step()
+                self.scheduler.step()
+                self.alpha_scheduler.step_alpha()
+                self.optimizer.zero_grad()
         
 
          # 6. Logging: gather detached metrics

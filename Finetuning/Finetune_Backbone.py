@@ -245,13 +245,18 @@ class OnlineFinetuner():
              self.config.AMConfig.lam = self.config.initial_lam
         else:
              self.config.AMConfig.lam = 0.0
-        self.config.AMConfig.update_ema_every = self.config.update_lambda_every
+        #self.config.AMConfig.update_ema_every = self.config.update_lambda_every
+        self.config.AMConfig.update_ema_every = self.config.gradient_accumulate_every
         self.config.AMConfig.reward_scaling_factor = self.config.reward_scaling_factor
         self.config.AMConfig.update_lambda_every = self.config.update_lambda_every
         self.config.AMConfig.MaxEnt = self.config.MaxEnt
         self.config.AMConfig.Entropy_Scaling_Factor = self.config.Entropy_Scaling_Factor
        
-        self.accelerator = Accelerator(mixed_precision = 'bf16')
+        #self.accelerator = Accelerator(mixed_precision = 'bf16')
+        self.accelerator = Accelerator(
+                  mixed_precision='bf16',
+                  gradient_accumulation_steps=self.config.gradient_accumulate_every,
+        )
         self.device = self.accelerator.device
         
         self.Initialize_BufferDataset()
