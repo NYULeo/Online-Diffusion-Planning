@@ -489,11 +489,11 @@ if __name__ == "__main__":
                             num_steps = 10000,
                             lr = 1e-05,
                             min_lr = 1e-06,
-                            horizon = 50,
+                            horizon = 128,
                             tau = 0.005,
                             gamma = 0.99,
                             data_conservation = True,
-                            momentum = 1.0)
+                            momentum = 0.5)
     
     FTConfig = FinetuningConfig(
         AMConfig = AMConfig, 
@@ -523,15 +523,15 @@ if __name__ == "__main__":
         finetune_lr = 2e-05,
         initial_lam = 0.05,
         eta_lam = 0.5,
-        gradient_accumulate_every = 1,
+        gradient_accumulate_every = 3,
         update_lambda_every = 1,
-        reward_scaling_factor = 40,
+        reward_scaling_factor = 50,
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value
-        rollout_num_envs = 8, 
+        rollout_num_envs = 3, 
         continual_rollout = True,
-        chunk_size = 15,
+        chunk_size = 10,
         num_rollout_processes = 8,
         train_reward_config = TrainRewardConfig,
         train_kernel_config = TrainKernelConfig,

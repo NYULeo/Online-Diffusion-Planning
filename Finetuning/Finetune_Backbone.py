@@ -337,11 +337,16 @@ class OnlineFinetuner():
             #print(f"Rollout Completed: Collected {len(collected_trajs)} trajectories across {self.accelerator.num_processes} processes")
             
             self.Train_Kernel_Buffer.extend(collected_trajs)
+            """
             success_trajs = get_success_trajs(collected_trajs)
             if(len(success_trajs) > 0):
                  self.Train_Buffer.extend(success_trajs)
                  self.Finetune_Buffer.extend(success_trajs)
                  update_reward = True
+            """
+            self.Train_Buffer.extend(collected_trajs)
+            self.Finetune_Buffer.extend(collected_trajs)
+            update_reward = True
             if len(self.Finetune_Buffer) > self.config.buffer_size:
                  num_to_remove = len(self.Finetune_Buffer) - self.config.buffer_size
                  self.Finetune_Buffer = self.Finetune_Buffer[num_to_remove:] 
@@ -380,6 +385,7 @@ class OnlineFinetuner():
               for process_trajs in gathered_trajs_list:
                   if process_trajs:
                       critic_buffer.extend(process_trajs)
+              """
               success_trajs = get_success_trajs(critic_buffer)
               if(len(success_trajs) > 1):
                   update_critic = True
@@ -388,6 +394,13 @@ class OnlineFinetuner():
               else:
                   critic_buffer = success_trajs
               self.Base_Critic_Buffer.extend(success_trajs.copy())
+              """
+              update_critic = True
+              if self.config.train_critic_config.data_conservation:
+                  critic_buffer = self.data_conservation_update(critic_buffer)
+              else:
+                  critic_buffer = critic_buffer
+              self.Base_Critic_Buffer.extend(critic_buffer.copy())
           else:
               critic_buffer = None
           
