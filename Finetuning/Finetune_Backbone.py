@@ -255,7 +255,7 @@ class OnlineFinetuner():
         #self.accelerator = Accelerator(mixed_precision = 'bf16')
         self.accelerator = Accelerator(
                mixed_precision='bf16',
-               gradient_accumulation_steps=self.config.gradient_accumulate_every,
+               gradient_accumulation_steps = self.config.gradient_accumulate_every,
         )
         self.device = self.accelerator.device
         

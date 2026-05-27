@@ -486,7 +486,7 @@ if __name__ == "__main__":
                             hidden_layers = 4,
                             hidden_dim = 512,
                             batch_size = 256,
-                            num_steps = 10000,
+                            num_steps = 5000,
                             lr = 1e-05,
                             min_lr = 1e-06,
                             horizon = 128,
