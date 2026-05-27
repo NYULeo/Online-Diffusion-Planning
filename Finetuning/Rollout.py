@@ -813,13 +813,13 @@ if __name__ == "__main__":
     
   
     
-    
+
     
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 15
+    checkpoint = 39
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}, checkpoint: {checkpoint}")
@@ -827,14 +827,14 @@ if __name__ == "__main__":
     
     set_seed(1)
     total_return = 0
-    for j in range(7, 69):
+    for j in range(41, 69):
         return_value, steps = rollout(
                env_name, 
                specific_train_dataset, 
                horizon, 
                steps_T = 10, 
                num_karras = 1, 
-               eta = 0.1, 
+               eta = 0.0, 
                episode_length = 3000, 
                checkpoint_steps = checkpoint, 
                render = True,  
@@ -870,9 +870,9 @@ if __name__ == "__main__":
                env_name, 
                specific_train_dataset, 
                horizon, 
-               steps_T = 20, 
-               num_karras = 2, 
-               eta = 0.2, 
+               steps_T = 10, 
+               num_karras = 1, 
+               eta = 0.0, 
                episode_length = 3000, 
                checkpoint_steps = checkpoint, 
                render = True,  
