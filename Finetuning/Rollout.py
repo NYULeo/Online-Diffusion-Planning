@@ -860,7 +860,7 @@ if __name__ == "__main__":
                eta = 0.0, 
                episode_length = 3000, 
                checkpoint_steps = checkpoint, 
-               render = True,  
+               render = False,  
                base_seed = 1, 
                #goal_cell = np.array([6, 1], dtype = int), 
                task_id = task_id,
