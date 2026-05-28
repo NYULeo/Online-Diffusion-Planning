@@ -344,7 +344,7 @@ def rollout(env_name,
             goal_cell: Optional[np.ndarray] = None, 
             start_cell: Optional[np.ndarray] = None,
             task_id: Optional[int] = None, 
-            base_seed: int = 0, 
+            base_seed: int = None, 
             continual_rollout = False, 
             chunk_size = 5, 
             device = None, 
@@ -819,10 +819,10 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 12
+    checkpoint = 3
     total_reward = 0.0
     device = check_device()
-    print(f"Using device {device}, checkpoint: {checkpoint}")
+    print(f"Using device {device}")
     #for i in range(1, 51):
     RConfig = RewardConfig(
                beta = 1.0, 
@@ -841,17 +841,43 @@ if __name__ == "__main__":
                hidden_dim_critic = 256,
                explore = False)
     #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
-    #set_seed(1)
-    chunk_size = [20, 19, 13, 12, 11, 5, 10]
-    
+    chunk_size = [20, 19, 18, 13, 12, 11, 5, 10, 15, 7, 6, 8, 4]
+    set_seed(1)
     while(checkpoint < 51):
+       print(f"Running checkpoing: {checkpoint}")
        total_return = 0.0
-       for j in range(1, 31):
+       for j in range(1, 51):
           return_value = 0.0
           chunk_size_index = 0
           while(return_value != 1.0 and chunk_size_index < len(chunk_size)):
-              set_seed(j)
               return_value, steps = rollout(
+                   env_name, 
+                   specific_train_dataset, 
+                   horizon, 
+                   steps_T = 10, 
+                   num_karras = 1, 
+                   eta = 0.0, 
+                   episode_length = 3000, 
+                   checkpoint_steps = checkpoint, 
+                   render = False,  
+                   base_seed = j, 
+                   #goal_cell = np.array([6, 1], dtype = int), 
+                   task_id = task_id,
+                   continual_rollout = True,
+                   chunk_size = chunk_size[chunk_size_index],
+                   device = device)
+              chunk_size_index += 1
+          total_return += return_value
+       print(f"Checkpoint: {checkpoint} Success Rate: {total_return / 50 :.4f}")
+       checkpoint += 3
+    exit()
+
+    total_return = 0.0
+    for j in range(1, 51):
+        chunk_size_index = 0
+        return_value = 0.0
+        while((return_value != 1.0) and (chunk_size_index < len(chunk_size))):
+            return_value, steps = rollout(
                env_name, 
                specific_train_dataset, 
                horizon, 
@@ -861,21 +887,19 @@ if __name__ == "__main__":
                episode_length = 3000, 
                checkpoint_steps = checkpoint, 
                render = False,  
-               base_seed = 1, 
+               base_seed = j, 
                #goal_cell = np.array([6, 1], dtype = int), 
                task_id = task_id,
                continual_rollout = True,
                chunk_size = chunk_size[chunk_size_index],
                device = device)
-              chunk_size_index += 1
-          total_return += return_value
-          #print(return_value)
-      
-       print(f"Checkpoint: {checkpoint} Success Rate: {total_return / 30 :.4f}")
-       checkpoint += 3
-    #print(get_normalized_score(total_reward/10, min_score, max_score))
-    
+            chunk_size_index += 1
+        total_return += return_value
+        print(return_value)
+    print(f"Checkpoint: {checkpoint} Success Rate: {total_return / 50 :.4f}")
     exit()
+
+    """
     horizon = 80
     env_name = 'ogpointmaze'
     specific_train_dataset = 'medium'
@@ -914,7 +938,7 @@ if __name__ == "__main__":
     #print(f"Success Rate: {total_reward / 50 :.4f}")
     #print(get_normalized_score(total_reward/10, min_score, max_score))
     print(total_return/50)
-    
+    """
 
 
     """
