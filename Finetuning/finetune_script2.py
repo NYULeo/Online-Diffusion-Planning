@@ -446,9 +446,9 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_env = 'single-play'
     task_id = 4
-    finetune_buffer_cutoff_length = 50
+    finetune_buffer_cutoff_length = 200
     train_buffer_cutoff_length = 200
-    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 90, decay = False)
+    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = True)
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32, eta = 0.0)
 
     RWConfig = RewardConfig(
@@ -462,7 +462,7 @@ if __name__ == "__main__":
                           hidden_layers = 4,
                           hidden_dim = 512,
                           batch_size = 256, 
-                          num_steps = 10000, 
+                          num_steps = 5000, 
                           lr = 5e-05,
                           min_lr = 8e-06,
                           sigma = 3.0, 
@@ -486,14 +486,14 @@ if __name__ == "__main__":
                             hidden_layers = 4,
                             hidden_dim = 512,
                             batch_size = 256,
-                            num_steps = 5000,
+                            num_steps = 2000,
                             lr = 1e-05,
                             min_lr = 1e-06,
                             horizon = 128,
                             tau = 0.005,
                             gamma = 0.99,
                             data_conservation = True,
-                            momentum = 0.5)
+                            momentum = 0.1)
     
     FTConfig = FinetuningConfig(
         AMConfig = AMConfig, 
@@ -509,11 +509,11 @@ if __name__ == "__main__":
         critic = True,
         update_critic = True,
         kernel = True,
-        update_kernel = False,
+        update_kernel = True,
         buffer_size = 20000,
         finetune_buffer_cutoff_length = finetune_buffer_cutoff_length,
         train_buffer_cutoff_length = train_buffer_cutoff_length,
-        finetune_steps = 90,
+        finetune_steps = 300,
         finetune_rounds = 30,
         diffusion_steps = 10,
         karras_percent = 0.1,
@@ -525,13 +525,13 @@ if __name__ == "__main__":
         eta_lam = 0.5,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
-        reward_scaling_factor = 50,
+        reward_scaling_factor = 40,
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value
         rollout_num_envs = 8, 
         continual_rollout = True,
-        chunk_size = 10,
+        chunk_size = 20,
         num_rollout_processes = 8,
         train_reward_config = TrainRewardConfig,
         train_kernel_config = TrainKernelConfig,

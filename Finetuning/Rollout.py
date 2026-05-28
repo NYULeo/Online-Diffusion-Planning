@@ -28,7 +28,7 @@ from typing import Optional
 from dataclasses import dataclass
 import time
 from typing import List
-from Finetuning.traj_reward import TotalReward_Critic, RewardConfig, TotalReward
+from Finetuning.traj_reward2 import TotalReward_Critic, RewardConfig, TotalReward
 
 class Selector():
     def __init__(self, env_name, specific_env, RConfig: RewardConfig, reward_checkpoint: int, kernel_checkpoint: Optional[int] = None, critic_checkpoint: Optional[int] = None):
@@ -819,15 +819,32 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 87
+    checkpoint = 15
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}, checkpoint: {checkpoint}")
     #for i in range(1, 51):
     
     set_seed(1)
-    total_return = 0
-    for j in range(30, 201):
+    RConfig = RewardConfig(
+               beta = 1.0, 
+               #max_mahalanobis_score = 3.5,
+               min_log_prob = 5.0,
+               #constraint_adapt = False,
+               critic_gamma = 1.0,
+               type_kernel = 'mog',
+               kernel_num_modes = 10,
+               kernel_noise_floor = 5e-4,
+               num_hidden_layers_kernel = 2,
+               hidden_dim_kernel = 256,
+               num_hidden_layers_reward = 1,
+               hidden_dim_reward = 32,
+               num_hidden_layers_critic = 3,
+               hidden_dim_critic = 256,
+               explore = False)
+    #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
+    total_return = 0.0
+    for j in range(1, 201):
         return_value, steps = rollout(
                env_name, 
                specific_train_dataset, 
@@ -886,11 +903,12 @@ if __name__ == "__main__":
     print(return_value)
     print(steps)
     exit()
+    
       #print(f"seed {i} finished")
     #print(f"Success Rate: {total_reward / 50 :.4f}")
     #print(get_normalized_score(total_reward/10, min_score, max_score))
     print(total_return/50)
-    """
+    
 
 
     """
@@ -930,55 +948,10 @@ if __name__ == "__main__":
       # print(f"Success Rate for checkpoint {checkpoint_step}: {total_success_rate:.4f}")
      # print(len(total_success_trajs))
     #save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 4)
-
-
-
-    """
-    env, _, _ = get_env(env_name, specific_train_dataset,  render_mode = 'rgb_array')
-    frames = []
-    obs, info = env.reset(seed=1, options = {"task_id": 1})  # may not exactly match logged init state
-    for a in traj['actions']:
-       obs, reward, terminated, truncated, info = env.step(a)
-       frame = env.render()
-       if frame is not None:
-            frames.append(frame)
-       if terminated or truncated:
-            break
-    media.write_video("demo2.mp4", frames, fps=50)
-    """
-    
-
-    
-    
-   
-    
-
-    
-    
-   
-
-
-
-
-
-    
-    """
-    for i in range(10):
-        set_seed(0)
-        rollout(env_name, specific_train_dataset, horizon, steps_T = 600, num_karras = 0, eta = 0.8, episode_length = 1000, checkpoint_steps = 150, render = True, base_seed = i, continual_rollout = True)
     """
 
-    #150, 8
-    #50, 3
-    #rollout_parallel(env_name, specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_step = 0, goal_cell = None, num_envs = 4, seed_base = 0)
 
-"""
-    checkpoint = 0
-    while(checkpoint < 450):
-       print(f"Rollout for checkpoint: {checkpoint}")
-       rollout_parallel(env_name,  specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, critic = False, checkpoint_steps = checkpoint, num_envs=8)
-       checkpoint += 50
-"""
+ 
     
 
 

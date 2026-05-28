@@ -46,19 +46,19 @@ if __name__ == '__main__':  # pragma: no cover
              specific_dataset = specific_env, 
              hidden_layers = 4, 
              hidden_dim = 512, 
-             sigma = 3.0,
+             sigma = 4.0,
              batch_size = 256, 
              num_steps = 10000, 
              gamma = 0.99, 
              lam = 0.95, 
              horizon = horizon, 
-             lr = 1e-05, 
-             min_lr = 1e-06, 
+             lr = 1e-04, 
+             min_lr = 1e-05, 
              tau = 0.005, 
              old_step = None, 
              new_step = step, 
              momentum = 0.005, 
-             target_reward = 80.0,
+             target_reward = 300.0,
              task_id = task_id)
 
        trajs = load_success_trajs(env_name, specific_env, task_id, step)
@@ -69,8 +69,8 @@ if __name__ == '__main__':  # pragma: no cover
             checkpoint_step = step, 
             gamma = 0.99, 
             horizon = horizon,  
-            sigma = 3.0, 
-            target_reward = 80.0, 
+            sigma = 4.0, 
+            target_reward = 300.0, 
             trajs = trajs,
             task_id = task_id)
  
