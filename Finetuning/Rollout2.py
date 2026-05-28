@@ -583,7 +583,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 30
+    checkpoint = 33
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -609,7 +609,7 @@ if __name__ == "__main__":
     while(checkpoint < 54):
        print(f"Running checkpoing: {checkpoint}")
        total_return = 0.0
-       for j in range(1, 54):
+       for j in range(1, 51):
           return_value = 0.0
           chunk_size_index = 0
           while((return_value != 1.0) and (chunk_size_index < len(chunk_size))):
