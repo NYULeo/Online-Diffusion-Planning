@@ -447,7 +447,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_env = 'single-play'
     task_id = 4
-    finetune_buffer_cutoff_length = 200
+    finetune_buffer_cutoff_length = 100
     train_buffer_cutoff_length = 200
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = True)
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32, eta = 0.0)
