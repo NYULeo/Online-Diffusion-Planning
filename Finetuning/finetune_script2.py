@@ -1,5 +1,7 @@
 import sys
 import os
+
+from sympy.logic.boolalg import false
 # Change to project root directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -509,7 +511,7 @@ if __name__ == "__main__":
         critic = True,
         update_critic = True,
         kernel = True,
-        update_kernel = True,
+        update_kernel = False,
         buffer_size = 20000,
         finetune_buffer_cutoff_length = finetune_buffer_cutoff_length,
         train_buffer_cutoff_length = train_buffer_cutoff_length,
@@ -525,7 +527,7 @@ if __name__ == "__main__":
         eta_lam = 0.5,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
-        reward_scaling_factor = 40,
+        reward_scaling_factor = 80,
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value
