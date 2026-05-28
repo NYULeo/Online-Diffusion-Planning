@@ -595,74 +595,6 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
 
 
 
-"""
-def model_rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, checkpoint_steps, train_goal: Optional[np.ndarray] = None, rollout_goal: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None):
-     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}")
-     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     device = "cuda" if torch.cuda.is_available() else "cpu"
-     print(f"Using device {device}")
-     
-     env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array')
-    
-    # Create environment factory function
-     state_dict = get_planner(env_name, specific_env, checkpoint_steps)
-     if( env_name == 'kitchen'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
-     elif (env_name == 'pointmaze'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
-     elif(env_name == 'antmaze'):
-           model = DiT1d(in_dim = (d_s), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
-     else:
-          raise ValueError(f"Invalid Environment: {env_name}")
-     model.load_state_dict(state_dict)
-     model.eval()
-
-     #get Processor
-     planner_processor = Planner_Processor(env_name, specific_env)
-     
-     if(rollout_goal is not None):
-        s0 = env.reset(seed = 0, options={"goal_cell": rollout_goal, 'reset_cell': start_cell})
-     else:
-        s0 = env.reset(seed = 0)
-     
-     if(env_name == 'antmaze'):
-          current_state = np.concatenate([
-               s0[0]['observation'],
-               s0[0]['achieved_goal']
-           ])
-     else:
-         current_state = s0[0]['observation']
-     
-     actions = []
-     states = []
-     count = 0
-     states.append(current_state.copy())
-     reached = False
-     while True:
-            current_state_norm = planner_processor.preprocess(current_state)
-            x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
-            for i in range(1, len(x)):
-                states.append(x[i, :d_s].copy())
-                if(np.linalg.norm(train_goal - x[i, :2].copy()) <= 0.5):
-                     reached = True
-                     break
-            for i in range(len(x)-1):
-                actions.append(x[i, d_s:(d_s+d_a)].copy())
-            current_state = x[-1, :d_s].copy()
-            count += 1
-            if(reached):
-                print('reached')
-                break
-            if(count == 1000):
-                print('not reached')
-                break
-            
-     traj = {'observations': np.asarray(states), 'actions': np.asarray(actions)}
-     return traj
-     
-     #reset
-"""
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
     goals = {'task_1': np.array( [ 0.0,       -1.0,        0.199599]), 
@@ -817,7 +749,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 9
+    checkpoint = 27
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -838,12 +770,12 @@ if __name__ == "__main__":
                hidden_dim_critic = 256,
                explore = False)
     #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
-    chunk_size = [20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 4]
+    chunk_size = [20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9]
     set_seed(1)
-    while(checkpoint < 15):
+    while(checkpoint < 54):
        print(f"Running checkpoing: {checkpoint}")
        total_return = 0.0
-       for j in range(1, 51):
+       for j in range(1, 54):
           return_value = 0.0
           chunk_size_index = 0
           while((return_value != 1.0) and (chunk_size_index < len(chunk_size))):
@@ -870,32 +802,7 @@ if __name__ == "__main__":
        checkpoint += 3
     exit()
 
-    total_return = 0.0
-    for j in range(1, 51):
-        chunk_size_index = 0
-        return_value = 0.0
-        while((return_value != 1.0) and (chunk_size_index < len(chunk_size))):
-            return_value, steps = rollout(
-               env_name, 
-               specific_train_dataset, 
-               horizon, 
-               steps_T = 10, 
-               num_karras = 1, 
-               eta = 0.0, 
-               episode_length = 3000, 
-               checkpoint_steps = checkpoint, 
-               render = False,  
-               base_seed = j, 
-               #goal_cell = np.array([6, 1], dtype = int), 
-               task_id = task_id,
-               continual_rollout = True,
-               chunk_size = chunk_size[chunk_size_index],
-               device = device)
-            chunk_size_index += 1
-        total_return += return_value
-        print(return_value)
-    print(f"Checkpoint: {checkpoint} Success Rate: {total_return / 50 :.4f}")
-    exit()
+    
 
     """
     horizon = 80
