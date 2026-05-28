@@ -32,13 +32,13 @@ class TrajectoryDict(TypedDict):
     actions: np.ndarray  
     rewards: np.ndarray
 
-
+"""
 def determine_stride(dataset_name, specific_dataset):
      if(dataset_name == 'antmaze'):
           return True
      else:
           return False
-
+"""
 #-------------------------------------------------------------------------------------#
 #------------------------------------- Dataset ---------------------------------------#
 #-------------------------------------------------------------------------------------#
