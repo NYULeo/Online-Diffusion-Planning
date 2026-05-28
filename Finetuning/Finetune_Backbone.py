@@ -827,7 +827,7 @@ class OnlineFinetuner():
                                       hidden_dim = self.config.train_kernel_config.hidden_dim,
                                       kernel_noise_floor = self.config.train_kernel_config.kernel_noise_floor,
                                       step = ((step+1) * self.config.AMConfig.per_round_steps),
-                                      constraint_type = self.config.RewardConfig.constraint_type,
+                                      #constraint_type = self.config.RewardConfig.constraint_type,
                                       #quantile = self.config.RewardConfig.quantile,
                                       x_generated_plans = None,
                                       accelerator = self.accelerator)
