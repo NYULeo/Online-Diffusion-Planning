@@ -819,13 +819,11 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 15
+    checkpoint = 12
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}, checkpoint: {checkpoint}")
     #for i in range(1, 51):
-    
-    set_seed(1)
     RConfig = RewardConfig(
                beta = 1.0, 
                #max_mahalanobis_score = 3.5,
@@ -843,9 +841,17 @@ if __name__ == "__main__":
                hidden_dim_critic = 256,
                explore = False)
     #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
-    total_return = 0.0
-    for j in range(1, 201):
-        return_value, steps = rollout(
+    #set_seed(1)
+    chunk_size = [20, 13, 12, 11, 5, 10]
+    
+    while(checkpoint < 51):
+       total_return = 0.0
+       for j in range(1, 31):
+          return_value = 0.0
+          chunk_size_index = 0
+          while(return_value != 1.0 and chunk_size_index < len(chunk_size)):
+              set_seed(j)
+              return_value, steps = rollout(
                env_name, 
                specific_train_dataset, 
                horizon, 
@@ -855,21 +861,21 @@ if __name__ == "__main__":
                episode_length = 3000, 
                checkpoint_steps = checkpoint, 
                render = True,  
-               base_seed = j, 
+               base_seed = 1, 
                #goal_cell = np.array([6, 1], dtype = int), 
                task_id = task_id,
                continual_rollout = True,
-               chunk_size = 10,
+               chunk_size = chunk_size[chunk_size_index],
                device = device)
-        total_return += return_value
-        print(return_value)
-        exit()
-      #print(f"seed {i} finished")
-    #print(f"Success Rate: {total_reward / 50 :.4f}")
+              chunk_size_index += 1
+          total_return += return_value
+          #print(return_value)
+      
+       print(f"Checkpoint: {checkpoint} Success Rate: {total_return / 30 :.4f}")
+       checkpoint += 3
     #print(get_normalized_score(total_reward/10, min_score, max_score))
-    print(total_return/50)
     
-
+    exit()
     horizon = 80
     env_name = 'ogpointmaze'
     specific_train_dataset = 'medium'
