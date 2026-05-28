@@ -842,7 +842,7 @@ if __name__ == "__main__":
                explore = False)
     #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
     #set_seed(1)
-    chunk_size = [20, 13, 12, 11, 5, 10]
+    chunk_size = [20, 19, 13, 12, 11, 5, 10]
     
     while(checkpoint < 51):
        total_return = 0.0
