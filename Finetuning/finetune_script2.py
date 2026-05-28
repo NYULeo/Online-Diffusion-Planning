@@ -456,7 +456,7 @@ if __name__ == "__main__":
                beta = 1.0, 
                min_log_prob = -110.0,
                #max_mahalanobis_score = 100.0,
-               critic_gamma = 1.0,
+               critic_gamma = 0.99,
                explore = False) 
   
     TrainRewardConfig = Train_Reward_Config(
