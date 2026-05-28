@@ -817,11 +817,10 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 3
+    checkpoint = 21
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
-    #for i in range(1, 51):
     RConfig = RewardConfig(
                beta = 1.0, 
                #max_mahalanobis_score = 3.5,
@@ -847,24 +846,25 @@ if __name__ == "__main__":
        for j in range(1, 51):
           return_value = 0.0
           chunk_size_index = 0
-          while(return_value != 1.0 and chunk_size_index < len(chunk_size)):
-              return_value, steps = rollout(
-                   env_name, 
-                   specific_train_dataset, 
-                   horizon, 
-                   steps_T = 10, 
-                   num_karras = 1, 
-                   eta = 0.0, 
-                   episode_length = 3000, 
-                   checkpoint_steps = checkpoint, 
-                   render = False,  
-                   base_seed = j, 
-                   #goal_cell = np.array([6, 1], dtype = int), 
-                   task_id = task_id,
-                   continual_rollout = True,
-                   chunk_size = chunk_size[chunk_size_index],
-                   device = device)
-              chunk_size_index += 1
+          while((return_value != 1.0) and (chunk_size_index < len(chunk_size))):
+                return_value, _ = rollout(
+                  env_name, 
+                  specific_train_dataset, 
+                  horizon, 
+                  steps_T = 10, 
+                  num_karras = 1, 
+                  eta = 0.0, 
+                  episode_length = 3000, 
+                  checkpoint_steps = checkpoint, 
+                  render = False,  
+                  base_seed = j, 
+                  #goal_cell = np.array([6, 1], dtype = int), 
+                  task_id = task_id,
+                  continual_rollout = True,
+                  chunk_size = chunk_size[chunk_size_index],
+                  device = device)
+                chunk_size_index += 1
+          print(return_value)
           total_return += return_value
        print(f"Checkpoint: {checkpoint} Success Rate: {total_return / 50 :.4f}")
        checkpoint += 3
