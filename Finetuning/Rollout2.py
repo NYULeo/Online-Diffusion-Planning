@@ -1,10 +1,8 @@
-from math import inf
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
-from sympy.simplify.fu import I
 import torch
 import numpy as np
 import mediapy as media
@@ -27,7 +25,8 @@ from typing import Optional, List
 #from utils import get_normalized_score, rollout_parallel3, get_current_state, get_trajs, spare_reward_prcocessor, compute_threshold_log_prob_mog, compute_threshold_mahalanobis_mog
 from dataclasses import dataclass
 import time
-from Finetuning.traj_reward import TotalReward_Critic, RewardConfig, TotalReward
+from typing import List
+from Finetuning.traj_reward2 import TotalReward_Critic, RewardConfig, TotalReward
 class Selector():
     def __init__(self, env_name, specific_env, RConfig: RewardConfig, reward_checkpoint: int, kernel_checkpoint: Optional[int] = None, critic_checkpoint: Optional[int] = None):
          self.env_name = env_name
@@ -578,320 +577,63 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
      #print(get_normalized_score([traj]))
 
 
-"""
-def model_rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, checkpoint_steps, train_goal: Optional[np.ndarray] = None, rollout_goal: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None):
-     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}")
-     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     device = "cuda" if torch.cuda.is_available() else "cpu"
-     print(f"Using device {device}")
-     
-     env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array')
-    
-    # Create environment factory function
-     state_dict = get_planner(env_name, specific_env, checkpoint_steps)
-     if( env_name == 'kitchen'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
-     elif (env_name == 'pointmaze'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
-     elif(env_name == 'antmaze'):
-           model = DiT1d(in_dim = (d_s), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
-     else:
-          raise ValueError(f"Invalid Environment: {env_name}")
-     model.load_state_dict(state_dict)
-     model.eval()
-
-     #get Processor
-     planner_processor = Planner_Processor(env_name, specific_env)
-     
-     if(rollout_goal is not None):
-        s0 = env.reset(seed = 0, options={"goal_cell": rollout_goal, 'reset_cell': start_cell})
-     else:
-        s0 = env.reset(seed = 0)
-     
-     if(env_name == 'antmaze'):
-          current_state = np.concatenate([
-               s0[0]['observation'],
-               s0[0]['achieved_goal']
-           ])
-     else:
-         current_state = s0[0]['observation']
-     
-     actions = []
-     states = []
-     count = 0
-     states.append(current_state.copy())
-     reached = False
-     while True:
-            current_state_norm = planner_processor.preprocess(current_state)
-            x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
-            for i in range(1, len(x)):
-                states.append(x[i, :d_s].copy())
-                if(np.linalg.norm(train_goal - x[i, :2].copy()) <= 0.5):
-                     reached = True
-                     break
-            for i in range(len(x)-1):
-                actions.append(x[i, d_s:(d_s+d_a)].copy())
-            current_state = x[-1, :d_s].copy()
-            count += 1
-            if(reached):
-                print('reached')
-                break
-            if(count == 1000):
-                print('not reached')
-                break
-            
-     traj = {'observations': np.asarray(states), 'actions': np.asarray(actions)}
-     return traj
-     
-     #reset
-"""
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
-    goals = {'task_1': np.array( [ 0.0,       -1.0,        0.199599]), 
-         'task_2': np.array([7.50000000e-01, 8.02418254e-18, 1.99598996e-01]),
-         'task_3': np.array([-7.50000000e-01,  1.21832368e-19,  1.99598996e-01]),
-         'task_4': np.array([0.75,     2.0,       0.199599]),
-         'task_5': np.array([ 0.75,     -2.0,        0.199599])}
-    
-   
-    """
-    horizon = 32
-    env_name = 'pointmaze'
-    specific_train_dataset = 'medium'
-    set_seed(1)
-    
-    rollout(env_name, 
-            specific_train_dataset, horizon, 
-            steps_T = 50, 
-            num_karras = 3, 
-            eta = 0.8, 
-            episode_length = 3000, 
-            checkpoint_steps = 0, 
-            render = True,  
-            base_seed = 1, 
-            goal_cell = np.array([6, 1], dtype = int), 
-            start_cell = np.array([1, 6], dtype = int), 
-            continual_rollout = False,
-            chunk_size = 10)
-    """
-    
-    horizon = 32
-    env_name = 'pointmaze'
-    specific_train_dataset = 'medium'
-    set_seed(1)
-    
-    return_value, steps = rollout(env_name, 
-            specific_train_dataset, horizon, 
-            steps_T = 50, 
-            num_karras = 3, 
-            eta = 0.8, 
-            episode_length = 3000, 
-            checkpoint_steps = 80, 
-            render = True,  
-            base_seed = 1, 
-            goal_cell = np.array([6, 1], dtype = int), 
-            start_cell = np.array([6, 5], dtype = int), 
-            continual_rollout = True,
-            chunk_size = 31)
-    print(steps)
-    print(return_value)
-    exit()
-    """
-    horizon = 32
-    env_name = 'kitchen'
-    specific_train_dataset = 'partial'
-    set_seed(2)
-    
-    rollout(env_name, 
-            specific_train_dataset, 
-            horizon, 
-            steps_T = 500, 
-            num_karras = 25, 
-            eta = 0.8, 
-            episode_length = 3000, 
-            checkpoint_steps = 40, 
-            render = True,  
-            base_seed = 1, 
-            continual_rollout = True,
-            chunk_size = 10)
-    """
-
-    #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length = 1000, checkpoint_steps = 0, render = True, base_seed = 0, continual_rollout = True, chunk_size = 3)
-    #traj = model_rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, checkpoint_steps = 210, train_goal = np.array([-2.5, -2.5], dtype = np.float32), rollout_goal = np.array([6, 1], dtype = int), start_cell = np.array([4, 4], dtype = int))
-    #print(traj['observations'])
-    #render(env_name, specific_train_dataset, traj, goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([4, 4], dtype = int))
-    """
-    average = 0.0
-    for i in range(1, 10):
-        set_seed(i)
-        score = rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 60, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([6, 5], dtype = int), base_seed = 0, continual_rollout = False)
-        average += score
-    average = average / 10
-    print(average)
-    """
-    #score = rollout(env_name, specific_train_dataset, horizon, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 500, checkpoint_steps = 50, render = True,  goal_cell = np.array([6, 1], dtype = int), start_cell = np.array([1, 5], dtype = int), base_seed = 0, continual_rollout = False)
-   
-    #min_score = 13.13
-    #max_score = 277.39
-    horizon = 32
-    env_name = 'pointmaze'
-    specific_train_dataset = 'medium'
-    data = get_dataset(env_name, specific_train_dataset)
-    min_score = data.get_ref_min_score()
-    max_score = data.get_ref_max_score()
-    device = check_device()
-    set_seed(1)
-    total_score = 0.0
-    for i in range(1, 61):
-        # t0 = time.perf_counter()
-       return_value = rollout(env_name, 
-            specific_train_dataset, 
-            horizon, 
-            steps_T = 50, 
-            num_karras = 3, 
-            eta = 0.8, 
-            episode_length = 3000, 
-            checkpoint_steps = 50, 
-            render = False,  
-            base_seed = i, 
-            goal_cell = np.array([6, 1], dtype = int), 
-            #start_cell = np.array([5, 4], dtype = int), 
-            start_cell = None,
-            continual_rollout = False,
-            chunk_size = 1,
-            device = device)
-        #print(get_normalized_score(return_value, min_score, max_score))
-       #elapsed = time.perf_counter() - t0
-       total_score += get_normalized_score(return_value, min_score, max_score)
-
-    print(total_score/60)
-    #print(f"Elapsed: {elapsed:.3f}s")
-    
-
-
-    
-  
-    
-    
-    """
-    horizon = 32
-    env_name = 'cube'
-    specific_train_dataset = 'single-play'
-    checkpoint = 15
-    total_reward = 0.0
-    device = check_device()
-    print(f"Using device {device}, checkpoint: {checkpoint}")
-    #for i in range(1, 51):
-      #set_seed(i)
-      #for j in range(1, 8):
-    reward  =  rollout(
-               env_name, 
-               specific_train_dataset, 
-               horizon, 
-               steps_T = 200, 
-               num_karras = 10, 
-               eta = 0.8, 
-               episode_length = 3000, 
-               checkpoint_steps = checkpoint, 
-               render = False,  
-               base_seed = 1, 
-               task_id = 4,
-               continual_rollout = True,
-               chunk_size = 10,
-               device = device)
-      #total_reward += reward
-      #print(f"seed {i} finished")
-    #print(f"Success Rate: {total_reward / 50 :.4f}")
-   """
-    
-
-    """
-    from Finetuning.utils import rollout_parallel3
-    #set_seed(1)
     horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    total_success_trajs = []
-   
-    
-    #for i in range(30, 60):
-       #checkpoint_step = i*5
-       #total_success_rate = 0.0
-    for i in range(60, 121):
-          set_seed(i)
-          trajs, _, success_rate, _ = rollout_parallel3(env_name = env_name, 
-                      specific_env = specific_train_dataset, 
-                      horizon = horizon,
-                      steps_T = 200, 
-                      num_karras = 10, 
-                      eta = 0.8, 
-                      episode_length = 4000, 
-                      checkpoint_step = 0,
-                      num_envs = 10, 
-                      task_id = task_id, 
-                      seed_base = 1, 
-                      continual_rollout = True, 
-                      chunk_size = 31)
-          success_trajs = get_success_trajs(trajs)
-          total_success_trajs.extend(success_trajs)
-          #success_rate = len(success_trajs) / len(trajs)
-          #total_success_rate += success_rate
-       #total_success_rate = total_success_rate / 50
-      # print(f"Success Rate for checkpoint {checkpoint_step}: {total_success_rate:.4f}")
-     # print(len(total_success_trajs))
-    save_success_trajs_for_reward(total_success_trajs, env_name, specific_train_dataset, task_id = 4)
-   
-   """
-
-    """
-    env, _, _ = get_env(env_name, specific_train_dataset,  render_mode = 'rgb_array')
-    frames = []
-    obs, info = env.reset(seed=1, options = {"task_id": 1})  # may not exactly match logged init state
-    for a in traj['actions']:
-       obs, reward, terminated, truncated, info = env.step(a)
-       frame = env.render()
-       if frame is not None:
-            frames.append(frame)
-       if terminated or truncated:
-            break
-    media.write_video("demo2.mp4", frames, fps=50)
-    """
-    
-
-    
-    
-   
-    
-
-    
-    
-   
-
-
-
-
+    checkpoint = 30
+    total_reward = 0.0
+    device = check_device()
+    print(f"Using device {device}")
+    RConfig = RewardConfig(
+               beta = 1.0, 
+               #max_mahalanobis_score = 3.5,
+               min_log_prob = 5.0,
+               #constraint_adapt = False,
+               critic_gamma = 1.0,
+               type_kernel = 'mog',
+               kernel_num_modes = 10,
+               kernel_noise_floor = 5e-4,
+               num_hidden_layers_kernel = 2,
+               hidden_dim_kernel = 256,
+               num_hidden_layers_reward = 1,
+               hidden_dim_reward = 32,
+               num_hidden_layers_critic = 3,
+               hidden_dim_critic = 256,
+               explore = False)
+    #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
+    chunk_size = [20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9]
+    set_seed(1)
+    while(checkpoint < 54):
+       print(f"Running checkpoing: {checkpoint}")
+       total_return = 0.0
+       for j in range(1, 54):
+          return_value = 0.0
+          chunk_size_index = 0
+          while((return_value != 1.0) and (chunk_size_index < len(chunk_size))):
+                return_value, _ = rollout(
+                  env_name, 
+                  specific_train_dataset, 
+                  horizon, 
+                  steps_T = 10, 
+                  num_karras = 1, 
+                  eta = 0.0, 
+                  episode_length = 3000, 
+                  checkpoint_steps = checkpoint, 
+                  render = False,  
+                  base_seed = j, 
+                  #goal_cell = np.array([6, 1], dtype = int), 
+                  task_id = task_id,
+                  continual_rollout = True,
+                  chunk_size = chunk_size[chunk_size_index],
+                  device = device)
+                chunk_size_index += 1
+          print(return_value)
+          total_return += return_value
+       print(f"Checkpoint: {checkpoint} Success Rate: {total_return / 50 :.4f}")
+       checkpoint += 3
+    exit()
 
     
-    """
-    for i in range(10):
-        set_seed(0)
-        rollout(env_name, specific_train_dataset, horizon, steps_T = 600, num_karras = 0, eta = 0.8, episode_length = 1000, checkpoint_steps = 150, render = True, base_seed = i, continual_rollout = True)
-    """
-
-    #150, 8
-    #50, 3
-    #rollout_parallel(env_name, specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 4000, checkpoint_step = 0, goal_cell = None, num_envs = 4, seed_base = 0)
-
-"""
-    checkpoint = 0
-    while(checkpoint < 450):
-       print(f"Rollout for checkpoint: {checkpoint}")
-       rollout_parallel(env_name,  specific_train_dataset, horizon = 32, steps_T = 50, num_karras = 3, eta = 0.8, episode_length = 1000, critic = False, checkpoint_steps = checkpoint, num_envs=8)
-       checkpoint += 50
-"""
-    
-
-
-

@@ -775,7 +775,7 @@ if __name__ == "__main__":
     while(checkpoint < 54):
        print(f"Running checkpoing: {checkpoint}")
        total_return = 0.0
-       for j in range(1, 54):
+       for j in range(1, 51):
           return_value = 0.0
           chunk_size_index = 0
           while((return_value != 1.0) and (chunk_size_index < len(chunk_size))):
