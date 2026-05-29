@@ -749,7 +749,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 27
+    checkpoint = 30
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")

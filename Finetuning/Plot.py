@@ -202,15 +202,34 @@ import seaborn as sns
 from matplotlib.ticker import FuncFormatter
 
 # Data
-"""
-env_steps = [0, 1592, 3182, 4782, 6193, 7609, 9209, 10764, 12186, 13786, 15385, 16939]
-success_rate = [6.12, 12.24, 8.16, 14.29, 8.16, 24.29, 18.37, 14.29, 4.08, 0.00, 0.00, 0.00]
-"""
-env_steps =    [0, 1600, 3200, 4800, 6400, 8000, 9600, 11200]
-success_rate = [10.00, 20.00, 40.00, 80.00, 50.00, 40.00, 0.00, 40.00]
+
+
+env_steps = [
+     0, 
+     12800, 
+     25600, 
+     38307, 
+     50875, 
+     63396, 
+     75823, 
+     87709, 
+     99555, 
+     110616, 
+     121453, 
+     131311, 
+     141308, 
+     151273, 
+     161101, 
+     170844, 
+     180756
+]
+success_rate = [0, 4, 38, 68, 92, 92, 94, 96, 98, 98, 98, 98, 94, 96, 94, 96, 92]
+
+
 # Style
+
 sns.set_style("whitegrid")
-fig, ax = plt.subplots(figsize=(11, 6.5))
+fig, ax = plt.subplots(figsize=(10, 6.5))
 
 ax.plot(
     env_steps,
@@ -221,22 +240,25 @@ ax.plot(
     markersize=7,
     markeredgecolor="white",
     markeredgewidth=0.8,
-    label="Success Rate",
+    label="Ours",
     zorder=5
 )
 
-# Optional: highlight area under curve
-ax.fill_between(env_steps, success_rate, 0, color="#C44E9B", alpha=0.15, zorder=2)
+# Optional: highlight area under curve#
+#ax.fill_between(env_steps, success_rate, 0, color="#C44E9B", alpha=0.15, zorder=2)
 
 # Axis formatting
-ax.set_xlim(min(env_steps), max(env_steps))
-ax.set_ylim(0, 50)
-ax.set_xlabel("Environment Steps")
+#ax.set_xlim(-0.1, max(env_steps) * 1.02)  
+ax.margins(x=0.02)
+ax.set_ylim(0, 100)
+
+#ax.set_xlabel("Online Environment Steps ()")
+ax.set_xlabel(r"Online Environment Steps ($\times 10^{4}$)")
 ax.set_ylabel("Success Rate")
-ax.set_title("Cube Single")
+ax.set_title("Cube-Single")
 
 # Show x-axis in k steps (e.g., 16.9k)
-ax.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x/1000:.1f}k"))
+ax.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x/10000:.1f}"))
 
 ax.legend(loc="upper right", frameon=True)
 plt.tight_layout()
