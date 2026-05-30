@@ -27,6 +27,231 @@ from dataclasses import dataclass
 import time
 from typing import List
 from Finetuning.traj_reward2 import TotalReward_Critic, RewardConfig, TotalReward
+from Pretrain.Planners.Backbone.Sampler import karras_beta_schedule, cosine_beta, clip_actions
+
+
+def create_initial(current_state: np.ndarray, plan_suffix: np.ndarray, d_s: int, d_a: int, horizon: int, device: str) -> np.ndarray:
+    initial = torch.zeros(1, horizon, d_s + d_a,device = device)
+    initial[:, 0, :d_s] = current_state
+    initial[:, 0, d_s: (d_s + d_a)] = plan_suffix[0, d_s: (d_s + d_a)]
+    for i in range(horizon):
+        if(i < len(plan_suffix)):
+             initial[:, i] = plan_suffix[i]
+        else:
+             initial[:, i] = initial[:, i-1]
+    return initial
+
+
+@torch.no_grad()
+def sample_euler_karras_replan(
+    s0: np.ndarray,
+    score_model: torch.nn.Module,
+    d_s: int,
+    d_a: int,
+    horizon: int,
+    num_steps: int = 50,
+    num_karras: int = 5,
+    eta: float = 1.0,
+    plan_suffix: np.ndarray = None,
+    device: Optional[str] = None,
+) -> np.ndarray:
+    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    s0_t = torch.tensor(s0, device=device, dtype=torch.float32)
+    if s0_t.shape[0] != d_s:
+        raise ValueError(f"s0 should have shape ({d_s},), but got {s0_t.shape}")
+
+    dim = d_s + d_a
+
+    # Karras β(t) + σ(t)
+    t_grid, beta_1, sigma_grid = karras_beta_schedule(num_steps, device=device)
+    #t_grid, beta_1, _, sigma_grid =  karras_cosine_interpolated_beta(num_steps, device=device)
+
+    beta_2 = cosine_beta(t_grid, s=0.008)
+
+    # Initialize x_T
+    x = create_initial(s0, plan_suffix, d_s, d_a, horizon, device) * sigma_grid[0]
+    #x = torch.randn(1, horizon, dim, device=device) * sigma_grid[0]
+    #x2 = torch.randn(1, horizon, dim, device=device)
+
+    # Conditioning
+    mask = torch.zeros(1, horizon, dim, device=device)
+    mask[:, 0, :d_s] = 1.0
+    y = torch.zeros_like(x)
+    y[:, 0, :d_s] = s0_t.unsqueeze(0)
+    x = mask * y + (1 - mask) * x
+    
+
+    for i in range(num_steps):
+        t_now = t_grid[i]
+        t_next = t_grid[i + 1] if i < num_steps - 1 else 0.0
+        dt = (t_next - t_now).item()
+        if( i < num_karras ):
+            beta_now = beta_1[i].item()
+        else:
+            beta_now = beta_2[i].item()
+
+        # Drift
+        drift = -0.5 * beta_now * x
+
+        # Score
+        score = score_model(x, t_now.unsqueeze(0))
+
+        # Euler step
+        if eta > 0:
+            noise = torch.randn_like(x)
+            noise_scale = eta * math.sqrt(beta_now * (-dt))
+            x = x + ((drift - beta_now * score) * dt + noise_scale * noise)
+        else:
+            x = x + (drift - beta_now * score) * dt
+
+        # Conditioning
+        x = mask * y + (1 - mask) * x
+        x = clip_actions(x, d_s)
+
+    return x.squeeze(0).cpu().numpy()
+
+def rollout(env_name, 
+            specific_env, 
+            horizon, 
+            steps_T, 
+            num_karras, eta, 
+            episode_length, 
+            checkpoint_steps, 
+            render = False, 
+            goal_cell: Optional[np.ndarray] = None, 
+            start_cell: Optional[np.ndarray] = None,
+            task_id: Optional[int] = None, 
+            base_seed: int = None, 
+            continual_rollout = False, 
+            chunk_size = 5, 
+            device = None):
+     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
+     #print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}, episode_length: {episode_length}")
+     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
+     #device = check_device()
+     #device = "cuda" if torch.cuda.is_available() else "cpu"
+     #print(f"Using device {device}")
+
+     #env.reset(seed=1)  # Important: pass seed to env.reset
+     env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', task_id = task_id, episode_length = None)
+     #env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', episode_length = episode_length)
+     #np.random.seed(base_seed)
+    
+    # 2. Reset environment with both seed and task_id
+     #env.reset(seed=base_seed)   # Important first reset
+    
+    # Create environment factory function
+     state_dict = get_planner(env_name, specific_env, checkpoint_steps)
+     if( env_name == 'kitchen'):
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     elif (env_name == 'pointmaze'):
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     elif(env_name == 'antmaze'):
+           model = DiT1d(in_dim = (d_s), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     elif(env_name == 'cube'):
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     elif(env_name == 'ogpointmaze'):
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+     else:
+          raise ValueError(f"Invalid Environment: {env_name}")
+     model.load_state_dict(state_dict)
+     model.eval()
+
+     #get Processor
+     planner_processor = Planner_Processor(env_name, specific_env)
+     
+     
+     #reset
+     if(env_name == 'cube'):
+         s0, info = env.reset(seed = base_seed, options = dict( task_id=task_id))
+         #s0, info = env.reset(seed = base_seed)
+        #s0, info = env.reset()
+     elif(env_name == 'ogpointmaze'):
+         s0, info = env.reset(seed = base_seed, options = dict( task_id=task_id))
+
+     elif(goal_cell is not None and start_cell is not None):
+         s0 = env.reset(seed = base_seed, options = {"goal_cell": goal_cell, "reset_cell": start_cell})
+        #s0, info = env.reset( options = {"goal_cell": goal_cell, "reset_cell": start_cell})
+     elif(goal_cell is not None):
+         s0 = env.reset(seed = base_seed, options = {"goal_cell": goal_cell})
+     else:
+         s0 = env.reset(seed = base_seed)
+        #s0, info = env.reset()
+     
+     
+     current_state = get_current_state(s0[0], env_name)
+     frames = []
+     observations = []
+     actions = []
+     rewards = []
+     chunk = []
+     plan_suffix = []
+     generated_state = None
+     violation_scores = []
+     number_of_plans = 0
+     for i in range(episode_length):
+            if(len(chunk) == 0):
+                 if(len(plan_suffix) != 0):
+                       current_state_norm = planner_processor.preprocess(current_state)
+                       x = sample_euler_karras_replan(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta,  plan_suffix, device)
+                       chunk = x[:chunk_size].copy()
+                       plan_suffix = x[chunk_size:].copy()
+                 else:
+                       current_state_norm = planner_processor.preprocess(current_state)
+                       x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                       chunk = x[:chunk_size].copy()
+                       plan_suffix = x[chunk_size:].copy()
+
+            action = chunk[0, d_s:(d_s+d_a)].copy()
+            chunk = chunk[1:]
+            obs, reward, terminated, truncated, info = env.step(action)
+            if(render):
+                      frames.append(env.render())
+           
+            current_state = get_current_state(obs.copy(), env_name)
+            if(generated_state is not None):
+                violation_scores.append(feasibility_check(generated_state, current_state.copy()))
+            observations.append(current_state.copy())
+            actions.append(action.copy())
+            rewards.append(reward)
+           #current_state = obs['observation'].copy()
+           #print(f"Episode {i} reward: {reward}")
+            if(terminated or truncated):
+                #print(f"Episode {i} terminated or truncated")
+                break
+     
+     env.close()
+
+     
+     """
+     if(len(violation_scores) > 0):
+         print(np.mean(violation_scores))
+         print(np.var(violation_scores))
+     """
+     #print(f"total steps: {len(observations)}")
+     #print(f"number of plans: {number_of_plans}")
+     rewards = spare_reward_prcocessor(rewards)
+     traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(rewards)}
+     traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
+     #print(test_rollout_fit_for_model(traj, env_name, specific_env, checkpoint_steps, checkpoint_steps, checkpoint_steps, device=None))
+     
+     #expert_score = get_expert_score(env_name)
+     #print(get_normalized_score([traj], expert_score))
+     if(render):
+          media.write_video("demo.mp4", frames, fps=50) #save the video
+     """
+     with open('Generated_trajectory.pkl', 'wb') as f:
+                pickle.dump(traj_info, f)
+     """
+     #print(sum(traj['rewards']))
+     #return traj
+     
+     #return rewards[-1], len(observations)
+     return sum(rewards), len(observations)
+     #print(get_normalized_score([traj]))
+
+
+
 
 class Selector():
     def __init__(self, env_name, specific_env, RConfig: RewardConfig, reward_checkpoint: int, kernel_checkpoint: Optional[int] = None, critic_checkpoint: Optional[int] = None):
@@ -784,7 +1009,7 @@ if __name__ == "__main__":
                   specific_train_dataset, 
                   horizon, 
                   steps_T = 10, 
-                  num_karras = 1, 
+                  num_karras = 10, 
                   eta = 0.0, 
                   episode_length = 3000, 
                   checkpoint_steps = checkpoint, 
