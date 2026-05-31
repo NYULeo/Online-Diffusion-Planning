@@ -583,7 +583,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 21
+    checkpoint = 42
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -604,9 +604,10 @@ if __name__ == "__main__":
                hidden_dim_critic = 256,
                explore = False)
     #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
-    chunk_size = [20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17]
+    chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17]
     set_seed(1)
-    while(checkpoint < 24):
+    
+    while(checkpoint < 45):
        print(f"Running checkpoing: {checkpoint}")
        total_return = 0.0
        for j in range(1, 51):
@@ -635,6 +636,25 @@ if __name__ == "__main__":
        print(f"Checkpoint: {checkpoint} Success Rate: {total_return / 50 :.4f}")
        checkpoint += 3
     exit()
-
     
+
+    """
+    return_value, _ = rollout(
+                  env_name, 
+                  specific_train_dataset, 
+                  horizon, 
+                  steps_T = 10, 
+                  num_karras = 1, 
+                  eta = 0.0, 
+                  episode_length = 3000, 
+                  checkpoint_steps = checkpoint, 
+                  render = True,  
+                  base_seed = 1, 
+                  #goal_cell = np.array([6, 1], dtype = int), 
+                  task_id = task_id,
+                  continual_rollout = True,
+                  chunk_size = 32 ,
+                  device = device)
+    print(return_value)
+    """
 

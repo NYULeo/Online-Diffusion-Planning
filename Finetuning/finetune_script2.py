@@ -12,7 +12,8 @@ from adjoint_matching import AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig
 #from AM import Acc_AdjointMatchingConfig
 #from traj_reward import RewardConfig
-from traj_reward2 import RewardConfig
+#from traj_reward2 import RewardConfig
+from traj_reward3 import RewardConfig
 import random
 import numpy as np
 import torch

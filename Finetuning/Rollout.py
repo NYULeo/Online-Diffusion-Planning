@@ -41,7 +41,6 @@ def create_initial(current_state: np.ndarray, plan_suffix: np.ndarray, d_s: int,
              initial[:, i] = initial[:, i-1]
     return initial
 
-
 @torch.no_grad()
 def sample_euler_karras_replan(
     s0: np.ndarray,
@@ -249,9 +248,6 @@ def rollout(env_name,
      #return rewards[-1], len(observations)
      return sum(rewards), len(observations)
      #print(get_normalized_score([traj]))
-
-
-
 
 class Selector():
     def __init__(self, env_name, specific_env, RConfig: RewardConfig, reward_checkpoint: int, kernel_checkpoint: Optional[int] = None, critic_checkpoint: Optional[int] = None):
@@ -974,7 +970,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 30
+    checkpoint = 66
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -995,21 +991,22 @@ if __name__ == "__main__":
                hidden_dim_critic = 256,
                explore = False)
     #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
-    chunk_size = [20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17]
+    chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17]
     set_seed(1)
-    while(checkpoint < 54):
+    while(checkpoint < 69):
        print(f"Running checkpoing: {checkpoint}")
        total_return = 0.0
        for j in range(1, 51):
           return_value = 0.0
           chunk_size_index = 0
           while((return_value != 1.0) and (chunk_size_index < len(chunk_size))):
-                return_value, _ = rollout(
+              
+              return_value, _ = rollout(
                   env_name, 
                   specific_train_dataset, 
                   horizon, 
                   steps_T = 10, 
-                  num_karras = 10, 
+                  num_karras = 1, 
                   eta = 0.0, 
                   episode_length = 3000, 
                   checkpoint_steps = checkpoint, 
@@ -1019,13 +1016,14 @@ if __name__ == "__main__":
                   task_id = task_id,
                   continual_rollout = True,
                   chunk_size = chunk_size[chunk_size_index],
+                  #chunk_size = 1,
                   device = device)
-                chunk_size_index += 1
+              chunk_size_index += 1
           print(return_value)
           total_return += return_value
        print(f"Checkpoint: {checkpoint} Success Rate: {total_return / 50 :.4f}")
        checkpoint += 3
-    exit()
+
 
     
 
