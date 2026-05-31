@@ -836,7 +836,8 @@ class OnlineFinetuner():
                                       accelerator = self.accelerator)
                       
                       if threshold is not None:
-                            self.config.RewardConfig.min_log_prob = threshold
+                            if self.config.RewardConfig.min_log_prob > threshold:
+                                self.config.RewardConfig.min_log_prob = threshold
            
             self.accelerator.wait_for_everyone()
             #set the new total reward model

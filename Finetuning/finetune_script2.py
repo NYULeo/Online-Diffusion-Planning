@@ -304,8 +304,6 @@ if __name__ == "__main__":
                             lam = 0.95,
                             data_conservation = True)
     
-    
-
     FTConfig = FinetuningConfig(
         AMConfig = AMConfig, 
         RewardConfig = RWConfig, 
@@ -368,7 +366,6 @@ if __name__ == "__main__":
                critic_gamma = 1.0,
                explore = False) 
 
-    
     TrainRewardConfig = Train_Reward_Config(
                           hidden_layers = 2,
                           hidden_dim = 128,
@@ -400,8 +397,6 @@ if __name__ == "__main__":
                             gamma = 0.99,
                             data_conservation = True)
     
-
-
     FTConfig = FinetuningConfig(
         AMConfig = AMConfig, 
         RewardConfig = RWConfig, 
@@ -639,5 +634,4 @@ if __name__ == "__main__":
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-    
     """
