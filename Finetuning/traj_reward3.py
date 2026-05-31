@@ -23,6 +23,8 @@ class RewardConfig:
     """Configuration for the adjoint matching fine‑tuner."""
     beta: float
     min_log_prob: float
+    quantile: float = 0.999
+    number_of_generated_plans: int = 50
     explore: bool = True
     gamma: float = 0.8
     critic_gamma: float = 0.99

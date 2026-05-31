@@ -125,6 +125,7 @@ class Acc_AdjointMatchingFineTuner:
          self.new_score_net.train()
          self.old_score_net.eval()
          return dataloader, reward_model
+    
     """
     def set_ema_model(self):
           self.ema_model = copy.deepcopy(self.new_score_net)
@@ -169,8 +170,7 @@ class Acc_AdjointMatchingFineTuner:
          # Create new scheduler
          self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer, steps)
-        
-         
+             
     def set_alpha_scheduler(self):
         self.alpha_scheduler = AlphaScheduler(config=self.config.alpha_scheduler_config)
 
@@ -406,8 +406,7 @@ class Acc_AdjointMatchingFineTuner:
         self.new_score_net.train()
         reward = reward_model.predict(X[-1].squeeze(0).to(self.device), self.Lam.get_lam())
         return torch.stack(X).to(self.device), reward
-
-    
+  
     def make_a(self, X, reward_model: Union[TotalReward, TotalReward_Critic], reward_std: float):
         base_old_score_net = self.accelerator.unwrap_model(self.old_score_net)
         for p in base_old_score_net.parameters():
@@ -666,8 +665,6 @@ class Acc_AdjointMatchingFineTuner:
         return 0, 0, 0
 
 
-
-    
     def finetune_planner(self, dataloader: DataLoader, reward_model: Union[TotalReward, TotalReward_Critic], round: int, old_planner_checkpoint: Optional[int] = None):
         if old_planner_checkpoint is not None:
             self.reset_old_score_net(old_planner_checkpoint)

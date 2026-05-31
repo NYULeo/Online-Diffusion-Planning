@@ -456,6 +456,8 @@ if __name__ == "__main__":
     RWConfig = RewardConfig(
                beta = 1.0, 
                min_log_prob = -110.0,
+               quantile = 0.999,
+               number_of_generated_plans = 50,
                #max_mahalanobis_score = 100.0,
                critic_gamma = 0.99,
                explore = False) 
@@ -511,7 +513,7 @@ if __name__ == "__main__":
         critic = True,
         update_critic = True,
         kernel = True,
-        update_kernel = False,
+        update_kernel = True,
         buffer_size = 20000,
         finetune_buffer_cutoff_length = finetune_buffer_cutoff_length,
         train_buffer_cutoff_length = train_buffer_cutoff_length,

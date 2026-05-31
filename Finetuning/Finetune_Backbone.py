@@ -437,7 +437,7 @@ class OnlineFinetuner():
              half_buffer_trajs = random.sample(critic_buffer, half_size_2)
              critic_buffer = half_pretrained_trajs + half_buffer_trajs
         return critic_buffer
-
+    
     """
     def get_generated_plans(self, number_of_generated_plans: int):
         dataloader = cycle(DataLoader(self.PlannerDataset, batch_size = 12, shuffle = False))
@@ -457,9 +457,8 @@ class OnlineFinetuner():
             
             generated_plans.append(x)
         return generated_plans
-     """
-
     """
+
     def get_generated_plans(self, number_of_generated_plans: int):
          # Build global s0 batch deterministically on all ranks
          #  (all processes must run same code before split/gather)
@@ -503,7 +502,7 @@ class OnlineFinetuner():
                 generated_plans.extend(per_rank)
 
          return generated_plans[:number_of_generated_plans]
-    """
+
     
 
     def finetune_planner(self):
@@ -794,6 +793,9 @@ class OnlineFinetuner():
                                    task_id = self.config.train_reward_config.task_id)                        
             self.accelerator.wait_for_everyone()
             
+
+            plans = self.get_generated_plans(number_of_generated_plans = self.config.RewardConfig.number_of_generated_plans)
+
             if self.config.kernel and self.config.update_kernel:
                       if self.accelerator.is_main_process:
                            print(f"Starting Kernel Training")
@@ -809,9 +811,9 @@ class OnlineFinetuner():
                              num_hidden_layers = self.config.train_kernel_config.num_hidden_layers,
                              hidden_dim = self.config.train_kernel_config.hidden_dim,
                              step = ((step+1) * self.config.AMConfig.per_round_steps),
-                             #constraint_type = self.config.RewardConfig.constraint_type,
-                             #quantile = self.config.RewardConfig.quantile, 
-                             x_generated_plans = None,
+                             constraint_type = "log_prob",
+                             quantile = self.config.RewardConfig.quantile, 
+                             x_generated_plans = plans,
                              accelerator = self.accelerator)
                       
                       elif(self.config.train_kernel_config.type_kernel == 'mog'):
@@ -828,23 +830,14 @@ class OnlineFinetuner():
                                       hidden_dim = self.config.train_kernel_config.hidden_dim,
                                       kernel_noise_floor = self.config.train_kernel_config.kernel_noise_floor,
                                       step = ((step+1) * self.config.AMConfig.per_round_steps),
-                                      #constraint_type = self.config.RewardConfig.constraint_type,
-                                      #quantile = self.config.RewardConfig.quantile,
-                                      x_generated_plans = None,
+                                      constraint_type = "log_prob",
+                                      quantile = self.config.RewardConfig.quantile,
+                                      x_generated_plans = plans,
                                       accelerator = self.accelerator)
                       
                       if threshold is not None:
-                          if(self.config.RewardConfig.constraint_type == 'mahalanobis' ):
-                               self.config.RewardConfig.max_mahalanobis_score = threshold
-                          elif(self.config.RewardConfig.constraint_type == 'log_prob'):
-                               self.config.RewardConfig.min_log_prob = threshold
-                                        
-            """
-            self.accelerator.wait_for_everyone()
-            stats = torch.tensor([threshold], device = self.accelerator.device)
-            stats = broadcast(stats, from_process=0)
-            threshold = stats.tolist()[0]
-            """
+                            self.config.RewardConfig.min_log_prob = threshold
+           
             self.accelerator.wait_for_everyone()
             #set the new total reward model
             if update_reward:
@@ -866,17 +859,9 @@ class OnlineFinetuner():
                      self.config.critic_model_checkpoint = last_critic_update_step
             else:
                  self.config.critic_model_checkpoint = 0
-            #if self.config.RewardConfig.max_mahalanobis_score < threshold: 
+           
+          
             
-            """
-            if(self.config.RewardConfig.constraint_type == 'mahalanobis' ):
-                 self.config.RewardConfig.max_mahalanobis_score = threshold
-            elif(self.config.RewardConfig.constraint_type == 'log_prob'):
-                 self.config.RewardConfig.min_log_prob = threshold
-            """
-            
-            
-            #self.config.critic_model_checkpoint = 0
             self.set_reward_model(self.device)
             if self.accelerator.is_main_process:
                    print(f"Finetuning round {step+1} completed")

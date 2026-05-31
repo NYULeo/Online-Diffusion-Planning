@@ -838,7 +838,10 @@ def train_kernel(
             t = torch.tensor([threshold], device=device, dtype=torch.float32)
             torch.distributed.broadcast(t, src=0)
             threshold = float(t.item())
-
+    
+    if accelerator is not None:
+        accelerator.wait_for_everyone()
+        
     return threshold
 
 def train_kernel_mog(
@@ -977,6 +980,9 @@ def train_kernel_mog(
             t = torch.tensor([threshold], device=device, dtype=torch.float32)
             torch.distributed.broadcast(t, src=0)
             threshold = float(t.item())
+    
+    if accelerator is not None:
+        accelerator.wait_for_everyone()
 
     return threshold
 
