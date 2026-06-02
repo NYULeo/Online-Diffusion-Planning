@@ -462,9 +462,9 @@ if __name__ == "__main__":
                           hidden_dim = 512,
                           batch_size = 256, 
                           num_steps = 30000, 
-                          lr = 5e-05,
-                          min_lr = 8e-06,
-                          sigma = 5.0, 
+                          lr = 5e-03,
+                          min_lr = 5e-04,
+                          sigma = 4.0, 
                           target_reward = 500.0, 
                           train_goal = None,
                           task_id = task_id)
