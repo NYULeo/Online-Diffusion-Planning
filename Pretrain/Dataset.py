@@ -32,13 +32,13 @@ class TrajectoryDict(TypedDict):
     actions: np.ndarray  
     rewards: np.ndarray
 
-"""
+
 def determine_stride(dataset_name, specific_dataset):
      if(dataset_name == 'antmaze'):
           return True
      else:
           return False
-"""
+
 #-------------------------------------------------------------------------------------#
 #------------------------------------- Dataset ---------------------------------------#
 #-------------------------------------------------------------------------------------#
@@ -429,11 +429,11 @@ class AntMazeDataset():
           return self.dataset.total_steps
 
 class CubeDataset:
-    def __init__(self, name: str):
+    def __init__(self, name: str, task_id: Optional[int] = None):
         
         self.name = name
-
-        name_to_id = {
+        if(task_id is None):
+           name_to_id = {
             "single-play": "cube-single-play-v0",
             "single-noisy": "cube-single-noisy-v0",
             "double-play": "cube-double-play-v0",
@@ -442,6 +442,17 @@ class CubeDataset:
             "triple-noisy": "cube-triple-noisy-v0",
             "quadruple-play": "cube-quadruple-play-v0",
             "quadruple-noisy": "cube-quadruple-noisy-v0",
+           }
+        else:
+             name_to_id = {
+            "single-play": f"cube-single-play-singletask-task{task_id}-v0",
+            "single-noisy": f"cube-single-noisy-singletask-task{task_id}-v0",
+            "double-play": f"cube-double-play-singletask-task{task_id}-v0",
+            "double-noisy": f"cube-double-noisy-singletask-task{task_id}-v0",
+            "triple-play": f"cube-triple-play-singletask-task{task_id}-v0",
+            "triple-noisy": f"cube-triple-noisy-singletask-task{task_id}-v0",
+            "quadruple-play": f"cube-quadruple-play-singletask-task{task_id}-v0",
+            "quadruple-noisy": f"cube-quadruple-noisy-singletask-task{task_id}-v0",
         }
 
         if name not in name_to_id:

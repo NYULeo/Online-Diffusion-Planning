@@ -509,7 +509,7 @@ if __name__ == "__main__":
         update_critic = True,
         kernel = True,
         update_kernel = True,
-        buffer_size = 20000,
+        buffer_size = 200000,
         finetune_buffer_cutoff_length = finetune_buffer_cutoff_length,
         train_buffer_cutoff_length = train_buffer_cutoff_length,
         finetune_steps = 90,
