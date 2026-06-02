@@ -528,8 +528,8 @@ class SimpleReward(nn.Module):
                 nn.LayerNorm(hidden_dim),
                 nn.SiLU(),
             ])
-        layers.extend([nn.Linear(hidden_dim, 1), nn.ReLU()])
-        #layers.extend([nn.Linear(hidden_dim, 1)])
+        #layers.extend([nn.Linear(hidden_dim, 1), nn.ReLU()])
+        layers.extend([nn.Linear(hidden_dim, 1)])
         self.net = nn.Sequential(*layers)
 
     def forward(self, obs, act):

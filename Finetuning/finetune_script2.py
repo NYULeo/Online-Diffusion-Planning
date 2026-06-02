@@ -464,8 +464,8 @@ if __name__ == "__main__":
                           num_steps = 30000, 
                           lr = 5e-05,
                           min_lr = 8e-06,
-                          sigma = 4.0, 
-                          target_reward = 300.0, 
+                          sigma = 5.0, 
+                          target_reward = 500.0, 
                           train_goal = None,
                           task_id = task_id)
       
