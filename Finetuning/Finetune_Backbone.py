@@ -794,9 +794,10 @@ class OnlineFinetuner():
             self.accelerator.wait_for_everyone()
             
 
-            plans = self.get_generated_plans(number_of_generated_plans = self.config.RewardConfig.number_of_generated_plans)
+            #plans = self.get_generated_plans(number_of_generated_plans = self.config.RewardConfig.number_of_generated_plans)
 
             if self.config.kernel and self.config.update_kernel:
+                      plans = self.get_generated_plans(number_of_generated_plans = self.config.RewardConfig.number_of_generated_plans)
                       if self.accelerator.is_main_process:
                            print(f"Starting Kernel Training")
                       if(self.config.train_kernel_config.type_kernel == 'robust'):
