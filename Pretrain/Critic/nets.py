@@ -51,7 +51,7 @@ class Critic(nn.Module):
         # Output layer
         layers.extend([
             nn.Linear(hidden_dim, 1),
-            nn.SiLU(),
+            nn.ReLU(),
         ])
         self.net = nn.Sequential(*layers)
 
