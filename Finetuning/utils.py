@@ -686,7 +686,8 @@ def train_reward(trajs: List[TrajectoryDict], dataset_name: str, hidden_layers: 
            # Predicted Reward
            optimizer.zero_grad()
            pred = reward_net(s, a)
-           loss = F.mse_loss(pred, r)
+           #loss = F.mse_loss(pred, r)
+           loss = F.smooth_l1_loss(pred, r, beta = 1)
            loss.backward()
            #torch.nn.utils.clip_grad_norm_(reward_net.parameters(), max_norm = 1.0)
            optimizer.step()

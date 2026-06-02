@@ -46,7 +46,7 @@ if __name__ == '__main__':  # pragma: no cover
              specific_dataset = specific_env, 
              hidden_layers = 4, 
              hidden_dim = 512, 
-             sigma = 5.0,
+             sigma = 4.0,
              batch_size = 256, 
              num_steps = 20000, 
              gamma = 0.99, 
@@ -69,7 +69,7 @@ if __name__ == '__main__':  # pragma: no cover
             checkpoint_step = step, 
             gamma = 0.99, 
             horizon = horizon,  
-            sigma = 5.0, 
+            sigma = 4.0, 
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
