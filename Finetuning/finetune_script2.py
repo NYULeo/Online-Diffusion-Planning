@@ -508,7 +508,7 @@ if __name__ == "__main__":
         critic = True,
         update_critic = True,
         kernel = True,
-        update_kernel = True,
+        update_kernel = False,
         buffer_size = 200000,
         finetune_buffer_cutoff_length = finetune_buffer_cutoff_length,
         train_buffer_cutoff_length = train_buffer_cutoff_length,
