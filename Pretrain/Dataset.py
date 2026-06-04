@@ -931,9 +931,9 @@ def get_PlannerName(env_name, specific_env, task_id=None):
 
 
 class PlannerDataset(Dataset):
-    def __init__(self, dataset_name, specific_dataset, horizon, state_dim, action_dim, stride: Optional[int] = 1):
-        data = get_dataset(dataset_name, specific_dataset)
-        self.planner_name = get_PlannerName(dataset_name, specific_dataset)
+    def __init__(self, dataset_name, specific_dataset, task_id, horizon, state_dim, action_dim, stride: Optional[int] = 1):
+        data = get_dataset(dataset_name, specific_dataset, task_id)
+        self.planner_name = get_PlannerName(dataset_name, specific_dataset, task_id)
         self.traj = data.get_trajectories()
         self.horizon = horizon
         self.windows = []

@@ -252,7 +252,7 @@ class SDETrainer:
 
     def train(self):
         print(self.device)
-        dataset = PlannerDataset(self.dataset_name, self.specific_dataset, self.horizon, self.state_dim, self.action_dim, self.stride)
+        dataset = PlannerDataset(self.dataset_name, self.specific_dataset, self.task_id, self.horizon, self.state_dim, self.action_dim, self.stride)
         dataloader = cycle(DataLoader(dataset, self.batch_size, shuffle = True, pin_memory = True, num_workers = 8))
         print(f"Training planner for {self.dataset_name}-{self.specific_dataset} Dataset")
         print(f"Backbone:{self.backbone_name}, Horizon: {self.horizon}, Epochs: {self.num_steps}, Batch Size: {self.batch_size}, Learning Rate; {self.lr}")

@@ -323,13 +323,13 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
              raise ValueError(f"Invalid dataset name: {dataset_name}")
          elif(specific_dataset == 'medium'):
               data = OGPointmazeDataset_Singletask('medium', task_id, mode = 'reward')
-              name = 'OG2DMaze_Reward_medium'
+              name = f'OG2DMaze_Reward_medium_task{task_id}'
          elif(specific_dataset == 'large'):
               data = OGPointmazeDataset_Singletask('large', task_id, mode = 'reward')
-              name = 'OG2DMaze_Reward_large'
+              name = f'OG2DMaze_Reward_large_task{task_id}'
          elif(specific_dataset == 'giant'):
               data = OGPointmazeDataset_Singletask('giant', task_id, mode = 'reward')
-              name = 'OG2DMaze_Reward_giant'
+              name = f'OG2DMaze_Reward_giant_task{task_id}'
          else: 
               raise ValueError(f"Invalid dataset name: {specific_dataset}")
          obs_dim = data.get_state_dim()
