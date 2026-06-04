@@ -564,7 +564,7 @@ class CubeDataset_Singletask:
                          trajectories.append(trajectory)
                          last_start = i + 1
                      else:
-                         
+                         """
                          trajectory = {
                            "observations": obs_slice[index:],
                            "actions": act_slice[index:],
@@ -572,7 +572,7 @@ class CubeDataset_Singletask:
                           }
                          
                          trajectories.append(trajectory)
-                         
+                         """
                          last_start = i + 1
 
         return trajectories
