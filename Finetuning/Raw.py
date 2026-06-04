@@ -63,13 +63,12 @@ def check_cube_double_goal_reach(trajs, task_id):
 data = get_dataset('cube', 'double-play', task_id = 1)
 trajs = data.get_trajectories()
 
-
-count = 0
-for traj in trajs:
-    if(traj['rewards'][-1] == 1):
-        count += 1
-print(count)
+env, dataset, eval_dataset = ogbench.make_env_and_datasets(
+                 f"cube-single-play-singletask-task{4}-v0", render_mode="rgb_array"
+            )
+print(len(dataset['observations']))
 exit()
+
 """
 env_steps = [0, 1592, 1590, 1600, 1411, 1416, 1600, 1555, 1422, 1600, 1599, 1554]
 total_steps = [0]
