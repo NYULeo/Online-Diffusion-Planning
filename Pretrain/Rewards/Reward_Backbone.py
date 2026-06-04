@@ -743,7 +743,6 @@ def train_reward_pos_weight(
     print("Reward model training finished!")
     return reward_net
 
-
 def _bootstrap_per_member(s, a, r, ensemble_size, device):
    
     B = s.shape[0]
@@ -870,7 +869,6 @@ def train_reward_ensemble(
     save_stats_to_finetuning(stats, dataset_name, SD, task_id)
     print("ensemble reward training finished.")
     return reward_net
-
 
 class test_dataset(Dataset):
     def __init__(self, trajs, Reward_name, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, goal: Optional[np.array] = None):
