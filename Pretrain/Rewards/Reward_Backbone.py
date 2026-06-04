@@ -823,7 +823,7 @@ def train_reward_ensemble(
         pred_e = reward_net(s_e, a_e)                     # (E, B)
         # mean over (E*B) ≡ mean of per-member SmoothL1 losses
         per_elem = F.smooth_l1_loss(pred_e, r_e, beta=1.0, reduction='none')
-        positive_weight = 15.0                       # try 8.0 ~ 30.0
+        positive_weight = 50.0                       # try 8.0 ~ 30.0
         weights = torch.where(r_e > 0, positive_weight, 1.0)
       
         loss = (weights * per_elem).mean()
