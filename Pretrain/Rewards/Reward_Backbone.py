@@ -510,8 +510,8 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
            total_loss += loss.item()
            step += 1
 
-           if step % 500 == 0:
-              avg_loss = total_loss / 500
+           if step % 2000 == 0:
+              avg_loss = total_loss / 2000
               print(f"Step {step}, loss {avg_loss:.4f}")
               total_loss = 0
         
