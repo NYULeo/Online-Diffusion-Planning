@@ -36,7 +36,21 @@ class TrajectoryDict(TypedDict):
     actions: np.ndarray  
     rewards: np.ndarray
 
+def divide_trajs(trajs):
+    success_trajs = []
+    failed_trajs = []
+    for traj in trajs:
+        if(traj['rewards'][-1] == 1.0):
+            success_trajs.append(traj)
+        else:
+            failed_trajs.append(traj)
+    return success_trajs, failed_trajs
 
+def drop_trajs(trajs, percentage):
+    success_trajs, failed_trajs = divide_trajs(trajs)
+    random.shuffle(failed_trajs)
+    failed_trajs = failed_trajs[:int(len(failed_trajs) * percentage)]
+    return success_trajs + failed_trajs
 
 def check_specific_dataset(dataset_name):
     if(dataset_name == 'kitchen'):
@@ -747,6 +761,7 @@ def train_reward_ensemble(
     min_lr: float,
     ensemble_size: int = 5,
     bootstrap: bool = True,
+    drop_percentage: float = 0.0,
     sigma: Optional[float] = None,
     alpha: Optional[float] = None,
     target_reward: Optional[float] = None,
@@ -772,6 +787,7 @@ def train_reward_ensemble(
             dataset_name, specific_dataset, task_id, goal, traj_length
         )
         trajs = trajs + extra_trajs
+    trajs = drop_trajs(trajs, drop_percentage)
     print(f"[ensemble:{ensemble_size}] training reward for "
           f"{dataset_name}/{specific_dataset} task={task_id}  "
           f"(obs_dim={obs_dim}, act_dim={act_dim})")
@@ -822,12 +838,13 @@ def train_reward_ensemble(
         optimizer.zero_grad()
         pred_e = reward_net(s_e, a_e)                     # (E, B)
         # mean over (E*B) ≡ mean of per-member SmoothL1 losses
+        """
         per_elem = F.smooth_l1_loss(pred_e, r_e, beta=1.0, reduction='none')
         positive_weight = 50.0                       # try 8.0 ~ 30.0
         weights = torch.where(r_e > 0, positive_weight, 1.0)
-      
         loss = (weights * per_elem).mean()
-        #loss = F.smooth_l1_loss(pred_e, r_e, beta=1.0)
+        """
+        loss = F.smooth_l1_loss(pred_e, r_e, beta=1.0)
         loss.backward()
         if grad_clip is not None:
             torch.nn.utils.clip_grad_norm_(reward_net.parameters(), grad_clip)
