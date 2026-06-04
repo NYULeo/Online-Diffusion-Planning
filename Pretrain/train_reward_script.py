@@ -100,7 +100,7 @@ if __name__ == '__main__':
         min_lr = 3e-05,
         ensemble_size = 5,
         bootstrap = True,
-        drop_percentage = 0.8,
+        save_percentage = 0.2,
         #lr = 1e-04,
         #min_lr = 5e-06,
         sigma = 4.0,

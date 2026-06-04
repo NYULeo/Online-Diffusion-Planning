@@ -761,7 +761,7 @@ def train_reward_ensemble(
     min_lr: float,
     ensemble_size: int = 5,
     bootstrap: bool = True,
-    drop_percentage: float = 0.0,
+    save_percentage: float = 0.0,
     sigma: Optional[float] = None,
     alpha: Optional[float] = None,
     target_reward: Optional[float] = None,
@@ -787,7 +787,7 @@ def train_reward_ensemble(
             dataset_name, specific_dataset, task_id, goal, traj_length
         )
         trajs = trajs + extra_trajs
-    trajs = drop_trajs(trajs, drop_percentage)
+    trajs = drop_trajs(trajs, save_percentage)
     print(f"[ensemble:{ensemble_size}] training reward for "
           f"{dataset_name}/{specific_dataset} task={task_id}  "
           f"(obs_dim={obs_dim}, act_dim={act_dim})")
