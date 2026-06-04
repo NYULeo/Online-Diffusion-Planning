@@ -537,7 +537,40 @@ class SimpleReward(nn.Module):
         return self.net(x).squeeze(-1)
 
 
+class EnsembleReward(nn.Module):
+    
 
+    def __init__(self, obs_dim, act_dim, hidden_dim, hidden_layers, ensemble_size=5):
+        super().__init__()
+        self.obs_dim = obs_dim
+        self.act_dim = act_dim
+        self.hidden_dim = hidden_dim
+        self.hidden_layers = hidden_layers
+        self.ensemble_size = ensemble_size
+        self.members = nn.ModuleList([
+            SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers)
+            for _ in range(ensemble_size)
+        ])
+
+    def forward(self, obs, act):
+        if obs.dim() == 3:
+            # Per-member inputs: (E, B, D)
+            assert obs.shape[0] == self.ensemble_size, \
+                f"expected leading dim {self.ensemble_size}, got {obs.shape[0]}"
+            preds = [m(obs[i], act[i]) for i, m in enumerate(self.members)]
+        else:
+            # Shared batch: (B, D)
+            preds = [m(obs, act) for m in self.members]
+        return torch.stack(preds, dim=0)   # (E, B)
+
+    @torch.no_grad()
+    def predict(self, obs, act, return_std: bool = False):
+        preds = self.forward(obs, act)      # (E, B)
+        mean = preds.mean(dim=0)
+        if return_std:
+            std = preds.std(dim=0)
+            return mean, std
+        return mean
 
 """
 class SimpleReward(nn.Module):

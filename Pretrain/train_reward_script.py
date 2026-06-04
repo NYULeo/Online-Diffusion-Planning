@@ -1,9 +1,7 @@
 import sys
 import os
-
-from torch._C import NoneType
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from Rewards.Reward_Backbone import train_reward, test_Model, train_reward_pos_weight
+from Rewards.Reward_Backbone import train_reward, test_Model, train_reward_pos_weight, train_reward_ensemble, test_Model_ensemble
 from Pretrain.utils import set_seed
 import numpy as np
 import pickle
@@ -91,7 +89,7 @@ if __name__ == '__main__':
           trajs = pickle.load(f)
     """
     
-    train_reward(
+    train_reward_ensemble(
         dataset_name = dataset_name,
         hidden_layers = 3,
         hidden_dim = 256, 
@@ -100,17 +98,20 @@ if __name__ == '__main__':
         save_freq = 5000,
         lr = 3e-04,
         min_lr = 3e-05,
+        ensemble_size = 5,
+        bootstrap = True,
         #lr = 1e-04,
         #min_lr = 5e-06,
-        #sigma = 4.0,
-        sigma = None,
-        alpha = None,
+        sigma = 4.0,
+        #sigma = None,
+        #alpha = None,
         #alpha = 0.99,
-        target_reward = 5000.0,
+        target_reward = 500.0,
         specific_dataset = specific_dataset,
         task_id = task_id,
         traj_length = traj_length,
-        trajs = None
+        trajs = None,
+        log_every = 2000
     )
     
     """
@@ -118,17 +119,18 @@ if __name__ == '__main__':
     with open(path, 'rb') as f:
           trajs = pickle.load(f)
     """
-    test_Model(
+    test_Model_ensemble(
         dataset_name = dataset_name, 
         hidden_layers = 3, 
         hidden_dim = 256,
+        ensemble_size = 5,
         specific_dataset = specific_dataset, 
         trajs = None,
-        #sigma = 4.0,
-        sigma = None,
-        alpha = None,
+        sigma = 4.0,
+        #sigma = None,
+        #alpha = None,
         #alpha = 0.99, 
-        target_reward = 5000.0,
+        target_reward = 500.0,
         task_id = task_id,
         traj_length = traj_length,
         save_freq = 30000, 
