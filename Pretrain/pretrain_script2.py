@@ -8,18 +8,20 @@ import torch
 
 if __name__ == '__main__':  # pragma: no cover
      set_seed(1)
-     dataset_name = 'ogpointmaze'
-     specific_dataset = 'medium'
-     horizon = 80
+     dataset_name = 'cube'
+     specific_dataset = 'double-play'
+     task_id = 2
+     horizon = 32
      device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
      trainer = SDETrainer(
          dataset_name, 
          specific_dataset, 
+         task_id,
          horizon,
          backbone_name = 'transformer',
          num_steps = 2000000, 
          batch_size = 128,
-         lr = 3e-4,
+         lr = 2e-4,
          device = device,
          stride = 1)
      trainer.train()

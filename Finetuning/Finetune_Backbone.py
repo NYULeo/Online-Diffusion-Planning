@@ -227,6 +227,7 @@ class OnlineFinetuner():
         self.config.RewardConfig.type_kernel = self.config.train_kernel_config.type_kernel
         self.config.RewardConfig.kernel_num_modes = self.config.train_kernel_config.kernel_num_modes
         self.config.RewardConfig.kernel_noise_floor = self.config.train_kernel_config.kernel_noise_floor
+        self.config.AMConfig.task_id = self.config.train_reward_config.task_id
         self.config.AMConfig.alpha_scheduler_config = self.config.AlphaConfig
         self.config.AMConfig.finetune_total_steps = self.config.finetune_steps
         self.config.AMConfig.batch_per_sample = self.config.finetune_batch_per_sample

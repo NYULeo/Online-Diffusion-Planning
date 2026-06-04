@@ -201,6 +201,7 @@ def get_kernel_stats(dataset_name, specific_dataset, step):
         stats = pickle.load(f)
     return stats  
 
+"""
 def save_planner(model, dataset_name, specific_dataset, step: int):
     model.eval()
     data = {
@@ -213,7 +214,37 @@ def save_planner(model, dataset_name, specific_dataset, step: int):
     savepath = f"./Finetuning/Planners/{dataset_name}/{specific_dataset}/{name}_Planner_{str(step)}.pt"
     torch.save(data, savepath)
     print(f"saved model to {savepath}")
+"""
 
+def save_planner(model, dataset_name, specific_dataset, step: int,
+                 task_id: Optional[int] = None):              # NEW arg
+    model.eval()
+    data = {
+        'dataset_name': dataset_name,
+        'specific_dataset': specific_dataset,
+        'task_id': task_id,                                   # NEW field
+        'step': step,
+        'ema': model.state_dict(),
+    }
+    base = getName(dataset_name, specific_dataset)
+    tid  = f"_task{task_id}" if task_id is not None else ""
+    fname = f"{base}{tid}_Planner_{step}.pt"
+    dir   = f"./Finetuning/Planners/{dataset_name}/{specific_dataset}"
+    os.makedirs(dir, exist_ok=True)
+    savepath = f"{dir}/{fname}"
+    torch.save(data, savepath)
+    print(f"saved model to {savepath}")
+
+def get_planner(dataset_name, specific_dataset, step,
+                task_id: Optional[int] = None):               # NEW arg
+    base = getName(dataset_name, specific_dataset)
+    tid  = f"_task{task_id}" if task_id is not None else ""
+    path = f"./Finetuning/Planners/{dataset_name}/{specific_dataset}/{base}{tid}_Planner_{step}.pt"
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Checkpoint not found: {path}")
+    return torch.load(path, weights_only=True, map_location='cpu')['ema']
+
+"""
 def get_planner(dataset_name, specific_dataset, step):
     name = getName(dataset_name, specific_dataset)
     path = f"./Finetuning/Planners/{dataset_name}/{specific_dataset}/{name}_Planner_{str(step)}.pt"
@@ -222,6 +253,7 @@ def get_planner(dataset_name, specific_dataset, step):
     checkpoint = torch.load(path, weights_only = True,map_location='cpu')
     #checkpoint = torch.load(checkpoint_path,  weights_only=True)
     return checkpoint['ema']
+"""
 
 def save_critic(model, dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
     model.eval()
@@ -1825,7 +1857,7 @@ def rollout_parallel2(
      #rows, cols = len(maze_map), len(maze_map[0])
     
      # Get Planner
-     state_dict = get_planner(env_name, specific_env, checkpoint_step)
+     state_dict = get_planner(env_name, specific_env, checkpoint_step, task_id)
      if env_name == 'kitchen':
          model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
      elif env_name == 'pointmaze':
@@ -2057,7 +2089,7 @@ def rollout_parallel3(
     vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
 
     # Load model
-    state_dict = get_planner(env_name, specific_env, checkpoint_step)
+    state_dict = get_planner(env_name, specific_env, checkpoint_step, task_id)
 
     if env_name in ['kitchen', 'pointmaze', 'cube']:
         model = DiT1d(

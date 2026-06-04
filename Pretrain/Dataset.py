@@ -564,6 +564,15 @@ class CubeDataset_Singletask:
                          trajectories.append(trajectory)
                          last_start = i + 1
                      else:
+                         
+                         trajectory = {
+                           "observations": obs_slice[index:],
+                           "actions": act_slice[index:],
+                           'rewards': rews[index:]
+                          }
+                         
+                         trajectories.append(trajectory)
+                         
                          last_start = i + 1
 
         return trajectories
@@ -742,6 +751,8 @@ class OGPointmazeDataset_Singletask:
 #-------------------------------------------------------------------------------------#
 #---------------------------------- Planner Dataset ----------------------------------#
 #-------------------------------------------------------------------------------------#
+
+"""
 def get_PlannerName(env_name, specific_env):
      if(env_name == 'kitchen'):
           if(specific_env == 'complete'):
@@ -817,6 +828,107 @@ def get_PlannerName(env_name, specific_env):
 
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
+"""
+
+
+def _get_planner_base(env_name, specific_env):
+    """Return the env-specific stem, without '_Planner' and without task_id.
+
+    e.g. ('cube', 'single-play') -> 'Cube_SinglePlay'
+    """
+    if env_name == 'kitchen':
+        if specific_env == 'complete':
+            return 'Kitchen_High'
+        elif specific_env == 'partial':
+            return 'Kitchen_Medium'
+        elif specific_env == 'mixed':
+            return 'Kitchen_Mixed'
+        else:
+            raise ValueError(f"Invalid specific environment: {specific_env}")
+
+    elif env_name == 'pointmaze':
+        if specific_env == 'open_dense':
+            return 'PointMaze_OpenDense'
+        elif specific_env == 'umaze':
+            return 'PointMaze_Umaze'
+        elif specific_env == 'large_dense':
+            return 'PointMaze_LargeDense'
+        elif specific_env == 'medium':
+            return 'PointMaze_Medium'
+        elif specific_env == 'umaze_dense':
+            return 'PointMaze_UmazeDense'
+        elif specific_env == 'large':
+            return 'PointMaze_Large'
+        elif specific_env == 'open':
+            return 'PointMaze_Open'
+        else:
+            raise ValueError(f"Invalid specific environment: {specific_env}")
+
+    elif env_name == 'antmaze':
+        if specific_env == 'medium_play':
+            return 'AntMaze_MediumPlay'
+        elif specific_env == 'umaze_diverse':
+            return 'AntMaze_UmazeDiverse'
+        elif specific_env == 'large_diverse':
+            return 'AntMaze_LargeDiverse'
+        elif specific_env == 'large_play':
+            return 'AntMaze_LargePlay'
+        elif specific_env == 'medium_diverse':
+            return 'AntMaze_MediumDiverse'
+        elif specific_env == 'umaze':
+            return 'AntMaze_Umaze'
+        else:
+            raise ValueError(f"Invalid Dataset name: {specific_env}")
+
+    elif env_name == 'cube':
+        if specific_env == 'single-play':
+            return 'Cube_SinglePlay'
+        elif specific_env == 'single-noisy':
+            return 'Cube_SingleNoisy'
+        elif specific_env == 'double-play':
+            return 'Cube_DoublePlay'
+        elif specific_env == 'double-noisy':
+            return 'Cube_DoubleNoisy'
+        elif specific_env == 'triple-play':
+            return 'Cube_TriplePlay'
+        elif specific_env == 'triple-noisy':
+            return 'Cube_TripleNoisy'
+        elif specific_env == 'quadruple-play':
+            return 'Cube_QuadruplePlay'
+        elif specific_env == 'quadruple-noisy':
+            return 'Cube_QuadrupleNoisy'
+        else:
+            raise ValueError(f"Invalid cube dataset name: {specific_env}")
+
+    elif env_name == 'ogpointmaze':
+        if specific_env == 'medium':
+            return 'OG2DMaze_Medium'
+        elif specific_env == 'large':
+            return 'OG2DMaze_Large'
+        elif specific_env == 'giant':
+            return 'OG2DMaze_Giant'
+        else:
+            raise ValueError(f"Invalid ogpointmaze dataset name: {specific_env}")
+
+    else:
+        raise ValueError(f"Invalid environment name: {env_name}")
+
+
+def get_PlannerName(env_name, specific_env, task_id=None):
+    """Returns the planner *stem* (no step, no extension).
+
+    With task_id=None (default), the result matches the pre-existing
+    behavior exactly, e.g. 'Cube_SinglePlay_Planner'.
+
+    With task_id given, '_task{id}' is inserted before '_Planner', e.g.
+    'Cube_SinglePlay_task4_Planner'.
+    """
+    base = _get_planner_base(env_name, specific_env)
+    tid  = f"_task{task_id}" if task_id is not None else ""
+    return f"{base}{tid}_Planner"
+
+
+
 
 class PlannerDataset(Dataset):
     def __init__(self, dataset_name, specific_dataset, horizon, state_dim, action_dim, stride: Optional[int] = 1):

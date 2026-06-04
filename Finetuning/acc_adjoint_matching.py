@@ -41,6 +41,7 @@ class Acc_AdjointMatchingConfig:
     d_a: Optional[int] = None
     dataset_name: Optional[str] = None
     specific_dataset: Optional[str] = None
+    task_id: Optional[int] = None
     backbone_name: str = 'transformer'
     eta: float = 0.8
     diffusion_steps: int = 30
@@ -175,7 +176,7 @@ class Acc_AdjointMatchingFineTuner:
         self.alpha_scheduler = AlphaScheduler(config=self.config.alpha_scheduler_config)
 
     def set_old_score_net(self, planner_checkpoint: int):
-        state_dict = get_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
+        state_dict = get_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint, self.config.task_id)
         #state_dict = get_pretrained_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
         if( self.config.dataset_name == 'kitchen'):
               self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
@@ -193,7 +194,7 @@ class Acc_AdjointMatchingFineTuner:
         self.old_score_net.eval()
     
     def reset_old_score_net(self, old_planner_checkpoint: int):
-        state_dict = get_planner(self.config.dataset_name, self.config.specific_dataset, old_planner_checkpoint)
+        state_dict = get_planner(self.config.dataset_name, self.config.specific_dataset, old_planner_checkpoint, self.config.task_id)
         #state_dict = get_pretrained_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
         if( self.config.dataset_name == 'kitchen'):
               self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
@@ -763,7 +764,7 @@ class Acc_AdjointMatchingFineTuner:
              self.accelerator.wait_for_everyone()
         
         if self.accelerator.is_main_process:
-             save_planner(self.ema_model, self.config.dataset_name, self.config.specific_dataset, (round*self.config.per_round_steps))
+             save_planner(self.ema_model, self.config.dataset_name, self.config.specific_dataset, (round*self.config.per_round_steps), task_id = self.config.task_id)
         self.accelerator.wait_for_everyone()
         if torch.cuda.is_available():
              torch.cuda.synchronize()

@@ -1,5 +1,7 @@
 import sys
 import os
+
+from torch._C import NoneType
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Rewards.Reward_Backbone import train_reward, test_Model, train_reward_pos_weight
 from Pretrain.utils import set_seed
@@ -79,14 +81,15 @@ if __name__ == '__main__':
     set_seed(1)
     
     dataset_name = 'cube'
-    specific_dataset = 'single'
-    task_id = 4
-    traj_length = 200
-
+    specific_dataset = 'double'
+    task_id = 1
+    traj_length = 500
+    
+    """
     path = f'./Finetuning/Rollouts/{dataset_name}/{specific_dataset}-play/task_{task_id}/trajs_task{task_id}_success_0.pkl'
     with open(path, 'rb') as f:
           trajs = pickle.load(f)
-    
+    """
     
     train_reward(
         dataset_name = dataset_name,
@@ -108,17 +111,17 @@ if __name__ == '__main__':
         trajs = None
     )
     
-    
+    """
     path = f'./Finetuning/Rollouts/{dataset_name}/{specific_dataset}-play/task_{task_id}/trajs_task{task_id}_success_0.pkl'
     with open(path, 'rb') as f:
           trajs = pickle.load(f)
-    
+    """
     test_Model(
         dataset_name = dataset_name, 
         hidden_layers = 4, 
         hidden_dim = 512,
         specific_dataset = specific_dataset, 
-        trajs = trajs,
+        trajs = None,
         sigma = 4.0,
         #alpha = 0.99, 
         target_reward = 500.0,

@@ -22,6 +22,7 @@ class SDETrainer:
         self,
         dataset_name,
         specific_dataset,
+        task_id,
         horizon,
         backbone_name,
         num_steps = 1000000,
@@ -42,6 +43,7 @@ class SDETrainer:
         self.device = device
         self.dataset_name = dataset_name
         self.specific_dataset = specific_dataset
+        self.task_id = task_id
         _, self.state_dim, self.action_dim = get_env(self.dataset_name, self.specific_dataset)
         if(determine_stride(self.dataset_name, self.specific_dataset)):
             self.Dimension = self.state_dim
@@ -51,7 +53,7 @@ class SDETrainer:
             self.stride = 1
         self.backbone_name = backbone_name
         self.backbone_selection()
-        self.model_name = get_PlannerName(self.dataset_name, self.specific_dataset)
+        self.model_name = get_PlannerName(self.dataset_name, self.specific_dataset, self.task_id)
         self.ema_model = copy.deepcopy(self.model).to(self.device)
         self.reset_parameters()
         self.ema = EMA(ema_decay)
@@ -70,7 +72,12 @@ class SDETrainer:
         self.batch_size = batch_size
         self.log_freq = log_freq
         self.save_freq = save_freq
-        self.logdir = f"./{self.dataset_name}_{self.specific_dataset}_checkpoints/"
+        #self.logdir = f"./{self.dataset_name}_{self.specific_dataset}_checkpoints/"
+        self.logdir = (
+            f"./{self.dataset_name}_{self.specific_dataset}"
+            + (f"_task{self.task_id}" if self.task_id is not None else "")
+            + "_checkpoints/"
+        )
         self.loss_tracker = LossTracker(save_dir="./logs/")
     
     def save_hyperparameters(self, filepath: Optional[str] = None):
@@ -193,6 +200,8 @@ class SDETrainer:
             return
         self.ema.update_model_average(self.ema_model, self.model)
     
+
+    """
     def save(self, epoch):
         '''
             saves model and ema to disk;
@@ -216,6 +225,28 @@ class SDETrainer:
             file_name = self.model_name + '_' + str(epoch) + '.pt'
             os.makedirs(self.logdir, exist_ok=True)
             savepath = os.path.join(self.logdir, file_name)
+        torch.save(data, savepath)
+        print(f'Saved model to {savepath}', flush=True)
+    """
+
+    def save(self, epoch):
+        self.model.eval()
+        self.ema_model.eval()
+        data = {
+              'dataset_name': self.dataset_name,
+              'specific_dataset': self.specific_dataset,
+              'task_id': self.task_id,                     # NEW
+              'step': self.step,
+              'ema': self.ema_model.state_dict(),
+        }
+        if epoch == self.num_steps:
+            file_name = f"{self.model_name}_0.pt"        # final handoff
+            dir = f"./Finetuning/Planners/{self.dataset_name}/{self.specific_dataset}/"
+        else:
+            file_name = f"{self.model_name}_{epoch}.pt"
+            dir = self.logdir
+        os.makedirs(dir, exist_ok=True)
+        savepath = os.path.join(dir, file_name)
         torch.save(data, savepath)
         print(f'Saved model to {savepath}', flush=True)
 
@@ -285,7 +316,7 @@ class SDETrainer:
          print(f"Loss of {self.model_name} on {specific_dataset} dataset. Running {times} times for each checkpoints")
          while(checkpoint <= self.num_steps):
             self.backbone_selection()
-            state_dict = get_pretrained_planner(self.dataset_name, self.specific_dataset, checkpoint)
+            state_dict = get_pretrained_planner(self.dataset_name, self.specific_dataset, checkpoint, self.task_id)
             self.model.load_state_dict(state_dict)
             self.model.eval()
             avg_loss = 0

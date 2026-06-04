@@ -32,15 +32,18 @@ from Pretrain.utils import set_seed
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'cube'
-       specific_env = 'single-play'
-       horizon = 50
-       task_id = 4
+       specific_env = 'double-play'
+       traj_length = 500
+       #horizon = 50
+       horizon = 300
+       task_id = 1
        step = 0
       
        
         
-       trajs = load_success_trajs(env_name, specific_env, task_id, step)
-       
+       #trajs = load_success_trajs(env_name, specific_env, task_id, step)
+       data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
+       trajs = data.get_trajectories()
        train_critic(trajs, 
              dataset_name = env_name, 
              specific_dataset = specific_env, 
@@ -52,16 +55,19 @@ if __name__ == '__main__':  # pragma: no cover
              gamma = 0.99, 
              lam = 0.95, 
              horizon = horizon, 
-             lr = 1e-04, 
-             min_lr = 1e-05, 
+             #lr = 1e-04, 
+             #min_lr = 1e-05, 
+             lr = 1e-05, 
+             min_lr = 5e-07, 
              tau = 0.005, 
              old_step = None, 
              new_step = step, 
              momentum = 0.005, 
              target_reward = 500.0,
              task_id = task_id)
-
-       trajs = load_success_trajs(env_name, specific_env, task_id, step)
+   
+       #trajs = load_success_trajs(env_name, specific_env, task_id, step)
+       trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
             hidden_layers = 4, 

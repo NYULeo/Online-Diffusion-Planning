@@ -347,7 +347,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      #env.reset(seed=base_seed)   # Important first reset
     
     # Create environment factory function
-     state_dict = get_planner(env_name, specific_env, checkpoint_steps)
+     state_dict = get_planner(env_name, specific_env, checkpoint_steps, task_id)
      if( env_name == 'kitchen'):
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
      elif (env_name == 'pointmaze'):
