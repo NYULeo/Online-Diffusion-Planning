@@ -62,9 +62,12 @@ def check_cube_double_goal_reach(trajs, task_id):
 
 data = get_dataset('cube', 'double-play', task_id = 1)
 trajs = data.get_trajectories()
+
+
 count = 0
 for traj in trajs:
-    count += len(traj['observations'])
+    if(traj['rewards'][-1] == 1):
+        count += 1
 print(count)
 exit()
 """
