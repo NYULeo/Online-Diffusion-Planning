@@ -80,7 +80,7 @@ if __name__ == '__main__':
     
     dataset_name = 'cube'
     specific_dataset = 'double'
-    task_id = 4
+    task_id = 5
     traj_length = 500
     
     """

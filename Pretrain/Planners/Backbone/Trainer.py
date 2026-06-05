@@ -1,5 +1,7 @@
-from itertools import accumulate
-from re import L
+import os
+REPO_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..")
+)
 import torch
 from typing import Optional
 from .utils import cosine_alpha_sigma, cosine_beta, EMA, cycle
@@ -73,10 +75,12 @@ class SDETrainer:
         self.log_freq = log_freq
         self.save_freq = save_freq
         #self.logdir = f"./{self.dataset_name}_{self.specific_dataset}_checkpoints/"
-        self.logdir = (
-            f"./{self.dataset_name}_{self.specific_dataset}"
-            + (f"_task{self.task_id}" if self.task_id is not None else "")
-            + "_checkpoints/"
+        self.logdir = os.path.join(
+            REPO_ROOT,
+            "Pretrain",
+            f"{self.dataset_name}_{self.specific_dataset}"
+             + (f"_task{self.task_id}" if self.task_id is not None else "")
+             + "_checkpoints",
         )
         self.loss_tracker = LossTracker(save_dir="./logs/")
     
@@ -240,13 +244,16 @@ class SDETrainer:
               'ema': self.ema_model.state_dict(),
         }
         if epoch == self.num_steps:
-            file_name = f"{self.model_name}_0.pt"        # final handoff
-            dir = f"./Finetuning/Planners/{self.dataset_name}/{self.specific_dataset}/"
+            file_name = f"{self.model_name}_0.pt"
+            save_dir = os.path.join(
+                REPO_ROOT, "Finetuning", "Planners",
+                self.dataset_name, self.specific_dataset,
+            )
         else:
             file_name = f"{self.model_name}_{epoch}.pt"
-            dir = self.logdir
-        os.makedirs(dir, exist_ok=True)
-        savepath = os.path.join(dir, file_name)
+            save_dir = self.logdir
+        os.makedirs(save_dir, exist_ok=True)
+        savepath = os.path.join(save_dir, file_name)
         torch.save(data, savepath)
         print(f'Saved model to {savepath}', flush=True)
 
