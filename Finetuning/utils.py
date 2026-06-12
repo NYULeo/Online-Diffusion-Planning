@@ -5,8 +5,6 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
-#from matplotlib import color_sequences
-from scipy.special import j0
 import torch
 import numpy as np
 import torch
@@ -22,15 +20,13 @@ import torch.nn.functional as F
 import seaborn as sns
 from Pretrain.Dataset import get_PlannerName
 from typing import Tuple, Dict
-#from Pretrain.Rewards.Reward_Backbone import Train_Dataset
 from Pretrain.Transition_Kernel.Kernel_Backbone import count_files_in_folder
 import copy
-from Pretrain.Rewards.nets import SimpleReward
+from Pretrain.Rewards.nets import SimpleReward, EnsembleReward
 from torch.utils.data import DataLoader
 import torch.optim as optim
 from Pretrain.Transition_Kernel.Kernel_Net import MoGTransitionKernel, RobustTransitionKernel
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_total_mahalanobis_score, compute_log_density_mog, compute_log_density, compute_total_mahalanobis_score_mog
-#from Pretrain.Rewards.Reward_Backbone import get_reward_name
 from Pretrain.Dataset import KitchenDataset, PointMazeDataset, get_env, get_dataset, Planner_Processor
 from gymnasium.vector import AsyncVectorEnv
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
@@ -39,11 +35,35 @@ from Pretrain.Critic.nets import Critic
 from Pretrain.Dataset import get_dataset
 import json
 import torch.nn as nn
+import random
+
+
 
 class TrajectoryDict(TypedDict):
     observations: np.ndarray
     actions: np.ndarray  
     rewards: np.ndarray
+
+def divide_trajs(trajs):
+    success_trajs = []
+    failed_trajs = []
+    for traj in trajs:
+        if(traj['rewards'][-1] == 1.0):
+            success_trajs.append(traj)
+        else:
+            failed_trajs.append(traj)
+    return success_trajs, failed_trajs
+
+def drop_trajs(trajs, percentage):
+    success_trajs, failed_trajs = divide_trajs(trajs)
+    random.shuffle(failed_trajs)
+    failed_trajs = failed_trajs[:int(len(failed_trajs) * percentage)]
+    return success_trajs + failed_trajs
+
+def _bootstrap_per_member(s, a, r, ensemble_size, device):
+    B = s.shape[0]
+    idx = torch.randint(0, B, (ensemble_size, B), device=device)
+    return s[idx], a[idx], r[idx]
 
 def check_specific_dataset(dataset_name):
     if(dataset_name == 'kitchen'):
@@ -63,18 +83,30 @@ def reward_name_converter(specific_dataset):
     else:
         return specific_dataset
 
-def spare_reward_prcocessor(rewards):
-    Temp = []
-    for i in range(1, len(rewards)):
-        if(rewards[i] == rewards[i-1]+1):
-            Temp.append(i)
-    new_rewards = [0]*len(rewards)
-    for i in range(len(rewards)):
-        if(i in Temp):
-            new_rewards[i] = 1.0
-        else:
-            new_rewards[i] = 0.0
-    return new_rewards
+def reward_processor(rewards, name: str):
+    def spare_reward_prcocessor(rewards):
+        Temp = []
+        for i in range(1, len(rewards)):
+             if(rewards[i] == rewards[i-1]+1):
+                 Temp.append(i)
+        new_rewards = [0]*len(rewards)
+        for i in range(len(rewards)):
+           if(i in Temp):
+                new_rewards[i] = 1.0
+           else:
+                new_rewards[i] = 0.0
+        return new_rewards
+    
+    def check_reward_ogbench(rewards):
+        rews = np.zeros(len(rewards))
+        if(rewards[-1] == 0.0):
+             rews[-1] = 1.0
+        return rews
+        
+    if name in ('cube', 'ogpointmaze'):
+        return check_reward_ogbench(rewards)
+    else:
+        return spare_reward_prcocessor(rewards)
 
 def reward_filter(obs, rews, goal):
     #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
@@ -694,7 +726,18 @@ class RewardDataset(Dataset):
          rews[rews == 1.0] = target_reward
          return rews
 
-def train_reward(trajs: List[TrajectoryDict], dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, lr, min_lr, sigma, step, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None):
+def train_reward(trajs: List[TrajectoryDict], 
+                 dataset_name: str,
+                 hidden_layers: int, 
+                 hidden_dim: int, 
+                 batch_size, 
+                 num_steps, 
+                 lr, min_lr, sigma, 
+                 step, 
+                 target_reward: Optional[float] = None, 
+                 specific_dataset: Optional[str] = None, 
+                 goal: Optional[np.array] = None, 
+                 task_id: Optional[int] = None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
     print(f"Training reward approximator for {dataset_name}_{specific_dataset} Dataset") 
@@ -726,6 +769,79 @@ def train_reward(trajs: List[TrajectoryDict], dataset_name: str, hidden_layers: 
            scheduler.step()
            total_loss += loss.item()
            counter += 1
+    save_reward_model(reward_net, dataset_name, specific_dataset, task_id, step)
+    print(f"reward model saved")
+
+def train_reward_ensemble(
+    trajs: List[TrajectoryDict], 
+    dataset_name: str,
+    hidden_layers: int,
+    hidden_dim: int,
+    batch_size: int,
+    num_steps: int,
+    lr: float,
+    min_lr: float,
+    ensemble_size: int = 5,
+    bootstrap: bool = True,
+    save_percentage: float = 0.0,
+    sigma: Optional[float] = None,
+    step: int = 0,
+    target_reward: Optional[float] = None,
+    specific_dataset: Optional[str] = None,
+    goal: Optional[np.ndarray] = None,
+    task_id: Optional[int] = None,
+    weight_decay: float = 1e-4,
+    grad_clip: Optional[float] = 1.0,
+):  
+   
+    device = check_device()
+    trajs = drop_trajs(trajs, save_percentage)
+    _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+    dataset = RewardDataset(trajs, sigma, dataset_name, specific_dataset, step, goal, target_reward, task_id)
+    dataloader = cycle(DataLoader(
+        dataset, batch_size = batch_size, shuffle = True,
+        pin_memory = True, num_workers = 8,
+    ))
+    # --- build model + optim
+    reward_net = EnsembleReward(
+        obs_dim, act_dim, hidden_dim, hidden_layers,
+        ensemble_size=ensemble_size,
+    ).to(device)
+    optimizer = optim.AdamW(
+        reward_net.parameters(), lr=lr, weight_decay=weight_decay,
+    )
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=num_steps, eta_min=min_lr,
+    )
+    running_loss = 0.0
+    for step in range(1, num_steps + 1):
+        s, a, r = next(dataloader)
+        s = s.to(device, non_blocking=True)
+        a = a.to(device, non_blocking=True)
+        r = r.to(device, non_blocking=True)
+        if bootstrap and ensemble_size > 1:
+            s_e, a_e, r_e = _bootstrap_per_member(s, a, r, ensemble_size, device)
+        else:
+            # diversity from random init only
+            s_e = s.unsqueeze(0).expand(ensemble_size, -1, -1)
+            a_e = a.unsqueeze(0).expand(ensemble_size, -1, -1)
+            r_e = r.unsqueeze(0).expand(ensemble_size, -1)
+        optimizer.zero_grad()
+        pred_e = reward_net(s_e, a_e)                     # (E, B)
+        # mean over (E*B) ≡ mean of per-member SmoothL1 losses
+        """
+        per_elem = F.smooth_l1_loss(pred_e, r_e, beta=1.0, reduction='none')
+        positive_weight = 50.0                       # try 8.0 ~ 30.0
+        weights = torch.where(r_e > 0, positive_weight, 1.0)
+        loss = (weights * per_elem).mean()
+        """
+        loss = F.smooth_l1_loss(pred_e, r_e, beta = 1.0)
+        loss.backward()
+        if grad_clip is not None:
+            torch.nn.utils.clip_grad_norm_(reward_net.parameters(), grad_clip)
+        optimizer.step()
+        scheduler.step()
+        running_loss += loss.item()
     save_reward_model(reward_net, dataset_name, specific_dataset, task_id, step)
     print(f"reward model saved")
 
@@ -1434,14 +1550,14 @@ def get_success_trajs(trajs):
     return success_trajs
 
 class PlannerDataset(Dataset):
-    def __init__(self, trajs: List[TrajectoryDict], horizon: int, dataset_name: str, specific_dataset: str, cutoff_length: Optional[int] = None):
+    def __init__(self, trajs: List[TrajectoryDict], horizon: int, dataset_name: str, specific_dataset: str, task_id: Optional[int] = None, cutoff_length: Optional[int] = None):
         self.trajs = copy.deepcopy(trajs)
         if(cutoff_length is not None):
             self.trajs = traj_cutoff(self.trajs, cutoff_length)
         print(f"total steps for Finetuning: {np.sum([len(traj['observations']) for traj in self.trajs])}")
         self.conditions = []
         self.horizon = horizon
-        self.planner_processor = Planner_Processor(dataset_name, specific_dataset)
+        self.planner_processor = Planner_Processor(dataset_name, specific_dataset, task_id)
         for traj in self.trajs:
             obs = traj['observations']
             for t in range(len(obs)):
@@ -1802,7 +1918,7 @@ def rollout_parallel(
           trajs.append({
               'observations': np.asarray(observations[env_idx].copy()),
               'actions': np.asarray(acts[env_idx].copy()),
-              'rewards': np.asarray(spare_reward_prcocessor(rewards[env_idx].copy()))
+              'rewards': np.asarray(reward_processor(rewards[env_idx].copy(), env_name))
           })
         
      vec_env.close()
@@ -2041,7 +2157,7 @@ def rollout_parallel2(
                    trajs.append({
                       'observations': np.asarray(observations[env_idx].copy()),
                       'actions': np.asarray(acts[env_idx].copy()),
-                      'rewards': np.asarray(spare_reward_prcocessor(rewards[env_idx].copy()))
+                      'rewards': np.asarray(reward_processor(rewards[env_idx].copy(), env_name))
         })     
      vec_env.close()
      success_rate = check_success_rate(trajs)
@@ -2192,7 +2308,7 @@ def rollout_parallel3(
             trajs.append({
                 'observations': np.asarray(observations[env_idx][:-1]),
                 'actions': np.asarray(acts[env_idx]),
-                'rewards': np.asarray(spare_reward_prcocessor(rewards[env_idx].copy()))  # FIXED
+                'rewards': np.asarray(reward_processor(rewards[env_idx].copy(), env_name))  # FIXED
             })
 
     # ====================== Main Logic ======================

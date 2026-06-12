@@ -17,7 +17,7 @@ from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Dataset import get_PlannerName, get_dataset, Planner_Processor
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 from typing import List
-from utils import TrajectoryDict, rollout_parallel, get_planner, rollout_parallel2, save_planner, train_reward, train_kernel, train_kernel_mog, train_critic, save_trajs, AlphaSchedulerConfig, checktrajs, rollout_parallel3
+from utils import TrajectoryDict, rollout_parallel, get_planner, rollout_parallel2, save_planner, train_reward, train_kernel, train_kernel_mog, train_critic, save_trajs, AlphaSchedulerConfig, checktrajs, rollout_parallel3, train_reward_ensemble
 from Pretrain.Dataset import get_env
 from torch.utils.data import DataLoader, DistributedSampler
 from accelerate.utils import broadcast
@@ -39,6 +39,7 @@ import random
 class Train_Reward_Config: 
     hidden_layers: int = 1
     hidden_dim: int = 128
+    ensemble_size: Optional[int] = None
     batch_size: int = 32
     num_steps: int = 1000
     lr: float = 2e-4
@@ -286,8 +287,9 @@ class OnlineFinetuner():
             self.Train_Buffer.extend(trajs_reward)
             self.Train_Kernel_Buffer.extend(trajs_kernel)
             if(self.Base_Critic_Buffer is not None):
-                success_trajs = load_success_trajs(self.config.dataset_name, self.config.specific_dataset, self.config.train_reward_config.task_id, step = 0)
-                self.Base_Critic_Buffer.extend(success_trajs)
+                #success_trajs = load_success_trajs(self.config.dataset_name, self.config.specific_dataset, self.config.train_reward_config.task_id, step = 0)
+                #self.Base_Critic_Buffer.extend(success_trajs)
+                self.Base_Critic_Buffer.extend(trajs_reward)
 
         elif(self.config.train_reward_config.train_goal is not None):
             dataset_reward = get_dataset(self.config.dataset_name, self.config.specific_dataset, goal = self.config.train_reward_config.train_goal, mode = 'reward')
@@ -301,6 +303,7 @@ class OnlineFinetuner():
             self.Train_Kernel_Buffer.extend(trajs_kernel)
             if(self.Base_Critic_Buffer is not None):
                 self.Base_Critic_Buffer.extend(trajs_critic)
+                #self.Base_Critic_Buffer.extend(trajs_reward)
         
         else:
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
@@ -316,6 +319,7 @@ class OnlineFinetuner():
                    self.config.AMConfig.horizon, 
                    self.config.dataset_name, 
                    self.config.specific_dataset, 
+                   self.config.train_reward_config.task_id,
                    self.config.finetune_buffer_cutoff_length)
 
     def set_reward_model(self, device):
@@ -377,6 +381,7 @@ class OnlineFinetuner():
                  self.config.AMConfig.horizon,
                  self.config.dataset_name,
                  self.config.specific_dataset,
+                 self.config.train_reward_config.task_id,
                  self.config.finetune_buffer_cutoff_length
          )
         return update_reward
@@ -504,8 +509,6 @@ class OnlineFinetuner():
 
          return generated_plans[:number_of_generated_plans]
 
-    
-
     def finetune_planner(self):
         if self.accelerator.is_main_process:
             print("Env Details: ------------------------------------------------------------------------------")
@@ -599,8 +602,6 @@ class OnlineFinetuner():
                     num_workers = (os.cpu_count() // 2),  
                     sampler = sampler,  
                     drop_last = True)
-                
-                
                 """
                 dataloader = DataLoader(
                     self.PlannerDataset,
@@ -612,7 +613,6 @@ class OnlineFinetuner():
                     persistent_workers = True,
                     prefetch_factor = 4)
                 """
-
             else:
                 dataloader = DataLoader(
                     self.PlannerDataset, 
@@ -714,7 +714,27 @@ class OnlineFinetuner():
                   #print(f"Starting Reward Training")
                   if update_reward:
                       print(f"Starting Reward Training")
-                      train_reward(self.Train_Buffer, 
+                      if(self.config.train_reward_config.ensemble_size is not None):
+                          train_reward_ensemble(self.Train_Buffer, 
+                             dataset_name = self.config.dataset_name, 
+                             hidden_layers = self.config.train_reward_config.hidden_layers,
+                             hidden_dim = self.config.train_reward_config.hidden_dim,
+                             batch_size = self.config.train_reward_config.batch_size, 
+                             num_steps = self.config.train_reward_config.num_steps, 
+                             lr = self.config.train_reward_config.lr, 
+                             min_lr = self.config.train_reward_config.min_lr,
+                             ensemble_size = self.config.train_reward_config.ensemble_size,
+                             bootstrap = True,
+                             save_percentage = 0.02,
+                             sigma = self.config.train_reward_config.sigma, 
+                             step = ((step+1) * self.config.AMConfig.per_round_steps), 
+                             target_reward = self.config.train_reward_config.target_reward, 
+                             specific_dataset = self.config.specific_dataset, 
+                             goal = self.config.train_reward_config.train_goal,
+                             task_id = self.config.train_reward_config.task_id)
+                      else:
+
+                         train_reward(self.Train_Buffer, 
                              dataset_name = self.config.dataset_name, 
                              hidden_layers = self.config.train_reward_config.hidden_layers,
                              hidden_dim = self.config.train_reward_config.hidden_dim,

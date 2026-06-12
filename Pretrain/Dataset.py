@@ -547,8 +547,8 @@ class CubeDataset_Singletask:
                      else:
                             index =  0
                 
-                    
-                     if len(act_slice) < 3:
+                     
+                     if len(act_slice) < 10:
                           last_start = i + 1
                           continue
                      
@@ -572,7 +572,6 @@ class CubeDataset_Singletask:
                           }
                          
                          trajectories.append(trajectory)
-                         
                          last_start = i + 1
 
         return trajectories
@@ -1100,9 +1099,9 @@ class Planner_Processor():
           with open(stats_path, 'rb') as f:
               self.stats = pickle.load(f)
      """
-     def __init__(self, dataset_name, specific_dataset):
+     def __init__(self, dataset_name, specific_dataset, task_id: Optional[int] = None):
           stats_dir = PRETRAIN_DIR / "Planners" / dataset_name / specific_dataset / "Stats"
-          planner_name = get_PlannerName(dataset_name, specific_dataset)
+          planner_name = get_PlannerName(dataset_name, specific_dataset, task_id)
           stats_name = str(planner_name) + "_stats.pkl"
           stats_path = stats_dir / stats_name
           if not stats_path.exists():

@@ -11,7 +11,7 @@ from Pretrain.Planners.Backbone.Dit import DiT1d
 from torch.utils.data import DataLoader
 from Finetuning.utils import cycle
 #from Pretrain.Planners.Backbone.utils import get_pretrained_planner
-from Finetuning.utils import get_planner, get_normalized_score, get_expert_score, spare_reward_prcocessor, PlannerDataset, get_current_state, spare_reward_prcocessor, check_device
+from Finetuning.utils import get_planner, get_normalized_score, get_expert_score, PlannerDataset, get_current_state, reward_processor, check_device
 from Pretrain.Dataset import Planner_Processor, get_dataset
 from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde, sample_euler_karras, sample_euler_karras2
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
@@ -462,7 +462,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      """
      #print(f"total steps: {len(observations)}")
      #print(f"number of plans: {number_of_plans}")
-     rewards = spare_reward_prcocessor(rewards)
+     rewards = reward_processor(rewards, env_name)
      traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(rewards)}
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      #print(test_rollout_fit_for_model(traj, env_name, specific_env, checkpoint_steps, checkpoint_steps, checkpoint_steps, device=None))

@@ -79,9 +79,9 @@ if __name__ == '__main__':
     set_seed(1)
     
     dataset_name = 'cube'
-    specific_dataset = 'double'
-    task_id = 5
-    traj_length = 500
+    specific_dataset = 'single'
+    task_id = 4
+    traj_length = 200
     
     """
     path = f'./Finetuning/Rollouts/{dataset_name}/{specific_dataset}-play/task_{task_id}/trajs_task{task_id}_success_0.pkl'
@@ -89,6 +89,7 @@ if __name__ == '__main__':
           trajs = pickle.load(f)
     """
     
+    """
     train_reward_ensemble(
         dataset_name = dataset_name,
         hidden_layers = 3,
@@ -114,11 +115,28 @@ if __name__ == '__main__':
         trajs = None,
         log_every = 2000
     )
+    """
+    
+    train_reward(dataset_name = dataset_name, 
+                 hidden_layers = 4, 
+                 hidden_dim = 512, 
+                 batch_size = 256, 
+                 num_steps = 30000, 
+                 save_freq = 10000, 
+                 lr = 5e-03, 
+                 min_lr = 5e-04, 
+                 sigma = 4.0,
+                 alpha = None, 
+                 target_reward = 500,
+                 specific_dataset = specific_dataset, 
+                 task_id = task_id, 
+                 traj_length = traj_length)
     
     """
     path = f'./Finetuning/Rollouts/{dataset_name}/{specific_dataset}-play/task_{task_id}/trajs_task{task_id}_success_0.pkl'
     with open(path, 'rb') as f:
           trajs = pickle.load(f)
+    """
     """
     test_Model_ensemble(
         dataset_name = dataset_name, 
@@ -136,6 +154,19 @@ if __name__ == '__main__':
         traj_length = traj_length,
         save_freq = 30000, 
         num_steps = 30000)
+    """
+    test_Model(dataset_name, 
+               hidden_layers = 4, 
+               hidden_dim = 512, 
+               specific_dataset = specific_dataset, 
+               trajs = None, 
+               sigma = 4.0, 
+               alpha = None, 
+               target_reward = 500, 
+               task_id = 4,
+               traj_length = traj_length, 
+               save_freq = 10000, 
+               num_steps = 30000)
     
 
 

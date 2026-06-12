@@ -1,7 +1,5 @@
 import sys
 import os
-from sympy.printing.rcode import reserved_words
-from torch.utils._sympy.value_ranges import ValueRangeError
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(project_root)
@@ -510,8 +508,6 @@ def reward_filter_goals(trajs: List[TrajectoryDict], goal) -> List[TrajectoryDic
         new_trajs2.append({'observations':traj['observations'][-200:], 'actions': traj['actions'][-200:], 'rewards': traj['rewards'][-200:]})
     return new_trajs2
 
-
-
 class RewardDataset(Dataset):
     def __init__(self, trajs, reward_name, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None):
             
@@ -744,7 +740,6 @@ def train_reward_pos_weight(
     return reward_net
 
 def _bootstrap_per_member(s, a, r, ensemble_size, device):
-   
     B = s.shape[0]
     idx = torch.randint(0, B, (ensemble_size, B), device=device)
     return s[idx], a[idx], r[idx]
