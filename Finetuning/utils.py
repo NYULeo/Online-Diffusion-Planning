@@ -1990,7 +1990,7 @@ def rollout_parallel2(
      model.eval()
      
      # Get Processor
-     planner_processor = Planner_Processor(env_name, specific_env)
+     planner_processor = Planner_Processor(env_name, specific_env, task_id)
      
      # <<< MODIFIED: Unique env reset seeds per process to prevent identical trajectories across GPUs
      reset_seeds = list(range(seed_base, seed_base + num_envs))
