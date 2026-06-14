@@ -364,7 +364,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      model.eval()
 
      #get Processor
-     planner_processor = Planner_Processor(env_name, specific_env)
+     planner_processor = Planner_Processor(env_name, specific_env, task_id)
      
      
      #reset
@@ -605,9 +605,10 @@ if __name__ == "__main__":
                hidden_dim_critic = 256,
                explore = False)
     #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
-    chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17]
-    set_seed(1)
-    while(checkpoint < 42):
+    #chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17]
+    chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17, 21, 22, 23, 24, 26, 27, 28, 29, 30]
+    set_seed(4)
+    while(checkpoint < 18):
        print(f"Running checkpoing: {checkpoint}")
        total_return = 0.0
        for j in range(1, 51):
