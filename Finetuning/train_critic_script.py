@@ -100,7 +100,7 @@ if __name__ == '__main__':  # pragma: no cover
              reward_hidden_layers = 4,
              reward_hidden_dim = 512,
              batch_size = 128,
-             num_steps = 20000,
+             num_steps = 50,
              horizon = 32,
              gamma = 0.99,
              lr = 5e-5,
@@ -111,7 +111,7 @@ if __name__ == '__main__':  # pragma: no cover
              eta = 0.0,
              new_step = 1,
              task_id = task_id,
-             log_every = 1000)
+             log_every = 1)
 
        #trajs = load_success_trajs(env_name, specific_env, task_id, step)
        trajs = data.get_trajectories()
