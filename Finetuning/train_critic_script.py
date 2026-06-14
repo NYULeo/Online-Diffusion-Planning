@@ -79,7 +79,7 @@ if __name__ == '__main__':  # pragma: no cover
                       gamma = 0.99,
                       lam = 0.95,
                       horizon = horizon,
-                      lr = 1e-03, 
+                      lr = 1e-04, 
                       min_lr = 5e-05, 
                       tau = 0.005, 
                       old_step = None,    # from scratch
