@@ -2650,7 +2650,8 @@ def train_critic_with_planner(
 
         # 7) gradient step on V_β
         v_pred = critic(s0_critic)                                           # (B,)
-        loss   = F.mse_loss(v_pred, target_value)
+        #loss   = F.mse_loss(v_pred, target_value)
+        loss = F.smooth_l1_loss(v_pred, target_value, beta = 1.0)
 
         optimizer.zero_grad()
         loss.backward()
