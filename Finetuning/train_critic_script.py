@@ -10,11 +10,9 @@ import seaborn as sns
 import minari
 import sys
 
-from sympy import Max
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
-from collections import deque
 import gymnasium as gym
 import gymnasium_robotics  # registers the envs
 import numpy as np
@@ -33,7 +31,7 @@ if __name__ == '__main__':  # pragma: no cover
        env_name = 'cube'
        specific_env = 'single-play'
        traj_length = 200
-       horizon = 150
+       horizon = 180
        #horizon = 300
        task_id = 4
        step = 0
