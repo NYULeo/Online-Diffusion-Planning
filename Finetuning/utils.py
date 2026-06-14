@@ -2497,17 +2497,13 @@ def train_critic_with_planner(
     trajs: List[TrajectoryDict],
     dataset_name: str,
     specific_dataset: str,
-    # checkpoints of the frozen models
     planner_checkpoint: int,
     reward_checkpoint: int,
     old_critic_checkpoint: int,
-    # critic architecture (must match old checkpoint)
     hidden_layers: int,
     hidden_dim: int,
-    # reward model architecture (must match what was trained)
     reward_hidden_layers: int = 1,
     reward_hidden_dim: int = 128,
-    # training hyper-parameters
     batch_size: int = 64,
     num_steps: int = 20000,
     horizon: int = 32,

@@ -22,7 +22,7 @@ from scipy.ndimage import gaussian_filter1d
 from Pretrain.Dataset import get_dataset
 import ogbench
 from Finetuning.Rollout import load_success_trajs
-from Finetuning.utils import train_critic, test_critic, train_critic_with_reward
+from Finetuning.utils import train_critic, test_critic, train_critic_with_reward, train_critic_with_planner
 from Pretrain.utils import set_seed
 
 
@@ -65,7 +65,7 @@ if __name__ == '__main__':  # pragma: no cover
              target_reward = 500.0,
              task_id = task_id)  
        """
-       
+       """
        train_critic_with_reward(trajs,
                       dataset_name  = env_name,
                       specific_dataset = specific_env,
@@ -86,18 +86,44 @@ if __name__ == '__main__':  # pragma: no cover
                       new_step = step,
                       momentum = 0.005,   # unused when old_step is None
                       task_id = task_id)
-       
+       """
+
+       train_critic_with_planner(
+             trajs,
+             dataset_name = env_name,
+             specific_dataset = specific_env,
+             planner_checkpoint = 0,
+             reward_checkpoint = 0,
+             old_critic_checkpoint = 0,
+             hidden_layers = 4,
+             hidden_dim = 512,
+             reward_hidden_layers = 4,
+             reward_hidden_dim = 512,
+             batch_size = 128,
+             num_steps = 20000,
+             horizon = 32,
+             gamma = 0.99,
+             lr = 5e-5,
+             min_lr = 1e-6,
+             tau = 0.005,
+             steps_T = 10,
+             num_karras = 1,
+             eta = 0.0,
+             new_step = 1,
+             task_id = task_id,
+             log_every = 1000)
+
        #trajs = load_success_trajs(env_name, specific_env, task_id, step)
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
             hidden_layers = 4, 
             hidden_dim = 512, 
-            checkpoint_step = step, 
+            checkpoint_step = 1, 
             gamma = 0.99, 
             horizon = horizon,  
             sigma = 4.0, 
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
- 
+     
