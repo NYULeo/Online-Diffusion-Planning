@@ -65,7 +65,7 @@ if __name__ == '__main__':  # pragma: no cover
              target_reward = 500.0,
              task_id = task_id)  
        """
-       """
+       
        train_critic_with_reward(trajs,
                       dataset_name  = env_name,
                       specific_dataset = specific_env,
@@ -86,7 +86,20 @@ if __name__ == '__main__':  # pragma: no cover
                       new_step = step,
                       momentum = 0.005,   # unused when old_step is None
                       task_id = task_id)
-       """
+      
+       trajs = data.get_trajectories()
+       test_critic(dataset_name = env_name, 
+            specific_dataset = specific_env, 
+            finetune = False,
+            hidden_layers = 4, 
+            hidden_dim = 512, 
+            checkpoint_step = 0, 
+            gamma = 0.99, 
+            horizon = horizon,  
+            sigma = 4.0, 
+            target_reward = 500.0, 
+            trajs = trajs,
+            task_id = task_id)
 
        train_critic_with_planner(
              trajs,
