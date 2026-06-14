@@ -1390,6 +1390,7 @@ def train_critic(trajs: List[TrajectoryDict],
            # Predicted Q-values
            q_pred = critic(s)
            loss = F.smooth_l1_loss(q_pred, target_value, beta = 1.0)
+           #loss = F.mse_loss(q_pred, target_value)
            total_loss += loss.item()
 
            optimizer.zero_grad()
@@ -2886,7 +2887,8 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
 
            # Predicted Q-values
            q_pred = critic(s)
-           loss = F.smooth_l1_loss(q_pred, target_value, beta = 1.0)
+           #loss = F.smooth_l1_loss(q_pred, target_value, beta = 1.0)
+           loss = F.mse_loss(q_pred, target_value)
            total_loss += loss.item()
 
            optimizer.zero_grad()
