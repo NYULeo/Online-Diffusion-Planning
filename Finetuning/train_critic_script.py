@@ -100,7 +100,7 @@ if __name__ == '__main__':  # pragma: no cover
              reward_hidden_layers = 4,
              reward_hidden_dim = 512,
              batch_size = 128,
-             num_steps = 50,
+             num_steps = 100,
              horizon = 32,
              gamma = 0.99,
              lr = 5e-5,
@@ -117,6 +117,7 @@ if __name__ == '__main__':  # pragma: no cover
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
+            finetune = True,
             hidden_layers = 4, 
             hidden_dim = 512, 
             checkpoint_step = 1, 

@@ -1465,6 +1465,7 @@ class Critic_Test_Dataset(Dataset):
 
 def test_critic(dataset_name: str,
                 specific_dataset: str,
+                finetune: bool,
                 hidden_layers: int,
                 hidden_dim: int,
                 checkpoint_step: int,
@@ -1476,11 +1477,18 @@ def test_critic(dataset_name: str,
                 task_id: Optional[int] = None):
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    if(finetune):
+        dataset = Critic_Test_Dataset(
+           dataset_name, specific_dataset, 0, trajs,
+           sigma, task_id, target_reward, horizon, gamma
+        )
+    else:
+        dataset = Critic_Test_Dataset(
+           dataset_name, specific_dataset, checkpoint_step, trajs,
+           sigma, task_id, target_reward, horizon, gamma
+        )
 
-    dataset = Critic_Test_Dataset(
-        dataset_name, specific_dataset, checkpoint_step, trajs,
-        sigma, task_id, target_reward, horizon, gamma
-    )
 
     dataloader = DataLoader(dataset, batch_size=100, shuffle=False, drop_last=False)
 
