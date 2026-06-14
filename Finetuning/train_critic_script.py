@@ -65,7 +65,7 @@ if __name__ == '__main__':  # pragma: no cover
              target_reward = 500.0,
              task_id = task_id)  
        """
-       
+       """
        train_critic_with_reward(trajs,
                       dataset_name  = env_name,
                       specific_dataset = specific_env,
@@ -100,7 +100,7 @@ if __name__ == '__main__':  # pragma: no cover
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
-
+       """
        train_critic_with_planner(
              trajs,
              dataset_name = env_name,
@@ -113,7 +113,7 @@ if __name__ == '__main__':  # pragma: no cover
              reward_hidden_layers = 4,
              reward_hidden_dim = 512,
              batch_size = 128,
-             num_steps = 100,
+             num_steps = 200,
              horizon = 32,
              gamma = 0.99,
              lr = 5e-5,
