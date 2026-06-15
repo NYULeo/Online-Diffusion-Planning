@@ -29,7 +29,7 @@ from Pretrain.utils import set_seed
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'cube'
-       specific_env = 'single-play'
+       specific_env = 'double-play'
        traj_length = 200
        horizon = 128
        #horizon = 300
