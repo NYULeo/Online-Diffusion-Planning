@@ -5,7 +5,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 from dataclasses import dataclass
 from gymnasium.vector import AsyncVectorEnv
-from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs, check_Critic, get_kernel, get_new_critic_stats, load_success_trajs
+from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs, check_Critic, get_kernel, get_new_critic_stats, load_success_trajs, KernelConfig, train_critic_with_planner2
 #from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
 #from Finetuning.traj_reward2 import RewardConfig, TotalReward, TotalReward_Critic
 from Finetuning.traj_reward3 import RewardConfig, TotalReward, TotalReward_Critic
@@ -254,7 +254,16 @@ class OnlineFinetuner():
         self.config.AMConfig.update_lambda_every = self.config.update_lambda_every
         self.config.AMConfig.MaxEnt = self.config.MaxEnt
         self.config.AMConfig.Entropy_Scaling_Factor = self.config.Entropy_Scaling_Factor
-       
+        self.kernel_config = KernelConfig(
+                checkpoint = self.config.kernel_model_checkpoint,
+                type_kernel = self.config.train_kernel_config.type_kernel,
+                num_hidden_layers = self.config.train_kernel_config.num_hidden_layers,
+                hidden_dim = self.config.train_kernel_config.hidden_dim,
+                num_modes = self.config.train_kernel_config.kernel_num_modes,
+                noise_floor = self.config.train_kernel_config.kernel_noise_floor,
+                min_log_prob = self.config.RewardConfig.min_log_prob,
+                oversample = 5,
+        )
         #self.accelerator = Accelerator(mixed_precision = 'bf16')
         self.accelerator = Accelerator(
                mixed_precision='bf16',
@@ -304,7 +313,6 @@ class OnlineFinetuner():
             if(self.Base_Critic_Buffer is not None):
                 self.Base_Critic_Buffer.extend(trajs_critic)
                 #self.Base_Critic_Buffer.extend(trajs_reward)
-        
         else:
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
             trajs = dataset.get_trajectories()
@@ -375,7 +383,7 @@ class OnlineFinetuner():
         flag = torch.tensor([1 if update_reward else 0], device=self.accelerator.device, dtype=torch.int64)
         flag = broadcast(flag, from_process=0)   # accelerate.utils.broadcast
         update_reward = bool(flag.item())
-
+        
         self.PlannerDataset = PlannerDataset(
                  self.Finetune_Buffer,
                  self.config.AMConfig.horizon,
@@ -645,7 +653,6 @@ class OnlineFinetuner():
             do_rollout = (num_rollout_procs is None) or (rank < num_rollout_procs)
             if do_rollout:
                 seed_base = rank * num_envs_per_process
-               
                 trajs, score, success_rate, total_steps = rollout_parallel2(self.config.dataset_name, 
                                              self.config.specific_dataset, 
                                              horizon = self.config.AMConfig.horizon, 
@@ -662,14 +669,11 @@ class OnlineFinetuner():
                                              seed_base = seed_base,
                                              continual_rollout = self.config.continual_rollout,
                                              chunk_size = self.config.chunk_size)
-                
             else:
-                trajs, score, success_rate, total_steps = [], 0.0, 0.0, 0
-            
+                trajs, score, success_rate, total_steps = [], 0.0, 0.0, 0      
             self.accelerator.wait_for_everyone()                    
             if self.accelerator.is_main_process:
-                  print(f"Rollout Completed")
-            
+                  print(f"Rollout Completed")  
             update_reward = self.gather_and_sync_trajs_and_buffer(trajs)
             self.accelerator.wait_for_everyone()
 
@@ -683,7 +687,6 @@ class OnlineFinetuner():
                          print("Do not Train Critic")
                  self.accelerator.wait_for_everyone()
                  
-            
             #collect the score and number of env stepsacross all processes
             gathered_scores = self.accelerator.gather_for_metrics(torch.tensor([score], device=self.device, dtype = torch.float32),  use_gather_object=False)
             gathered_success_rates = self.accelerator.gather_for_metrics(torch.tensor([success_rate], device=self.device, dtype = torch.float32), use_gather_object=False)
@@ -703,8 +706,39 @@ class OnlineFinetuner():
             
             if(self.config.offline):
                 if(self.accelerator.is_main_process):
+                     if self.config.critic and self.config.update_critic and update_critic:
+                         print(f"Starting Critic Training with Planner")
+                         print(f"Number of trajectories of Critic Training: {len(critic_buffer)}")
+                         train_critic_with_planner2(
+                               trajs                  = critic_buffer,
+                               dataset_name           = self.config.dataset_name,
+                               specific_dataset       = self.config.specific_dataset,
+                               planner_checkpoint     = self.config.planner_checkpoint,
+                               reward_checkpoint      = self.config.reward_model_checkpoint,
+                               old_critic_checkpoint  = self.config.critic_model_checkpoint,
+                               hidden_layers          = self.config.train_critic_config.hidden_layers,
+                               hidden_dim             = self.config.train_critic_config.hidden_dim,
+                               kernel_config          = self.kernel_config,
+                               reward_hidden_layers   = self.config.train_reward_config.hidden_layers,
+                               reward_hidden_dim      = self.config.train_reward_config.hidden_dim,
+                               batch_size             = self.config.train_critic_config.batch_size,
+                               num_steps              = self.config.train_critic_config.num_steps,
+                               horizon                = self.config.AMConfig.horizon,
+                               gamma                  = self.config.train_critic_config.gamma,
+                               lr                     = self.config.train_critic_config.lr,
+                               min_lr                 = self.config.train_critic_config.min_lr,
+                               tau                    = self.config.train_critic_config.tau,
+                               steps_T                = self.config.diffusion_steps,
+                               num_karras             = self.config.AMConfig.num_karras,
+                               eta                    = self.config.AMConfig.eta,
+                               new_step               = ((step+1) * self.config.AMConfig.per_round_steps),
+                               task_id                = self.config.train_reward_config.task_id)
                      print(f"Finetuning round {step+1} completed")
                      print()
+                self.accelerator.wait_for_everyone()
+                if self.config.critic and self.config.update_critic and update_critic:
+                      self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
+                self.set_reward_model(self.device)
                 self.accelerator.wait_for_everyone()
                 continue
 
@@ -733,8 +767,7 @@ class OnlineFinetuner():
                              goal = self.config.train_reward_config.train_goal,
                              task_id = self.config.train_reward_config.task_id)
                       else:
-
-                         train_reward(self.Train_Buffer, 
+                          train_reward(self.Train_Buffer, 
                              dataset_name = self.config.dataset_name, 
                              hidden_layers = self.config.train_reward_config.hidden_layers,
                              hidden_dim = self.config.train_reward_config.hidden_dim,
@@ -748,6 +781,7 @@ class OnlineFinetuner():
                              specific_dataset = self.config.specific_dataset, 
                              goal = self.config.train_reward_config.train_goal,
                              task_id = self.config.train_reward_config.task_id)
+                  
                   """
                   if self.config.kernel:
                       print(f"Starting Kernel Training")
@@ -787,36 +821,37 @@ class OnlineFinetuner():
                   """
 
                   if self.config.critic and self.config.update_critic and update_critic:
-                      print(f"Starting Critic Training")
+                      print(f"Starting Critic Training with Planner")
                       #save_trajs(critic_buffer, self.config.dataset_name, self.config.specific_dataset, ((step+1) * self.config.AMConfig.per_round_steps))
                       print(f"Number of trajectories of Critic Training: {len(critic_buffer)}")
-                    
-                      train_critic(critic_buffer, 
-                                   dataset_name = self.config.dataset_name, 
-                                   specific_dataset = self.config.specific_dataset, 
-                                   hidden_layers = self.config.train_critic_config.hidden_layers,
-                                   hidden_dim = self.config.train_critic_config.hidden_dim,
-                                   sigma = self.config.train_reward_config.sigma, 
-                                   batch_size = self.config.train_critic_config.batch_size, 
-                                   num_steps = self.config.train_critic_config.num_steps, 
-                                   gamma = self.config.train_critic_config.gamma, 
-                                   lam = self.config.train_critic_config.lam,
-                                   #horizon = self.config.AMConfig.horizon,
-                                   #horizon = self.config.chunk_size,
-                                   horizon = self.config.train_critic_config.horizon,
-                                   lr = self.config.train_critic_config.lr, 
-                                   min_lr = self.config.train_critic_config.min_lr,
-                                   tau = self.config.train_critic_config.tau, 
-                                   old_step = last_critic_update_step,
-                                   new_step = ((step+1) * self.config.AMConfig.per_round_steps), 
-                                   momentum = self.config.train_critic_config.momentum,
-                                   target_reward = self.config.train_reward_config.target_reward,
-                                   task_id = self.config.train_reward_config.task_id)                        
+                      if self.config.kernel and self.config.update_kernel:
+                           self.kernel_config.checkpoint = self.config.kernel_model_checkpoint
+                      train_critic_with_planner2(
+                               trajs                  = critic_buffer,
+                               dataset_name           = self.config.dataset_name,
+                               specific_dataset       = self.config.specific_dataset,
+                               planner_checkpoint     = self.config.planner_checkpoint,
+                               reward_checkpoint      = ((step+1) * self.config.AMConfig.per_round_steps),
+                               old_critic_checkpoint  = self.config.critic_model_checkpoint,
+                               hidden_layers          = self.config.train_critic_config.hidden_layers,
+                               hidden_dim             = self.config.train_critic_config.hidden_dim,
+                               kernel_config          = self.kernel_config,
+                               reward_hidden_layers   = self.config.train_reward_config.hidden_layers,
+                               reward_hidden_dim      = self.config.train_reward_config.hidden_dim,
+                               batch_size             = self.config.train_critic_config.batch_size,
+                               num_steps              = self.config.train_critic_config.num_steps,
+                               horizon                = self.config.AMConfig.horizon,
+                               gamma                  = self.config.train_critic_config.gamma,
+                               lr                     = self.config.train_critic_config.lr,
+                               min_lr                 = self.config.train_critic_config.min_lr,
+                               tau                    = self.config.train_critic_config.tau,
+                               steps_T                = self.config.diffusion_steps,
+                               num_karras             = self.config.AMConfig.num_karras,
+                               eta                    = self.config.AMConfig.eta,
+                               new_step               = ((step+1) * self.config.AMConfig.per_round_steps),
+                               task_id                = self.config.train_reward_config.task_id)                       
             self.accelerator.wait_for_everyone()
-            
-
             #plans = self.get_generated_plans(number_of_generated_plans = self.config.RewardConfig.number_of_generated_plans)
-
             if self.config.kernel and self.config.update_kernel:
                       plans = self.get_generated_plans(number_of_generated_plans = self.config.RewardConfig.number_of_generated_plans)
                       if self.accelerator.is_main_process:
@@ -882,9 +917,7 @@ class OnlineFinetuner():
                      self.config.critic_model_checkpoint = last_critic_update_step
             else:
                  self.config.critic_model_checkpoint = 0
-           
-          
-            
+              
             self.set_reward_model(self.device)
             if self.accelerator.is_main_process:
                    print(f"Finetuning round {step+1} completed")
@@ -895,22 +928,6 @@ class OnlineFinetuner():
      
         
             
-
-
-
-
-     
-
-
-
-    
-
-
-
-
-
-
-
 
 
 
