@@ -22,7 +22,13 @@ from scipy.ndimage import gaussian_filter1d
 from Pretrain.Dataset import get_dataset
 import ogbench
 from Finetuning.Rollout import load_success_trajs
-from Finetuning.utils import train_critic, test_critic, train_critic_with_reward, train_critic_with_planner
+from Finetuning.utils import (
+    train_critic_with_reward,
+    train_critic_with_planner,
+    train_critic_with_planner2,
+    test_critic,
+    KernelConfig,
+)
 from Pretrain.utils import set_seed
 
 
@@ -101,6 +107,47 @@ if __name__ == '__main__':  # pragma: no cover
             trajs = trajs,
             task_id = task_id)
        
+
+
+       kernel_config = KernelConfig(
+             checkpoint        = 0,           # which kernel checkpoint to load
+             type_kernel       = 'mog',    # 'robust' or 'mog'
+             num_hidden_layers = 4,           # must match training-time arch
+             hidden_dim        = 514,         # must match training-time arch
+             num_modes         = 10,           # only used when type_kernel == 'mog'
+             noise_floor       = 5e-4,        # only used when type_kernel == 'mog'
+             min_log_prob      = -110.0,       # feasibility threshold (tune per kernel type)
+             oversample        = 4,           # try up to oversample * batch_size candidates
+       )
+
+
+       train_critic_with_planner2(
+            trajs                  = trajs,
+            dataset_name           = env_name,
+            specific_dataset       = specific_env,
+            planner_checkpoint     = 0,
+            reward_checkpoint      = 0,
+            old_critic_checkpoint  = 0,
+            hidden_layers          = 4,
+            hidden_dim             = 512,
+            kernel_config          = kernel_config,
+            reward_hidden_layers   = 4,
+            reward_hidden_dim      = 512,
+            batch_size             = 128,
+            num_steps              = 200,
+            horizon                = 32,
+            gamma                  = 0.99,
+            lr                     = 5e-5,
+            min_lr                 = 1e-6,
+            tau                    = 0.005,
+            steps_T                = 10,
+            num_karras             = 1,
+            eta                    = 0.0,
+            new_step               = 1,
+            task_id                = task_id,
+            log_every              = 1,
+         )
+
        """
        train_critic_with_planner(
              trajs,
@@ -126,7 +173,7 @@ if __name__ == '__main__':  # pragma: no cover
              new_step = 1,
              task_id = task_id,
              log_every = 1)
-
+       """
        #trajs = load_success_trajs(env_name, specific_env, task_id, step)
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
@@ -141,4 +188,3 @@ if __name__ == '__main__':  # pragma: no cover
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
-      """

@@ -68,11 +68,7 @@ def check_cube_double_goal_reach(trajs, task_id):
 
 
 
-
-a = [1, 1, 1, 1, 1, 1, 1, 0.98]
-print(np.mean(a))
-print(np.std(a))
-exit()
+    
 """
 env_steps = [0, 1592, 1590, 1600, 1411, 1416, 1600, 1555, 1422, 1600, 1599, 1554]
 total_steps = [0]
