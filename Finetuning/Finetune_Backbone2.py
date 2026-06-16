@@ -364,7 +364,7 @@ class OnlineFinetuner():
                  update_reward = True
             """
             self.Train_Buffer.extend(collected_trajs)
-            #self.Finetune_Buffer.extend(collected_trajs)
+            self.Finetune_Buffer.extend(collected_trajs)
             if len(self.Finetune_Buffer) > self.config.buffer_size:
                  num_to_remove = len(self.Finetune_Buffer) - self.config.buffer_size
                  self.Finetune_Buffer = self.Finetune_Buffer[num_to_remove:] 
