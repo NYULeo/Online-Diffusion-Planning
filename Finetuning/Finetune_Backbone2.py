@@ -398,7 +398,6 @@ class OnlineFinetuner():
           # ALL processes must participate in gather_for_metrics (collective operation)
           gathered_trajs_list = self.accelerator.gather_for_metrics([local_trajs if local_trajs else []], use_gather_object=True)
           self.accelerator.wait_for_everyone()
-          update_critic = False
           # Only main process needs to process the gathered data
           if self.accelerator.is_main_process:
               total_trajs = []
@@ -415,7 +414,6 @@ class OnlineFinetuner():
                   critic_buffer = success_trajs
               self.Base_Critic_Buffer.extend(success_trajs.copy())
               """
-              update_critic = True
               success_trajs = get_success_trajs(total_trajs)
               if self.config.train_critic_config.data_conservation:
                   critic_buffer = self.data_conservation_update(total_trajs)
@@ -426,7 +424,7 @@ class OnlineFinetuner():
           else:
               critic_buffer = None
           
-          return critic_buffer, update_critic
+          return critic_buffer
    
     def data_conservation_update(self, critic_buffer):
         """
@@ -594,7 +592,6 @@ class OnlineFinetuner():
         rank = self.accelerator.process_index
         world_size = self.accelerator.num_processes
         num_envs_per_process = self.config.rollout_num_envs  # Total envs = base * world_size
-        last_critic_update_step = 0
         last_reward_update_step = 0
         for step in range(self.config.finetune_rounds):
             if (torch.cuda.device_count() > 1):
@@ -673,18 +670,15 @@ class OnlineFinetuner():
                 trajs, score, success_rate, total_steps = [], 0.0, 0.0, 0      
             self.accelerator.wait_for_everyone()                    
             if self.accelerator.is_main_process:
-                  print(f"Rollout Completed")  
-            update_reward = self.gather_and_sync_trajs_and_buffer(trajs)
+                  print(f"Rollout Completed") 
+            if(not self.config.offline): 
+                 update_reward = self.gather_and_sync_trajs_and_buffer(trajs)
             self.accelerator.wait_for_everyone()
 
-            if self.config.critic:
-                 critic_buffer, update_critic = self.collect_critic_buffer(trajs)
+            if self.config.critic and (not self.config.offline):
+                 critic_buffer = self.collect_critic_buffer(trajs)
                  if self.accelerator.is_main_process:
                      print(f"Number of trajectories for critic training: {len(critic_buffer)}")
-                     if(update_critic):
-                         print("Training Critic")
-                     else:
-                         print("Do not Train Critic")
                  self.accelerator.wait_for_everyone()
                  
             #collect the score and number of env stepsacross all processes
@@ -706,11 +700,10 @@ class OnlineFinetuner():
             
             if(self.config.offline):
                 if(self.accelerator.is_main_process):
-                     if self.config.critic and self.config.update_critic and update_critic:
+                     if self.config.critic and self.config.update_critic:
                          print(f"Starting Critic Training with Planner")
-                         print(f"Number of trajectories of Critic Training: {len(critic_buffer)}")
                          train_critic_with_planner2(
-                               trajs                  = critic_buffer,
+                               trajs                  = self.Finetune_Buffer,
                                dataset_name           = self.config.dataset_name,
                                specific_dataset       = self.config.specific_dataset,
                                planner_checkpoint     = ((step+1) * self.config.AMConfig.per_round_steps),
@@ -736,7 +729,7 @@ class OnlineFinetuner():
                      print(f"Finetuning round {step+1} completed")
                      print()
                 self.accelerator.wait_for_everyone()
-                if self.config.critic and self.config.update_critic and update_critic:
+                if self.config.critic and self.config.update_critic:
                       self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
                 self.set_reward_model(self.device)
                 self.accelerator.wait_for_everyone()
@@ -820,10 +813,9 @@ class OnlineFinetuner():
                                       x_generated_plans = x_generated_plans)
                   """
 
-                  if self.config.critic and self.config.update_critic and update_critic:
+                  if self.config.critic and self.config.update_critic:
                       print(f"Starting Critic Training with Planner")
                       #save_trajs(critic_buffer, self.config.dataset_name, self.config.specific_dataset, ((step+1) * self.config.AMConfig.per_round_steps))
-                      print(f"Number of trajectories of Critic Training: {len(critic_buffer)}")
                       if self.config.kernel and self.config.update_kernel:
                            self.kernel_config.checkpoint = self.config.kernel_model_checkpoint
                       train_critic_with_planner2(
@@ -910,11 +902,7 @@ class OnlineFinetuner():
                   self.config.kernel_model_checkpoint = 0
             
             if(self.config.critic and self.config.update_critic):
-                if (update_critic):
-                     self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
-                     last_critic_update_step = ((step+1) * self.config.AMConfig.per_round_steps)
-                else:
-                     self.config.critic_model_checkpoint = last_critic_update_step
+                self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             else:
                  self.config.critic_model_checkpoint = 0
               
