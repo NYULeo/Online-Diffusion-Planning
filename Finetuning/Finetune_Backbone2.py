@@ -703,7 +703,7 @@ class OnlineFinetuner():
                      if self.config.critic and self.config.update_critic:
                          print(f"Starting Critic Training with Planner")
                          train_critic_with_planner2(
-                               trajs                  = self.Finetune_Buffer,
+                               trajs                  = self.Base_Critic_Buffer,
                                dataset_name           = self.config.dataset_name,
                                specific_dataset       = self.config.specific_dataset,
                                planner_checkpoint     = ((step+1) * self.config.AMConfig.per_round_steps),
