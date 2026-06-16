@@ -517,7 +517,7 @@ if __name__ == "__main__":
         diffusion_steps = 10,
         karras_percent = 0.1,
         Loss_Clip_percent = 0.0,
-        finetune_batch_size = 16,
+        finetune_batch_size = 24,
         finetune_batch_per_sample = 6,
         finetune_lr = 2e-05,
         initial_lam = 0.05,
