@@ -525,7 +525,8 @@ if __name__ == "__main__":
         eta_lam = 0.5,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
-        reward_scaling_factor = 50,
+        #reward_scaling_factor = 50,
+        reward_scaling_factor = 80,
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value

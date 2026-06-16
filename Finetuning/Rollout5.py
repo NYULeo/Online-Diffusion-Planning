@@ -584,7 +584,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 30
+    checkpoint = 51
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -607,8 +607,8 @@ if __name__ == "__main__":
     #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
     #chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17]
     chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17, 21, 22, 23, 24, 26, 27, 28, 29, 30]
-    set_seed(10)
-    while(checkpoint < 33):
+    set_seed(5)
+    while(checkpoint < 54):
        print(f"Running checkpoing: {checkpoint}")
        total_return = 0.0
        for j in range(1, 51):
