@@ -670,8 +670,8 @@ class OnlineFinetuner():
             self.accelerator.wait_for_everyone()                    
             if self.accelerator.is_main_process:
                   print(f"Rollout Completed") 
-            #if(not self.config.offline): 
-            update_reward = self.gather_and_sync_trajs_and_buffer(trajs)
+            if(not self.config.offline): 
+                 update_reward = self.gather_and_sync_trajs_and_buffer(trajs)
             self.accelerator.wait_for_everyone()
 
             if self.config.critic and (not self.config.offline):
