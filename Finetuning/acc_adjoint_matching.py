@@ -193,6 +193,7 @@ class Acc_AdjointMatchingFineTuner:
               p.requires_grad_(False)
         self.old_score_net.eval()
     
+    """
     def reset_old_score_net(self, old_planner_checkpoint: int):
         state_dict = get_planner(self.config.dataset_name, self.config.specific_dataset, old_planner_checkpoint, self.config.task_id)
         #state_dict = get_pretrained_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
@@ -210,7 +211,7 @@ class Acc_AdjointMatchingFineTuner:
         for p in self.old_score_net.parameters():
               p.requires_grad_(False)
         self.old_score_net.eval()
-
+    """
     def set_new_score_net(self):
          if(self.config.backbone_name == 'transformer'):
               self.new_score_net = DiT1d(
@@ -252,6 +253,20 @@ class Acc_AdjointMatchingFineTuner:
         torch.save(data, savepath)
         print(f"saved model to {savepath}")
     """
+    def reset_old_score_net(self, old_planner_checkpoint: int):
+         state_dict = get_planner(self.config.dataset_name, self.config.specific_dataset,
+                             old_planner_checkpoint, self.config.task_id)
+         base = self.accelerator.unwrap_model(self.old_score_net)
+         base.load_state_dict(state_dict)
+         for p in self.old_score_net.parameters():
+             p.requires_grad_(False)
+         self.old_score_net.eval()
+
+    def set_new_score_net2(self):
+         base_old = self.accelerator.unwrap_model(self.old_score_net)
+         base_new = self.accelerator.unwrap_model(self.new_score_net)
+         base_new.load_state_dict(base_old.state_dict())
+         self.new_score_net.train()
 
     def save_initial_conds(self, step: int):
         filename = 'Initial_Conds_' + str(step) + '.pkl'
@@ -669,7 +684,7 @@ class Acc_AdjointMatchingFineTuner:
     def finetune_planner(self, dataloader: DataLoader, reward_model: Union[TotalReward, TotalReward_Critic], round: int, old_planner_checkpoint: Optional[int] = None):
         if old_planner_checkpoint is not None:
             self.reset_old_score_net(old_planner_checkpoint)
-            self.set_new_score_net()
+            self.set_new_score_net2()
         reward_model.eval()
         
         if(round > 1):
