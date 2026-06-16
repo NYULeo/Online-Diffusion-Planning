@@ -354,7 +354,7 @@ class OnlineFinetuner():
                else self.accelerator.num_processes)
             print(f"Rollout Completed: Collected {len(collected_trajs)} trajectories across {num_rollout} rollout processes")
             #print(f"Rollout Completed: Collected {len(collected_trajs)} trajectories across {self.accelerator.num_processes} processes")
-            
+            update_reward = True
             self.Train_Kernel_Buffer.extend(collected_trajs)
             """
             success_trajs = get_success_trajs(collected_trajs)
@@ -364,8 +364,7 @@ class OnlineFinetuner():
                  update_reward = True
             """
             self.Train_Buffer.extend(collected_trajs)
-            self.Finetune_Buffer.extend(collected_trajs)
-            update_reward = True
+            #self.Finetune_Buffer.extend(collected_trajs)
             if len(self.Finetune_Buffer) > self.config.buffer_size:
                  num_to_remove = len(self.Finetune_Buffer) - self.config.buffer_size
                  self.Finetune_Buffer = self.Finetune_Buffer[num_to_remove:] 
