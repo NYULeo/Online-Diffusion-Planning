@@ -35,11 +35,11 @@ from Pretrain.utils import set_seed
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'cube'
-       specific_env = 'single-play'
-       traj_length = 200
-       horizon = 128
+       specific_env = 'double-play'
+       traj_length = 500
+       horizon = 400
        #horizon = 300
-       task_id = 5
+       task_id = 4
        step = 0
       
        
@@ -102,8 +102,8 @@ if __name__ == '__main__':  # pragma: no cover
             checkpoint_step = 0, 
             gamma = 0.99, 
             horizon = horizon,  
-            sigma = 4.0, 
-            target_reward = 500.0, 
+            sigma = 7.0, 
+            target_reward = 5000.0, 
             trajs = trajs,
             task_id = task_id)
        
