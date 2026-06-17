@@ -80,7 +80,7 @@ if __name__ == '__main__':
     
     dataset_name = 'cube'
     specific_dataset = 'single'
-    task_id = 4
+    task_id = 1
     traj_length = 200
     
     """
@@ -163,7 +163,7 @@ if __name__ == '__main__':
                sigma = 4.0, 
                alpha = None, 
                target_reward = 500, 
-               task_id = 4,
+               task_id = task_id,
                traj_length = traj_length, 
                save_freq = 10000, 
                num_steps = 30000)
