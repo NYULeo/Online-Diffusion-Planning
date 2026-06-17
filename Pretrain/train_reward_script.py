@@ -80,7 +80,7 @@ if __name__ == '__main__':
     
     dataset_name = 'cube'
     specific_dataset = 'double'
-    task_id = 1
+    task_id = 4
     traj_length = 500
     
     """
@@ -125,9 +125,9 @@ if __name__ == '__main__':
                  save_freq = 10000, 
                  lr = 5e-03, 
                  min_lr = 5e-04, 
-                 sigma = 5.0,
+                 sigma = 7.0,
                  alpha = None, 
-                 target_reward = 3000.0,
+                 target_reward = 5000.0,
                  specific_dataset = specific_dataset, 
                  task_id = task_id, 
                  traj_length = traj_length)
@@ -160,9 +160,9 @@ if __name__ == '__main__':
                hidden_dim = 512, 
                specific_dataset = specific_dataset, 
                trajs = None, 
-               sigma = 5.0, 
+               sigma = 7.0, 
                alpha = None, 
-               target_reward = 3000.0, 
+               target_reward = 5000.0, 
                task_id = task_id,
                traj_length = traj_length, 
                save_freq = 10000, 
