@@ -39,7 +39,7 @@ if __name__ == '__main__':  # pragma: no cover
        traj_length = 200
        horizon = 128
        #horizon = 300
-       task_id = 4
+       task_id = 1
        step = 0
       
        
