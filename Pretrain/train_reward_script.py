@@ -81,7 +81,7 @@ if __name__ == '__main__':
     dataset_name = 'cube'
     specific_dataset = 'double'
     task_id = 4
-    traj_length = 300
+    traj_length = 500
     
     """
     path = f'./Finetuning/Rollouts/{dataset_name}/{specific_dataset}-play/task_{task_id}/trajs_task{task_id}_success_0.pkl'
@@ -121,8 +121,8 @@ if __name__ == '__main__':
                  hidden_layers = 4, 
                  hidden_dim = 512, 
                  batch_size = 256, 
-                 num_steps = 5000, 
-                 save_freq = 1000, 
+                 num_steps = 50000, 
+                 save_freq = 10000, 
                  lr = 5e-03, 
                  min_lr = 5e-04, 
                  sigma = 7.0,
@@ -165,8 +165,8 @@ if __name__ == '__main__':
                target_reward = 5000.0, 
                task_id = task_id,
                traj_length = traj_length, 
-               save_freq = 1000, 
-               num_steps = 5000)
+               save_freq = 10000, 
+               num_steps = 50000)
     
 
 
