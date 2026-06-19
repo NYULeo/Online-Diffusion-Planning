@@ -81,7 +81,7 @@ if __name__ == '__main__':
     dataset_name = 'cube'
     specific_dataset = 'double'
     task_id = 4
-    traj_length = 500
+    traj_length = 200
     
     """
     path = f'./Finetuning/Rollouts/{dataset_name}/{specific_dataset}-play/task_{task_id}/trajs_task{task_id}_success_0.pkl'
