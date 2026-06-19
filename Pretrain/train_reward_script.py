@@ -127,7 +127,7 @@ if __name__ == '__main__':
                  min_lr = 5e-04, 
                  sigma = 4.0,
                  alpha = None, 
-                 target_reward = 5000.0,
+                 target_reward = 20000.0,
                  specific_dataset = specific_dataset, 
                  task_id = task_id, 
                  traj_length = traj_length)
@@ -162,7 +162,7 @@ if __name__ == '__main__':
                trajs = None, 
                sigma = 4.0, 
                alpha = None, 
-               target_reward = 5000.0, 
+               target_reward = 20000.0, 
                task_id = task_id,
                traj_length = traj_length, 
                save_freq = 1000, 
