@@ -64,6 +64,19 @@ def merger(traj_1, traj_2):
      else:
           return None   
 
+def spare_reward_prcocessor(rewards):
+        Temp = []
+        for i in range(1, len(rewards)):
+             if(rewards[i] == rewards[i-1]+1):
+                 Temp.append(i)
+        new_rewards = [0]*len(rewards)
+        for i in range(len(rewards)):
+           if(i in Temp):
+                new_rewards[i] = 1.0
+           else:
+                new_rewards[i] = 0.0
+        return np.array(new_rewards, dtype = np.float64)
+
 def get_dataset(name: str, specific_name: str, task_id: Optional[int] = None, goal: Optional[np.array] = None, traj_length: Optional[int] = None, mode: Optional[str] = None):
        if(name == 'kitchen'):
             return KitchenDataset(specific_name)
@@ -502,6 +515,7 @@ class CubeDataset:
         env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
         return env
 
+"""
 class CubeDataset_Singletask:
     def __init__(self, name: str, task_id, traj_length: Optional[int] = None):
         
@@ -585,7 +599,7 @@ class CubeDataset_Singletask:
     def get_env(self, render_mode: str = "rgb_array"):
         env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
         return env
-
+"""
 class OGPointmazeDataset:
     def __init__(self, name: str):
         
@@ -744,6 +758,81 @@ class OGPointmazeDataset_Singletask:
         env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode = render_mode, max_episode_steps = 2000)
         return env
 
+class CubeDataset_Singletask:
+    def __init__(self, name: str, task_id, traj_length: Optional[int] = None):
+        
+        self.name = name
+        self.traj_length = traj_length
+        name_to_id = {
+            "single-play": f"cube-single-play-singletask-task{task_id}-v0",
+            "single-noisy": f"cube-single-noisy-singletask-task{task_id}-v0",
+            "double-play": f"cube-double-play-singletask-task{task_id}-v0",
+            "double-noisy": f"cube-double-noisy-singletask-task{task_id}-v0",
+            "triple-play": f"cube-triple-play-singletask-task{task_id}-v0",
+            "triple-noisy": f"cube-triple-noisy-singletask-task{task_id}-v0",
+            "quadruple-play": f"cube-quadruple-play-singletask-task{task_id}-v0",
+            "quadruple-noisy": f"cube-quadruple-noisy-singletask-task{task_id}-v0",
+        }
+
+        if name not in name_to_id:
+            raise ValueError(f"Invalid dataset name: {name}")
+
+        self.dataset_id = name_to_id[name]
+
+        self.env, self.dataset, self.eval_dataset = ogbench.make_env_and_datasets(
+                 self.dataset_id, render_mode="rgb_array"
+            )
+
+    def get_trajectories(self) -> List[Dict[str, np.ndarray]]:
+       
+        trajectories = []
+        last_start = 0
+        N = len(self.dataset["observations"])
+
+        for i in range(N):
+            # End of a natural episode (terminal or dataset end)
+            if self.dataset['terminals'][i] == 1:
+                     obs_slice = self.dataset["observations"][last_start : i]
+                     act_slice = self.dataset["actions"][last_start : i]
+                     rews = spare_reward_prcocessor(self.dataset['rewards'][last_start : i])
+                     L = len(obs_slice)
+                     if(self.traj_length is not None):
+                           index = L - self.traj_length
+                           if(index < 0):
+                                index = 0
+                     else:
+                            index =  0
+                
+                     
+                     if len(act_slice) < 10:
+                          last_start = i + 1
+                          continue
+                     
+                     if(sum(rews) == 0):
+                          last_start = i + 1
+                          continue 
+                    
+                         
+                     trajectory = {
+                           "observations": obs_slice[index:],
+                           "actions": act_slice[index:],
+                           "rewards": rews[index:]
+                     }
+                         
+                     trajectories.append(trajectory)
+                     last_start = i + 1
+
+        return trajectories
+
+    def get_state_dim(self) -> int:
+        return int(self.dataset["observations"].shape[-1])
+
+    def get_action_dim(self) -> int:
+        return int(self.dataset["actions"].shape[-1])
+
+    def get_env(self, render_mode: str = "rgb_array"):
+        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
+        return env
 
 
 
