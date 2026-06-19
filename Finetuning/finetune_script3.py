@@ -154,7 +154,7 @@ if __name__ == "__main__":
 
     RWConfig = RewardConfig(
                beta = 1.0, 
-               min_log_prob = -110.0,
+               min_log_prob = -150.0,
                quantile = 0.999,
                number_of_generated_plans = 50,
                #max_mahalanobis_score = 100.0,
