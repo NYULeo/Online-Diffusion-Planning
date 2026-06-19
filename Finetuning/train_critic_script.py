@@ -102,8 +102,8 @@ if __name__ == '__main__':  # pragma: no cover
             checkpoint_step = 0, 
             gamma = 0.99, 
             horizon = horizon,  
-            sigma = 7.0, 
-            target_reward = 5000.0, 
+            sigma = 4.0, 
+            target_reward = 1000.0, 
             trajs = trajs,
             task_id = task_id)
        
