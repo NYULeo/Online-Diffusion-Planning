@@ -310,7 +310,7 @@ class TotalReward_Critic(nn.Module):
                 self.kernels.append(kernel_net)
         self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint, task_id)
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
-        self.critic_stat = get_critic_stats(dataset_name, specific_dataset, task_id, critic_checkpoint = 0)
+        self.critic_stat = get_critic_stats(dataset_name, specific_dataset, task_id, 0)
        
 
         self.config.d_s = obs_dim
