@@ -121,13 +121,13 @@ if __name__ == '__main__':
                  hidden_layers = 4, 
                  hidden_dim = 512, 
                  batch_size = 256, 
-                 num_steps = 5000, 
-                 save_freq = 1000, 
+                 num_steps = 50000, 
+                 save_freq = 10000, 
                  lr = 1e-04, 
                  min_lr = 1e-05, 
                  sigma = 8.0,
                  alpha = None, 
-                 target_reward = 1000000.0,
+                 target_reward = 500.0,
                  specific_dataset = specific_dataset, 
                  task_id = task_id, 
                  traj_length = traj_length)
@@ -162,11 +162,11 @@ if __name__ == '__main__':
                trajs = None, 
                sigma = 8.0, 
                alpha = None, 
-               target_reward = 1000000.0, 
+               target_reward = 500.0, 
                task_id = task_id,
                traj_length = traj_length, 
-               save_freq = 5000, 
-               num_steps = 5000)
+               save_freq = 50000, 
+               num_steps = 50000)
     
 
 
