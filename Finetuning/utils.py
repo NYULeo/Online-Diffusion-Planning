@@ -2551,7 +2551,7 @@ def train_critic_with_planner(
     # ------------------------------------------------------------------ critic
     critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
     critic_state, _ = get_critic_model(
-        dataset_name, specific_dataset, task_id=task_id, step=old_critic_checkpoint,
+        dataset_name, specific_dataset, task_id=task_id, step=0,
     )
     critic.load_state_dict(critic_state)
 
