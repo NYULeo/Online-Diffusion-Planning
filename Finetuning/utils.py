@@ -2868,7 +2868,7 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
     target_critic.eval()
     for p in target_critic.parameters():
         p.requires_grad_(False)
-    optimizer = optim.Adam(critic.parameters(), lr = lr)
+    optimizer = optim.AdamW(critic.parameters(), lr = lr, weight_decay = 1e-2)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(
             optimizer,
             T_max = num_steps,   # one scheduler step per training step
@@ -3187,7 +3187,7 @@ def train_critic_with_planner2(
     ).astype(np.float32)
 
     # ----------------------------------------------------------------- optim
-    optimizer = optim.Adam(critic.parameters(), lr=lr)
+    optimizer = optim.AdamW(critic.parameters(), lr=lr, weight_decay = 1e-2)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=num_steps, eta_min=min_lr,
     )
