@@ -3166,7 +3166,7 @@ def train_critic_with_planner2(
     # ----------------------------------- critic stats: load once, never save
     critic_stat = get_critic_stats(
         dataset_name, specific_dataset,
-        task_id=task_id, step=old_critic_checkpoint,
+        task_id=task_id, step=0,
     )
     c_mean = torch.as_tensor(
         critic_stat.obs_mean, device=device, dtype=torch.float32,
