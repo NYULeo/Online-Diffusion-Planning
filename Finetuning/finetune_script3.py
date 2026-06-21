@@ -148,7 +148,7 @@ if __name__ == "__main__":
     specific_env = 'double-play'
     task_id = 4
     finetune_buffer_cutoff_length = None
-    train_buffer_cutoff_length = 500
+    train_buffer_cutoff_length = None
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = True)
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32, eta = 0.0)
 
@@ -168,8 +168,8 @@ if __name__ == "__main__":
                           num_steps = 50000, 
                           lr = 5e-03,
                           min_lr = 5e-04,
-                          sigma = 7.0, 
-                          target_reward = 5000.0, 
+                          sigma = 4.0, 
+                          target_reward = 500.0, 
                           train_goal = None,
                           task_id = task_id)
       
