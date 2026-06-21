@@ -614,6 +614,7 @@ class CubeDataset_Singletask:
         env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
         return env
 """
+
 class OGPointmazeDataset:
     def __init__(self, name: str):
         
@@ -802,13 +803,14 @@ class CubeDataset_Singletask:
         trajectories = []
         last_start = 0
         N = len(self.dataset["observations"])
-
+        rewards = reward_processor(self.dataset['rewards'].copy(), 'cube')
         for i in range(N):
             # End of a natural episode (terminal or dataset end)
-            if self.dataset['terminals'][i] == 1:
+            if self.dataset['terminals'][i] == 1 or rewards[i] == 0:
                      obs_slice = self.dataset["observations"][last_start : i]
                      act_slice = self.dataset["actions"][last_start : i]
-                     rews = reward_processor(self.dataset['rewards'][last_start : i], 'cube')
+                     rews = reward_processor(rewards[last_start : i+1], 'cube')[1:]
+            
                      L = len(obs_slice)
                      if(self.traj_length is not None):
                            index = L - self.traj_length

@@ -69,11 +69,29 @@ def check_cube_double_goal_reach(trajs, task_id):
 
 
 
-a = np.array([1, 1, 2, 2, 2])
-a = np.asarray(a)
-a = a * 4
-print(a)
+env, dataset, eval_dataset = ogbench.make_env_and_datasets(
+                 "cube-double-play-singletask-task4-v0", render_mode="rgb_array"
+                  )
+last_start = 0
+
+for i in range(1, len(dataset['rewards'])):
+    if(dataset['rewards'][i] == 0 or dataset['terminals'][i] == 1):
+          
+          rews_slice = dataset['rewards'][last_start:i+1].copy() 
+          if(np.max(rews_slice) != 0.0):
+              count += 1
+          if len(rews_slice) < 10:
+                    last_start = i + 1
+                    continue
+          
+          print(f"Min: {np.min(rews_slice)}")
+          print(f"Max: {np.max(rews_slice)}")
+          print()
+          last_start = i + 1
+print(count)
 exit()
+
+
 """
 env_steps = [0, 1592, 1590, 1600, 1411, 1416, 1600, 1555, 1422, 1600, 1599, 1554]
 total_steps = [0]
