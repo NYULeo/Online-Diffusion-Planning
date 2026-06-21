@@ -38,7 +38,7 @@ if __name__ == '__main__':  # pragma: no cover
        env_name = 'cube'
        specific_env = 'double-play'
        traj_length = None
-       horizon = 400
+       horizon = None
        #horizon = 300
        task_id = 4
        step = 0
@@ -48,7 +48,7 @@ if __name__ == '__main__':  # pragma: no cover
        #trajs = load_success_trajs(env_name, specific_env, task_id, step)
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
-       
+       """
        train_critic(trajs, 
              dataset_name = env_name, 
              specific_dataset = specific_env, 
@@ -70,15 +70,15 @@ if __name__ == '__main__':  # pragma: no cover
              momentum = 0.005, 
              target_reward = 300.0,
              task_id = task_id)  
-       
        """
+       
        train_critic_with_reward(trajs,
                       dataset_name  = env_name,
                       specific_dataset = specific_env,
                       reward_hidden_layers = 5,
                       reward_hidden_dim  = 512,
                       reward_checkpoint  = 0,
-                      critic_hidden_layers = 4,
+                      critic_hidden_layers = 5,
                       critic_hidden_dim  = 512,
                       batch_size = 256,
                       num_steps  = 50000,
@@ -92,12 +92,12 @@ if __name__ == '__main__':  # pragma: no cover
                       new_step = step,
                       momentum = 0.005,   # unused when old_step is None
                       task_id = task_id)
-       """
+       
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
             finetune = False,
-            hidden_layers = 4, 
+            hidden_layers = 5, 
             hidden_dim = 512, 
             checkpoint_step = 0, 
             gamma = 0.99, 
