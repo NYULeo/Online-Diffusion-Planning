@@ -476,7 +476,7 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
          obs_dim = data.get_state_dim()
          act_dim = data.get_action_dim()
          trajs = data.get_trajectories()
-         trajs = make_reward_increase(trajs)
+         #trajs = make_reward_increase(trajs)
          return trajs, name, obs_dim, act_dim
 
     elif(dataset_name == 'cube'):
@@ -499,7 +499,7 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
          obs_dim = data_1.get_state_dim()
          act_dim = data_1.get_action_dim()
          trajs = data_1.get_trajectories() + data_2.get_trajectories()
-         trajs = make_reward_increase(trajs)
+         #trajs = make_reward_increase(trajs)
          return trajs, name, obs_dim, act_dim
 
     else:
