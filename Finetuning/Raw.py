@@ -9,8 +9,6 @@ import numpy as np
 import seaborn as sns
 import minari
 import sys
-
-from sympy import Max
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -25,6 +23,7 @@ from Pretrain.utils import ema_smooth
 from Pretrain.Dataset import get_dataset
 import ogbench
 from Finetuning.Rollout import load_success_trajs
+from Finetuning.utils import reward_processor
 from typing import Optional, List
 from torch.utils.data import Dataset
 import torch.nn as nn
@@ -77,18 +76,14 @@ last_start = 0
 for i in range(1, len(dataset['rewards'])):
     if(dataset['rewards'][i] == 0 or dataset['terminals'][i] == 1):
           
-          rews_slice = dataset['rewards'][last_start:i+1].copy() 
-          if(np.max(rews_slice) != 0.0):
-              count += 1
+          rews_slice = reward_processor(dataset['rewards'][last_start:i+1].copy(), 'cube')
+          print(rews_slice)
           if len(rews_slice) < 10:
                     last_start = i + 1
                     continue
-          
-          print(f"Min: {np.min(rews_slice)}")
-          print(f"Max: {np.max(rews_slice)}")
           print()
           last_start = i + 1
-print(count)
+
 exit()
 
 
@@ -166,7 +161,7 @@ print(reward)
 
 
 from Finetuning.Rollout import load_success_trajs
-from Finetuning.utils import TrajectoryDict, train_critic, test_critic
+from Finetuning.utils import TrajectoryDict, reward_processor, train_critic, test_critic
 from Pretrain.utils import set_seed
 
 env_name = 'cube'
