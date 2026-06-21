@@ -36,7 +36,7 @@ if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'cube'
        specific_env = 'double-play'
-       traj_length = None
+       traj_length = 500
        horizon = 400
        #horizon = 300
        task_id = 4
@@ -47,7 +47,6 @@ if __name__ == '__main__':  # pragma: no cover
        #trajs = load_success_trajs(env_name, specific_env, task_id, step)
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
-       
        """
        train_critic(trajs, 
              dataset_name = env_name, 
