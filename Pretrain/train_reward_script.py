@@ -165,8 +165,8 @@ if __name__ == '__main__':
                target_reward = 500.0, 
                task_id = task_id,
                traj_length = traj_length, 
-               save_freq = 50000, 
-               num_steps = 50000)
+               save_freq = 100000, 
+               num_steps = 100000)
     
 
 
