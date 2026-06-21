@@ -646,7 +646,7 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
            loss = F.smooth_l1_loss(pred, r, beta = 1.0)
            #loss = reward_net.loss(s, a, r)
            loss.backward()
-           #torch.nn.utils.clip_grad_norm_(reward_net.parameters(), max_norm = 1.0)
+           torch.nn.utils.clip_grad_norm_(reward_net.parameters(), max_norm = 1.0)
            optimizer.step()
            scheduler.step()
            total_loss += loss.item()

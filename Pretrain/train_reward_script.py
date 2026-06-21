@@ -127,7 +127,7 @@ if __name__ == '__main__':
                  min_lr = 1e-05, 
                  sigma = 4.0,
                  alpha = None, 
-                 target_reward = 500.0,
+                 target_reward = 300.0,
                  specific_dataset = specific_dataset, 
                  task_id = task_id, 
                  traj_length = traj_length)
