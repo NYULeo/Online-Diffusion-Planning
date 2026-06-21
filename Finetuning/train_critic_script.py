@@ -36,7 +36,7 @@ if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'cube'
        specific_env = 'double-play'
-       traj_length = 500
+       traj_length = None
        horizon = 400
        #horizon = 300
        task_id = 4
@@ -80,7 +80,7 @@ if __name__ == '__main__':  # pragma: no cover
                       critic_hidden_layers = 4,
                       critic_hidden_dim  = 512,
                       batch_size = 256,
-                      num_steps  = 50000,
+                      num_steps  = 100000,
                       gamma = 0.99,
                       lam = 0.95,
                       horizon = horizon,
