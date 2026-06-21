@@ -162,7 +162,7 @@ if __name__ == '__main__':
                trajs = None, 
                sigma = 4.0, 
                alpha = None, 
-               target_reward = 500.0, 
+               target_reward = 300.0, 
                task_id = task_id,
                traj_length = traj_length, 
                save_freq = 100000, 
