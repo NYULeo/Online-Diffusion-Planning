@@ -64,7 +64,8 @@ def merger(traj_1, traj_2):
      else:
           return None   
 
-def spare_reward_prcocessor(rewards):
+def reward_processor(rewards, name: str):
+    def spare_reward_processor(rewards):
         Temp = []
         for i in range(1, len(rewards)):
              if(rewards[i] == rewards[i-1]+1):
@@ -77,6 +78,19 @@ def spare_reward_prcocessor(rewards):
                 new_rewards[i] = 0.0
         return np.array(new_rewards, dtype = np.float64)
 
+    def ogbench_reward_processor(rewards):
+         if(not isinstance(rewards, np.ndarray)):
+              rewards = np.array(rewards)
+         Min = np.min(rewards)
+         dist = 0 - Min
+         rews = rewards + dist
+         return rews
+    
+    if(name in ('cube', 'ogpointmaze', 'antmaze', 'humanoidmaze', 'puzzle', 'scene')):
+         return ogbench_reward_processor(rewards)
+    else:
+         return spare_reward_processor(rewards)
+    
 def get_dataset(name: str, specific_name: str, task_id: Optional[int] = None, goal: Optional[np.array] = None, traj_length: Optional[int] = None, mode: Optional[str] = None):
        if(name == 'kitchen'):
             return KitchenDataset(specific_name)
@@ -794,7 +808,7 @@ class CubeDataset_Singletask:
             if self.dataset['terminals'][i] == 1:
                      obs_slice = self.dataset["observations"][last_start : i]
                      act_slice = self.dataset["actions"][last_start : i]
-                     rews = spare_reward_prcocessor(self.dataset['rewards'][last_start : i])
+                     rews = reward_processor(self.dataset['rewards'][last_start : i], 'cube')
                      L = len(obs_slice)
                      if(self.traj_length is not None):
                            index = L - self.traj_length

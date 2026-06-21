@@ -21,6 +21,7 @@ import numpy as np
 import torch
 import pickle
 from scipy.ndimage import gaussian_filter1d
+from Pretrain.utils import ema_smooth
 from Pretrain.Dataset import get_dataset
 import ogbench
 from Finetuning.Rollout import load_success_trajs
@@ -68,6 +69,11 @@ def check_cube_double_goal_reach(trajs, task_id):
 
 
 
+a = np.array([1, 1, 2, 2, 2])
+a = np.asarray(a)
+a = a * 4
+print(a)
+exit()
 """
 env_steps = [0, 1592, 1590, 1600, 1411, 1416, 1600, 1555, 1422, 1600, 1599, 1554]
 total_steps = [0]

@@ -84,7 +84,7 @@ def reward_name_converter(specific_dataset):
         return specific_dataset
 
 def reward_processor(rewards, name: str):
-    def spare_reward_prcocessor(rewards):
+    def spare_reward_processor(rewards):
         Temp = []
         for i in range(1, len(rewards)):
              if(rewards[i] == rewards[i-1]+1):
@@ -95,18 +95,20 @@ def reward_processor(rewards, name: str):
                 new_rewards[i] = 1.0
            else:
                 new_rewards[i] = 0.0
-        return new_rewards
+        return np.array(new_rewards, dtype = np.float64)
+
+    def ogbench_reward_processor(rewards):
+         if(not isinstance(rewards, np.ndarray)):
+              rewards = np.array(rewards)
+         Min = np.min(rewards)
+         dist = 0 - Min
+         rews = rewards + dist
+         return rews
     
-    def check_reward_ogbench(rewards):
-        rews = np.zeros(len(rewards))
-        if(rewards[-1] == 0.0):
-             rews[-1] = 1.0
-        return rews
-        
-    if name in ('cube', 'ogpointmaze'):
-        return check_reward_ogbench(rewards)
+    if(name in ('cube', 'ogpointmaze', 'antmaze', 'humanoidmaze', 'puzzle', 'scene')):
+         return ogbench_reward_processor(rewards)
     else:
-        return spare_reward_prcocessor(rewards)
+         return spare_reward_processor(rewards)
 
 def reward_filter(obs, rews, goal):
     #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
@@ -723,7 +725,7 @@ class RewardDataset(Dataset):
     
     def boost_signal(self, target_reward, rews):
          rews = np.asarray(rews, dtype=np.float64).copy()
-         rews[rews == 1.0] = target_reward
+         rews = rews * target_reward
          return rews
 
 def train_reward(trajs: List[TrajectoryDict], 
@@ -1331,7 +1333,7 @@ class CriticDataset(Dataset):
 
     def boost_signal(self, target_reward, rews):
         rews = np.asarray(rews, dtype=np.float64).copy()
-        rews[rews == 1.0] = target_reward
+        rews = rews * target_reward
         return rews
 
 def train_critic(trajs: List[TrajectoryDict], 

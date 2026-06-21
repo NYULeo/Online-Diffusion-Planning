@@ -353,7 +353,7 @@ class CriticDataset(Dataset):
 
     def boost_signal(self, target_reward, rews):
         rews = np.asarray(rews, dtype=np.float64).copy()
-        rews[rews == 1.0] = target_reward
+        rews = rews * target_reward
         return rews
     
     def reward_processor(self, rews, horizon, gamma):

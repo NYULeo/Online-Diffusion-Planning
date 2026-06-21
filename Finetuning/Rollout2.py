@@ -583,7 +583,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'double-play'
     task_id = 4
-    checkpoint = 15
+    checkpoint = 0
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -621,7 +621,7 @@ if __name__ == "__main__":
                   #goal_cell = np.array([6, 1], dtype = int), 
                   task_id = task_id,
                   continual_rollout = True,
-                  chunk_size = 31,
+                  chunk_size = 18,
                   device = device)
     exit()
     while(checkpoint < 42):
