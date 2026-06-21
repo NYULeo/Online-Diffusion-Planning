@@ -68,7 +68,7 @@ if __name__ == '__main__':  # pragma: no cover
              old_step = None, 
              new_step = step, 
              momentum = 0.005, 
-             target_reward = 50.0,
+             target_reward = 300.0,
              task_id = task_id)  
        
        """

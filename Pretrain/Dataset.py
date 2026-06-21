@@ -64,6 +64,19 @@ def merger(traj_1, traj_2):
      else:
           return None   
 
+def sparse_reward_processor(rewards):
+        Temp = []
+        for i in range(1, len(rewards)):
+             if(rewards[i] == rewards[i-1]+1):
+                 Temp.append(i)
+        new_rewards = [0]*len(rewards)
+        for i in range(len(rewards)):
+           if(i in Temp):
+                new_rewards[i] = 1.0
+           else:
+                new_rewards[i] = 0.0
+        return np.array(new_rewards, dtype = np.float64)
+
 def reward_processor(rewards, name: str):
     def spare_reward_processor(rewards):
         Temp = []
@@ -803,13 +816,14 @@ class CubeDataset_Singletask:
         trajectories = []
         last_start = 0
         N = len(self.dataset["observations"])
-        rewards = reward_processor(self.dataset['rewards'].copy(), 'cube')
+        #rewards = reward_processor(self.dataset['rewards'].copy(), 'cube')
         for i in range(N):
             # End of a natural episode (terminal or dataset end)
             if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
                      obs_slice = self.dataset["observations"][last_start : i].copy()
                      act_slice = self.dataset["actions"][last_start : i].copy()
-                     rews = rewards[last_start+1: i+1].copy()
+                     rews = sparse_reward_processor(self.dataset['rewards'][last_start+1: i+1].copy())
+                     #rews = rewards[last_start+1: i+1].copy()
                      
             
                      L = len(obs_slice)
