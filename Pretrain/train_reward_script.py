@@ -79,8 +79,8 @@ if __name__ == '__main__':
     set_seed(1)
     
     dataset_name = 'cube'
-    specific_dataset = 'double'
-    task_id = 4
+    specific_dataset = 'triple'
+    task_id = 5
     traj_length = None
     
     """
@@ -127,7 +127,7 @@ if __name__ == '__main__':
                  min_lr = 1e-06, 
                  sigma = 4.0,
                  alpha = None, 
-                 target_reward = 1000.0,
+                 target_reward = 2000.0,
                  specific_dataset = specific_dataset, 
                  task_id = task_id, 
                  traj_length = traj_length)
@@ -162,7 +162,7 @@ if __name__ == '__main__':
                trajs = None, 
                sigma = 4.0, 
                alpha = None, 
-               target_reward = 1000.0, 
+               target_reward = 2000.0, 
                task_id = task_id,
                traj_length = traj_length, 
                save_freq = 200000, 
