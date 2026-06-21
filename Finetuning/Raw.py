@@ -29,6 +29,13 @@ from torch.utils.data import Dataset
 import torch.nn as nn
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 
+def check_increase(rewards):
+    for i in range(1, len(rewards)):
+        if( rewards[i] < rewards[i-1]):
+            return False
+    
+    return True
+
 
 goals = {'task_1': np.array( [ 0.0,       -1.0,        0.199599]), 
          'task_2': np.array([7.50000000e-01, 8.02418254e-18, 1.99598996e-01]),
@@ -74,10 +81,11 @@ env, dataset, eval_dataset = ogbench.make_env_and_datasets(
 last_start = 0
 
 for i in range(1, len(dataset['rewards'])):
-    if(dataset['rewards'][i] == 0 or dataset['terminals'][i] == 1):
-          
+    if(dataset['rewards'][i] == 0  or dataset['terminals'][i] == 1):
+          if(not check_increase(dataset['rewards'][last_start: i+1])):
+             print('False')
+             exit()
           rews_slice = reward_processor(dataset['rewards'][last_start:i+1].copy(), 'cube')
-          print(rews_slice)
           if len(rews_slice) < 10:
                     last_start = i + 1
                     continue
