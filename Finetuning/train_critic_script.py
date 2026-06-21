@@ -48,11 +48,11 @@ if __name__ == '__main__':  # pragma: no cover
        #trajs = load_success_trajs(env_name, specific_env, task_id, step)
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
-       """
+       
        train_critic(trajs, 
              dataset_name = env_name, 
              specific_dataset = specific_env, 
-             hidden_layers = 4, 
+             hidden_layers = 5, 
              hidden_dim = 512, 
              sigma = 4.0,
              batch_size = 256, 
@@ -68,10 +68,10 @@ if __name__ == '__main__':  # pragma: no cover
              old_step = None, 
              new_step = step, 
              momentum = 0.005, 
-             target_reward = 300.0,
+             target_reward = 50.0,
              task_id = task_id)  
-       """
        
+       """
        train_critic_with_reward(trajs,
                       dataset_name  = env_name,
                       specific_dataset = specific_env,
@@ -92,7 +92,7 @@ if __name__ == '__main__':  # pragma: no cover
                       new_step = step,
                       momentum = 0.005,   # unused when old_step is None
                       task_id = task_id)
-       
+       """
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
@@ -103,7 +103,7 @@ if __name__ == '__main__':  # pragma: no cover
             gamma = 0.99, 
             horizon = horizon,  
             sigma = 4.0, 
-            target_reward = 300.0, 
+            target_reward = 50.0, 
             trajs = trajs,
             task_id = task_id)
        
