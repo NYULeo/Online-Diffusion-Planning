@@ -18,8 +18,10 @@ import torch.nn as nn
 import pickle
 try:
     from Pretrain.Rewards.nets import Reward, MLPNetwork, ScalarReward, SimpleReward, EnsembleReward
+    from Pretrain.Dataset import TrajectoryDict
 except ModuleNotFoundError:
     from Rewards.nets import Reward, MLPNetwork, ScalarReward, SimpleReward, EnsembleReward
+    from Dataset import TrajectoryDict
 import os
 from scipy.ndimage import gaussian_filter1d, convolve
 import copy
@@ -28,6 +30,32 @@ import torch.nn.functional as F
 import numpy as np
 import json
 from typing import TypedDict, List
+
+
+def make_reward_increase(trajs) -> List[TrajectoryDict]:
+     def separate_traj(traj) -> TrajectoryDict :
+         new_trajs = []
+         last_start = 0
+         for i in range(1, len(traj['rewards'])):
+            if(traj['rewards'][i] < traj['rewards'][i-1]):
+                 new_traj = {
+                     'observations': traj['observations'][last_start: i].copy(),
+                     'actions': traj['actions'][last_start: i].copy(),
+                     'rewards': traj['rewards'][last_start: i].copy(),
+                 }
+                 new_trajs.append(new_traj)
+                 last_start = i
+         if last_start < len(traj['rewards']):
+             new_trajs.append({
+                  'observations': traj['observations'][last_start:].copy(),
+                  'actions': traj['actions'][last_start:].copy(),
+                  'rewards': traj['rewards'][last_start:].copy(),
+              })
+         return new_trajs
+     new_trajs = []
+     for traj in trajs:
+         new_trajs.extend(separate_traj(traj.copy()))
+     return new_trajs
 
 class TrajectoryDict(TypedDict):
     observations: np.ndarray
@@ -448,6 +476,7 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
          obs_dim = data.get_state_dim()
          act_dim = data.get_action_dim()
          trajs = data.get_trajectories()
+         trajs = make_reward_increase(trajs)
          return trajs, name, obs_dim, act_dim
 
     elif(dataset_name == 'cube'):
@@ -470,6 +499,7 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
          obs_dim = data_1.get_state_dim()
          act_dim = data_1.get_action_dim()
          trajs = data_1.get_trajectories() + data_2.get_trajectories()
+         trajs = make_reward_increase(trajs)
          return trajs, name, obs_dim, act_dim
 
     else:
