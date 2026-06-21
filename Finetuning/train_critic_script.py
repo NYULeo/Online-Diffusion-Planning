@@ -74,7 +74,7 @@ if __name__ == '__main__':  # pragma: no cover
        train_critic_with_reward(trajs,
                       dataset_name  = env_name,
                       specific_dataset = specific_env,
-                      reward_hidden_layers = 4,
+                      reward_hidden_layers = 5,
                       reward_hidden_dim  = 512,
                       reward_checkpoint  = 0,
                       critic_hidden_layers = 4,
