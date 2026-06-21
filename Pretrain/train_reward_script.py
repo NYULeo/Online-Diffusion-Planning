@@ -122,7 +122,7 @@ if __name__ == '__main__':
                  hidden_dim = 512, 
                  batch_size = 256, 
                  num_steps = 100000, 
-                 save_freq = 10000, 
+                 save_freq = 100000, 
                  lr = 1e-02, 
                  min_lr = 1e-03, 
                  sigma = 4.0,
