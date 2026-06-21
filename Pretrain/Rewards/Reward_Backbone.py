@@ -532,10 +532,10 @@ class RewardDataset(Dataset):
             obs = np.asarray(traj['observations'])
             acts = np.asarray(traj['actions'])
             rews = np.asarray(traj['rewards'])
-            """
+            
             if(not np.all(np.isin(rews, allowed_values))):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
-            """
+            
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
             if(sigma is not None):
