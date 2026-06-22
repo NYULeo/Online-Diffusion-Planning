@@ -745,8 +745,8 @@ def train_reward_pos_weight(
 
         total_loss += loss.item()
 
-        if step % 200 == 0:                                 # more frequent log
-            avg_loss = total_loss / 200
+        if step % 2000 == 0:                                 # more frequent log
+            avg_loss = total_loss / 2000
             pos_ratio = (r > 0.01).float().mean().item()
             current_lr = scheduler.get_last_lr()[0]
             print(f"Step {step:6d} | Loss: {avg_loss:.6f} | "

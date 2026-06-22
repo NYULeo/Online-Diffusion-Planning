@@ -137,8 +137,8 @@ if __name__ == '__main__':
           hidden_layers = 4,
           hidden_dim = 512,
           batch_size = 256,
-          num_steps = 20000,
-          save_freq = 20000,
+          num_steps = 50000,
+          save_freq = 50000,
           lr = 1e-04,                    # lowered
           min_lr = 5e-06,
           sigma = 4.0,
