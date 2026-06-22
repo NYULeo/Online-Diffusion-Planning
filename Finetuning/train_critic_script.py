@@ -103,7 +103,7 @@ if __name__ == '__main__':  # pragma: no cover
             gamma = 0.99, 
             horizon = horizon,  
             sigma = 4.0, 
-            target_reward = 300.0, 
+            target_reward = 700.0, 
             trajs = trajs,
             task_id = task_id)
        
