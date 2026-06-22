@@ -38,7 +38,7 @@ if __name__ == '__main__':  # pragma: no cover
        env_name = 'cube'
        specific_env = 'double-play'
        traj_length = None
-       horizon = 32
+       horizon = 100
        #horizon = 300
        task_id = 4
        step = 0
@@ -79,7 +79,7 @@ if __name__ == '__main__':  # pragma: no cover
                       reward_hidden_layers = 5,
                       reward_hidden_dim  = 512,
                       reward_checkpoint  = 0,
-                      critic_hidden_layers = 5,
+                      critic_hidden_layers = 4,
                       critic_hidden_dim  = 512,
                       batch_size = 256,
                       num_steps  = 50000,
@@ -98,7 +98,7 @@ if __name__ == '__main__':  # pragma: no cover
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
             finetune = False,
-            hidden_layers = 5, 
+            hidden_layers = 4, 
             hidden_dim = 512, 
             checkpoint_step = 0, 
             gamma = 0.99, 
