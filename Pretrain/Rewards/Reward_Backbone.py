@@ -645,6 +645,8 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
            #loss = F.mse_loss(pred, r)
            loss = F.smooth_l1_loss(pred, r, beta = 1.0)
            #loss = reward_net.loss(s, a, r)
+           
+          
            loss.backward()
            torch.nn.utils.clip_grad_norm_(reward_net.parameters(), max_norm = 1.0)
            optimizer.step()
@@ -667,34 +669,34 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
 
 def train_reward_pos_weight(
     dataset_name: str,
-    hidden_layers: int = 3,
+    hidden_layers: int = 5,
     hidden_dim: int = 512,
-    batch_size: int = 512,
+    batch_size: int = 256,
     num_steps: int = 30000,
     save_freq: int = 5000,
-    lr: float = 1e-4,
+    lr: float = 5e-5,                    # lowered
+    min_lr: float = 1e-6,
     sigma: Optional[float] = None,
     alpha: Optional[float] = None,
-    target_reward: Optional[float] = None,
+    target_reward: Optional[float] = 10.0,   # lowered
     specific_dataset: Optional[str] = None,
     goal: Optional[np.array] = None,
     task_id: Optional[int] = None,
-    traj_length: Optional[int] = 100,
+    traj_length: Optional[int] = None,
     trajs: Optional[list] = None,
-    pos_weight: float = 50.0,          # ← Very important
+    pos_weight: float = 25.0,                # tuned down a bit
     device=None
 ):
-    
-    device = check_device()
-    
+    device = check_device() if device is None else device
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
-    #trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
-    if(trajs is  None): 
-         trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
+
+    if trajs is None:
+        trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, goal, traj_length)
     else:
-         train_trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, traj_length)
-         trajs = trajs + train_trajs
-    print(f"Training reward approximator for {dataset_name}-{specific_dataset}")
+        train_trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, goal, traj_length)
+        trajs = trajs + train_trajs
+
+    print(f"Training reward approximator for {dataset_name}-{specific_dataset} | pos_weight={pos_weight}")
 
     dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward, goal)
     dataloader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
@@ -702,34 +704,23 @@ def train_reward_pos_weight(
 
     reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
     optimizer = optim.AdamW(reward_net.parameters(), lr=lr, weight_decay=1e-4)
-    if(check_specific_dataset(dataset_name)):
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_steps, eta_min=min_lr)
+
+    if check_specific_dataset(dataset_name):
         SD = specific_dataset
     else:
         SD = None
-    # Save hyperparameters (you can keep your existing function)
+
+    # Save hyperparameters
     save_reward_hyperparameters(
-        dataset_name, 
-        batch_size, 
-        num_steps, 
-        lr, 
-        sigma,
-        alpha,
-        obs_dim,
-        act_dim, 
-        reward_name, 
-        optimizer, 
-        reward_net, 
-        filepath = None,
-        specific_dataset = specific_dataset, 
-        target_reward = target_reward, 
-        goal = goal,
-        task_id = task_id,
-        pos_weight = pos_weight
+        dataset_name, batch_size, num_steps, lr, sigma, alpha,
+        obs_dim, act_dim, reward_name, optimizer, reward_net,
+        filepath=None, specific_dataset=specific_dataset,
+        target_reward=target_reward, goal=goal, task_id=task_id,
+        pos_weight=pos_weight
     )
 
     total_loss = 0.0
-    step = 0
-
     for step in range(1, num_steps + 1):
         s, a, r = next(dataloader)
         s = s.to(device)
@@ -739,31 +730,33 @@ def train_reward_pos_weight(
         optimizer.zero_grad()
         pred = reward_net(s, a)                     # (B,)
 
-        # === Weighted MSE Loss (Critical Fix) ===
-        weights = torch.where(r > 0, pos_weight, 1.0)
-        loss = (weights * (pred - r) ** 2).mean()
+        # === Weighted Loss (Improved) ===
+        weights = torch.where(r > 0.01, pos_weight, 1.0)
+        loss = (weights * F.smooth_l1_loss(pred, r, beta=1.0, reduction='none')).mean()
 
-        # Optional: Add small L2 regularization on positive predictions
-        pos_reg = torch.mean(torch.relu(pred) ** 2) * 0.05
+        # Positive regularization
+        pos_reg = torch.mean(torch.relu(pred) ** 2) * 0.02   # lowered coefficient
         total_loss_val = loss + pos_reg
 
         total_loss_val.backward()
-        torch.nn.utils.clip_grad_norm_(reward_net.parameters(), max_norm=5.0)
+        torch.nn.utils.clip_grad_norm_(reward_net.parameters(), max_norm=1.0)  # tighter clip
         optimizer.step()
+        scheduler.step()
 
         total_loss += loss.item()
 
-        if step % 100 == 0:
-            avg_loss = total_loss / 100
-            pos_ratio = (r > 0).float().mean().item()
-            print(f"Step {step:6d} | Loss: {avg_loss:.6f} | Pos Ratio: {pos_ratio:.4f}")
+        if step % 200 == 0:                                 # more frequent log
+            avg_loss = total_loss / 200
+            pos_ratio = (r > 0.01).float().mean().item()
+            current_lr = scheduler.get_last_lr()[0]
+            print(f"Step {step:6d} | Loss: {avg_loss:.6f} | "
+                  f"Pos Ratio: {pos_ratio:.4f} | LR: {current_lr:.2e}")
             total_loss = 0.0
 
         if step % save_freq == 0 or step == num_steps:
             checkpoint = copy.deepcopy(reward_net).cpu()
             save_model(checkpoint, dataset_name, specific_dataset, task_id, step)
-     
-     
+
     save_to_finetuning(reward_net, dataset_name, SD, task_id)
     stats = get_pretrained_reward_stats(reward_name)
     save_stats_to_finetuning(stats, dataset_name, SD, task_id, step)

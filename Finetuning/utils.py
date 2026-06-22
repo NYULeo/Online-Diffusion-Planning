@@ -3216,6 +3216,12 @@ def train_critic_with_planner2(
     s0_pool = np.concatenate(
         [t['observations'] for t in trajs], axis=0,
     ).astype(np.float32)
+    
+    # === NEW: Running stats for targets ===
+    running_tgt_mean = torch.zeros(1, device=device)
+    running_tgt_std  = torch.ones(1, device=device)
+    alpha = 0.99   # momentum
+    # ======================================
 
     # ----------------------------------------------------------------- optim
     optimizer = optim.AdamW(critic.parameters(), lr=lr, weight_decay = 1e-2)
@@ -3266,7 +3272,11 @@ def train_critic_with_planner2(
             r_hat   = reward_net(
                 s_for_r.reshape(B * n, -1),
                 actions[:, :n].reshape(B * n, -1),
-            ).reshape(B, n)                                                   # (B', n)
+            ).reshape(B, n)  
+            
+            # NEW: Strong scaling
+            r_hat = torch.clamp(r_hat, -10.0, 10.0)
+            r_hat = r_hat / 5.0                                                 # (B', n)
 
             # 4) discounted return + bootstrapped target value
             disc_return  = (gamma_pow_t.unsqueeze(0) * r_hat).sum(dim=1)      # (B',)
@@ -3274,12 +3284,23 @@ def train_critic_with_planner2(
             v_bootstrap  = target_critic(s_n_critic)                          # (B',)
             target_value = disc_return + gamma_n * v_bootstrap                # (B',)
 
+
+            # === NEW: Running normalization ===
+            batch_mean = target_value.mean()
+            batch_std  = target_value.std(unbiased=False) + 1e-8
+
+            running_tgt_mean = alpha * running_tgt_mean + (1 - alpha) * batch_mean
+            running_tgt_std  = alpha * running_tgt_std  + (1 - alpha) * batch_std
+
+            normalized_target = (target_value - running_tgt_mean) / running_tgt_std
+            # =================================
+
             # 5) input for V_β(s_0)
             s0_critic = (s_raw[:, 0] - c_mean) / c_std                        # (B', d_s)
 
         # 6) gradient step on V_β
         v_pred = critic(s0_critic)                                            # (B',)
-        loss   = F.smooth_l1_loss(v_pred, target_value, beta=1.0)
+        loss   = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
 
         optimizer.zero_grad()
         loss.backward()

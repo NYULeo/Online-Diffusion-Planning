@@ -116,7 +116,7 @@ if __name__ == '__main__':
         log_every = 2000
     )
     """
-    
+    """
     train_reward(dataset_name = dataset_name, 
                  hidden_layers = 5, 
                  hidden_dim = 512, 
@@ -131,6 +131,23 @@ if __name__ == '__main__':
                  specific_dataset = specific_dataset, 
                  task_id = task_id, 
                  traj_length = traj_length)
+    """
+    train_reward_pos_weight(
+          dataset_name = dataset_name,
+          hidden_layers = 5,
+          hidden_dim = 512,
+          batch_size = 256,
+          num_steps = 100000,
+          save_freq = 100000,
+          lr = 1e-04,                    # lowered
+          min_lr = 5e-05,
+          sigma = 4.0,
+          alpha = None,
+          target_reward = 300.0,   # lowered
+          specific_dataset = specific_dataset,
+          task_id = task_id,
+          traj_length = traj_length,
+          pos_weigh = 25.0)
     
     """
     path = f'./Finetuning/Rollouts/{dataset_name}/{specific_dataset}-play/task_{task_id}/trajs_task{task_id}_success_0.pkl'
