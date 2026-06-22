@@ -38,7 +38,7 @@ if __name__ == '__main__':  # pragma: no cover
        env_name = 'cube'
        specific_env = 'double-play'
        traj_length = None
-       horizon = 100
+       horizon = 32
        #horizon = 300
        task_id = 4
        step = 0
@@ -49,6 +49,7 @@ if __name__ == '__main__':  # pragma: no cover
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
        
+       """
        train_critic(trajs, 
              dataset_name = env_name, 
              specific_dataset = specific_env, 
@@ -62,16 +63,16 @@ if __name__ == '__main__':  # pragma: no cover
              horizon = horizon, 
              #lr = 1e-04, 
              #min_lr = 1e-05, 
-             lr = 1e-05, 
-             min_lr = 5e-07, 
+             lr = 1e-03, 
+             min_lr = 5e-04, 
              tau = 0.005, 
              old_step = None, 
              new_step = step, 
              momentum = 0.005, 
              target_reward = 300.0,
              task_id = task_id)  
-       
        """
+       
        train_critic_with_reward(trajs,
                       dataset_name  = env_name,
                       specific_dataset = specific_env,
@@ -92,7 +93,7 @@ if __name__ == '__main__':  # pragma: no cover
                       new_step = step,
                       momentum = 0.005,   # unused when old_step is None
                       task_id = task_id)
-       """
+       
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
@@ -103,7 +104,7 @@ if __name__ == '__main__':  # pragma: no cover
             gamma = 0.99, 
             horizon = horizon,  
             sigma = 4.0, 
-            target_reward = 50.0, 
+            target_reward = 300.0, 
             trajs = trajs,
             task_id = task_id)
        

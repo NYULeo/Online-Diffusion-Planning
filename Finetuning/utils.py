@@ -1366,7 +1366,7 @@ def train_critic(trajs: List[TrajectoryDict],
     target_critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
     target_critic.load_state_dict(critic.state_dict())
     target_critic.eval()
-    optimizer = optim.Adam(critic.parameters(), lr = lr)
+    optimizer = optim.AdamW(critic.parameters(), lr = lr, weight_decay = 1e-2)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(
             optimizer,
             T_max = num_steps,   # one scheduler step per training step
@@ -2746,6 +2746,9 @@ class CriticDataset_Reward(Dataset):
                 s_t = torch.as_tensor(obs_for_r, dtype=torch.float32, device=device)
                 a_t = torch.as_tensor(acts[:T_traj], dtype=torch.float32, device=device)
                 rews = reward_net(s_t, a_t).cpu().numpy().astype(np.float32)   # (T_traj,)  
+                # Scale down predicted rewards from reward model
+                rews = np.clip(rews, -20.0, 20.0)      # adjust bounds if needed
+                rews = rews / 5.0                      # or use a running std
             
             for t in range(len(obs) - horizon):
                  obs_chunk = self.stats.norm_obs(obs[t : t + horizon]).astype(np.float32)
@@ -2835,7 +2838,35 @@ class Critic_Buffer_Reward():
                 last_adv = deltas[:, t] + self.gamma * self.lam * last_adv
                 advantages[:, t] = last_adv
 
-            value_targets = values[:, 0] + advantages[:, 0]   # (B,)
+            #value_targets = values[:, 0] + advantages[:, 0]   # (B,)
+            with torch.no_grad():
+                 values = target_critic(obs_chunks)                      # (B, T)
+                 deltas = (
+                       rews_chunks[:, :-1]
+                       + self.gamma * values[:, 1:]
+                       - values[:, :-1]
+                 )                                                       # (B, T-1)
+
+                  # GAE advantages
+                 advantages = torch.zeros_like(deltas)
+                 last_adv = torch.zeros(B, device=device)
+                 for t in reversed(range(deltas.shape[1])):
+                     last_adv = deltas[:, t] + self.gamma * self.lam * last_adv
+                     advantages[:, t] = last_adv
+
+                 # === ADD NORMALIZATION HERE ===
+                 value_targets = values[:, 0] + advantages[:, 0]         # raw targets
+            
+                 # Normalize advantages and targets (running stats or batch stats)
+                 adv_mean = advantages.mean()
+                 adv_std  = advantages.std() + 1e-8
+                 advantages = (advantages - adv_mean) / adv_std
+            
+                 tgt_mean = value_targets.mean()
+                 tgt_std  = value_targets.std() + 1e-8
+                 value_targets = (value_targets - tgt_mean) / tgt_std
+                 # =================================
+            
 
         return obs_chunks[:, 0], value_targets
 
