@@ -698,7 +698,7 @@ def train_reward_pos_weight(
 
     print(f"Training reward approximator for {dataset_name}-{specific_dataset} | pos_weight={pos_weight}")
 
-    dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward, goal)
+    dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward)
     dataloader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
                                   pin_memory=True, num_workers=8))
 
