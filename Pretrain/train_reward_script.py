@@ -134,7 +134,7 @@ if __name__ == '__main__':
     """
     train_reward_pos_weight(
           dataset_name = dataset_name,
-          hidden_layers = 5,
+          hidden_layers = 4,
           hidden_dim = 512,
           batch_size = 256,
           num_steps = 20000,
