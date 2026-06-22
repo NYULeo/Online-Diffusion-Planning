@@ -38,7 +38,7 @@ if __name__ == '__main__':  # pragma: no cover
        env_name = 'cube'
        specific_env = 'double-play'
        traj_length = None
-       horizon = 100
+       horizon = 32
        #horizon = 300
        task_id = 4
        step = 0
