@@ -1599,7 +1599,7 @@ def test_critic(dataset_name: str,
                 gamma: float = 0.99,
                 horizon: int = 32,
                 sigma: Optional[float] = None,
-                target_reward: float = 1.0,
+                target_reward: float = 10.0,      # ← must match reward model
                 trajs: List[TrajectoryDict] = None,
                 task_id: Optional[int] = None):
     device = check_device()
@@ -1623,16 +1623,20 @@ def test_critic(dataset_name: str,
     print(f"Testing critic at checkpoint {checkpoint_step}...")
 
     with torch.no_grad():
-        for s, rews_chunk in dataloader:
+        for s, rews_chunk in dataloader:               # s: (B,), rews_chunk: (B, horizon)
             s = s.to(device)
-            rews_chunk = rews_chunk.to(device)          # (B, horizon)
+            rews_chunk = rews_chunk.to(device)
 
-            pred = model(s).squeeze(-1)                 # (B,)
+            pred = model(s).squeeze(-1)                # (B,)  ← normalized V(s)
 
-            # === Compute n-step return (no bootstrap) ===
-            target = torch.zeros_like(pred)
-            gamma_pow = torch.tensor([gamma ** i for i in range(horizon)], device=device)
-            target = (gamma_pow.unsqueeze(0) * rews_chunk).sum(dim=1)
+            # Compute raw n-step return
+            gamma_pow = torch.tensor([gamma ** i for i in range(horizon)], device=device, dtype=torch.float32)
+            raw_target = (gamma_pow.unsqueeze(0) * rews_chunk).sum(dim=1)
+
+            # === Normalize target (CRITICAL) ===
+            tgt_mean = raw_target.mean()
+            tgt_std = raw_target.std(unbiased=False) + 1e-8
+            target = (raw_target - tgt_mean) / tgt_std
 
             loss = F.smooth_l1_loss(pred, target, beta=1.0)
             total_loss += loss.item() * s.size(0)
