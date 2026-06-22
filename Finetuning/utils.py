@@ -1417,6 +1417,7 @@ def train_critic(trajs: List[TrajectoryDict],
     save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
     print(f"critic model saved")
 
+"""
 class Critic_Test_Dataset(Dataset):
     def __init__(self, 
                  dataset_name: str, 
@@ -1438,10 +1439,7 @@ class Critic_Test_Dataset(Dataset):
             obs = traj['observations']
             rews = traj['rewards'].copy()
              
-            """
-            if not np.all(np.isin(rews, [0.0, 1.0])):
-                raise ValueError(f"Rewards must be either 0 or 1, but got {rews}")
-            """
+            
             if target_reward is not None:
                 rews = self.boost_signal(target_reward, rews)
             if sigma is not None:
@@ -1541,6 +1539,116 @@ def test_critic(dataset_name: str,
     print(f"   Mean Pred      : {np.mean(all_preds):.3f}")
     print(f"   Mean Target    : {np.mean(all_targets):.3f}")
     print(f"   Pred Std       : {np.std(all_preds):.3f}")
+
+    return avg_loss, mae
+"""
+
+class Critic_Test_Dataset(Dataset):
+    def __init__(self,
+                 dataset_name: str,
+                 specific_dataset: str,
+                 checkpoint_step: int,
+                 trajs: List[TrajectoryDict],
+                 sigma: Optional[float] = None,
+                 task_id: Optional[int] = None,
+                 target_reward: Optional[float] = None,
+                 horizon: int = 32,
+                 gamma: float = 0.99):
+        self.stats = get_critic_stats(dataset_name, specific_dataset, task_id, checkpoint_step)
+        self.horizon = horizon
+        self.gamma = gamma
+
+        transitions = []
+        for traj in trajs:
+            obs = traj['observations']
+            rews = traj['rewards'].copy()
+
+            if target_reward is not None:
+                rews = self.boost_signal(target_reward, rews)
+            if sigma is not None:
+                rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate=200/sigma)
+
+            for t in range(len(obs) - horizon):
+                obs_t = self.stats.norm_obs(obs[t])
+                rews_chunk = rews[t : t + horizon]
+                transitions.append((obs_t, rews_chunk))
+
+        self.transitions = transitions
+        print(f"Test dataset created: {len(self.transitions)} samples")
+
+    def boost_signal(self, target_reward, rews):
+        rews = np.asarray(rews, dtype=np.float64).copy()
+        rews = rews * target_reward
+        return rews
+
+    def __len__(self):
+        return len(self.transitions)
+
+    def __getitem__(self, idx):
+        obs_t, rews_chunk = self.transitions[idx]
+        return (
+            torch.tensor(obs_t, dtype=torch.float32),
+            torch.tensor(rews_chunk, dtype=torch.float32)
+        )
+
+def test_critic(dataset_name: str,
+                specific_dataset: str,
+                hidden_layers: int,
+                hidden_dim: int,
+                checkpoint_step: int,
+                gamma: float = 0.99,
+                horizon: int = 32,
+                sigma: Optional[float] = None,
+                target_reward: float = 1.0,
+                trajs: List[TrajectoryDict] = None,
+                task_id: Optional[int] = None):
+    device = check_device()
+    
+    dataset = Critic_Test_Dataset(
+        dataset_name, specific_dataset, checkpoint_step, trajs,
+        sigma, task_id, target_reward, horizon, gamma
+    )
+    dataloader = DataLoader(dataset, batch_size=256, shuffle=False, drop_last=False)
+
+    # Load model
+    model_state_dict, obs_dim = get_critic_model(dataset_name, specific_dataset, task_id, checkpoint_step)
+    model = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
+    model.load_state_dict(model_state_dict)
+    model.eval()
+
+    total_loss = 0.0
+    all_preds = []
+    all_targets = []
+
+    print(f"Testing critic at checkpoint {checkpoint_step}...")
+
+    with torch.no_grad():
+        for s, rews_chunk in dataloader:
+            s = s.to(device)
+            rews_chunk = rews_chunk.to(device)          # (B, horizon)
+
+            pred = model(s).squeeze(-1)                 # (B,)
+
+            # === Compute n-step return (no bootstrap) ===
+            target = torch.zeros_like(pred)
+            gamma_pow = torch.tensor([gamma ** i for i in range(horizon)], device=device)
+            target = (gamma_pow.unsqueeze(0) * rews_chunk).sum(dim=1)
+
+            loss = F.smooth_l1_loss(pred, target, beta=1.0)
+            total_loss += loss.item() * s.size(0)
+
+            all_preds.extend(pred.cpu().numpy())
+            all_targets.extend(target.cpu().numpy())
+
+    avg_loss = total_loss / len(dataset)
+    mae = np.mean(np.abs(np.array(all_preds) - np.array(all_targets)))
+
+    print(f"Test Results (Checkpoint {checkpoint_step}):")
+    print(f"  Smooth L1 Loss : {avg_loss:.4f}")
+    print(f"  MAE            : {mae:.4f}")
+    print(f"  Mean Pred      : {np.mean(all_preds):.3f}")
+    print(f"  Mean Target    : {np.mean(all_targets):.3f}")
+    print(f"  Pred Std       : {np.std(all_preds):.3f}")
 
     return avg_loss, mae
 
