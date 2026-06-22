@@ -137,8 +137,8 @@ if __name__ == '__main__':
           hidden_layers = 5,
           hidden_dim = 512,
           batch_size = 256,
-          num_steps = 100000,
-          save_freq = 100000,
+          num_steps = 20000,
+          save_freq = 20000,
           lr = 1e-04,                    # lowered
           min_lr = 5e-05,
           sigma = 4.0,
@@ -147,7 +147,7 @@ if __name__ == '__main__':
           specific_dataset = specific_dataset,
           task_id = task_id,
           traj_length = traj_length,
-          pos_weigh = 25.0)
+          pos_weight = 25.0)
     
     """
     path = f'./Finetuning/Rollouts/{dataset_name}/{specific_dataset}-play/task_{task_id}/trajs_task{task_id}_success_0.pkl'
