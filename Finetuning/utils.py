@@ -1437,10 +1437,11 @@ class Critic_Test_Dataset(Dataset):
         for traj in trajs:
             obs = traj['observations']
             rews = traj['rewards'].copy()
-
+             
+            """
             if not np.all(np.isin(rews, [0.0, 1.0])):
                 raise ValueError(f"Rewards must be either 0 or 1, but got {rews}")
-
+            """
             if target_reward is not None:
                 rews = self.boost_signal(target_reward, rews)
             if sigma is not None:
@@ -1455,8 +1456,8 @@ class Critic_Test_Dataset(Dataset):
         print(f"Test dataset created: {len(self.transitions)} samples (horizon={horizon})")
 
     def boost_signal(self, target_reward, rews):
-        rews = rews.copy()
-        rews[rews == 1.0] = target_reward
+        rews = np.asarray(rews, dtype=np.float64).copy()
+        rews = rews * target_reward
         return rews
 
     def __len__(self):
