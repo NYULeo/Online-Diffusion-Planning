@@ -140,7 +140,7 @@ if __name__ == '__main__':
           num_steps = 20000,
           save_freq = 20000,
           lr = 1e-04,                    # lowered
-          min_lr = 5e-05,
+          min_lr = 5e-06,
           sigma = 4.0,
           alpha = None,
           target_reward = 300.0,   # lowered

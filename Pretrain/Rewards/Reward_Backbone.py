@@ -759,7 +759,7 @@ def train_reward_pos_weight(
 
     save_to_finetuning(reward_net, dataset_name, SD, task_id)
     stats = get_pretrained_reward_stats(reward_name)
-    save_stats_to_finetuning(stats, dataset_name, SD, task_id, step)
+    save_stats_to_finetuning(stats, dataset_name, SD, task_id)
     print("Reward model training finished!")
     return reward_net
 
