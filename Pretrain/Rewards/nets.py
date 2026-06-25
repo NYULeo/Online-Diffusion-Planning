@@ -16,11 +16,7 @@ import distrax
 from scipy.ndimage import gaussian_filter1d, convolve
 import warnings
 
-# Shared port plumbing (mirrors fql).
-from JAX_PORT.jax_utils import (
-    MLP, ModuleDict, TrainState, nonpytree_field, default_init, ensemblize,
-    target_update, save_agent, restore_agent, supply_rng,
-)
+from flax_utils import MLP, TrainState
 
 
 class CategoricalReward(nn.Module):

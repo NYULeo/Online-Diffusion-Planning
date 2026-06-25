@@ -12,6 +12,7 @@ import jax.numpy as jnp
 import flax
 import numpy as np
 import optax
+import wandb
 
 from Pretrain.Dataset import CubeDataset_Singletask, KitchenDataset, OGPointmazeDataset, OGPointmazeDataset_Singletask, PointMazeDataset, CubeDataset
 from .Kernel_Net import RobustTransitionKernel, MoGTransitionKernel
@@ -23,7 +24,7 @@ import math
 import copy
 
 # Shared port plumbing (mirrors fql).
-from JAX_PORT.jax_utils import TrainState
+from flax_utils import TrainState
 
 try:
     from Pretrain.utils import SAStats, cycle, check_device
@@ -609,11 +610,8 @@ def train_mog_kernel(
 
         if step % 100 == 0:
             print(f'Step {step:6d} | Avg Loss: {total_loss/100:.6f}')
-            try:
-                from wandb_logger import wlog
-                wlog({'kernel/avg_loss': total_loss / 100, 'kernel/step_loss': avg_loss}, step=step)
-            except Exception:
-                pass
+            if wandb.run is not None:
+                wandb.log({'kernel/avg_loss': total_loss / 100, 'kernel/step_loss': avg_loss}, step=step)
             total_loss = 0.0
 
         # Save checkpoints

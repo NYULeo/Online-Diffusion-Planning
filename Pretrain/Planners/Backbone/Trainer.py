@@ -15,6 +15,7 @@ import flax
 import flax.linen as nn
 import numpy as np
 import optax
+import wandb
 
 from .utils import cosine_alpha_sigma, cosine_beta, EMA, cycle
 from Dataset import get_env, determine_stride
@@ -23,11 +24,7 @@ from .UNet import TemporalUnet
 from Dataset import get_PlannerName, PlannerDataset, PlannerDataset_Rollout
 from .utils import LossTracker, get_pretrained_planner, getName
 
-# Shared port plumbing (mirrors fql).
-from JAX_PORT.jax_utils import (
-    MLP, ModuleDict, TrainState, nonpytree_field, default_init, ensemblize,
-    target_update, save_agent, restore_agent, supply_rng,
-)
+from flax_utils import TrainState
 
 
 class SDETrainer:
@@ -361,12 +358,9 @@ class SDETrainer:
 
             if ((self.step % self.log_freq) == 0):
                 print(f"step {self.step} loss {total_loss/self.log_freq}")
-                try:
-                    from wandb_logger import wlog
-                    wlog({'pretrain/loss': float(loss), 'pretrain/lr': cur_lr,
-                          'pretrain/avg_loss': total_loss / self.log_freq}, step=self.step)
-                except Exception:
-                    pass
+                if wandb.run is not None:
+                    wandb.log({'pretrain/loss': float(loss), 'pretrain/lr': cur_lr,
+                               'pretrain/avg_loss': total_loss / self.log_freq}, step=self.step)
                 total_loss = 0
 
             if ((self.step % self.save_freq == 0) and (self.step!=0)):

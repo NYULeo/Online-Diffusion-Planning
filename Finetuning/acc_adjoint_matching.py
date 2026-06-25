@@ -27,22 +27,18 @@ import flax
 import flax.linen as nn
 import numpy as np
 import optax
+import wandb
 from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, karras_beta_schedule, clip_actions, save_planner, get_planner, getName, AlphaScheduler, AlphaSchedulerConfig
 from Pretrain.Planners.Backbone.utils import cosine_alpha_sigma, cosine_beta, compute_dot_alpha_beta, get_pretrained_planner
 from Pretrain.Dataset import get_PlannerName
 from typing import Optional, Union
-#from Finetuning.traj_reward2 import RewardConfig, TotalReward, TotalReward_Critic
-from Finetuning.traj_reward3 import RewardConfig, TotalReward, TotalReward_Critic
+from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
 from Pretrain.Planners.Backbone.UNet import TemporalUnet
 from Pretrain.Dataset import get_env
 import copy
 import pickle
 
-# Shared port plumbing (mirrors fql).
-from JAX_PORT.jax_utils import (
-    MLP, ModuleDict, TrainState, nonpytree_field, default_init, ensemblize,
-    target_update, save_agent, restore_agent, supply_rng,
-)
+from flax_utils import TrainState, target_update
 
 
 def broadcast(tensor, from_process=0):
@@ -692,17 +688,14 @@ class Acc_AdjointMatchingFineTuner:
                          print(f"round: {round}, step: {step}, alpha {self.alpha_scheduler.get_alpha()}")
                     global_step = (round - 1) * self.config.per_round_steps + step
                     denom = 1.0 if step == 0 else float(self.config.log_freq)
-                    try:
-                        from wandb_logger import wlog
-                        wlog({'finetune/loss': total_loss / denom,
-                              'finetune/total_reward': total_reward / denom,
-                              'finetune/reward': pure_reward / denom,
-                              'finetune/constraint': total_C / denom,
-                              'finetune/alpha': float(self.alpha_scheduler.get_alpha()),
-                              'finetune/lambda': float(self.Lam.get_lam()),
-                              'finetune/round': round}, step=global_step)
-                    except Exception:
-                        pass
+                    if wandb.run is not None:
+                        wandb.log({'finetune/loss': total_loss / denom,
+                                   'finetune/total_reward': total_reward / denom,
+                                   'finetune/reward': pure_reward / denom,
+                                   'finetune/constraint': total_C / denom,
+                                   'finetune/alpha': float(self.alpha_scheduler.get_alpha()),
+                                   'finetune/lambda': float(self.Lam.get_lam()),
+                                   'finetune/round': round}, step=global_step)
                     total_loss = 0.0
                     total_reward = 0.0
                     pure_reward = 0.0

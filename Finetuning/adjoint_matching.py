@@ -26,11 +26,7 @@ from traj_reward import RewardConfig, TotalReward
 from Pretrain.Planners.Backbone.UNet import TemporalUnet
 from Pretrain.Dataset import get_env
 
-# Shared port plumbing (mirrors fql).
-from JAX_PORT.jax_utils import (
-    MLP, ModuleDict, TrainState, nonpytree_field, default_init, ensemblize,
-    target_update, save_agent, restore_agent, supply_rng,
-)
+from flax_utils import TrainState
 
 
 

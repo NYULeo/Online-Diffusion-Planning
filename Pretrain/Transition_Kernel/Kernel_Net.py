@@ -8,7 +8,7 @@ import jax
 import jax.numpy as jnp
 import flax.linen as nn
 
-from JAX_PORT.jax_utils import default_init
+from flax_utils import default_init
 
 # Define the Gaussian forward dynamics model: inputs (s, a), outputs mean and log_std of s'
 

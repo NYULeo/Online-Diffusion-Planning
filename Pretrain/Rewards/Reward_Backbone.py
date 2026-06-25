@@ -18,6 +18,7 @@ import flax
 import flax.linen as nn
 import numpy as np
 import optax
+import wandb
 
 from Dataset import CubeDataset_Singletask, KitchenDataset, PointMazeDataset, get_dataset, get_env, CubeDataset, OGPointmazeDataset_Singletask
 import random
@@ -39,11 +40,7 @@ from sympy import Predicate, factorint
 import json
 from typing import TypedDict, List
 
-# Shared port plumbing (mirrors fql).
-from JAX_PORT.jax_utils import (
-    MLP, ModuleDict, TrainState, nonpytree_field, default_init, ensemblize,
-    target_update, save_agent, restore_agent, supply_rng,
-)
+from flax_utils import TrainState
 
 
 def make_reward_increase(trajs) -> List[TrajectoryDict]:
@@ -612,11 +609,8 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
            if step % 2000 == 0:
               avg_loss = total_loss / 2000
               print(f"Step {step}, loss {avg_loss:.4f}")
-              try:
-                  from wandb_logger import wlog
-                  wlog({'reward/loss': avg_loss, 'reward/lr': float(schedule(train_state.step - 1))}, step=step)
-              except Exception:
-                  pass
+              if wandb.run is not None:
+                  wandb.log({'reward/loss': avg_loss, 'reward/lr': float(schedule(train_state.step - 1))}, step=step)
               total_loss = 0
 
            if step % save_freq == 0:

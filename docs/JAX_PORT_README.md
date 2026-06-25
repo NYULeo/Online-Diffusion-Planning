@@ -5,7 +5,7 @@
 This is a **PyTorch → JAX/Flax port of the ODP codebase, done FQL-style** (Flow-Q-Learning
 conventions). Networks become `flax.linen` modules (`forward` → `__call__`, `nn.Module` →
 `flax.linen.Module`, `setup()`/`@nn.compact` idioms); training moves to **`optax`** (`adamw` +
-`cosine_decay_schedule` + `clip_by_global_norm`) driven by the small `JAX_PORT/jax_utils.py` plumbing
+`cosine_decay_schedule` + `clip_by_global_norm`) driven by the small `flax_utils.py` plumbing
 (`TrainState`, `ModuleDict`, `ensemblize`, `target_update`, `default_init`, `save_agent`/`restore_agent`).
 In-place tensor writes become `x.at[...].set(...)`; autograd / input-gradients become
 `jax.grad`/`jax.vjp`/`jax.jvp`/`jax.jacrev`; RNG becomes explicit (`set_seed` returns a
@@ -19,14 +19,14 @@ pre-existing latent torch bugs were preserved verbatim, not "fixed."
 
 > **Status:** all 31 core files are `ast.parse`-clean and free of executable torch. The 3 previously-open
 > cross-file HIGH issues are now **fixed** (see §5). **Nothing has been runtime-executed** — see "Known
-> limitations" below. Read `CONVERSION_GUIDE.md` for the full rule set and `PORT_REPORT.md` for the
+> limitations" below. Read `docs/CONVERSION_GUIDE.md` for the full rule set and `docs/PORT_REPORT.md` for the
 > per-file conversion record. Weights & Biases logging and a sequential cube-double training pipeline have
-> been added (§4b, `run_cube_double_pipeline.py`, `wandb_logger.py`).
+> been added (§4b, `run_cube_double_pipeline.py`, `plain `import wandb` (FQL-style)`).
 
 ## 2. Module map (by dependency tier)
 
 **Tier 0 — shared plumbing**
-- `JAX_PORT/jax_utils.py` — `TrainState`/`ModuleDict`, `ensemblize`, `target_update`, `default_init`,
+- `flax_utils.py` — `TrainState`/`ModuleDict`, `ensemblize`, `target_update`, `default_init`,
   `save_agent`/`restore_agent`. Imported by everything that trains or holds params.
 
 **Tier 1 — Pretrain spine** (`Pretrain/`)
@@ -76,7 +76,7 @@ the original torch layout). Run from the repo root, e.g. `python -m Pretrain.pre
 
 Reproducibility note: several entry scripts compute `rng = set_seed(1)` but do not yet thread the key into
 the trainer/callee (which then self-seeds with `PRNGKey(0)`). If `seed=1` matters, pass `seed=1` /
-`rng=set_seed(1)` explicitly (LOW issues in `PORT_REPORT.md` §8d).
+`rng=set_seed(1)` explicitly (LOW issues in `docs/PORT_REPORT.md` §8d).
 
 ## 4. Installation
 
@@ -144,7 +144,7 @@ pip install -U "jax[cpu]" flax optax distrax einops chex ml_collections \
 
 ### 4.5 Weights & Biases
 
-Metric logging goes through `wandb_logger.py` (repo root), which is a **safe no-op unless a run is
+Metric logging goes through `plain `import wandb` (FQL-style)` (repo root), which is a **safe no-op unless a run is
 active** — training behaves identically whether or not wandb is installed/enabled.
 
 ```bash

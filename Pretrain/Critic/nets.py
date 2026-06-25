@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import numpy as np
 
 # Shared port plumbing (mirrors fql). Used for the CriticEnsemble vmapped ensemble.
-from JAX_PORT.jax_utils import ensemblize
+from flax_utils import ensemblize
 
 # NOTE (data pipeline): the torch original imported `from torch.utils.data import Dataset, DataLoader`
 # at module scope. Per CONVERSION_GUIDE §13 datasets become numpy/fql-style `sample()` objects; this

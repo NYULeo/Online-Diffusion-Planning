@@ -30,15 +30,15 @@ USAGE
     # quick smoke test with tiny step counts (verifies wiring end-to-end):
     python run_cube_double_pipeline.py --smoke
 
-    # disable wandb (logs become no-ops, training is otherwise identical):
-    python run_cube_double_pipeline.py --no-wandb        # or: ODP_WANDB=0 python run_cube_double_pipeline.py
+    # disable wandb (training is otherwise identical):
+    python run_cube_double_pipeline.py --no-wandb
     # offline wandb (sync later with `wandb sync`):
     WANDB_MODE=offline python run_cube_double_pipeline.py
 
 NOTE: requires the JAX stack + ogbench (see README "Installation"). Nothing here uses torch. Pretrained
 torch checkpoints are NOT needed — every stage trains from scratch and saves a flax-serialized
 checkpoint that the next stage / the finetuner reads (JAX-to-JAX). The legacy torch checkpoint-bridge
-(JAX_PORT/README.md) is only needed if you instead want to ingest the authors' original .pt weights.
+(docs/JAX_PORT_README.md) is only needed if you instead want to ingest the authors' original .pt weights.
 """
 import argparse
 import os
@@ -52,8 +52,7 @@ sys.path.insert(0, PROJECT_ROOT)
 os.chdir(PROJECT_ROOT)
 
 import jax
-
-from wandb_logger import wandb_init, wandb_finish, wandb_available
+import wandb
 
 # --------------------------------------------------------------------------------------------------
 # Environment + per-stage hyperparameters. These mirror the original cube-double entry-script values;
@@ -84,6 +83,23 @@ def _banner(stage, run_name):
     print('=' * 90, flush=True)
 
 
+# Whether wandb runs are created this invocation (set in main() from --no-wandb).
+_USE_WANDB = True
+
+
+def init_run(name, group, config):
+    """Start a wandb run for one stage (FQL-style `wandb.init`). No-op when --no-wandb is set."""
+    if not _USE_WANDB:
+        return
+    wandb.init(project=WANDB_PROJECT, name=name, group=group, config=config, reinit=True)
+
+
+def finish_run():
+    """Finish the active wandb run (no-op if none / --no-wandb)."""
+    if wandb.run is not None:
+        wandb.finish()
+
+
 # --------------------------------------------------------------------------------------------------
 # Stage 1: pretrain the diffusion planner.
 # --------------------------------------------------------------------------------------------------
@@ -92,7 +108,7 @@ def stage_pretrain(args, group):
     from Pretrain.Planners.Backbone.Trainer import SDETrainer
 
     num_steps = SMOKE['pretrain'] if args.smoke else PRETRAIN_STEPS
-    run = wandb_init(project=WANDB_PROJECT, name='pretrain', group=group,
+    init_run('pretrain', group,
                      config=dict(stage='pretrain', env=ENV_NAME, specific=SPECIFIC_PLAY, task_id=TASK_ID,
                                  horizon=HORIZON, num_steps=num_steps, batch_size=128, lr=2e-4))
     _banner('pretrain', 'pretrain')
@@ -107,7 +123,7 @@ def stage_pretrain(args, group):
         seed=args.seed,
     )
     trainer.train()
-    wandb_finish()
+    finish_run()
 
 
 # --------------------------------------------------------------------------------------------------
@@ -119,7 +135,7 @@ def stage_kernel(args, group):
 
     num_steps = SMOKE['kernel'] if args.smoke else KERNEL_STEPS
     save_freq = SMOKE['kernel_save'] if args.smoke else 10_000
-    run = wandb_init(project=WANDB_PROJECT, name='kernel', group=group,
+    init_run('kernel', group,
                      config=dict(stage='kernel', env=ENV_NAME, specific=SPECIFIC_DATA, num_steps=num_steps,
                                  ensemble_size=10, num_modes=10, hidden_dim=514, num_hidden_layers=4))
     _banner('kernel', 'kernel')
@@ -154,7 +170,7 @@ def stage_kernel(args, group):
         noise_floor=5e-4,
         rng=test_rng,
     )
-    wandb_finish()
+    finish_run()
 
 
 # --------------------------------------------------------------------------------------------------
@@ -166,7 +182,7 @@ def stage_reward(args, group):
 
     num_steps = SMOKE['reward'] if args.smoke else REWARD_STEPS
     save_freq = SMOKE['reward_save'] if args.smoke else REWARD_STEPS
-    run = wandb_init(project=WANDB_PROJECT, name='reward', group=group,
+    init_run('reward', group,
                      config=dict(stage='reward', env=ENV_NAME, specific=SPECIFIC_DATA, task_id=TASK_ID,
                                  num_steps=num_steps, hidden_dim=512, hidden_layers=4, sigma=4.0))
     _banner('reward', 'reward')
@@ -202,7 +218,7 @@ def stage_reward(args, group):
         save_freq=save_freq,
         num_steps=num_steps,
     )
-    wandb_finish()
+    finish_run()
 
 
 # --------------------------------------------------------------------------------------------------
@@ -214,7 +230,7 @@ def stage_critic(args, group):
     from Pretrain.Critic.train_critic import train_critic, test_critic
 
     num_steps = SMOKE['critic'] if args.smoke else CRITIC_STEPS
-    run = wandb_init(project=WANDB_PROJECT, name='critic', group=group,
+    init_run('critic', group,
                      config=dict(stage='critic', env=ENV_NAME, specific=SPECIFIC_PLAY, task_id=TASK_ID,
                                  num_steps=num_steps, hidden_dim=512, hidden_layers=5, gamma=0.99,
                                  horizon=HORIZON, tau=0.005, sigma=8.0))
@@ -257,7 +273,7 @@ def stage_critic(args, group):
         trajs=trajs,
         task_id=TASK_ID,
     )
-    wandb_finish()
+    finish_run()
 
 
 # --------------------------------------------------------------------------------------------------
@@ -275,7 +291,7 @@ def stage_finetune(args, group):
     from Finetuning.traj_reward import RewardConfig
 
     num_steps = SMOKE['finetune'] if args.smoke else FINETUNE_STEPS
-    run = wandb_init(project=WANDB_PROJECT, name='finetune', group=group,
+    init_run('finetune', group,
                      config=dict(stage='finetune', env=ENV_NAME, specific=SPECIFIC_PLAY, task_id=TASK_ID,
                                  finetune_steps=num_steps, finetune_lr=2e-4, finetune_batch_size=12,
                                  planner_ckpt=PRETRAIN_STEPS, reward_ckpt=REWARD_STEPS,
@@ -309,7 +325,7 @@ def stage_finetune(args, group):
 
     finetuner = OnlineFinetuner(FTConfig)
     finetuner.finetune_planner(seed=rng)
-    wandb_finish()
+    finish_run()
 
 
 STAGES = {
@@ -333,8 +349,8 @@ def main():
                    help='wandb group name tying the 5 stage-runs together (default: cube-double-<seed>).')
     args = p.parse_args()
 
-    if args.no_wandb:
-        os.environ['ODP_WANDB'] = '0'
+    global _USE_WANDB
+    _USE_WANDB = not args.no_wandb
 
     requested = [s.strip() for s in args.stages.split(',') if s.strip()]
     unknown = [s for s in requested if s not in STAGES]
@@ -344,9 +360,6 @@ def main():
     selected = [s for s in ORDER if s in requested]
 
     group = args.wandb_group or f'cube-double-seed{args.seed}'
-    if not wandb_available() and not args.no_wandb:
-        print('[pipeline] NOTE: wandb not installed -> metric logging is a no-op '
-              '(pip install wandb, then `wandb login`). Training will still run.')
 
     print(f'[pipeline] env={ENV_NAME}/{SPECIFIC_PLAY} task={TASK_ID} | stages={selected} | '
           f'seed={args.seed} | smoke={args.smoke} | wandb_group={group}')
@@ -358,7 +371,7 @@ def main():
             STAGES[stage](args, group)
         except Exception:
             # Make sure a failed stage closes its wandb run before we surface the error.
-            wandb_finish()
+            finish_run()
             print(f'[pipeline] stage "{stage}" FAILED after {time.time() - s0:.1f}s', flush=True)
             raise
         print(f'[pipeline] stage "{stage}" done in {time.time() - s0:.1f}s', flush=True)

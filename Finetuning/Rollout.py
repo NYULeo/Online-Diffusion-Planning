@@ -27,14 +27,10 @@ from typing import Optional
 from dataclasses import dataclass
 import time
 from typing import List
-from Finetuning.traj_reward2 import TotalReward_Critic, RewardConfig, TotalReward
+from Finetuning.traj_reward import TotalReward_Critic, RewardConfig, TotalReward
 from Pretrain.Planners.Backbone.Sampler import karras_beta_schedule, cosine_beta, clip_actions
 
-# Shared port plumbing (mirrors fql).
-from JAX_PORT.jax_utils import (
-    MLP, ModuleDict, TrainState, nonpytree_field, default_init, ensemblize,
-    target_update, save_agent, restore_agent, supply_rng,
-)
+from flax_utils import TrainState
 
 
 def create_initial(current_state: np.ndarray, plan_suffix: np.ndarray, d_s: int, d_a: int, horizon: int, device: str) -> np.ndarray:
