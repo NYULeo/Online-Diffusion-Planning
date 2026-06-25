@@ -17,9 +17,11 @@ trailing keyword-only `rng=`/`seed=` additions (JAX has no global RNG) plus a sm
 `# API-CHANGE`-flagged deltas where torch's stateful/in-place semantics are impossible in JAX. Even
 pre-existing latent torch bugs were preserved verbatim, not "fixed."
 
-> **Status:** all 31 core files are `ast.parse`-clean; 30/31 are free of executable torch. **Nothing has
-> been runtime-executed** — see `PORT_REPORT.md` §8e and the "Known limitations" section below. Read
-> `CONVERSION_GUIDE.md` for the full rule set and `PORT_REPORT.md` for the per-file conversion record.
+> **Status:** all 31 core files are `ast.parse`-clean and free of executable torch. The 3 previously-open
+> cross-file HIGH issues are now **fixed** (see §5). **Nothing has been runtime-executed** — see "Known
+> limitations" below. Read `CONVERSION_GUIDE.md` for the full rule set and `PORT_REPORT.md` for the
+> per-file conversion record. Weights & Biases logging and a sequential cube-double training pipeline have
+> been added (§4b, `run_cube_double_pipeline.py`, `wandb_logger.py`).
 
 ## 2. Module map (by dependency tier)
 
@@ -76,19 +78,131 @@ Reproducibility note: several entry scripts compute `rng = set_seed(1)` but do n
 the trainer/callee (which then self-seeds with `PRNGKey(0)`). If `seed=1` matters, pass `seed=1` /
 `rng=set_seed(1)` explicitly (LOW issues in `PORT_REPORT.md` §8d).
 
-## 4. Dependencies (none installed in this environment)
+## 4. Installation
 
-The port has **not** been run here — install before any execution:
+The port targets **Python 3.10** (recommended for OGBench/D4RL compatibility) and the JAX stack — **no
+PyTorch is needed to run the converted code**. Nothing is installed in this checkout, so set up a fresh
+environment first.
 
+### 4.1 Create an environment
+
+```bash
+# from the repo root (/Users/kaiwenhu/ODP)
+python3.10 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+python -m pip install -U pip wheel setuptools
 ```
-pip install jax jaxlib flax optax distrax einops
-pip install gym gymnasium minari ogbench
+
+(or with conda: `conda create -n odp python=3.10 -y && conda activate odp`)
+
+### 4.2 Install the JAX runtime
+
+Pick the `jax`/`jaxlib` build that matches your hardware — this is the one install that is
+accelerator-specific:
+
+```bash
+# CPU (works everywhere; slow for full training):
+pip install -U "jax[cpu]"
+
+# NVIDIA GPU (CUDA 12):
+pip install -U "jax[cuda12]"
+
+# Apple Silicon (experimental Metal backend) — CPU is the safer default on macOS:
+#   pip install -U jax-metal      # optional; otherwise use the CPU build above
 ```
 
-- `jaxlib` must match your accelerator (CPU / CUDA / TPU build).
-- `distrax` is needed for `Rewards/nets.py` (Beta reward). Confirm `distrax.Beta(...).distribution.quantile`
-  resolves at runtime — it backs the reward-CI path (no active caller exercises it today).
-- `gym`/`gymnasium` + `minari`/`ogbench` back `Pretrain/Dataset.py`'s loaders (D4RL/OGBench).
+Then the framework layer used by the converted code:
+
+```bash
+pip install -U flax optax distrax einops chex ml_collections
+```
+
+### 4.3 Install logging, data, and environment deps
+
+```bash
+# logging + utilities
+pip install -U wandb tqdm numpy "numpy<2.0" matplotlib loguru
+
+# environments / datasets (cube-double comes from OGBench)
+pip install -U "gymnasium<1.0.0" ogbench minari h5py
+```
+
+`ogbench` provides the **cube** tasks (`cube-double-play-*`) used by the default pipeline. `gymnasium`'s
+`AsyncVectorEnv` backs the parallel rollouts. `minari`/`h5py` back the other (D4RL/maze) loaders in
+`Pretrain/Dataset.py` — only needed if you train those envs.
+
+### 4.4 One-line install (CPU)
+
+```bash
+pip install -U "jax[cpu]" flax optax distrax einops chex ml_collections \
+               wandb tqdm "numpy<2.0" matplotlib loguru "gymnasium<1.0.0" ogbench minari h5py
+```
+
+> Reference dependency lists from the original project live in `requirements/` (these still pin **torch**,
+> which the JAX port does not require — install it only if you also want to run the original torch code or
+> ingest legacy torch checkpoints; see §5 checkpoint bridge).
+
+### 4.5 Weights & Biases
+
+Metric logging goes through `wandb_logger.py` (repo root), which is a **safe no-op unless a run is
+active** — training behaves identically whether or not wandb is installed/enabled.
+
+```bash
+wandb login                      # once, for online logging
+# or run without an account:
+export WANDB_MODE=offline        # logs locally; sync later with `wandb sync`
+export ODP_WANDB=0               # fully disable wandb (pure no-op)
+```
+
+### 4.6 Verify the install (no training)
+
+```bash
+python -c "import jax, flax, optax, distrax, ogbench; print('jax', jax.__version__, jax.devices())"
+# exercise the whole pipeline wiring with tiny step counts:
+python run_cube_double_pipeline.py --smoke
+```
+
+## 4b. Quick start — cube-double training pipeline
+
+`run_cube_double_pipeline.py` (repo root) runs all five training stages **sequentially** on the cube
+*double* environment, each as its own wandb run:
+
+`pretrain → kernel → reward → critic → finetune`
+
+```bash
+# full pipeline (online wandb):
+python run_cube_double_pipeline.py
+
+# a subset / resume mid-pipeline:
+python run_cube_double_pipeline.py --stages kernel,reward,critic
+
+# fast end-to-end wiring check (tiny steps):
+python run_cube_double_pipeline.py --smoke
+
+# without wandb:
+python run_cube_double_pipeline.py --no-wandb
+```
+
+The stages chain via checkpoints: pretrain/kernel/reward/critic each save at a known step, and the
+finetune stage loads exactly those (`PRETRAIN_STEPS`/`KERNEL_STEPS`/`REWARD_STEPS`/`CRITIC_STEPS` at the
+top of the script — edit them together if you change step counts). wandb metrics are namespaced per stage
+(`pretrain/loss`, `kernel/avg_loss`, `reward/loss`, `critic/loss`, `finetune/reward`, …) and all five
+runs share one wandb **group** (`cube-double-seed<seed>`) so you can compare them on one dashboard.
+
+> The cube naming has two spellings on purpose: kernel/reward use `specific='double'` while
+> planner/critic/finetune use `'double-play'` — both resolve to the same checkpoint stem. This is the
+> original ODP convention; the runner handles it for you.
+
+## 4c. Dependencies (summary)
+
+The port has **not** been run in this checkout — install per §4 before any execution.
+
+- **Runtime:** `jax`/`jaxlib` (accelerator-matched), `flax`, `optax`, `distrax`, `einops`, `chex`,
+  `ml_collections`.
+- **Logging/util:** `wandb`, `tqdm`, `numpy<2.0`, `matplotlib`, `loguru`.
+- **Envs/data:** `gymnasium<1.0.0`, `ogbench` (cube), `minari`, `h5py`.
+- `distrax.Beta(...).distribution.quantile` backs the reward-CI path (no active caller exercises it today
+  — confirm it resolves at runtime if you enable that path).
 
 ## 5. Known limitations — NOT YET RUNTIME-VERIFIED
 
@@ -96,12 +210,16 @@ JAX/Flax/optax/distrax are not installed here, so the **only** gate applied was 
 AST-level torch-residue scans. Linen `.init`/`.apply` tracing, optax wiring, attention/conv shape
 round-trips, gradient numerics, and the checkpoint bridge are all **unverified**.
 
-**Open HIGH issues to fix before the finetuning subsystem can run** (see `PORT_REPORT.md` §8d/§8e):
-1. `Finetuning/utils.py` `rollout_parallel2` still calls `.to()/.load_state_dict()/.eval()` on a linen
-   `DiT1d` — fix by mirroring `rollout_parallel3` (init → `from_state_dict` → `TrainState.create`).
-2. `Finetuning/acc_adjoint_matching.py:623` `reward_model.eval()` on a plain container — delete the line.
-3. Kernel-list mismatch: `Kernel_Backbone.compute_*` require python lists of `(model_def, params)` tuples,
-   but `utils.train_kernel*` / `Rollout.load_kernel` pass lists of `TrainState` — append tuples instead.
+**Previously-open HIGH issues — now FIXED** (the finetuning subsystem is now internally consistent;
+still requires a JAX env to runtime-verify):
+1. ✅ `Finetuning/utils.py` `rollout_parallel2` — now builds the planner via `DiT1d.init` →
+   `flax.serialization.from_state_dict` → `TrainState.create` (mirrors `rollout_parallel`), and threads
+   `rng=` into every `sample_euler_karras` call (no more `.to()/.load_state_dict()/.eval()` on a linen module).
+2. ✅ `Finetuning/acc_adjoint_matching.py` — the `reward_model.eval()` call (a no-op on the JAX container)
+   was removed.
+3. ✅ Kernel-list type consistency — every list fed to `Kernel_Backbone.compute_*` is now a python list of
+   `(model_def, params)` tuples (`Rollout.load_kernel`, `traj_reward2/3` mog branches), matching the §11
+   contract used by `utils.py`.
 
 ### Checkpoint-bridge TODO (torch state_dict → flax pytree remap)
 

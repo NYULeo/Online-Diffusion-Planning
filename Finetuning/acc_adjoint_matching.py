@@ -690,6 +690,19 @@ class Acc_AdjointMatchingFineTuner:
                          print(f"round: {round}, step: {step}, reward {pure_reward / self.config.log_freq}")
                          print(f"round: {round}, step: {step}, constraint {total_C / self.config.log_freq}")
                          print(f"round: {round}, step: {step}, alpha {self.alpha_scheduler.get_alpha()}")
+                    global_step = (round - 1) * self.config.per_round_steps + step
+                    denom = 1.0 if step == 0 else float(self.config.log_freq)
+                    try:
+                        from wandb_logger import wlog
+                        wlog({'finetune/loss': total_loss / denom,
+                              'finetune/total_reward': total_reward / denom,
+                              'finetune/reward': pure_reward / denom,
+                              'finetune/constraint': total_C / denom,
+                              'finetune/alpha': float(self.alpha_scheduler.get_alpha()),
+                              'finetune/lambda': float(self.Lam.get_lam()),
+                              'finetune/round': round}, step=global_step)
+                    except Exception:
+                        pass
                     total_loss = 0.0
                     total_reward = 0.0
                     pure_reward = 0.0

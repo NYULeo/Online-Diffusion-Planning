@@ -452,6 +452,11 @@ def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, h
            if(k % 2000 == 0):
                 avg_loss = total_loss/2000
                 print(f"Average Loss: {avg_loss:.4f}")
+                try:
+                    from wandb_logger import wlog
+                    wlog({'critic/loss': avg_loss, 'critic/lr': float(schedule(critic.step - 1))}, step=k)
+                except Exception:
+                    pass
                 total_loss = 0.0
 
            if(k % 10000 == 0):

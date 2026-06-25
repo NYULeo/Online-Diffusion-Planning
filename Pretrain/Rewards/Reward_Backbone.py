@@ -612,6 +612,11 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
            if step % 2000 == 0:
               avg_loss = total_loss / 2000
               print(f"Step {step}, loss {avg_loss:.4f}")
+              try:
+                  from wandb_logger import wlog
+                  wlog({'reward/loss': avg_loss, 'reward/lr': float(schedule(train_state.step - 1))}, step=step)
+              except Exception:
+                  pass
               total_loss = 0
 
            if step % save_freq == 0:

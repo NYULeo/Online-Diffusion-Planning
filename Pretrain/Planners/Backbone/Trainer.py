@@ -361,6 +361,12 @@ class SDETrainer:
 
             if ((self.step % self.log_freq) == 0):
                 print(f"step {self.step} loss {total_loss/self.log_freq}")
+                try:
+                    from wandb_logger import wlog
+                    wlog({'pretrain/loss': float(loss), 'pretrain/lr': cur_lr,
+                          'pretrain/avg_loss': total_loss / self.log_freq}, step=self.step)
+                except Exception:
+                    pass
                 total_loss = 0
 
             if ((self.step % self.save_freq == 0) and (self.step!=0)):

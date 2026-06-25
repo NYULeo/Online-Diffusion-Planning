@@ -609,6 +609,11 @@ def train_mog_kernel(
 
         if step % 100 == 0:
             print(f'Step {step:6d} | Avg Loss: {total_loss/100:.6f}')
+            try:
+                from wandb_logger import wlog
+                wlog({'kernel/avg_loss': total_loss / 100, 'kernel/step_loss': avg_loss}, step=step)
+            except Exception:
+                pass
             total_loss = 0.0
 
         # Save checkpoints
