@@ -1,39 +1,40 @@
-"""Sequential cube-double training pipeline for the JAX/Flax ODP port.
+"""Sequential cube training pipeline for the JAX/Flax ODP port.
 
-Runs the five training stages **in order**, each as its own Weights & Biases run, on the cube
-*double* environment:
+Runs the five training stages **in order**, each as its own Weights & Biases run, on a cube
+variant (default `double`; choose another with `--variant`, e.g. `single`):
 
-    1. pretrain  -> diffusion planner            (SDETrainer)                       env='cube', 'double-play'
-    2. kernel    -> MoG transition kernel         (train_mog_kernel / test_kernel_mog) env='cube', 'double'
-    3. reward    -> reward function               (train_reward / test_Model)          env='cube', 'double'
-    4. critic    -> value/critic                  (train_critic / test_critic)         env='cube', 'double-play'
-    5. finetune  -> adjoint-matching finetuning   (OnlineFinetuner.finetune_planner)   env='cube', 'double-play'
+    1. pretrain  -> diffusion planner            (SDETrainer)                         env='cube', '<variant>-play'
+    2. kernel    -> MoG transition kernel         (train_mog_kernel / test_kernel_mog) env='cube', '<variant>'
+    3. reward    -> reward function               (train_reward / test_Model)          env='cube', '<variant>'
+    4. critic    -> value/critic                  (train_critic / test_critic)         env='cube', '<variant>-play'
+    5. finetune  -> adjoint-matching finetuning   (OnlineFinetuner.finetune_planner)   env='cube', '<variant>-play'
 
-WHY two spellings of "double": the kernel/reward/critic backbones take `specific='double'` (their
-`Train_Dataset` maps it to the underlying `double-play` data + checkpoint stem), while the planner,
-critic-rollout naming, and finetuner take `specific='double-play'` (-> `Cube_DoublePlay`). Both resolve
-to the same checkpoint stem via `getName(...) == 'double'`, so the stages chain correctly. This is the
-original ODP convention, preserved unchanged.
+WHY two spellings of the variant: the kernel/reward/critic backbones take `--variant` verbatim
+(e.g. `single`) while the planner, critic-rollout naming, and finetuner take `<variant>-<suffix>`
+(e.g. `single-play` -> `Cube_SinglePlay`). Both resolve to the same checkpoint stem via `getName`, so
+the stages chain correctly. This is the original ODP convention, preserved unchanged.
 
 CHECKPOINT CHAINING: each stage saves at a step that the finetuner then loads. The step constants below
 (PRETRAIN_STEPS, KERNEL_STEPS, REWARD_STEPS, CRITIC_STEPS) are passed both to the trainers (so they save
 at that step) and to the FinetuningConfig (so it loads exactly those). Keep them consistent if you edit.
 
 USAGE
-    # full pipeline, online wandb (needs `wandb login` once):
-    python run_cube_double_pipeline.py
+    # cube SINGLE, full pipeline (online wandb; needs `wandb login` once):
+    python run_cube_pipeline.py --variant single --task 4
 
-    # pick a subset of stages:
-    python run_cube_double_pipeline.py --stages pretrain,kernel,reward,critic,finetune
-    python run_cube_double_pipeline.py --stages kernel,reward         # e.g. resume mid-pipeline
+    # cube double (default):
+    python run_cube_pipeline.py
+
+    # pick a subset of stages / resume mid-pipeline:
+    python run_cube_pipeline.py --variant single --stages pretrain,kernel,reward,critic
 
     # quick smoke test with tiny step counts (verifies wiring end-to-end):
-    python run_cube_double_pipeline.py --smoke
+    python run_cube_pipeline.py --variant single --smoke
 
     # disable wandb (training is otherwise identical):
-    python run_cube_double_pipeline.py --no-wandb
+    python run_cube_pipeline.py --variant single --no-wandb
     # offline wandb (sync later with `wandb sync`):
-    WANDB_MODE=offline python run_cube_double_pipeline.py
+    WANDB_MODE=offline python run_cube_pipeline.py --variant single
 
 NOTE: requires the JAX stack + ogbench (see README "Installation"). Nothing here uses torch. Pretrained
 torch checkpoints are NOT needed — every stage trains from scratch and saves a flax-serialized
@@ -63,7 +64,7 @@ SPECIFIC_PLAY = 'double-play'   # planner / critic / finetune naming
 SPECIFIC_DATA = 'double'        # kernel / reward / critic backbone dataset arg
 TASK_ID = 4                     # cube-double task index (matches the example scripts)
 HORIZON = 32
-WANDB_PROJECT = 'odp-cube-double'
+WANDB_PROJECT = 'odp-cube'
 
 # Checkpoint steps each stage trains to / saves at (and that finetune then loads).
 PRETRAIN_STEPS = 1_000_000
@@ -236,7 +237,7 @@ def stage_critic(args, group):
                                  horizon=HORIZON, tau=0.005, sigma=8.0))
     _banner('critic', 'critic')
     rng = set_seed(args.seed)
-    # Build the offline trajectories the critic regresses on (from the cube-double dataset).
+    # Build the offline trajectories the critic regresses on (from the cube dataset).
     data = get_dataset(ENV_NAME, SPECIFIC_PLAY, task_id=TASK_ID, traj_length=200)
     trajs = data.get_trajectories()
 
@@ -339,18 +340,29 @@ ORDER = ['pretrain', 'kernel', 'reward', 'critic', 'finetune']
 
 
 def main():
-    p = argparse.ArgumentParser(description='Sequential cube-double training pipeline (JAX/Flax ODP port).')
+    p = argparse.ArgumentParser(description='Sequential cube training pipeline (JAX/Flax ODP port).')
     p.add_argument('--stages', default=','.join(ORDER),
                    help='comma-separated subset of: ' + ','.join(ORDER) + ' (default: all, in order).')
     p.add_argument('--seed', type=int, default=1, help='random seed (threaded as a jax PRNGKey).')
+    p.add_argument('--variant', default='double',
+                   help="cube variant: single | double | triple | quadruple (default: double). "
+                        "Kernel/reward use this name; planner/critic/finetune use '<variant>-<suffix>'.")
+    p.add_argument('--suffix', default='play', choices=['play', 'noisy'],
+                   help="cube dataset suffix for the planner/critic/finetune naming (default: play).")
+    p.add_argument('--task', type=int, default=4, help='cube singletask task id (default: 4; valid 1-5).')
     p.add_argument('--smoke', action='store_true', help='tiny step counts to verify wiring end-to-end.')
     p.add_argument('--no-wandb', action='store_true', help='disable wandb (logging becomes a no-op).')
     p.add_argument('--wandb-group', default=None,
-                   help='wandb group name tying the 5 stage-runs together (default: cube-double-<seed>).')
+                   help='wandb group name tying the stage-runs together (default: cube-<variant>-<seed>).')
     args = p.parse_args()
 
-    global _USE_WANDB
+    global _USE_WANDB, SPECIFIC_DATA, SPECIFIC_PLAY, TASK_ID
     _USE_WANDB = not args.no_wandb
+    # cube uses two spellings: kernel/reward take the bare variant ('single'); planner/critic/finetune
+    # take '<variant>-<suffix>' ('single-play'). Both resolve to the same checkpoint stem via getName().
+    SPECIFIC_DATA = args.variant
+    SPECIFIC_PLAY = f'{args.variant}-{args.suffix}'
+    TASK_ID = args.task
 
     requested = [s.strip() for s in args.stages.split(',') if s.strip()]
     unknown = [s for s in requested if s not in STAGES]
@@ -359,7 +371,7 @@ def main():
     # Always run in the canonical order regardless of how they were listed.
     selected = [s for s in ORDER if s in requested]
 
-    group = args.wandb_group or f'cube-double-seed{args.seed}'
+    group = args.wandb_group or f'cube-{args.variant}-seed{args.seed}'
 
     print(f'[pipeline] env={ENV_NAME}/{SPECIFIC_PLAY} task={TASK_ID} | stages={selected} | '
           f'seed={args.seed} | smoke={args.smoke} | wandb_group={group}')

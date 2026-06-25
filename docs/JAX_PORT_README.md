@@ -21,7 +21,7 @@ pre-existing latent torch bugs were preserved verbatim, not "fixed."
 > cross-file HIGH issues are now **fixed** (see §5). **Nothing has been runtime-executed** — see "Known
 > limitations" below. Read `docs/CONVERSION_GUIDE.md` for the full rule set and `docs/PORT_REPORT.md` for the
 > per-file conversion record. Weights & Biases logging and a sequential cube-double training pipeline have
-> been added (§4b, `run_cube_double_pipeline.py`, `plain `import wandb` (FQL-style)`).
+> been added (§4b, `run_cube_pipeline.py`, `plain `import wandb` (FQL-style)`).
 
 ## 2. Module map (by dependency tier)
 
@@ -159,28 +159,32 @@ export ODP_WANDB=0               # fully disable wandb (pure no-op)
 ```bash
 python -c "import jax, flax, optax, distrax, ogbench; print('jax', jax.__version__, jax.devices())"
 # exercise the whole pipeline wiring with tiny step counts:
-python run_cube_double_pipeline.py --smoke
+python run_cube_pipeline.py --smoke
+# cube single instead of double:
+python run_cube_pipeline.py --variant single --task 4
 ```
 
 ## 4b. Quick start — cube-double training pipeline
 
-`run_cube_double_pipeline.py` (repo root) runs all five training stages **sequentially** on the cube
+`run_cube_pipeline.py` (repo root) runs all five training stages **sequentially** on the cube
 *double* environment, each as its own wandb run:
 
 `pretrain → kernel → reward → critic → finetune`
 
 ```bash
 # full pipeline (online wandb):
-python run_cube_double_pipeline.py
+python run_cube_pipeline.py
 
 # a subset / resume mid-pipeline:
-python run_cube_double_pipeline.py --stages kernel,reward,critic
+python run_cube_pipeline.py --stages kernel,reward,critic
 
 # fast end-to-end wiring check (tiny steps):
-python run_cube_double_pipeline.py --smoke
+python run_cube_pipeline.py --smoke
+# cube single instead of double:
+python run_cube_pipeline.py --variant single --task 4
 
 # without wandb:
-python run_cube_double_pipeline.py --no-wandb
+python run_cube_pipeline.py --no-wandb
 ```
 
 The stages chain via checkpoints: pretrain/kernel/reward/critic each save at a known step, and the
