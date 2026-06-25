@@ -1,58 +1,64 @@
+'''Entry-point script: build the finetuning configs and run OnlineFinetuner (JAX/Flax port).'''
 import sys
 import os
 # Change to project root directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
-from Finetune_Backbone import OnlineFinetuner, FinetuningConfig
+from Finetune_Backbone import (
+    OnlineFinetuner, FinetuningConfig,
+    Train_Reward_Config, Train_Kernel_Config, Train_Critic_Config,
+)
+from Finetuning.utils import AlphaSchedulerConfig
 from adjoint_matching import AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig
 from traj_reward import RewardConfig
 import random
 import numpy as np
-import torch
-import torch.multiprocessing as mp
+import jax
+
 
 def set_seed(seed: int):
     random.seed(seed)
     np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    return jax.random.PRNGKey(seed)
 
-              
+
 if __name__ == "__main__":
     # Example usage of the Adjoint Matching training without a dataset.
-    # In practice, 
-    # 
+    # In practice,
+    #
     # replace the reward and backbone initialisations with
-    # loading of your pretrained models (e.g. via torch.load).
+    # loading of your pretrained models.
+    # TODO(checkpoint-bridge): original loaded pretrained models via torch.load.
     env_name = 'kitchen'
     specific_env = 'partial'
-    #AMConfig = AdjointMatchingConfig(horizon = 32) 
+    #AMConfig = AdjointMatchingConfig(horizon = 32)
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32)
-    
-    RWConfig = RewardConfig(beta = 1.0, min_log_prob = 150.0, explore = False) 
-    
+
+    RWConfig = RewardConfig(beta = 1.0, min_log_prob = 150.0, explore = False)
+
+    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 1.0, total_steps = 1000000)
+
     FTConfig = FinetuningConfig(
-        AMConfig = AMConfig, 
-        RewardConfig = RWConfig, 
+        AMConfig = AMConfig,
+        RewardConfig = RWConfig,
+        AlphaConfig = AlphaConfig,
         dataset_name = env_name,
         specific_dataset = specific_env,
         planner_checkpoint = 990000,
         reward_model_checkpoint = 10000,
         kernel_model_checkpoint = 50000,
+        critic_model_checkpoint = 0,
+        train_reward_config = Train_Reward_Config(),
+        train_kernel_config = Train_Kernel_Config(),
+        train_critic_config = Train_Critic_Config(),
         finetune_steps = 1000000,
         finetune_batch_size  = 12,
         finetune_lr = 2e-4)
-    set_seed(1)
+    rng = set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
-    mp.spawn(OnlineFinetuner.finetune_planner(), args=(), nprocs=3)
-   
-
-    
-   
-   
+    # API-CHANGE: torch.multiprocessing.mp.spawn(...) dropped; the original
+    # `mp.spawn(OnlineFinetuner.finetune_planner(), ...)` already called
+    # finetune_planner() eagerly, so we call it directly and thread the jax rng key.
+    OnlineFinetuner.finetune_planner(seed=rng)

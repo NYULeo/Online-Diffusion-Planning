@@ -55,7 +55,7 @@ def check_cube_double_goal_reach(trajs, task_id):
 if __name__ == '__main__':  # pragma: no cover
     
     
-    set_seed(1)
+    rng = set_seed(1)  # set_seed now returns a jax.random.PRNGKey (CONVERSION_GUIDE §8)
     env_name = 'cube'
     specific_env = 'single-play'
     task_id = 4
@@ -79,14 +79,14 @@ if __name__ == '__main__':  # pragma: no cover
         check_cube_single_goal_reach(trajs, task_id)
 
     train_critic(dataset_name = env_name,
-                 specific_dataset = specific_env, 
+                 specific_dataset = specific_env,
                  hidden_layers = 5,
                  hidden_dim = 512,
-                 batch_size = 256, 
-                 num_steps = 50000, 
-                 gamma = 0.99, 
-                 horizon = 32, 
-                 #lr = 3e-04, 
+                 batch_size = 256,
+                 num_steps = 50000,
+                 gamma = 0.99,
+                 horizon = 32,
+                 #lr = 3e-04,
                  lr = 1e-05,
                  min_lr = 1e-06,
                  tau = 0.005,
@@ -95,8 +95,9 @@ if __name__ == '__main__':  # pragma: no cover
                  #alpha = 0.99,
                  #alpha = None,
                  target_reward = 50.0,
-                 trajs = trajs, 
-                 task_id = task_id)
+                 trajs = trajs,
+                 task_id = task_id,
+                 rng = rng)
     
     
     data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
@@ -193,7 +194,7 @@ if __name__ == '__main__':  # pragma: no cover
     
     
     #medium
-    set_seed(1)
+    rng = set_seed(1)  # set_seed now returns a jax.random.PRNGKey (CONVERSION_GUIDE §8)
     env_name = 'pointmaze'
     specific_env = 'medium'
     
@@ -206,20 +207,21 @@ if __name__ == '__main__':  # pragma: no cover
           trajs = pickle.load(f)
     trajs = get_success_trajs(trajs)
     """
-    train_critic(dataset_name = env_name, 
-                 specific_dataset = specific_env, 
+    train_critic(dataset_name = env_name,
+                 specific_dataset = specific_env,
                  hidden_layers = 1,
                  hidden_dim = 128,
-                 batch_size = 256, 
-                 num_steps = 50000, 
-                 gamma = 0.99, 
-                 horizon = 32, 
-                 lr = 1e-05, 
+                 batch_size = 256,
+                 num_steps = 50000,
+                 gamma = 0.99,
+                 horizon = 32,
+                 lr = 1e-05,
                  min_lr = 1e-06,
                  tau = 0.005,
                  sigma = 3.0,
                  target_reward = 20.0,
-                 trajs = trajs)
+                 trajs = trajs,
+                 rng = rng)
     print('training complete')
 
 

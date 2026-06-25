@@ -16,7 +16,6 @@ os.chdir(project_root)
 import gymnasium as gym
 import gymnasium_robotics  # registers the envs
 import numpy as np
-import torch
 import pickle
 from scipy.ndimage import gaussian_filter1d
 from Pretrain.Dataset import get_dataset
@@ -34,7 +33,7 @@ from Pretrain.utils import set_seed
 
 
 if __name__ == '__main__':  # pragma: no cover
-       set_seed(1)
+       rng = set_seed(1)  # set_seed now returns a jax.random.PRNGKey; thread it into downstream stochastic calls
        env_name = 'cube'
        specific_env = 'double-play'
        traj_length = None

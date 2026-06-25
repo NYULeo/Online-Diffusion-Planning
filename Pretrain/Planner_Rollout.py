@@ -1,8 +1,16 @@
+'''Planner rollout / action-selection entry points (JAX/Flax FQL-style port of the torch original).
+
+Inference-only orchestration: loads a pretrained planner (a DiT1d score model), runs a diffusion
+sampler each environment step, optionally re-ranks sampled actions with a Critic, and steps a
+gymnasium env. RNG is threaded explicitly (no global seed): the rollout entry points take a
+keyword-only `seed=None` and split a fresh key for each sampler call.
+'''
 import sys
 import os
 import math
 import numpy as np
-import torch
+import jax
+import jax.numpy as jnp
 from dataclasses import dataclass
 #from Planners.Backbone.UNet import TemporalUnet
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -25,20 +33,10 @@ from Dataset import Planner_Processor
 import gymnasium as gym
 import os
 from Planners.Backbone.Dit import DiT1d
-from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
+from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv
 import mediapy as media
 from Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 
-
-
-"""
-def get_pretrained_planner(planner_name, checkpoint_steps):
-      checkpoint_path = f"./Checkpoints/{planner_name}_{checkpoint_steps}.pt"
-      if not os.path.exists(checkpoint_path):
-          raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
-      checkpoint = torch.load(checkpoint_path, map_location='cpu')
-      return checkpoint['ema']
-"""
 
 
 def save_trajs(trajs, env_name, specific_env):
@@ -57,10 +55,17 @@ class ActionSelector:
          self.critic = Critic(self.d_s, self.d_a)
          critic_name = get_CriticName(self.dataset_name, self.specific_dataset)
          #critic_state_dict = torch.load(critic_name, map_location = 'cpu')
-         critic_state_dict = torch.load(critic_name, weights_only=True)
-         self.critic.load_state_dict(critic_state_dict)
-         self.critic = self.critic.to(device)  # Move critic to correct device
-         self.critic.eval()
+         # TODO(checkpoint-bridge): the trained critic is stored as a torch `.pt`/state_dict.
+         # Original (torch): `critic_state_dict = torch.load(critic_name, weights_only=True)` then
+         # `self.critic.load_state_dict(critic_state_dict)`. Loading it into the flax `Critic` linen
+         # module needs a torch state_dict -> flax param-tree remap (Dense weight.T -> kernel, bias ->
+         # bias, LayerNorm weight -> scale; CONVERSION_GUIDE §10). Until that bridge exists, the loaded
+         # `self.critic_params` cannot be produced from the torch checkpoint without torch installed.
+         critic_state_dict = None  # TODO(checkpoint-bridge): load via the torch->flax state_dict remap.
+         # self.critic (a flax.linen.Module) is frozen/stateless; its params live separately. The
+         # original `.load_state_dict(...)`, `.to(device)`, and `.eval()` calls collapse to holding the
+         # remapped params here (no in-place device move / eval mode in JAX).
+         self.critic_params = critic_state_dict  # TODO(checkpoint-bridge): remapped flax params.
          self.critic_processor = Critic_Processor(self.dataset_name, self.specific_dataset)
          self.device = device
 
@@ -68,45 +73,53 @@ class ActionSelector:
         q_values = []
         for i in range(len(actions)):
            current_state_norm, act_norm = self.critic_processor.preprocess(current_state, actions[i])
-           current_state_norm = torch.tensor(current_state_norm, dtype = torch.float32).unsqueeze(0).to(self.device)
-           act_norm = torch.tensor(act_norm, dtype = torch.float32).unsqueeze(0).to(self.device)
-           q_value = self.critic(current_state_norm, act_norm)
-           q_values.append(q_value.item())
+           current_state_norm = jnp.asarray(current_state_norm, dtype=jnp.float32)[None]
+           act_norm = jnp.asarray(act_norm, dtype=jnp.float32)[None]
+           # torch called `self.critic(current_state_norm, act_norm)`; the flax Critic is applied via
+           # its stored params (frozen, no-grad inference). See checkpoint-bridge TODO in __init__.
+           q_value = self.critic.apply({'params': self.critic_params}, current_state_norm, act_norm)
+           q_values.append(float(q_value))
         idx = np.argmax(q_values)
         return actions[idx]
 
 
-def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, critic, checkpoint_steps, render = False):
+def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, critic, checkpoint_steps, render = False, *, seed=None):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      print(f"Horizon: {horizon}, Diffusion_steps: {steps_T}, num_karras: {num_karras}, eta: {eta}, critic: {critic}, Checpoint_steps; {checkpoint_steps}, Episode_length: {episode_length}")
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     device = "cuda" if torch.cuda.is_available() else "cpu"
+     device = None  # JAX places arrays automatically; the torch cuda/cpu device string is unused.
      print(f"Using device {device}")
+
+     # No global RNG in JAX: derive a key for this rollout (split per sampler call below).
+     rng = jax.random.PRNGKey(0) if seed is None else jax.random.PRNGKey(seed)
 
      if critic:
             action_selector = ActionSelector(env_name, specific_env, device)
      else:
             action_selector = None
-     
+
      #get environment
-     
+
      if(render):
          env, d_s, d_a = get_env(env_name, specific_env, 'rgb_array')
      else:
          env, d_s, d_a = get_env(env_name, specific_env, None)
-     
+
      #get Planner
      state_dict = get_pretrained_planner(env_name, specific_env, checkpoint_steps)
      if( env_name == 'kitchen'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
      elif (env_name == 'pointmaze'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
      elif (env_name == 'antmaze'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
      else:
           raise ValueError(f"Invalid Environment: {env_name}")
-     model.load_state_dict(state_dict)
-     model.eval()
+     # TODO(checkpoint-bridge): torch `model.load_state_dict(state_dict)` + `model.eval()`. `state_dict`
+     # is the EMA torch state_dict from get_pretrained_planner; mapping it into the flax DiT1d param tree
+     # needs the torch->flax remap (CONVERSION_GUIDE §10). The sampler expects a callable score model
+     # bound to params (e.g. a jax_utils.TrainState whose __call__ omits params= for frozen inference).
+     model = model  # placeholder: pass `model` to the samplers once bound to remapped flax params.
 
     #get Processor
      planner_processor = Planner_Processor(env_name, specific_env)
@@ -127,35 +140,37 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
            if critic:
                 candidates = []
                 for j in range(10):
-                   
+
                    #x =  sample_reverse_ddim(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
-                   
-                   x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+
+                   rng, k = jax.random.split(rng)
+                   x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device, rng=k)
                    action = x[0, d_s:(d_s+d_a)].copy()
-                   #action = torch.tanh(action)
+                   #action = jnp.tanh(action)
                    #action = planner_processor.postprocess(action)
                    candidates.append(action)
                 action = action_selector.action_selection(current_state, candidates)
            else:
                #x =  sample_reverse_ddim(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
-               
-               x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+
+               rng, k = jax.random.split(rng)
+               x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device, rng=k)
                #print(x[0])
                action = x[0, d_s:(d_s+d_a)].copy()
-               
+
                #print(action)
                #print(action.max(), action.min())
                #exit()
 
-               #action = torch.tanh(torch.tensor(action))
+               #action = jnp.tanh(jnp.asarray(action))
                #action = planner_processor.postprocess(action)
                #action = x[0, d_s:(d_s+d_a)].copy()
-               
+
            obs, reward, terminated, truncated, info = env.step(action)
            #print(np.linalg.norm(obs['observation'] - current_state))
            if(render):
                 frames.append(env.render())
-           
+
            observations.append(obs['observation'].copy())
            actions.append(action.copy())
            rewards.append(reward)
@@ -164,7 +179,7 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
            if(terminated or truncated):
                 #print(f"Episode {i} terminated or truncated")
                 break
-     
+
      env.close()
      #print(f"Total reward: {sum(rewards)}")
      #print(rewards)
@@ -172,115 +187,118 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      if(render):
           media.write_video("demo.mp4", frames, fps=50)
-     """
-     with open('Generated_trajectory.pkl', 'wb') as f:
-                pickle.dump(traj_info, f)
-     """
-    
-def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 100, eta = 0.8, episode_length = 4000, critic = False, checkpoint_steps = 1000000, num_envs=8):
-     
+
+def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 100, eta = 0.8, episode_length = 4000, critic = False, checkpoint_steps = 1000000, num_envs=8, *, seed=None):
+
      print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
      print(f"Running {num_envs} environments in parallel")
-     
-     device = "cuda" if torch.cuda.is_available() else "cpu"
+
+     device = None  # JAX places arrays automatically; the torch cuda/cpu device string is unused.
      print(f"Using device {device}")
-     
+
+     # No global RNG in JAX: derive a key for this rollout (split per sampler call below).
+     rng = jax.random.PRNGKey(0) if seed is None else jax.random.PRNGKey(seed)
+
      if critic:
          action_selector = ActionSelector(env_name, specific_env, device)
      else:
          action_selector = None
-     
+
      # Create environment factory function
      def make_env():
          env, _, _ = get_env(env_name, specific_env)
          return env
      # Create vectorized environment
      vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
-     
+
      # Get dimensions from single env
      _, d_s, d_a = get_env(env_name, specific_env)
-     
+
      # Get Planner
      state_dict = get_pretrained_planner(env_name, specific_env, checkpoint_steps)
      if env_name == 'kitchen':
-         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier")
      elif env_name == 'pointmaze':
-         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier")
      else:
          raise ValueError(f"Invalid Environment: {env_name}")
-     model.load_state_dict(state_dict)
-     model.eval()
-     
+     # TODO(checkpoint-bridge): torch `model.load_state_dict(state_dict)` + `model.eval()`. See the
+     # matching note in `rollout` and CONVERSION_GUIDE §10; the sampler needs `model` bound to remapped
+     # flax params (e.g. a jax_utils.TrainState) for frozen no-grad inference.
+     model = model  # placeholder: pass `model` to the samplers once bound to remapped flax params.
+
      # Get Processor
      planner_processor = Planner_Processor(env_name, specific_env)
-     
+
      # Reset all environments
      s0_vec = vec_env.reset(seed=1)
      current_states = s0_vec[0]['observation']  # Shape: (num_envs, d_s)
-     
+
      # Store trajectories for each environment
      all_rewards = [0.0 for _ in range(num_envs)]
      done_envs = [False for _ in range(num_envs)]
      observations = [[] for _ in range(num_envs)]
      acts = [[] for _ in range(num_envs)]
      rewards = [[] for _ in range(num_envs)]
-     
+
      for i in range(episode_length):
          actions = np.zeros((num_envs, d_a))
-         
+
          # Generate actions for each environment
          for env_idx in range(num_envs):
              if done_envs[env_idx]:
                  continue
-                 
+
              current_state = current_states[env_idx]
              current_state_norm = planner_processor.preprocess(current_state)
-             
+
              if critic:
                  action_candidates = []
                  for j in range(10):
-                     x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta, device=device)
+                     rng, k = jax.random.split(rng)
+                     x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta, device=device, rng=k)
                      action = x[0, d_s:(d_s+d_a)].copy()
                      action_candidates.append(action)
                  action = action_selector.action_selection(current_state, action_candidates)
              else:
-                 x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta, device=device)
+                 rng, k = jax.random.split(rng)
+                 x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta, device=device, rng=k)
                  action = x[0, d_s:(d_s+d_a)].copy()
-             
+
              actions[env_idx] = action
-         
+
          # Step all environments at once
          obs_vec, rewards_vec, terminated_vec, truncated_vec, info_vec = vec_env.step(actions)
-         
+
          # Update trajectories
          for env_idx in range(num_envs):
              if done_envs[env_idx]:
                  continue
-             
+
              observations[env_idx].append(obs_vec['observation'][env_idx].copy())
              acts[env_idx].append(actions[env_idx].copy())
              rewards[env_idx].append(rewards_vec[env_idx])
              all_rewards[env_idx] += rewards_vec[env_idx]
-             
+
              current_states[env_idx] = obs_vec['observation'][env_idx].copy()
-             
+
              if terminated_vec[env_idx] or truncated_vec[env_idx]:
                  done_envs[env_idx] = True
                  print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
-         
-        
+
+
          # Check if all environments are done
          if all(done_envs):
              print("All environments completed!")
              break
-         
+
          if i % 50 == 0:
              active_count = sum(not d for d in done_envs)
              if active_count > 0:
                  print(f"Step {i}: Active envs: {active_count}")
-     
+
      vec_env.close()
-     
+
      # Find the trajectory with the maximum reward
      trajs = [[] for _ in range(num_envs)]
      for env_idx in range(num_envs):
@@ -292,7 +310,7 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 100, eta = 
      best_idx = np.argmax(all_rewards)
      best_reward = all_rewards[best_idx]
      best_trajectory = trajs[best_idx]
-     
+
      print(f"\n{'='*60}")
      print(f"Results from {num_envs} parallel rollouts:")
      print(f"{'='*60}")
@@ -302,7 +320,7 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 100, eta = 
      print(f"Best trajectory: Env {best_idx} with reward = {best_reward:.4f}")
      print(f"Average reward: {np.mean(all_rewards):.4f} ± {np.std(all_rewards):.4f}")
      print(f"{'='*60}\n")
-     
+
      # Save the best trajectory in the same format as single rollout
      trajs_info = {
          'best_traj': best_trajectory,
@@ -311,7 +329,7 @@ def rollout_parallel(env_name, specific_env, horizon = 32, steps_T = 100, eta = 
          'all_rewards': all_rewards
      }
      save_trajs(trajs_info, env_name, specific_env)
-     
+
 
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
@@ -322,5 +340,5 @@ if __name__ == "__main__":
     #rollout(env_name, specific_train_dataset, horizon, steps_T = 150, num_karras = 8, eta = 0.8, episode_length  = 4000, critic = False, checkpoint_steps = 990000, render = True)
     #rollout(env_name, specific_train_dataset, horizon, steps_T = 20, num_karras = 0, eta = 1.5, episode_length  = 10000, critic = False, checkpoint_steps = 990000, render = True)
     #rollout_parallel(env_name, specific_train_dataset, horizon, steps_T = 200, eta = 0.8, episode_length  = 10000, critic = False, checkpoint_steps = 1000000, num_envs = 50)
-  
-  
+
+

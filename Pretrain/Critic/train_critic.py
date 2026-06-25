@@ -1,29 +1,36 @@
+'''Critic training / testing for ODP (JAX/Flax port of the PyTorch originals, FQL-style).'''
 
 from pathlib import Path
 import copy
 import pickle
 from typing import Optional, List
+
 import numpy as np
 from sympy.integrals.meijerint import _rewrite_single
-import torch
-import torch.optim as optim
 from scipy.ndimage import gaussian_filter1d
-from torch.utils.data import Dataset, DataLoader
+
+import jax
+import jax.numpy as jnp
+import flax
+import flax.linen as nn
+import optax
+
 from Finetuning.utils import TrajectoryDict, get_trajs, getName, check_device
 from Pretrain.Dataset import get_dataset, get_env
 from Pretrain.utils import set_seed, SAStats, cycle, ema_smooth
 from Pretrain.Critic.nets import Critic, CriticEnsemble
-import torch.nn.functional as F
-import torch.nn as nn
+
+# Shared port plumbing (mirrors fql).
+from JAX_PORT.jax_utils import (
+    MLP, ModuleDict, TrainState, nonpytree_field, default_init, ensemblize,
+    target_update, save_agent, restore_agent, supply_rng,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]   # Online-Diffusion-Planning/
 PRETRAIN_DIR = PROJECT_ROOT / "Pretrain"
 FINETUNE_DIR = PROJECT_ROOT / "Finetuning"
 
-
-import numpy as np
-import torch
 
 class RunningMeanStd:
     """
@@ -40,49 +47,39 @@ class RunningMeanStd:
     def update(self, x):
         """
         Update statistics with new batch of data.
-        x can be torch.Tensor or numpy array.
+        x can be a jax/numpy array.
         """
-        if isinstance(x, torch.Tensor):
-            x = x.detach().cpu().numpy()
-        
         x = np.asarray(x).flatten()
         batch_count = len(x)
-        
+
         if batch_count == 0:
             return
-        
+
         batch_mean = np.mean(x)
         batch_var = np.var(x)
-        
+
         if self.count == 0:
             self.mean = batch_mean
             self.var = batch_var
         else:
             delta = batch_mean - self.mean
             total_count = self.count + batch_count
-            
+
             self.mean = (self.count * self.mean + batch_count * batch_mean) / total_count
-            
+
             self.var = (self.count * self.var + batch_count * batch_var +
                        (self.count * batch_count * delta ** 2) / total_count) / total_count
-        
+
         self.std = np.sqrt(self.var + self.epsilon)
         self.count += batch_count
 
     def normalize(self, x):
-        """Normalize input tensor/array"""
-        if isinstance(x, torch.Tensor):
-            x = x.clone()
-            return (x - self.mean) / (self.std + self.epsilon)
-        else:
-            return (np.asarray(x) - self.mean) / (self.std + self.epsilon)
+        """Normalize input array"""
+        return (np.asarray(x) - self.mean) / (self.std + self.epsilon)
 
     def denormalize(self, x):
         """Denormalize (useful when using the value for policy)"""
-        if isinstance(x, torch.Tensor):
-            return x * (self.std + self.epsilon) + self.mean
-        else:
-            return np.asarray(x) * (self.std + self.epsilon) + self.mean
+        return np.asarray(x) * (self.std + self.epsilon) + self.mean
 
 
 def spare_reward_prcocessor(rewards):
@@ -96,15 +93,15 @@ def spare_reward_prcocessor(rewards):
             new_rewards[i] = 1.0
         else:
             new_rewards[i] = 0.0
-    return np.array(new_rewards, dtype = np.float64) 
-    #return np.array(new_rewards) 
+    return np.array(new_rewards, dtype = np.float64)
+    #return np.array(new_rewards)
 
-def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, min_lr, sigma, alpha, 
+def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, min_lr, sigma, alpha,
                                 obs_dim, critic_net, optimizer, gamma, horizon, tau,
-                                specific_dataset: Optional[str] = None, 
+                                specific_dataset: Optional[str] = None,
                                 target_reward: Optional[float] = None,
                                 goal: Optional[np.array] = None, task_id: Optional[int] = None):
-    
+
     """
     os.makedirs(f"./Pretrain/Critic/{dataset_name}/{specific_dataset}/args/", exist_ok=True)
     filepath = f"./Pretrain/Critic/{dataset_name}/{specific_dataset}/args/hyperparameters.json"
@@ -119,8 +116,6 @@ def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, min_lr,
             return obj.tolist()
         elif isinstance(obj, np.generic):
             return obj.item()
-        elif isinstance(obj, torch.device):
-            return str(obj)
         elif isinstance(obj, (np.integer, np.floating)):
             return obj.item()
         elif obj is None:
@@ -132,25 +127,26 @@ def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, min_lr,
         elif hasattr(obj, '__dict__') and not isinstance(obj, (str, int, float, bool, type(None))):
             return str(obj)
         return obj
-    
+
     # Get optimizer info
     optimizer_type = type(optimizer).__name__
     optimizer_params = {
         'type': optimizer_type,
         'lr': lr,
-        'weight_decay': optimizer.param_groups[0].get('weight_decay', 0)
+        # optax optimizers carry no per-group weight_decay introspection; ODP critic uses Adam (wd=0).
+        'weight_decay': 0,
     }
-    
+
     # Get model architecture info
     model_info = {
         'model_type': type(critic_net).__name__,
         'obs_dim': int(obs_dim),
     }
-    
+
     # Add model-specific parameters if available
     if hasattr(critic_net, 'hidden'):
         model_info['hidden_dim'] = int(critic_net.hidden)
-    
+
     # Compile all hyperparameters
     hyperparams = {
         'env_details': {
@@ -179,15 +175,15 @@ def save_critic_hyperparameters(dataset_name, batch_size, num_steps, lr, min_lr,
             'task_id': task_id
         }
     }
-    
-    # Handle numpy arrays, torch.device, and other non-JSON-serializable types
+
+    # Handle numpy arrays and other non-JSON-serializable types
     hyperparams = convert_to_json_serializable(hyperparams)
-    
+
     # Save with pretty printing (indent=4 makes it human-readable)
     import json
     with open(filepath, 'w') as f:
         json.dump(hyperparams, f, indent=4, sort_keys=False)
-    
+
     print(f"Critic pretraining hyperparameters saved to {filepath}", flush=True)
 
 def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
@@ -232,32 +228,30 @@ def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
          raise ValueError(f"Invalid environment name: {env_name}")
 
 def save_critic(model, dataset_name, specific_dataset, step, task_id: Optional[int] = None):
-    model.eval()
+    # `model` is a TrainState (the JAX critic). Serialize its params (flax.serialization).
     name = get_CriticName(dataset_name, specific_dataset, task_id)
-    net_dict = model.state_dict()
-    """
-    os.makedirs(f'./Pretrain/Critic/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
-    save_path = f'./Pretrain/Critic/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl'
-    """
+    net_dict = flax.serialization.to_state_dict(model.params)
     models_dir = PRETRAIN_DIR / "Critic" / dataset_name / specific_dataset / "Models"
     models_dir.mkdir(parents=True, exist_ok=True)
     save_path = models_dir / f"{name}_Critic_{step}.pkl"
     #print("Exists:", os.path.isfile(save_path), "Size:", os.path.getsize(save_path) if os.path.isfile(save_path) else None)
-    torch.save(net_dict, save_path)
+    # TODO(checkpoint-bridge): torch original did `torch.save(model.state_dict(), save_path)`.
+    # The flax param tree differs in key/layout from the torch state_dict; consumers loading these
+    # checkpoints (get_critic_model) must use the matching flax loader, not torch.load.
+    with open(save_path, "wb") as f:
+        pickle.dump(net_dict, f)
     print(f"critic model save to {name}.pkl")
 
 def save_to_finetuning(critic_net, dataset_name, specific_dataset, task_id: Optional[int] = None):
-    critic_net.eval()
-    net_dict = critic_net.state_dict()
+    # `critic_net` is a TrainState (the JAX critic). Serialize its params (flax.serialization).
+    net_dict = flax.serialization.to_state_dict(critic_net.params)
     name = get_CriticName(dataset_name, specific_dataset, task_id)
-    """
-    os.makedirs(f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
-    save_path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(0)}.pkl'
-    """
     ft_models_dir = FINETUNE_DIR / "Critics" / dataset_name / specific_dataset / "Models"
     ft_models_dir.mkdir(parents=True, exist_ok=True)
     save_path = ft_models_dir / f"{name}_Critic_0.pkl"
-    torch.save(net_dict, save_path)
+    # TODO(checkpoint-bridge): torch original did `torch.save(critic_net.state_dict(), save_path)`.
+    with open(save_path, "wb") as f:
+        pickle.dump(net_dict, f)
     print(f"critic model save to {save_path}")
 
 def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
@@ -273,7 +267,13 @@ def get_critic_model(dataset_name, specific_dataset, step, task_id: Optional[int
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
     name = get_CriticName(dataset_name, specific_dataset, task_id)
     path = PRETRAIN_DIR / "Critic" / dataset_name / specific_dataset / "Models" / f"{name}_Critic_{step}.pkl"
-    model_state_dict = torch.load(path, weights_only=True, map_location="cpu")
+    # TODO(checkpoint-bridge): torch original did
+    #   model_state_dict = torch.load(path, weights_only=True, map_location="cpu")
+    # We now load the flax-serialized param state_dict pickled by save_critic. If a *legacy torch*
+    # checkpoint is ingested here, a torch->flax key remap (Linear weight.T -> kernel, LayerNorm
+    # weight -> scale, etc.; see CONVERSION_GUIDE §10) must be inserted before returning.
+    with open(path, "rb") as f:
+        model_state_dict = pickle.load(f)
     return model_state_dict, obs_dim
 
 def get_critic_stats(dataset_name, specific_dataset, task_id: Optional[int] = None):
@@ -283,14 +283,14 @@ def get_critic_stats(dataset_name, specific_dataset, task_id: Optional[int] = No
         stats = pickle.load(f)
     return stats
 
-class CriticDataset(Dataset):
+class CriticDataset:
     def __init__(self, dataset_name: str, specific_dataset: str, trajs: List[TrajectoryDict], target_reward: Optional[float] = None, horizon: int = 32, gamma: float = 0.99, sigma: float = 7.0, alpha: Optional[float] = None, task_id: Optional[int] = None):
-        
+
         obs_all = []
         for traj in trajs:
             obs_all.append(traj['observations'])
         obs_all = np.concatenate(obs_all, axis = 0)
-        
+
         #get stats
         self.stats = SAStats()
         self.stats.obs_mean = obs_all.mean(axis=0)
@@ -304,7 +304,7 @@ class CriticDataset(Dataset):
             #rews = spare_reward_prcocessor(rews)
             if(not np.all(np.isin(rews, allowed_values))):
                 raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
-            
+
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
             if(alpha is not None):
@@ -324,11 +324,11 @@ class CriticDataset(Dataset):
                         done = True
                      transitions.append((obs_t, r_t, obs_next_t, done))
 
-           
+
         self.transitions = transitions
         self.save_stats(dataset_name, specific_dataset, task_id)
-        
-   
+
+
     def save_stats(self, dataset_name, specific_dataset, task_id: Optional[int] = None):
         name = get_CriticName(dataset_name, specific_dataset, task_id)
         stats_name =  str(name) + f'_Critic_stats.pkl'
@@ -345,17 +345,39 @@ class CriticDataset(Dataset):
     def __getitem__(self, idx):
         s, r, s_next, done = self.transitions[idx]
         return (
-                torch.tensor(s, dtype = torch.float32),
-                torch.tensor(r, dtype = torch.float32),
-                torch.tensor(s_next, dtype = torch.float32),
-                torch.tensor(done, dtype = torch.float32)
+                np.asarray(s, dtype=np.float32),
+                np.asarray(r, dtype=np.float32),
+                np.asarray(s_next, dtype=np.float32),
+                np.asarray(done, dtype=np.float32),
             )
+
+    def sample(self, batch_size):
+        """fql-style host-side batch sampler (replaces torch DataLoader iteration).
+
+        Returns a tuple `(s, r, s_next, done)` of stacked numpy arrays, matching the per-item layout
+        produced by `__getitem__`. Random index draw uses numpy RNG (data shuffling stays host-side
+        per CONVERSION_GUIDE §13).
+        """
+        idxs = np.random.randint(0, len(self.transitions), size=batch_size)
+        s, r, s_next, done = [], [], [], []
+        for idx in idxs:
+            si, ri, sni, di = self[idx]
+            s.append(si)
+            r.append(ri)
+            s_next.append(sni)
+            done.append(di)
+        return (
+            np.stack(s, axis=0),
+            np.stack(r, axis=0),
+            np.stack(s_next, axis=0),
+            np.stack(done, axis=0),
+        )
 
     def boost_signal(self, target_reward, rews):
         rews = np.asarray(rews, dtype=np.float64).copy()
         rews = rews * target_reward
         return rews
-    
+
     def reward_processor(self, rews, horizon, gamma):
         new_rews = []
         for t in range(len(rews)):
@@ -367,64 +389,72 @@ class CriticDataset(Dataset):
             #new_rews.append(np.sum(rews[t:]))
         return new_rews
 
-def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, gamma, horizon, lr, min_lr, tau, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward = 1.0, trajs: List[TrajectoryDict] = None, task_id: Optional[int] = None):
+def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, gamma, horizon, lr, min_lr, tau, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward = 1.0, trajs: List[TrajectoryDict] = None, task_id: Optional[int] = None, *, rng=None):
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    device = check_device()
+    # device threading is a no-op in JAX (CONVERSION_GUIDE §9); check_device kept importable but unused.
 
-
+    if rng is None:
+        rng = jax.random.PRNGKey(0)
 
     dataset = CriticDataset(dataset_name, specific_dataset, trajs, target_reward, horizon, gamma, sigma, alpha, task_id)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
 
-    
-    dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True))
-    critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
-    critic.train()
-    target_critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
-    target_critic.load_state_dict(critic.state_dict())
-    target_critic.eval()
-    optimizer = optim.Adam(critic.parameters(), lr = lr)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max = num_steps,   # one scheduler step per training step
-            eta_min = min_lr
-        )
+
+    dataloader = cycle(iter(lambda: dataset.sample(batch_size), None))
+    critic_def = Critic(obs_dim, hidden_dim, hidden_layers)
+    # Cosine LR schedule (one step per training step), eta_min = min_lr. Matches torch
+    # CosineAnnealingLR(T_max=num_steps, eta_min=min_lr) folded into the optax optimizer.
+    schedule = optax.cosine_decay_schedule(lr, num_steps, alpha=min_lr / lr)
+    # grad clip (max_norm=1.0) chained before Adam, matching torch clip_grad_norm_ + Adam.
+    tx = optax.chain(optax.clip_by_global_norm(1.0), optax.adam(learning_rate=schedule))
+
+    # Build params + TrainState for the online critic; target_critic mirrors the same init (load_state_dict).
+    rng, init_rng = jax.random.split(rng)
+    example_s = np.zeros((1, int(obs_dim)), dtype=np.float32)
+    params = critic_def.init(init_rng, example_s)['params']
+    critic = TrainState.create(critic_def, params, tx=tx)
+    target_critic = TrainState.create(critic_def, jax.tree_util.tree_map(lambda x: x, params))
 
     print(f"Training critic for {dataset_name}-{specific_dataset}")
     #return_rms = RunningMeanStd(epsilon = 1e-8)
+
+    @jax.jit
+    def update_step(critic, target_critic, s, r, s_next, done):
+        # Compute target V-values (no grad through the target net; call without params=).
+        q_next = target_critic(s_next)
+        target = r + ((gamma ** horizon) * q_next * (1 - done.astype(jnp.float32)))
+
+        def loss_fn(params):
+            # Predicted V-values
+            q_pred = critic(s, params=params)
+            # Original computed an MSE then overwrote it with smooth_l1 (beta=1.0); keep smooth_l1.
+            diff = jnp.abs(q_pred - target)
+            loss = jnp.mean(jnp.where(diff < 1.0, 0.5 * diff ** 2, diff - 0.5))
+            return loss, {'loss': loss}
+
+        new_critic, info = critic.apply_loss_fn(loss_fn=loss_fn)
+        # Soft update target network: tgt = (1 - tau) * tgt + tau * online (target_update(p, tp, tau)).
+        new_target_params = target_update(new_critic.params, target_critic.params, tau)
+        new_target_critic = target_critic.replace(params=new_target_params)
+        return new_critic, new_target_critic, info['loss']
+
     total_loss = 0.0
     for k in range(1, num_steps + 1):  # number of passes over dataset
            s, r, s_next, done = next(dataloader)   # r is now n-step return
-           s, r, s_next, done = s.to(device), r.to(device), s_next.to(device), done.to(device)
+           s = jnp.asarray(s)
+           r = jnp.asarray(r)
+           s_next = jnp.asarray(s_next)
+           done = jnp.asarray(done)
 
-           # Compute target V-values
-           with torch.no_grad():
-              q_next = target_critic(s_next)
-              target = r +  ( (gamma**horizon) * q_next * (1 - done.float()) )
-             
-           # Predicted V-values
-           q_pred = critic(s)
-           loss = ((q_pred - target) ** 2).mean()
-           loss = F.smooth_l1_loss(q_pred, target, beta = 1.0)
-           total_loss += loss.item()
+           critic, target_critic, loss = update_step(critic, target_critic, s, r, s_next, done)
+           total_loss += float(loss)
 
-           optimizer.zero_grad()
-           loss.backward()
-           torch.nn.utils.clip_grad_norm_(critic.parameters(), max_norm=1.0)
-           optimizer.step()
-           scheduler.step()
-           
            if(k % 2000 == 0):
                 avg_loss = total_loss/2000
                 print(f"Average Loss: {avg_loss:.4f}")
                 total_loss = 0.0
-           # Soft update target network
-           for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):
-               tgt_param.data.mul_(1 - tau)
-               tgt_param.data.add_(tau * param.data)
-        
+
            if(k % 10000 == 0):
-                target_critic.eval()
                 save_critic(target_critic, dataset_name, specific_dataset, k, task_id)
                 print(f"Checkpoint saved at step {k}")
     save_to_finetuning(target_critic, dataset_name, specific_dataset, task_id)
@@ -432,17 +462,17 @@ def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, h
     save_stats_to_finetuning(stats, dataset_name, specific_dataset, task_id)
     print(f"critic model saved")
 
-class Critic_Test_Dataset(Dataset):
-    def __init__(self, 
-                 dataset_name: str, 
-                 specific_dataset: str, 
+class Critic_Test_Dataset:
+    def __init__(self,
+                 dataset_name: str,
+                 specific_dataset: str,
                  trajs: List[TrajectoryDict],
                  sigma: Optional[float] = None,
                  task_id: Optional[int] = None,
                  target_reward: Optional[float] = None,
                  horizon: int = 32,
                  gamma: float = 0.99):
-        
+
         self.stats = get_critic_stats(dataset_name, specific_dataset, task_id)
         self.horizon = horizon
         self.gamma = gamma
@@ -479,9 +509,24 @@ class Critic_Test_Dataset(Dataset):
     def __getitem__(self, idx):
         obs_t, rews_chunk = self.transitions[idx]
         return (
-            torch.tensor(obs_t, dtype=torch.float32),
-            torch.tensor(rews_chunk, dtype=torch.float32)
+            np.asarray(obs_t, dtype=np.float32),
+            np.asarray(rews_chunk, dtype=np.float32),
         )
+
+    def batches(self, batch_size):
+        """fql-style sequential batching (replaces DataLoader(shuffle=False, drop_last=False)).
+
+        Yields `(s, rews_chunk)` numpy arrays in dataset order, matching the torch eval loop.
+        """
+        n = len(self.transitions)
+        for start in range(0, n, batch_size):
+            idxs = range(start, min(start + batch_size, n))
+            s, rc = [], []
+            for idx in idxs:
+                si, rci = self[idx]
+                s.append(si)
+                rc.append(rci)
+            yield np.stack(s, axis=0), np.stack(rc, axis=0)
 
 def test_critic(dataset_name: str,
                 specific_dataset: str,
@@ -494,21 +539,23 @@ def test_critic(dataset_name: str,
                 target_reward: float = 1.0,
                 trajs: List[TrajectoryDict] = None,
                 task_id: Optional[int] = None):
-    
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # device threading is a no-op in JAX (CONVERSION_GUIDE §9).
 
     dataset = Critic_Test_Dataset(
         dataset_name, specific_dataset, trajs,
         sigma, task_id, target_reward, horizon, gamma
     )
 
-    dataloader = DataLoader(dataset, batch_size=100, shuffle=False, drop_last=False)
-
-    # Load model
+    # Load model (preserves the torch call's argument order, including its existing task_id/step swap).
     model_state_dict, obs_dim = get_critic_model(dataset_name, specific_dataset, task_id, checkpoint_step)
-    model = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
-    model.load_state_dict(model_state_dict)
-    model.eval()
+    model_def = Critic(obs_dim, hidden_dim, hidden_layers)
+    # TODO(checkpoint-bridge): torch original did model.load_state_dict(model_state_dict).
+    # model_state_dict is the flax-serialized param tree saved by save_critic; restore it into a fresh
+    # param template so `model_def.apply` can run it.
+    template_params = model_def.init(jax.random.PRNGKey(0), np.zeros((1, int(obs_dim)), dtype=np.float32))['params']
+    params = flax.serialization.from_state_dict(template_params, model_state_dict)
+    model = TrainState.create(model_def, params)
 
     total_loss = 0.0
     all_preds = []
@@ -516,26 +563,26 @@ def test_critic(dataset_name: str,
 
     print(f"Testing critic at checkpoint {checkpoint_step} (consistent with training)...")
 
-    with torch.no_grad():
-        for s, rews_chunk in dataloader:
-            s = s.to(device)
-            rews_chunk = rews_chunk.to(device)          # (B, horizon)
+    for s, rews_chunk in dataset.batches(100):
+        s = jnp.asarray(s)
+        rews_chunk = jnp.asarray(rews_chunk)          # (B, horizon)
 
-            pred = model(s)                             # V(s) - shape (B, 1) or (B,)
+        pred = model(s)                               # V(s) - shape (B, 1) or (B,)
 
-            if pred.dim() == 2:
-                pred = pred.squeeze(1)
+        if pred.ndim == 2:
+            pred = jnp.squeeze(pred, 1)
 
-            # Compute same style target as training: n-step return
-            target = torch.zeros_like(pred)
-            for i in range(rews_chunk.shape[1]):
-                target += (gamma ** i) * rews_chunk[:, i]
+        # Compute same style target as training: n-step return
+        target = jnp.zeros_like(pred)
+        for i in range(rews_chunk.shape[1]):
+            target = target + (gamma ** i) * rews_chunk[:, i]
 
-            loss = F.smooth_l1_loss(pred, target, beta=1.0)
-            total_loss += loss.item() * s.size(0)
+        diff = jnp.abs(pred - target)
+        loss = jnp.mean(jnp.where(diff < 1.0, 0.5 * diff ** 2, diff - 0.5))
+        total_loss += float(loss) * s.shape[0]
 
-            all_preds.extend(pred.cpu().numpy())
-            all_targets.extend(target.cpu().numpy())
+        all_preds.extend(np.asarray(pred))
+        all_targets.extend(np.asarray(target))
 
     avg_loss = total_loss / len(dataset)
     mae = np.mean(np.abs(np.array(all_preds) - np.array(all_targets)))
@@ -549,91 +596,3 @@ def test_critic(dataset_name: str,
 
     return avg_loss, mae
 
-
-
-
-"""
-def train_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, sigma: float, batch_size, num_steps, gamma, horizon, lr, tau, goal, target_reward=1.0, trajs: List[TrajectoryDict] = None, num_heads: int = 5):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dataset = CriticDataset(sigma, dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma)
-    _, obs_dim, _ = get_env(dataset_name, specific_dataset)
-
-    dataloader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True))
-    critic = CriticEnsemble(obs_dim, hidden_dim, hidden_layers, num_heads=num_heads).to(device)
-    critic.train()
-    target_critic = CriticEnsemble(obs_dim, hidden_dim, hidden_layers, num_heads=num_heads).to(device)
-    target_critic.load_state_dict(critic.state_dict())
-    target_critic.eval()
-    optimizer = optim.Adam(critic.parameters(), lr=lr)
-
-    save_critic_hyperparameters(
-            dataset_name=dataset_name,
-            batch_size=batch_size,
-            num_steps=num_steps,
-            lr=lr,
-            sigma=sigma,
-            obs_dim=obs_dim,
-            critic_net=critic,
-            optimizer=optimizer,
-            gamma=gamma,
-            horizon=horizon,
-            tau=tau,
-            specific_dataset=specific_dataset,
-            target_reward=target_reward,
-            goal=goal)
-
-    print(f"Training critic ensemble (num_heads={num_heads}) for {dataset_name}-{specific_dataset}")
-    for k in range(1, num_steps + 1):
-           s, r, s_next = next(dataloader)
-           s = s.to(device)
-           r = r.to(device)
-           s_next = s_next.to(device)
-
-           with torch.no_grad():
-              q_next = target_critic(s_next, aggregate="mean")
-              target = r + ((gamma**horizon) * q_next)
-
-           q_pred = critic(s, aggregate="mean")
-           loss = ((q_pred - target) ** 2).mean()
-
-           optimizer.zero_grad()
-           loss.backward()
-           optimizer.step()
-
-           for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):
-               tgt_param.data.mul_(1 - tau)
-               tgt_param.data.add_(tau * param.data)
-
-           if k % 5000 == 0:
-                target_critic.eval()
-                save_critic(target_critic, dataset_name, specific_dataset, k)
-                print(f"Checkpoint saved at step {k}")
-    save_to_finetuning(target_critic, dataset_name, specific_dataset)
-    stats = get_critic_stats(dataset_name, specific_dataset)
-    save_stats_to_finetuning(stats, dataset_name, specific_dataset)
-    print("critic model saved")
-
-
-
-def test_critic(dataset_name: str, specific_dataset: str, hidden_layers: int, hidden_dim: int, checkpoint_step, sigma, gamma, horizon, goal=None, target_reward=1.0, trajs: Optional[List[TrajectoryDict]] = None, num_heads: int = 5):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dataset = Critic_Test_Dataset(sigma, dataset_name, specific_dataset, trajs, goal, target_reward, horizon, gamma)
-    batch_size = 100
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True)
-    model_state_dict, obs_dim = get_critic_model(dataset_name, specific_dataset, checkpoint_step)
-
-    model = CriticEnsemble(obs_dim, hidden_dim, hidden_layers, num_heads=num_heads).to(device)
-    model.load_state_dict(model_state_dict)
-    model.eval()
-
-    print(f"Testing critic ensemble (num_heads={num_heads}) for {dataset_name}-{specific_dataset} at checkpoint step {checkpoint_step}")
-    total_loss = 0.0
-    for s, r in dataloader:
-           s = s.to(device)
-           r = r.to(device)
-           pred = model(s, aggregate="mean")
-           total_loss += ((pred - r) ** 2).mean().item()
-    avg_loss = total_loss / len(dataloader)
-    print(f"Average Loss: {avg_loss:.4f}")
-
-"""

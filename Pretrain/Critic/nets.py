@@ -1,173 +1,62 @@
-
+'''Critic networks for ODP (JAX/Flax port of the PyTorch originals).'''
 import random
-from torch.utils.data import Dataset, DataLoader
-import torch
-import torch.optim as optim
+
+import flax.linen as nn
+import jax.numpy as jnp
 import numpy as np
-import torch.nn as nn
 
+# Shared port plumbing (mirrors fql). Used for the CriticEnsemble vmapped ensemble.
+from JAX_PORT.jax_utils import ensemblize
 
-"""
-class Critic(nn.Module):
-    def __init__(self, obs_dim, hidden  = 128):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(obs_dim, hidden),
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, 1),
-            nn.ReLU()                              
-        )
-        #self.scale = nn.Parameter(torch.tensor(5.0))
+# NOTE (data pipeline): the torch original imported `from torch.utils.data import Dataset, DataLoader`
+# at module scope. Per CONVERSION_GUIDE §13 datasets become numpy/fql-style `sample()` objects; this
+# nets.py defines only the networks (no Dataset subclass), so the unused torch dataloader import is
+# dropped. `random` / `numpy` kept (they were imported here and are numpy-side, not framework).
 
-    def forward(self, obs):
-        #return self.net([obs, act]).squeeze(-1) * self.scale
-        return self.net(obs).squeeze(-1)
-"""
 
 class Critic(nn.Module):
-    def __init__(self, obs_dim, hidden_dim=128, hidden_layers=2):
-        super().__init__()
-        layers = []
+    obs_dim: int
+    hidden_dim: int = 128
+    hidden_layers: int = 2
+
+    # init: fql-style (not torch-identical). This critic is trained from scratch in JAX.
+    @nn.compact
+    def __call__(self, obs):
+        x = obs
         # Input layer
-        layers.extend([
-            nn.Linear(obs_dim, hidden_dim),
-            nn.LayerNorm(hidden_dim),
-            nn.SiLU(),
-        ])
+        x = nn.Dense(self.hidden_dim)(x)
+        x = nn.LayerNorm()(x)
+        x = nn.silu(x)
         # Hidden layers (repeat num_layers - 1 times; last "hidden" block is output)
-        for _ in range(hidden_layers):
-            layers.extend([
-                nn.Linear(hidden_dim, hidden_dim),
-                nn.LayerNorm(hidden_dim),
-                nn.SiLU(),
-            ])
+        for _ in range(self.hidden_layers):
+            x = nn.Dense(self.hidden_dim)(x)
+            x = nn.LayerNorm()(x)
+            x = nn.silu(x)
         # Output layer
-        layers.extend([
-            nn.Linear(hidden_dim, 1),
-            #nn.ReLU(),
-        ])
-        self.net = nn.Sequential(*layers)
-
-    def forward(self, obs):
-        return self.net(obs).squeeze(-1)
-
-
-
-"""
-class Critic(nn.Module):
-    def __init__(self, obs_dim, hidden  = 128):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(obs_dim, hidden),
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, 1),
-            nn.ReLU()                              
-        )
-        #self.scale = nn.Parameter(torch.tensor(5.0))
-
-    def forward(self, obs):
-        #return self.net([obs, act]).squeeze(-1) * self.scale
-        return self.net(obs).squeeze(-1)
-
-"""
-
-
-
-
-
-
-"""
-class Critic(nn.Module):
-    def __init__(self, obs_dim, hidden = 32):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(obs_dim, hidden),
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, 1),
-            nn.ReLU()                              
-        )
-        #self.scale = nn.Parameter(torch.tensor(5.0))
-
-    def forward(self, obs):
-        #return self.net([obs, act]).squeeze(-1) * self.scale
-        return self.net(obs).squeeze(-1)
-"""
-
-"""
-class Critic(nn.Module):
-    def __init__(self, obs_dim, hidden = 32):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(obs_dim, hidden),
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, 1),
-            nn.ReLU()                              
-        )
-        #self.scale = nn.Parameter(torch.tensor(5.0))
-
-    def forward(self, obs):
-        #return self.net([obs, act]).squeeze(-1) * self.scale
-        return self.net(obs).squeeze(-1)
-"""
+        x = nn.Dense(1)(x)
+        # nn.relu(x)  # (commented out in the torch original)
+        return x.squeeze(-1)
 
 
 class CriticEnsemble(nn.Module):
-    def __init__(self, obs_dim, hidden_dim=128, hidden_layers=2, num_heads=5):
-        super().__init__()
-        self.hidden = hidden_dim
-        self.num_heads = num_heads
-        self.critics = nn.ModuleList([
-            Critic(obs_dim, hidden_dim, hidden_layers) for _ in range(num_heads)
-        ])
+    obs_dim: int
+    hidden_dim: int = 128
+    hidden_layers: int = 2
+    num_heads: int = 5
 
-    def forward(self, obs, aggregate="mean"):
-        preds = torch.stack([c(obs) for c in self.critics], dim=-1)
-        if aggregate == "mean":
-            return preds.mean(dim=-1)
-        elif aggregate == "min":
-            return preds.min(dim=-1).values
+    @nn.compact
+    def __call__(self, obs, aggregate='mean'):
+        # torch used nn.ModuleList of `num_heads` Critic copies; here we vmap Critic over a leading
+        # ensemble axis (CONVERSION_GUIDE §11). Each member gets independent params.
+        critic_module = ensemblize(Critic, self.num_heads)(
+            obs_dim=self.obs_dim, hidden_dim=self.hidden_dim, hidden_layers=self.hidden_layers
+        )
+        # `preds` stacks the ensemble on the leading axis 0 (torch stacked on dim=-1); reduce on axis=0
+        # to keep the result shape identical to the torch version.
+        preds = critic_module(obs)
+        if aggregate == 'mean':
+            return preds.mean(axis=0)
+        elif aggregate == 'min':
+            return preds.min(axis=0)
         else:
             return preds

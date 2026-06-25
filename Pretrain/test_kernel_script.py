@@ -1,3 +1,4 @@
+'''Entrypoint script: train/test a transition kernel (and MoG variant) on a chosen dataset.'''
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -13,17 +14,19 @@ import pickle
 
 
 if __name__ == '__main__':  # pragma: no cover
-    set_seed(1)
+    # set_seed now returns a jax.random.PRNGKey (no global RNG in JAX); thread it to stochastic callees.
+    rng = set_seed(1)
     #trajs = get_trajs('pointmaze', 'medium', step = 0)
-    
-    test_kernel(dataset_name = 'pointmaze', 
-                specific_dataset = 'medium', 
-                trajs = None, 
-                save_freq = 50000, 
-                num_steps = 50000, 
-                hidden_layers = 2, 
-                hidden_dim = 256, 
-                ensemble_size = 10)
+
+    test_kernel(dataset_name = 'pointmaze',
+                specific_dataset = 'medium',
+                trajs = None,
+                save_freq = 50000,
+                num_steps = 50000,
+                hidden_layers = 2,
+                hidden_dim = 256,
+                ensemble_size = 10,
+                rng = rng)
 
     """
     test_kernel(dataset_name = 'cube',
@@ -43,10 +46,9 @@ if __name__ == '__main__':  # pragma: no cover
                 num_steps = 50000,
                 num_hidden_layers = 4,
                 hidden_dim = 512,
-                ensemble_size = 20, 
+                ensemble_size = 20,
                 num_modes = 8,
                 quantile = 0.95)
      """
 
     #test_Model(dataset_name = 'kitchen', save_freq = 2000, num_steps = 300000)
-    

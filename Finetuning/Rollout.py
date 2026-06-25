@@ -1,20 +1,21 @@
+'''Rollout / planning-time sampling utilities (JAX/Flax port, FQL-style).'''
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
-import torch
+import jax
+import jax.numpy as jnp
 import numpy as np
 import mediapy as media
 from Pretrain.Dataset import get_env
 from Pretrain.Planners.Backbone.Dit import DiT1d
-from torch.utils.data import DataLoader
 from Finetuning.utils import cycle
 #from Pretrain.Planners.Backbone.utils import get_pretrained_planner
 from Finetuning.utils import get_planner, get_normalized_score, get_expert_score, PlannerDataset, get_current_state, reward_processor, check_device
 from Pretrain.Dataset import Planner_Processor, get_dataset
 from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde, sample_euler_karras, sample_euler_karras2
-from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
+from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv
 import pickle
 import random
 import gymnasium as gym
@@ -29,22 +30,27 @@ from typing import List
 from Finetuning.traj_reward2 import TotalReward_Critic, RewardConfig, TotalReward
 from Pretrain.Planners.Backbone.Sampler import karras_beta_schedule, cosine_beta, clip_actions
 
+# Shared port plumbing (mirrors fql).
+from JAX_PORT.jax_utils import (
+    MLP, ModuleDict, TrainState, nonpytree_field, default_init, ensemblize,
+    target_update, save_agent, restore_agent, supply_rng,
+)
+
 
 def create_initial(current_state: np.ndarray, plan_suffix: np.ndarray, d_s: int, d_a: int, horizon: int, device: str) -> np.ndarray:
-    initial = torch.zeros(1, horizon, d_s + d_a,device = device)
-    initial[:, 0, :d_s] = current_state
-    initial[:, 0, d_s: (d_s + d_a)] = plan_suffix[0, d_s: (d_s + d_a)]
+    initial = jnp.zeros((1, horizon, d_s + d_a))
+    initial = initial.at[:, 0, :d_s].set(current_state)
+    initial = initial.at[:, 0, d_s:(d_s + d_a)].set(plan_suffix[0, d_s:(d_s + d_a)])
     for i in range(horizon):
-        if(i < len(plan_suffix)):
-             initial[:, i] = plan_suffix[i]
+        if (i < len(plan_suffix)):
+            initial = initial.at[:, i].set(plan_suffix[i])
         else:
-             initial[:, i] = initial[:, i-1]
+            initial = initial.at[:, i].set(initial[:, i - 1])
     return initial
 
-@torch.no_grad()
 def sample_euler_karras_replan(
     s0: np.ndarray,
-    score_model: torch.nn.Module,
+    score_model,
     d_s: int,
     d_a: int,
     horizon: int,
@@ -53,9 +59,11 @@ def sample_euler_karras_replan(
     eta: float = 1.0,
     plan_suffix: np.ndarray = None,
     device: Optional[str] = None,
+    *,
+    rng=None,
 ) -> np.ndarray:
-    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    s0_t = torch.tensor(s0, device=device, dtype=torch.float32)
+    # API-CHANGE: added keyword-only `rng=` (Euler-Karras noise is stochastic when eta > 0).
+    s0_t = jnp.asarray(s0, dtype=jnp.float32)
     if s0_t.shape[0] != d_s:
         raise ValueError(f"s0 should have shape ({d_s},), but got {s0_t.shape}")
 
@@ -73,32 +81,32 @@ def sample_euler_karras_replan(
     #x2 = torch.randn(1, horizon, dim, device=device)
 
     # Conditioning
-    mask = torch.zeros(1, horizon, dim, device=device)
-    mask[:, 0, :d_s] = 1.0
-    y = torch.zeros_like(x)
-    y[:, 0, :d_s] = s0_t.unsqueeze(0)
+    mask = jnp.zeros((1, horizon, dim))
+    mask = mask.at[:, 0, :d_s].set(1.0)
+    y = jnp.zeros_like(x)
+    y = y.at[:, 0, :d_s].set(s0_t[None])
     x = mask * y + (1 - mask) * x
-    
 
     for i in range(num_steps):
         t_now = t_grid[i]
         t_next = t_grid[i + 1] if i < num_steps - 1 else 0.0
-        dt = (t_next - t_now).item()
-        if( i < num_karras ):
-            beta_now = beta_1[i].item()
+        dt = float(t_next - t_now)
+        if (i < num_karras):
+            beta_now = float(beta_1[i])
         else:
-            beta_now = beta_2[i].item()
+            beta_now = float(beta_2[i])
 
         # Drift
         drift = -0.5 * beta_now * x
 
         # Score
-        score = score_model(x, t_now.unsqueeze(0))
+        score = score_model(x, t_now[None])
 
         # Euler step
         if eta > 0:
-            noise = torch.randn_like(x)
-            noise_scale = eta * math.sqrt(beta_now * (-dt))
+            rng, noise_key = jax.random.split(rng)
+            noise = jax.random.normal(noise_key, x.shape)
+            noise_scale = eta * jnp.sqrt(beta_now * (-dt))
             x = x + ((drift - beta_now * score) * dt + noise_scale * noise)
         else:
             x = x + (drift - beta_now * score) * dt
@@ -107,7 +115,7 @@ def sample_euler_karras_replan(
         x = mask * y + (1 - mask) * x
         x = clip_actions(x, d_s)
 
-    return x.squeeze(0).cpu().numpy()
+    return np.asarray(x.squeeze(0))
 
 class Selector():
     def __init__(self, env_name, specific_env, RConfig: RewardConfig, reward_checkpoint: int, kernel_checkpoint: Optional[int] = None, critic_checkpoint: Optional[int] = None):
@@ -123,15 +131,13 @@ class Selector():
             self.model = TotalReward_Critic(self.device, RConfig, env_name, specific_env, self.reward_checkpoint, self.kernel_checkpoint, self.critic_checkpoint)
          else:
             self.model = TotalReward(self.device, RConfig, env_name, specific_env, self.reward_checkpoint, self.kernel_checkpoint)
-         self.model.eval()
-    
+
     def select_plan(self, plans: List[np.ndarray]) -> np.ndarray:
          rewards = []
-         with torch.no_grad():
-            for plan in plans:
-             plan_tensor = torch.from_numpy(plan).float().to(self.device) 
+         for plan in plans:
+             plan_tensor = jnp.asarray(plan, dtype=jnp.float32)
              reward = self.model.predict(plan_tensor, self.lam)
-             rewards.append(reward.item())
+             rewards.append(float(reward))
          return plans[rewards.index(max(rewards))].copy()
 
 def check(env):
@@ -252,45 +258,46 @@ def test_rollout_fit_for_model(traj, dataset_name=None, specific_dataset=None,
         }
     """
     if device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
+        device = None  # API note: JAX places arrays automatically; `device` kept for signature compat.
+
     if dataset_name is None or specific_dataset is None:
         raise ValueError("dataset_name and specific_dataset must be provided")
-    
+
     # Load reward model and stats
-    from Finetuning.utils import (get_reward_model, get_reward_stats, get_kernel, 
+    from Finetuning.utils import (get_reward_model, get_reward_stats, get_kernel,
                                    get_kernel_stats, get_critic_model, get_critic_stats)
     from Pretrain.Rewards.nets import SimpleReward
     from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel
     from Pretrain.Critic.nets import Critic
     from Pretrain.Dataset import get_env
-    
+
     reward_state_dict, obs_dim, act_dim = get_reward_model(dataset_name, specific_dataset, reward_checkpoint)
-    reward_net = SimpleReward(obs_dim, act_dim).to(device)
-    reward_net.load_state_dict(reward_state_dict)
-    reward_net.eval()
+    # TODO(checkpoint-bridge): map the torch reward state_dict into a flax param tree + TrainState.
+    reward_net = SimpleReward(obs_dim, act_dim)
+    reward_params = reward_state_dict
+    reward_state = TrainState.create(reward_net, reward_params)
     reward_stats = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint)
-    
+
     # Load kernel models and stats
     kernel_state_dicts, _, _ = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
     kernels = []
     for kernel_state_dict in kernel_state_dicts:
-        kernel_net = RobustTransitionKernel(obs_dim, act_dim).to(device)
-        kernel_net.load_state_dict(kernel_state_dict)
-        kernel_net.eval()
-        kernels.append(kernel_net)
+        # TODO(checkpoint-bridge): map the torch kernel state_dict into a flax param tree + TrainState.
+        kernel_net = RobustTransitionKernel(obs_dim, act_dim)
+        kernel_state = TrainState.create(kernel_net, kernel_state_dict)
+        kernels.append(kernel_state)
     kernel_stats = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
-    
+
     # Load critic model and stats
     critic_state_dict, critic_obs_dim = get_critic_model(dataset_name, specific_dataset, critic_checkpoint)
-    critic_net = Critic(critic_obs_dim).to(device)
-    critic_net.load_state_dict(critic_state_dict)
-    critic_net.eval()
+    # TODO(checkpoint-bridge): map the torch critic state_dict into a flax param tree + TrainState.
+    critic_net = Critic(critic_obs_dim)
+    critic_state = TrainState.create(critic_net, critic_state_dict)
     critic_stats = get_critic_stats(dataset_name, specific_dataset, critic_checkpoint)
-    
+
     observations = traj['observations']
     actions = traj['actions']
-    
+
     # Calculate average log probability, average reward, and average critic value
     total_log_prob = 0.0
     total_reward = 0.0
@@ -298,71 +305,70 @@ def test_rollout_fit_for_model(traj, dataset_name=None, specific_dataset=None,
     num_transitions = len(actions)
     num_states = len(observations)
     
-    with torch.no_grad():
-        for t in range(num_transitions):
-            # Get state, action, and next state
-            s = observations[t]
-            a = actions[t]
-            
-            # Compute reward
-            s_norm_reward = reward_stats.norm_obs(s)
-            s_tensor = torch.tensor(s_norm_reward, dtype=torch.float32, device=device).unsqueeze(0)
-            a_tensor = torch.tensor(a, dtype=torch.float32, device=device).unsqueeze(0)
-            r = reward_net(s_tensor, a_tensor)
-            total_reward += r.item()
-            
-            # Compute critic value for current state
-            # For pointmaze, critic uses only first 2 dimensions
-            """
-            if dataset_name == 'pointmaze':
-                s_critic = s[:2]
-            else:
-                s_critic = s
-            """
+    for t in range(num_transitions):
+        # Get state, action, and next state
+        s = observations[t]
+        a = actions[t]
+
+        # Compute reward
+        s_norm_reward = reward_stats.norm_obs(s)
+        s_tensor = jnp.asarray(s_norm_reward, dtype=jnp.float32)[None]
+        a_tensor = jnp.asarray(a, dtype=jnp.float32)[None]
+        r = reward_state(s_tensor, a_tensor)
+        total_reward += float(r)
+
+        # Compute critic value for current state
+        # For pointmaze, critic uses only first 2 dimensions
+        """
+        if dataset_name == 'pointmaze':
+            s_critic = s[:2]
+        else:
             s_critic = s
-            s_norm_critic = critic_stats.norm_obs(s_critic)
-            s_critic_tensor = torch.tensor(s_norm_critic, dtype=torch.float32, device=device).unsqueeze(0)
-            v = critic_net(s_critic_tensor)
-            total_critic += v.item()
-            
-            # Skip if we don't have next state for log prob calculation
-            if t >= len(observations) - 1:
-                continue
-            
-            s_next = observations[t + 1]
-            
-            # Compute log probability using kernel ensemble
-            s_norm_kernel = kernel_stats.norm_obs(s)
-            s_next_norm_kernel = kernel_stats.norm_obs(s_next)
-            
-            s_tensor = torch.tensor(s_norm_kernel, dtype=torch.float32, device=device).unsqueeze(0)
-            a_tensor = torch.tensor(a, dtype=torch.float32, device=device).unsqueeze(0)
-            s_next_tensor = torch.tensor(s_next_norm_kernel, dtype=torch.float32, device=device).unsqueeze(0)
-            
-            # Average log prob across ensemble
-            ensemble_log_probs = []
-            for kernel in kernels:
-                mu, log_std = kernel(s_tensor, a_tensor)
-                lp = kernel.log_prob(s_next_tensor, mu, log_std)
-                ensemble_log_probs.append(lp.item())
-            
-            avg_log_prob_transition = np.mean(ensemble_log_probs)
-            total_log_prob += avg_log_prob_transition
-        
-        # Compute critic value for the last state (if not already computed)
-        if num_states > num_transitions:
-            s_final = observations[num_states - 1]
-            """
-            if dataset_name == 'pointmaze':
-                s_final_critic = s_final[:2]
-            else:
-                s_final_critic = s_final
-            """
+        """
+        s_critic = s
+        s_norm_critic = critic_stats.norm_obs(s_critic)
+        s_critic_tensor = jnp.asarray(s_norm_critic, dtype=jnp.float32)[None]
+        v = critic_state(s_critic_tensor)
+        total_critic += float(v)
+
+        # Skip if we don't have next state for log prob calculation
+        if t >= len(observations) - 1:
+            continue
+
+        s_next = observations[t + 1]
+
+        # Compute log probability using kernel ensemble
+        s_norm_kernel = kernel_stats.norm_obs(s)
+        s_next_norm_kernel = kernel_stats.norm_obs(s_next)
+
+        s_tensor = jnp.asarray(s_norm_kernel, dtype=jnp.float32)[None]
+        a_tensor = jnp.asarray(a, dtype=jnp.float32)[None]
+        s_next_tensor = jnp.asarray(s_next_norm_kernel, dtype=jnp.float32)[None]
+
+        # Average log prob across ensemble
+        ensemble_log_probs = []
+        for kernel in kernels:
+            mu, log_std = kernel(s_tensor, a_tensor)
+            lp = kernel(s_next_tensor, mu, log_std, method='log_prob')
+            ensemble_log_probs.append(float(lp))
+
+        avg_log_prob_transition = np.mean(ensemble_log_probs)
+        total_log_prob += avg_log_prob_transition
+
+    # Compute critic value for the last state (if not already computed)
+    if num_states > num_transitions:
+        s_final = observations[num_states - 1]
+        """
+        if dataset_name == 'pointmaze':
+            s_final_critic = s_final[:2]
+        else:
             s_final_critic = s_final
-            s_final_norm_critic = critic_stats.norm_obs(s_final_critic)
-            s_final_critic_tensor = torch.tensor(s_final_norm_critic, dtype=torch.float32, device=device).unsqueeze(0)
-            v_final = critic_net(s_final_critic_tensor)
-            total_critic += v_final.item()
+        """
+        s_final_critic = s_final
+        s_final_norm_critic = critic_stats.norm_obs(s_final_critic)
+        s_final_critic_tensor = jnp.asarray(s_final_norm_critic, dtype=jnp.float32)[None]
+        v_final = critic_state(s_final_critic_tensor)
+        total_critic += float(v_final)
     
     # Calculate averages
     # For log prob, we have num_transitions-1 transitions (last step has no next state)
@@ -382,15 +388,10 @@ def set_seed(seed=0):
     random.seed(seed)
     # NumPy random
     np.random.seed(seed)
-    # PyTorch random
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)  # if using multiple GPUs
-    # PyTorch deterministic algorithms
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
     # Set environment variable for additional reproducibility
     os.environ['PYTHONHASHSEED'] = str(seed)
+    # JAX has no global RNG: return a key for callers to thread.
+    return jax.random.PRNGKey(seed)
 
 def save_trajs(trajs, env_name, specific_env, step):
     os.makedirs(f'./Finetuning/Rollouts/{env_name}/{specific_env}/', exist_ok=True)
@@ -424,10 +425,15 @@ def rollout(env_name,
             start_cell: Optional[np.ndarray] = None,
             task_id: Optional[int] = None,
             base_seed: int = None, 
-            continual_rollout = False, 
-            chunk_size = 5, 
-            device = None, 
-            selector: Optional[Selector] = None):
+            continual_rollout = False,
+            chunk_size = 5,
+            device = None,
+            selector: Optional[Selector] = None,
+            *,
+            rng=None):
+     # API-CHANGE: added keyword-only `rng=` (planner sampling is stochastic). Defaults from base_seed.
+     if rng is None:
+          rng = jax.random.PRNGKey(base_seed if base_seed is not None else 0)
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      #print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}, episode_length: {episode_length}")
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
@@ -447,19 +453,19 @@ def rollout(env_name,
      state_dict = get_planner(env_name, specific_env, checkpoint_steps, task_id)
      #state_dict = get_planner(env_name, specific_env, checkpoint_steps)
      if( env_name == 'kitchen'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
      elif (env_name == 'pointmaze'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
      elif(env_name == 'antmaze'):
-           model = DiT1d(in_dim = (d_s), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
      elif(env_name == 'cube'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
      elif(env_name == 'ogpointmaze'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
      else:
           raise ValueError(f"Invalid Environment: {env_name}")
-     model.load_state_dict(state_dict)
-     model.eval()
+     # TODO(checkpoint-bridge): map the torch planner state_dict into a flax param tree.
+     model = TrainState.create(model, state_dict)
 
      #get Processor
      planner_processor = Planner_Processor(env_name, specific_env, task_id)
@@ -499,11 +505,13 @@ def rollout(env_name,
                 if(len(Temp_acts) == 0):
                      current_state_norm = planner_processor.preprocess(current_state)
                      if(selector is None):
-                         x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                         rng, plan_key = jax.random.split(rng)
+                         x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device, rng=plan_key)
                      else:
                          Plans = []
                          for j in range(30):
-                              Plans.append(sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device))
+                              rng, plan_key = jax.random.split(rng)
+                              Plans.append(sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device, rng=plan_key))
                          x = selector.select_plan(Plans)
                      for k in range(min(chunk_size, len(x))):
                          Temp_acts.append(x[k, d_s:(d_s+d_a)].copy())
@@ -526,11 +534,13 @@ def rollout(env_name,
                 current_state_norm = planner_processor.preprocess(current_state)
                 #x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
                 if(selector is None):
-                    x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                    rng, plan_key = jax.random.split(rng)
+                    x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device, rng=plan_key)
                 else:
                     Plans = []
                     for j in range(30):
-                        Plans.append(sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device))
+                        rng, plan_key = jax.random.split(rng)
+                        Plans.append(sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device, rng=plan_key))
                     x = selector.select_plan(Plans)
                 action = x[0, d_s:(d_s+d_a)].copy()
                 generated_state = x[1, :d_s].copy()
@@ -596,28 +606,30 @@ def load_kernel(env_name, specific_env, checkpoint_steps, kernel_config: Kernel_
     for sd in kernel_state_dicts:
             kernel_net = Model(
                 obs_dim, act_dim, kernel_config.kernel_num_modes, kernel_config.num_hidden_layers, kernel_config.hidden_dim, noise_floor = kernel_config.kernel_noise_floor
-            ).to(device)
-            kernel_net.load_state_dict(sd)
-            kernel_net.eval()
-            kernels.append(kernel_net)
+            )
+            # TODO(checkpoint-bridge): map the torch kernel state_dict into a flax param tree.
+            # §11: compute_*_mog consumers iterate `for model_def, params in kernels`, so store tuples.
+            kernels.append((kernel_net, sd))
     return kernels, kernel_stats, obs_dim, act_dim
 
 def compute_log_prob(kernels, kernel_stats, x, obs_dim, act_dim, type: str = 'log_density', device: str = 'cuda'):
-    #device = 'cuda' if torch.cuda.is_available() else 'cpu'
     from Pretrain.Transition_Kernel.Kernel_Backbone import  compute_log_density_mog, compute_total_mahalanobis_score_mog
     values = []
     for i in range(1, len(x)-1):
-        obs = torch.tensor(kernel_stats.norm_obs(x[i, :obs_dim].copy()), dtype = torch.float32).unsqueeze(0).to(device)
-        act = torch.tensor(x[i, obs_dim:(obs_dim+act_dim)].copy(), dtype = torch.float32).unsqueeze(0).to(device)
-        s_next = torch.tensor(kernel_stats.norm_obs(x[i+1, :obs_dim].copy()), dtype = torch.float32).unsqueeze(0).to(device)
+        obs = jnp.asarray(kernel_stats.norm_obs(x[i, :obs_dim].copy()), dtype=jnp.float32)[None]
+        act = jnp.asarray(x[i, obs_dim:(obs_dim+act_dim)].copy(), dtype=jnp.float32)[None]
+        s_next = jnp.asarray(kernel_stats.norm_obs(x[i+1, :obs_dim].copy()), dtype=jnp.float32)[None]
         if(type == 'log_density'):
-            value = compute_log_density_mog(kernels, obs, act, s_next).item()
+            value = float(compute_log_density_mog(kernels, obs, act, s_next))
         else:
-            value = compute_total_mahalanobis_score_mog(kernels, obs, act, s_next).item()
+            value = float(compute_total_mahalanobis_score_mog(kernels, obs, act, s_next))
         values.append(value)
     return np.mean(values)
 
-def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_config: Kernel_Config,  steps_T, num_karras, eta, time, planner_checkpoint, kernel_checkpoint, task_id: Optional[int] = None):
+def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_config: Kernel_Config,  steps_T, num_karras, eta, time, planner_checkpoint, kernel_checkpoint, task_id: Optional[int] = None, *, rng=None):
+     # API-CHANGE: added keyword-only `rng=` (planner sampling is stochastic).
+     if rng is None:
+          rng = jax.random.PRNGKey(0)
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      
 
@@ -630,18 +642,18 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
     # Create environment factory function
      state_dict = get_planner(env_name, specific_env, planner_checkpoint)
      if( env_name == 'kitchen'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
      elif (env_name == 'pointmaze'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
      elif(env_name == 'antmaze'):
-           model = DiT1d(in_dim = (d_s), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
      elif(env_name == 'cube'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
      else:
           raise ValueError(f"Invalid Environment: {env_name}")
-     model.load_state_dict(state_dict)
-     model.eval()
-     
+     # TODO(checkpoint-bridge): map the torch planner state_dict into a flax param tree.
+     model = TrainState.create(model, state_dict)
+
 
      #get Processor
      planner_processor = Planner_Processor(env_name, specific_env)
@@ -649,14 +661,21 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
      dataset = get_dataset(env_name, specific_env, task_id)
      trajs = dataset.get_trajectories()
      planner_dataset = PlannerDataset(trajs, horizon, env_name, specific_env)
-     dataloader = cycle(DataLoader(planner_dataset, batch_size = 1, shuffle = False))
+
+     def _dataloader_cycle(ds):
+          # Replaces torch DataLoader(batch_size=1, shuffle=False) + cycle: sequential numpy batching.
+          while True:
+               for idx in range(len(ds)):
+                    yield np.asarray(ds[idx])
+
+     dataloader = cycle(_dataloader_cycle(planner_dataset))
      kernels, kernel_stats, obs_dim, act_dim = load_kernel(env_name, specific_env, kernel_checkpoint, kernel_config, device)
      mahalanobis_scores = []
      log_density_scores = []
      for i in range(time):
             norm_state = next(dataloader)
-            norm_state = norm_state.squeeze(0).numpy()
-            x = sample_euler_karras(norm_state, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+            rng, plan_key = jax.random.split(rng)
+            x = sample_euler_karras(norm_state, model, d_s, d_a, horizon, steps_T, num_karras, eta, device, rng=plan_key)
             log_density_score = compute_log_prob(kernels, kernel_stats, x, obs_dim, act_dim, type = 'log_density', device = device)
             mahalanobis_score = compute_log_prob(kernels, kernel_stats, x, obs_dim, act_dim, type = 'mahalanobis', device = device)
             mahalanobis_scores.append(mahalanobis_score)

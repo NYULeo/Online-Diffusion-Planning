@@ -1,3 +1,12 @@
+'''Finetuning hub for ODP: datasets, reward/kernel/critic trainers, planner rollouts, schedulers.
+
+JAX/Flax (FQL-style) port of the original torch module. Training loops use optax + jax_utils.TrainState
+(grads via apply_loss_fn / jax.grad), EMA/target nets use jax_utils.target_update, datasets store numpy
+arrays and expose fql-style sample(), and the diffusion rollouts thread an explicit rng. Functions that
+ingest pre-trained torch checkpoints (get_planner / get_reward_model / get_kernel / get_critic_model and
+the save_* twins) keep their signatures and carry a `# TODO(checkpoint-bridge)` describing the torch
+state_dict -> flax param-tree remap (Dense weight (out,in) -> kernel (in,out).T).
+'''
 import sys
 import os
 
@@ -5,26 +14,20 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
-import torch
 import numpy as np
-import torch
 import os
 import pickle
-from torch.utils.data import Dataset
 from Pretrain.utils import SAStats
 from scipy.ndimage import gaussian_filter1d
 from typing import TypedDict, List
 from typing import Optional
 import matplotlib.pyplot as plt
-import torch.nn.functional as F
 import seaborn as sns
 from Pretrain.Dataset import get_PlannerName
 from typing import Tuple, Dict
 from Pretrain.Transition_Kernel.Kernel_Backbone import count_files_in_folder
 import copy
 from Pretrain.Rewards.nets import SimpleReward, EnsembleReward
-from torch.utils.data import DataLoader
-import torch.optim as optim
 from Pretrain.Transition_Kernel.Kernel_Net import MoGTransitionKernel, RobustTransitionKernel
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_total_mahalanobis_score, compute_log_density_mog, compute_log_density, compute_total_mahalanobis_score_mog
 from Pretrain.Dataset import KitchenDataset, PointMazeDataset, get_env, get_dataset, Planner_Processor
@@ -34,8 +37,18 @@ from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Critic.nets import Critic
 from Pretrain.Dataset import get_dataset
 import json
-import torch.nn as nn
 import random
+
+import jax
+import jax.numpy as jnp
+import flax
+import flax.linen as nn
+import optax
+
+from JAX_PORT.jax_utils import (
+    MLP, ModuleDict, TrainState, nonpytree_field, default_init, ensemblize,
+    target_update, save_agent, restore_agent, supply_rng,
+)
 
 
 
@@ -61,8 +74,9 @@ def drop_trajs(trajs, percentage):
     return success_trajs + failed_trajs
 
 def _bootstrap_per_member(s, a, r, ensemble_size, device):
+    # Host-side data bootstrap (numpy RNG for data shuffling per CONVERSION_GUIDE.md §13).
     B = s.shape[0]
-    idx = torch.randint(0, B, (ensemble_size, B), device=device)
+    idx = np.random.randint(0, B, size=(ensemble_size, B))
     return s[idx], a[idx], r[idx]
 
 def check_specific_dataset(dataset_name):
@@ -153,35 +167,45 @@ def reward_filter_goals(trajs: List[TrajectoryDict], goal) -> List[TrajectoryDic
     return new_trajs
    
 def save_reward_model(reward_net, dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
-    reward_net.eval()
-    net_dict = reward_net.state_dict()
+    # TODO(checkpoint-bridge): `reward_net` is now a (model_def, params) / TrainState pair (was a torch
+    # nn.Module). We persist `flax.serialization.to_state_dict(params)` via pickle, keeping the exact path
+    # layout so the rest of the pipeline finds the checkpoint. The torch->flax Dense remap
+    # (weight (out,in) -> kernel (in,out).T, bias->bias, LayerNorm weight->scale) is documented in get_reward_model.
+    net_dict = flax.serialization.to_state_dict(reward_net)
     specific_dataset = reward_name_converter(specific_dataset)
     #reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     reward_name = get_RewardName(dataset_name, specific_dataset, task_id)
     if(check_specific_dataset(dataset_name)):
           os.makedirs(f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
           save_path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{reward_name}_Reward_{str(step)}.pkl'
-    else: 
+    else:
           os.makedirs(f'./Finetuning/Rewards/{dataset_name}/Models/', exist_ok=True)
           save_path = f'./Finetuning/Rewards/{dataset_name}/Models/{reward_name}_Reward_{str(step)}.pkl'
     #print("Exists:", os.path.isfile(save_path), "Size:", os.path.getsize(save_path) if os.path.isfile(save_path) else None)
-    torch.save(net_dict, save_path)
+    with open(save_path, 'wb') as f:
+          pickle.dump(net_dict, f)
 
 def save_kernel_model(kernel_net, dataset_name, specific_dataset, step, ensemble_idx):
-    kernel_net.eval()
+    # TODO(checkpoint-bridge): `kernel_net` is now (model_def, params)/params (was a torch nn.Module). Persist
+    # via flax.serialization + pickle, keeping the path layout; torch->flax Dense remap documented in get_kernel.
     specific_dataset = reward_name_converter(specific_dataset)
     name = getName2(dataset_name, specific_dataset)
-    net_dict = kernel_net.state_dict()
+    net_dict = flax.serialization.to_state_dict(kernel_net)
     if(check_specific_dataset(dataset_name)):
           os.makedirs(f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}', exist_ok=True)
           save_path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}/{name}_Kernel_{str(ensemble_idx)}.pkl'
-    else: 
+    else:
           os.makedirs(f'./Finetuning/Kernels/{dataset_name}/Models/{str(step)}', exist_ok=True)
           save_path = f'./Finetuning/Kernels/{dataset_name}/Models/{str(step)}/{name}_Kernel_{str(ensemble_idx)}.pkl'
-    torch.save(net_dict, save_path)
+    with open(save_path, 'wb') as f:
+          pickle.dump(net_dict, f)
     #print(f"Kernel model save to {name}_{str(step)}_{str(ensemble_idx)}.pkl")
 
 def get_reward_model(dataset_name, specific_dataset, step, task_id: Optional[int] = None):
+    # TODO(checkpoint-bridge): legacy checkpoints are torch state_dicts saved via torch.save. To ingest a
+    # torch .pkl into the flax SimpleReward param tree, remap each Dense: torch Linear `weight` (out,in) ->
+    # flax `kernel` = weight.T (in,out); `bias` -> `bias`; LayerNorm `weight` -> `scale`, `bias` -> `bias`.
+    # New checkpoints are saved as flax.serialization state dicts (pickle); load them directly here.
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
     specific_dataset = reward_name_converter(specific_dataset)
     #reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
@@ -190,7 +214,8 @@ def get_reward_model(dataset_name, specific_dataset, step, task_id: Optional[int
         path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{reward_name}_Reward_{str(step)}.pkl'
     else:
         path = f'./Finetuning/Rewards/{dataset_name}/Models/{reward_name}_Reward_{str(step)}.pkl'
-    model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
+    with open(path, 'rb') as f:
+        model_state_dict = pickle.load(f)
     return model_state_dict, obs_dim, act_dim
 
 def get_reward_stats(dataset_name, specific_dataset, step, task_id: Optional[int] = None):
@@ -207,6 +232,9 @@ def get_reward_stats(dataset_name, specific_dataset, step, task_id: Optional[int
     return stats  
 
 def get_kernel(dataset_name, specific_dataset, step):
+    # TODO(checkpoint-bridge): returns a python list of kernel state dicts (independently-loaded models,
+    # NOT a vmapped ensemble — keep as a list). Legacy torch state_dicts need the per-Dense remap
+    # (weight (out,in) -> kernel (in,out).T, bias->bias, LayerNorm weight->scale); new ones are flax pickles.
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
     specific_dataset = reward_name_converter(specific_dataset)
     name = getName2(dataset_name, specific_dataset)
@@ -221,7 +249,8 @@ def get_kernel(dataset_name, specific_dataset, step):
             dir = f"./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}/{name}_Kernel_{str(i)}.pkl"
         else:
             dir = f"./Finetuning/Kernels/{dataset_name}/Models/{str(step)}/{name}_Kernel_{str(i)}.pkl"
-        kernel_state_dicts.append(torch.load(dir, weights_only=True, map_location='cpu'))
+        with open(dir, 'rb') as f:
+            kernel_state_dicts.append(pickle.load(f))
     return kernel_state_dicts, obs_dim, act_dim
 
 def get_kernel_stats(dataset_name, specific_dataset, step):
@@ -233,32 +262,19 @@ def get_kernel_stats(dataset_name, specific_dataset, step):
         path = f'./Finetuning/Kernels/{dataset_name}/Stats/{name}_Kernel_stats_{str(step)}.pkl'
     with open(path, 'rb') as f:
         stats = pickle.load(f)
-    return stats  
-
-"""
-def save_planner(model, dataset_name, specific_dataset, step: int):
-    model.eval()
-    data = {
-            'dataset_name': dataset_name,
-            'specific_dataset': specific_dataset,
-            'step': step,
-            'ema': model.state_dict()
-    }
-    name = getName(dataset_name, specific_dataset)
-    savepath = f"./Finetuning/Planners/{dataset_name}/{specific_dataset}/{name}_Planner_{str(step)}.pt"
-    torch.save(data, savepath)
-    print(f"saved model to {savepath}")
-"""
+    return stats
 
 def save_planner(model, dataset_name, specific_dataset, step: int,
                  task_id: Optional[int] = None):              # NEW arg
-    model.eval()
+    # TODO(checkpoint-bridge): `model` is now (model_def, params)/params for the flax DiT1d (was a torch
+    # nn.Module). The 'ema' field holds flax.serialization.to_state_dict(params); the torch->flax remap
+    # (Dense weight (out,in)->kernel (in,out).T, bias->bias, LayerNorm weight->scale) is documented in get_planner.
     data = {
         'dataset_name': dataset_name,
         'specific_dataset': specific_dataset,
         'task_id': task_id,                                   # NEW field
         'step': step,
-        'ema': model.state_dict(),
+        'ema': flax.serialization.to_state_dict(model),
     }
     base = getName(dataset_name, specific_dataset)
     tid  = f"_task{task_id}" if task_id is not None else ""
@@ -266,44 +282,44 @@ def save_planner(model, dataset_name, specific_dataset, step: int,
     dir   = f"./Finetuning/Planners/{dataset_name}/{specific_dataset}"
     os.makedirs(dir, exist_ok=True)
     savepath = f"{dir}/{fname}"
-    torch.save(data, savepath)
+    with open(savepath, 'wb') as f:
+        pickle.dump(data, f)
     print(f"saved model to {savepath}")
 
 def get_planner(dataset_name, specific_dataset, step,
                 task_id: Optional[int] = None):               # NEW arg
+    # TODO(checkpoint-bridge): returns the planner 'ema' params. Legacy files are torch.save dicts whose
+    # 'ema' is a torch state_dict; ingest into the flax DiT1d param tree with the per-Dense remap
+    # (weight (out,in)->kernel (in,out).T, bias->bias, LayerNorm weight->scale). New files are pickled flax dicts.
     base = getName(dataset_name, specific_dataset)
     tid  = f"_task{task_id}" if task_id is not None else ""
     path = f"./Finetuning/Planners/{dataset_name}/{specific_dataset}/{base}{tid}_Planner_{step}.pt"
     if not os.path.exists(path):
         raise FileNotFoundError(f"Checkpoint not found: {path}")
-    return torch.load(path, weights_only=True, map_location='cpu')['ema']
-
-"""
-def get_planner(dataset_name, specific_dataset, step):
-    name = getName(dataset_name, specific_dataset)
-    path = f"./Finetuning/Planners/{dataset_name}/{specific_dataset}/{name}_Planner_{str(step)}.pt"
-    if not os.path.exists(path):
-          raise FileNotFoundError(f"Checkpoint not found: {path}")
-    checkpoint = torch.load(path, weights_only = True,map_location='cpu')
-    #checkpoint = torch.load(checkpoint_path,  weights_only=True)
-    return checkpoint['ema']
-"""
+    with open(path, 'rb') as f:
+        return pickle.load(f)['ema']
 
 def save_critic(model, dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
-    model.eval()
+    # TODO(checkpoint-bridge): `model` is now (model_def, params)/params for the flax Critic (was a torch
+    # nn.Module). Persist flax.serialization.to_state_dict; the torch->flax Dense remap is documented in get_critic_model.
     critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
-    net_dict = model.state_dict()
+    net_dict = flax.serialization.to_state_dict(model)
     os.makedirs(f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
     save_path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{critic_name}_Critic_{str(step)}.pkl'
     #print("Exists:", os.path.isfile(save_path), "Size:", os.path.getsize(save_path) if os.path.isfile(save_path) else None)
-    torch.save(net_dict, save_path)
+    with open(save_path, 'wb') as f:
+        pickle.dump(net_dict, f)
     print(f"critic model save to {critic_name}_{str(step)}.pkl")
 
 def get_critic_model(dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
+    # TODO(checkpoint-bridge): legacy critic checkpoints are torch state_dicts; ingest into the flax Critic
+    # param tree with the per-Dense remap (weight (out,in)->kernel (in,out).T, bias->bias, LayerNorm
+    # weight->scale). New checkpoints are pickled flax.serialization state dicts; load directly.
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
     critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
     path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{critic_name}_Critic_{str(step)}.pkl'
-    model_state_dict = torch.load(path, weights_only=True, map_location='cpu')
+    with open(path, 'rb') as f:
+        model_state_dict = pickle.load(f)
     return model_state_dict, obs_dim
 
 def get_critic_stats(dataset_name, specific_dataset, task_id: Optional[int] = None,  step: int = 0) -> SAStats:
@@ -604,10 +620,10 @@ def get_RewardName(env_name, specific_env, task_id: Optional[int] = None):
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
-class KernelDataset(Dataset):
+class KernelDataset:
     def __init__(self, trajectories: List[TrajectoryDict], dataset_name: str, specific_dataset: str, step: int):
          obs_list, act_list = [], []
-        
+
          for traj in trajectories:
             obs, acts = traj['observations'], traj['actions']
             L = min(len(obs), len(acts))
@@ -615,7 +631,7 @@ class KernelDataset(Dataset):
             act_list.append(acts[:L])
          obs_all = np.concatenate(obs_list, axis=0)  # [N, d_s]
          #act_all = np.concatenate(act_list, axis=0)  # [N, d_a]
-        
+
         #get stats
          self.stats = SAStats()
          self.stats.obs_mean = obs_all.mean(axis=0)
@@ -631,7 +647,7 @@ class KernelDataset(Dataset):
                 data.append((s_t, a_t, s_tp1))
          self.data = data
          self.save_stats(dataset_name, specific_dataset, step)
-    
+
     def save_stats(self, dataset_name, specific_dataset, step):
         specific_dataset = reward_name_converter(specific_dataset)
         name = getName2(dataset_name, specific_dataset)
@@ -652,12 +668,20 @@ class KernelDataset(Dataset):
     def __getitem__(self, idx):
         s, a, s_next = self.data[idx]
         return (
-            torch.tensor(s, dtype=torch.float32),
-            torch.tensor(a, dtype=torch.float32),
-            torch.tensor(s_next, dtype=torch.float32)
+            np.asarray(s, dtype=np.float32),
+            np.asarray(a, dtype=np.float32),
+            np.asarray(s_next, dtype=np.float32),
         )
 
-class RewardDataset(Dataset):
+    def sample(self, batch_size):
+        # fql-style host-side sampling: returns numpy batch (s, a, s_next).
+        idxs = np.random.randint(0, len(self.data), size=batch_size)
+        s = np.stack([np.asarray(self.data[i][0], dtype=np.float32) for i in idxs], axis=0)
+        a = np.stack([np.asarray(self.data[i][1], dtype=np.float32) for i in idxs], axis=0)
+        s_next = np.stack([np.asarray(self.data[i][2], dtype=np.float32) for i in idxs], axis=0)
+        return s, a, s_next
+
+class RewardDataset:
     def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, step: int, goal: Optional[np.array] = None, target_reward: Optional[float] = None, task_id: Optional[int] = None):
             
         # ----- gather raw obs/actions to fit stats -----
@@ -720,64 +744,77 @@ class RewardDataset(Dataset):
     def __getitem__(self, idx):
         s, a, r = self.transitions[idx]
         return (
-            torch.tensor(s, dtype=torch.float32),
-            torch.tensor(a, dtype=torch.float32),
-            torch.tensor(r, dtype=torch.float32),
+            np.asarray(s, dtype=np.float32),
+            np.asarray(a, dtype=np.float32),
+            np.asarray(r, dtype=np.float32),
         )
-    
+
+    def sample(self, batch_size):
+        # fql-style host-side sampling: returns numpy batch (s, a, r).
+        idxs = np.random.randint(0, len(self.transitions), size=batch_size)
+        s = np.stack([np.asarray(self.transitions[i][0], dtype=np.float32) for i in idxs], axis=0)
+        a = np.stack([np.asarray(self.transitions[i][1], dtype=np.float32) for i in idxs], axis=0)
+        r = np.stack([np.asarray(self.transitions[i][2], dtype=np.float32) for i in idxs], axis=0)
+        return s, a, r
+
     def boost_signal(self, target_reward, rews):
          rews = np.asarray(rews, dtype=np.float64).copy()
          rews = rews * target_reward
          return rews
 
-def train_reward(trajs: List[TrajectoryDict], 
+def train_reward(trajs: List[TrajectoryDict],
                  dataset_name: str,
-                 hidden_layers: int, 
-                 hidden_dim: int, 
-                 batch_size, 
-                 num_steps, 
-                 lr, min_lr, sigma, 
-                 step, 
-                 target_reward: Optional[float] = None, 
-                 specific_dataset: Optional[str] = None, 
-                 goal: Optional[np.array] = None, 
-                 task_id: Optional[int] = None):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                 hidden_layers: int,
+                 hidden_dim: int,
+                 batch_size,
+                 num_steps,
+                 lr, min_lr, sigma,
+                 step,
+                 target_reward: Optional[float] = None,
+                 specific_dataset: Optional[str] = None,
+                 goal: Optional[np.array] = None,
+                 task_id: Optional[int] = None,
+                 *, rng=None):  # API-CHANGE: rng= threaded for param init (was implicitly stochastic)
+    if rng is None:
+        rng = jax.random.PRNGKey(0)
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
-    print(f"Training reward approximator for {dataset_name}_{specific_dataset} Dataset") 
+    print(f"Training reward approximator for {dataset_name}_{specific_dataset} Dataset")
     dataset = RewardDataset(trajs, sigma, dataset_name, specific_dataset, step, goal, target_reward, task_id)
-    dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
-    reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
-    optimizer = optim.AdamW(reward_net.parameters(), lr = lr, weight_decay = 1e-4)
+    reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers)
+    # CosineAnnealingLR(T_max=num_steps, eta_min=min_lr) folded into the optax schedule (reads opt_state.count).
+    schedule = optax.cosine_decay_schedule(lr, num_steps, alpha=min_lr / lr)
+    tx = optax.adamw(schedule, weight_decay=1e-4)
+    s0, a0, _ = dataset.sample(batch_size)
+    rng, init_rng = jax.random.split(rng)
+    params = reward_net.init(init_rng, jnp.asarray(s0), jnp.asarray(a0))['params']
+    train_state = TrainState.create(reward_net, params, tx=tx)
     total_loss = 0
     counter = 0
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max = num_steps,   # one scheduler step per training step
-            eta_min = min_lr
-        )
+
+    @jax.jit
+    def _update(train_state, s, a, r):
+        def loss_fn(params):
+            pred = train_state(s, a, params=params)
+            #loss = jnp.mean((pred - r) ** 2)
+            loss = jnp.mean(optax.huber_loss(pred, r, delta=1.0))
+            return loss, {'loss': loss}
+        return train_state.apply_loss_fn(loss_fn)
+
     for i in range(num_steps):
-           s, a, r = next(dataloader)
-           s = s.to(device)
-           a = a.to(device)
-           r = r.to(device)
-        
-           # Predicted Reward
-           optimizer.zero_grad()
-           pred = reward_net(s, a)
-           #loss = F.mse_loss(pred, r)
-           loss = F.smooth_l1_loss(pred, r, beta = 1)
-           loss.backward()
-           #torch.nn.utils.clip_grad_norm_(reward_net.parameters(), max_norm = 1.0)
-           optimizer.step()
-           scheduler.step()
-           total_loss += loss.item()
+           s, a, r = dataset.sample(batch_size)
+           s = jnp.asarray(s)
+           a = jnp.asarray(a)
+           r = jnp.asarray(r)
+
+           # Predicted Reward + gradient step (apply_loss_fn handles grad/step/sched)
+           train_state, info = _update(train_state, s, a, r)
+           total_loss += float(info['loss'])
            counter += 1
-    save_reward_model(reward_net, dataset_name, specific_dataset, task_id, step)
+    save_reward_model(train_state.params, dataset_name, specific_dataset, task_id, step)
     print(f"reward model saved")
 
 def train_reward_ensemble(
-    trajs: List[TrajectoryDict], 
+    trajs: List[TrajectoryDict],
     dataset_name: str,
     hidden_layers: int,
     hidden_dim: int,
@@ -796,57 +833,59 @@ def train_reward_ensemble(
     task_id: Optional[int] = None,
     weight_decay: float = 1e-4,
     grad_clip: Optional[float] = 1.0,
-):  
-   
-    device = check_device()
+    *, rng=None,  # API-CHANGE: rng= threaded for param init (was implicitly stochastic)
+):
+
+    if rng is None:
+        rng = jax.random.PRNGKey(0)
     trajs = drop_trajs(trajs, save_percentage)
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
     dataset = RewardDataset(trajs, sigma, dataset_name, specific_dataset, step, goal, target_reward, task_id)
-    dataloader = cycle(DataLoader(
-        dataset, batch_size = batch_size, shuffle = True,
-        pin_memory = True, num_workers = 8,
-    ))
     # --- build model + optim
     reward_net = EnsembleReward(
         obs_dim, act_dim, hidden_dim, hidden_layers,
         ensemble_size=ensemble_size,
-    ).to(device)
-    optimizer = optim.AdamW(
-        reward_net.parameters(), lr=lr, weight_decay=weight_decay,
     )
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=num_steps, eta_min=min_lr,
-    )
+    schedule = optax.cosine_decay_schedule(lr, num_steps, alpha=min_lr / lr)
+    if grad_clip is not None:
+        tx = optax.chain(optax.clip_by_global_norm(grad_clip), optax.adamw(schedule, weight_decay=weight_decay))
+    else:
+        tx = optax.adamw(schedule, weight_decay=weight_decay)
+    s0, a0, _ = dataset.sample(batch_size)
+    s0_e = np.broadcast_to(s0[None], (ensemble_size, *s0.shape))
+    a0_e = np.broadcast_to(a0[None], (ensemble_size, *a0.shape))
+    rng, init_rng = jax.random.split(rng)
+    params = reward_net.init(init_rng, jnp.asarray(s0_e), jnp.asarray(a0_e))['params']
+    train_state = TrainState.create(reward_net, params, tx=tx)
+
+    @jax.jit
+    def _update(train_state, s_e, a_e, r_e):
+        def loss_fn(params):
+            pred_e = train_state(s_e, a_e, params=params)            # (E, B)
+            loss = jnp.mean(optax.huber_loss(pred_e, r_e, delta=1.0))
+            return loss, {'loss': loss}
+        return train_state.apply_loss_fn(loss_fn)
+
     running_loss = 0.0
     for step in range(1, num_steps + 1):
-        s, a, r = next(dataloader)
-        s = s.to(device, non_blocking=True)
-        a = a.to(device, non_blocking=True)
-        r = r.to(device, non_blocking=True)
+        s, a, r = dataset.sample(batch_size)
         if bootstrap and ensemble_size > 1:
-            s_e, a_e, r_e = _bootstrap_per_member(s, a, r, ensemble_size, device)
+            s_e, a_e, r_e = _bootstrap_per_member(s, a, r, ensemble_size, None)
         else:
             # diversity from random init only
-            s_e = s.unsqueeze(0).expand(ensemble_size, -1, -1)
-            a_e = a.unsqueeze(0).expand(ensemble_size, -1, -1)
-            r_e = r.unsqueeze(0).expand(ensemble_size, -1)
-        optimizer.zero_grad()
-        pred_e = reward_net(s_e, a_e)                     # (E, B)
+            s_e = np.broadcast_to(s[None], (ensemble_size, *s.shape))
+            a_e = np.broadcast_to(a[None], (ensemble_size, *a.shape))
+            r_e = np.broadcast_to(r[None], (ensemble_size, *r.shape))
         # mean over (E*B) ≡ mean of per-member SmoothL1 losses
         """
-        per_elem = F.smooth_l1_loss(pred_e, r_e, beta=1.0, reduction='none')
+        per_elem = optax.huber_loss(pred_e, r_e, delta=1.0)
         positive_weight = 50.0                       # try 8.0 ~ 30.0
-        weights = torch.where(r_e > 0, positive_weight, 1.0)
+        weights = jnp.where(r_e > 0, positive_weight, 1.0)
         loss = (weights * per_elem).mean()
         """
-        loss = F.smooth_l1_loss(pred_e, r_e, beta = 1.0)
-        loss.backward()
-        if grad_clip is not None:
-            torch.nn.utils.clip_grad_norm_(reward_net.parameters(), grad_clip)
-        optimizer.step()
-        scheduler.step()
-        running_loss += loss.item()
-    save_reward_model(reward_net, dataset_name, specific_dataset, task_id, step)
+        train_state, info = _update(train_state, jnp.asarray(s_e), jnp.asarray(a_e), jnp.asarray(r_e))
+        running_loss += float(info['loss'])
+    save_reward_model(train_state.params, dataset_name, specific_dataset, task_id, step)
     print(f"reward model saved")
 
 def train_kernel(
@@ -865,11 +904,13 @@ def train_kernel(
     quantile: float = 0.95,
     x_generated_plans: Optional[list] = None,
     accelerator=None,
+    *, rng=None,  # API-CHANGE: rng= threaded for per-member param init (was implicitly stochastic)
 ):
-   
+
     if accelerator is not None and accelerator.is_main_process:
           print(f"Training kernel for {dataset_name}_{specific_dataset}")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if rng is None:
+        rng = jax.random.PRNGKey(0)
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
 
     # distributed role info
@@ -889,48 +930,49 @@ def train_kernel(
     ensemble = None
     if is_main:
         dataset = KernelDataset(trajs, dataset_name, specific_dataset, step)
-        loader = cycle(
-            DataLoader(
-                dataset,
-                batch_size=batch_size,
-                shuffle=True,
-                pin_memory=True,
-                num_workers=8,
-            )
-        )
+        # Independently-checkpointed kernels stay a python list of (model_def, TrainState) per §11.
         ensemble = [
-            RobustTransitionKernel(obs_dim, act_dim, num_hidden_layers, hidden_dim).to(device)
+            RobustTransitionKernel(obs_dim, act_dim, num_hidden_layers, hidden_dim)
             for _ in range(ensemble_size)
         ]
-        optimizers = [optim.Adam(m.parameters(), lr, weight_decay=1e-5) for m in ensemble]
+        s0, a0, _ = dataset.sample(batch_size)
+        train_states = []
+        for m in ensemble:
+            rng, init_rng = jax.random.split(rng)
+            params = m.init(init_rng, jnp.asarray(s0), jnp.asarray(a0))['params']
+            train_states.append(TrainState.create(m, params, tx=optax.adamw(lr, weight_decay=1e-5)))
+
+        noise_floors = [ts.model_def.noise_floor for ts in train_states]
+
+        @jax.jit
+        def _update(train_states, s, a, s_next):
+            # forward all members (stored params, no grad) to get disagreement target
+            mus = [ts(s, a)[0] for ts in train_states]
+            mus_stack = jnp.stack(mus, axis=0)
+            mu_mean = mus_stack.mean(axis=0)
+            disagreement = jax.lax.stop_gradient(((mus_stack - mu_mean[None]) ** 2).mean(axis=0))
+
+            new_states = []
+            infos = []
+            for i, ts in enumerate(train_states):
+                def loss_fn(params, ts=ts, i=i):
+                    mu, log_std = ts(s, a, params=params)
+                    nll = ts(s_next, mu, log_std, params=params, method='gaussian_nll')
+                    penalty = (disagreement / (jnp.exp(2 * log_std) + noise_floors[i])).sum(axis=-1).mean()
+                    loss = nll + λ_reg * penalty
+                    return loss, {'loss': loss}
+                new_ts, info = ts.apply_loss_fn(loss_fn)
+                new_states.append(new_ts)
+                infos.append(info)
+            return new_states, infos
 
         for _ in range(1, num_steps + 1):
-            s, a, s_next = next(loader)
-            s, a, s_next = s.to(device), a.to(device), s_next.to(device)
-
-            losses, mus, log_stds = [], [], []
-            for m in ensemble:
-                mu, log_std = m(s, a)
-                mus.append(mu)
-                log_stds.append(log_std)
-                losses.append(m.gaussian_nll(s_next, mu, log_std))
-
-            mus_stack = torch.stack(mus, dim=0)
-            mu_mean = mus_stack.mean(dim=0)
-            disagreement = ((mus_stack - mu_mean.unsqueeze(0)) ** 2).mean(dim=0).detach()
-
-            for i, m in enumerate(ensemble):
-                penalty = (disagreement / (torch.exp(2 * log_stds[i]) + m.noise_floor)).sum(dim=-1).mean()
-                losses[i] = losses[i] + λ_reg * penalty
-
-            for i, (m, opt) in enumerate(zip(ensemble, optimizers)):
-                opt.zero_grad()
-                losses[i].backward()
-                opt.step()
+            s, a, s_next = dataset.sample(batch_size)
+            train_states, _ = _update(train_states, jnp.asarray(s), jnp.asarray(a), jnp.asarray(s_next))
 
         # save trained kernels for all ranks to load
-        for idx, m in enumerate(ensemble):
-            save_kernel_model(copy.deepcopy(m).cpu(), dataset_name, specific_dataset, step, idx)
+        for idx, ts in enumerate(train_states):
+            save_kernel_model(ts.params, dataset_name, specific_dataset, step, idx)
         print("Kernel model saved")
 
     if accelerator is not None:
@@ -943,29 +985,34 @@ def train_kernel(
     if x_generated_plans is not None:
         # every rank loads saved kernels
         kernel_state_dicts, _, _ = get_kernel(dataset_name, specific_dataset, step)
-        eval_ensemble = [
-            RobustTransitionKernel(obs_dim, act_dim, num_hidden_layers, hidden_dim).to(device)
-            for _ in range(len(kernel_state_dicts))
-        ]
-        for m, sd in zip(eval_ensemble, kernel_state_dicts):
-            m.load_state_dict(sd)
-            m.eval()
-
         kernel_stats = get_kernel_stats(dataset_name, specific_dataset, step)
+        # TODO(checkpoint-bridge): rebuild each kernel as a TrainState; legacy torch state_dicts need the
+        # per-Dense remap (weight (out,in)->kernel (in,out).T) before from_state_dict. We init a template and
+        # restore the saved flax params. Kernels stay a python list (independently-loaded models, §11).
+        eval_ensemble = []
+        for sd in kernel_state_dicts:
+            m = RobustTransitionKernel(obs_dim, act_dim, num_hidden_layers, hidden_dim)
+            s_ex = jnp.zeros((1, obs_dim), dtype=jnp.float32)
+            a_ex = jnp.zeros((1, act_dim), dtype=jnp.float32)
+            rng, init_rng = jax.random.split(rng)
+            params = m.init(init_rng, s_ex, a_ex)['params']
+            ts = TrainState.create(m, params, tx=None)
+            ts = flax.serialization.from_state_dict(ts, sd) if isinstance(sd, dict) and 'params' in sd else ts.replace(params=sd)
+            eval_ensemble.append(ts)
 
         # shard plans across ranks
         local_plans = x_generated_plans[rank::world]
         local_values = []
         for x in local_plans:
             for j in range(1, len(x) - 1):
-                obs = torch.tensor(kernel_stats.norm_obs(x[j, :obs_dim].copy()), dtype=torch.float32).unsqueeze(0).to(device)
-                act = torch.tensor(x[j, obs_dim:obs_dim + act_dim].copy(), dtype=torch.float32).unsqueeze(0).to(device)
-                s_next = torch.tensor(kernel_stats.norm_obs(x[j + 1, :obs_dim].copy()), dtype=torch.float32).unsqueeze(0).to(device)
+                obs = jnp.asarray(kernel_stats.norm_obs(x[j, :obs_dim].copy()), dtype=jnp.float32)[None]
+                act = jnp.asarray(x[j, obs_dim:obs_dim + act_dim].copy(), dtype=jnp.float32)[None]
+                s_next = jnp.asarray(kernel_stats.norm_obs(x[j + 1, :obs_dim].copy()), dtype=jnp.float32)[None]
 
                 if ctype == "log_prob":
-                    v = compute_log_density(eval_ensemble, obs, act, s_next).item()
+                    v = float(compute_log_density(eval_ensemble, obs, act, s_next))
                 else:
-                    v = compute_total_mahalanobis_score(eval_ensemble, obs, act, s_next).item()
+                    v = float(compute_total_mahalanobis_score(eval_ensemble, obs, act, s_next))
                 local_values.append(v)
 
         # gather local values from all ranks
@@ -986,15 +1033,21 @@ def train_kernel(
         else:
             threshold = 0.0
 
-        # broadcast scalar threshold
-        if accelerator is not None and torch.distributed.is_available() and torch.distributed.is_initialized():
-            t = torch.tensor([threshold], device=device, dtype=torch.float32)
-            torch.distributed.broadcast(t, src=0)
-            threshold = float(t.item())
-    
+        # broadcast scalar threshold: torch.distributed removed. All ranks already hold the gathered values,
+        # so every rank recomputes the same scalar from `gathered` to stay in sync (no cross-process op needed).
+        if accelerator is not None and not is_main and gathered is not None:
+            values = []
+            for chunk in gathered:
+                values.extend(chunk)
+            if len(values) > 0:
+                if ctype == "log_prob":
+                    threshold = float(np.quantile(values, 1 - quantile))
+                else:
+                    threshold = float(np.quantile(values, quantile))
+
     if accelerator is not None:
         accelerator.wait_for_everyone()
-        
+
     return threshold
 
 def train_kernel_mog(
@@ -1015,10 +1068,12 @@ def train_kernel_mog(
     quantile: float = 0.95,
     x_generated_plans: Optional[List] = None,
     accelerator=None,
-):   
+    *, rng=None,  # API-CHANGE: rng= threaded for per-member param init (was implicitly stochastic)
+):
     if accelerator is not None and accelerator.is_main_process:
           print(f"Training kernel for {dataset_name}_{specific_dataset}")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if rng is None:
+        rng = jax.random.PRNGKey(0)
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
 
     if accelerator is None:
@@ -1035,48 +1090,47 @@ def train_kernel_mog(
     # -----------------------------
     if is_main:
         dataset = KernelDataset(trajs, dataset_name, specific_dataset, step)
-        loader = cycle(
-            DataLoader(
-                dataset,
-                batch_size=batch_size,
-                shuffle=True,
-                pin_memory=True,
-                num_workers=8,
-                persistent_workers=True,
-                prefetch_factor=4,
-                drop_last=True,
-            )
-        )
-
+        # Independently-checkpointed kernels stay a python list of TrainStates per §11.
         ensemble = [
-            MoGTransitionKernel(obs_dim, act_dim, num_modes, num_hidden_layers, hidden_dim, kernel_noise_floor).to(device)
+            MoGTransitionKernel(obs_dim, act_dim, num_modes, num_hidden_layers, hidden_dim, kernel_noise_floor)
             for _ in range(ensemble_size)
         ]
-        optimizers = [optim.Adam(m.parameters(), lr, weight_decay=1e-5) for m in ensemble]
+        s0, a0, _ = dataset.sample(batch_size)
+        train_states = []
+        for m in ensemble:
+            rng, init_rng = jax.random.split(rng)
+            params = m.init(init_rng, jnp.asarray(s0), jnp.asarray(a0))['params']
+            tx = optax.chain(optax.clip_by_global_norm(5.0), optax.adamw(lr, weight_decay=1e-5))
+            train_states.append(TrainState.create(m, params, tx=tx))
+
+        noise_floors = [ts.model_def.noise_floor for ts in train_states]
+
+        @jax.jit
+        def _update(train_states, s, a, s_next):
+            new_states = []
+            infos = []
+            for i, ts in enumerate(train_states):
+                def loss_fn(params, ts=ts, i=i):
+                    mu, log_std, weights = ts(s, a, params=params)
+                    loss = ts(s_next, mu, log_std, weights, params=params, method='mog_nll')
+
+                    mu_mean = mu.mean(axis=1)
+                    disagreement = ((mu - mu_mean[:, None]) ** 2).mean(axis=1).mean(axis=0)
+                    var = jnp.exp(2 * log_std) + noise_floors[i]
+                    penalty = (disagreement / (var.mean(axis=1) + 1e-6)).mean()
+                    total = loss + λ_reg * penalty
+                    return total, {'loss': total}
+                new_ts, info = ts.apply_loss_fn(loss_fn)
+                new_states.append(new_ts)
+                infos.append(info)
+            return new_states, infos
 
         for _ in range(1, num_steps + 1):
-            s, a, s_next = next(loader)
-            s, a, s_next = s.to(device), a.to(device), s_next.to(device)
+            s, a, s_next = dataset.sample(batch_size)
+            train_states, _ = _update(train_states, jnp.asarray(s), jnp.asarray(a), jnp.asarray(s_next))
 
-            losses = []
-            for m in ensemble:
-                mu, log_std, weights = m(s, a)
-                loss = m.mog_nll(s_next, mu, log_std, weights)
-
-                mu_mean = mu.mean(dim=1)
-                disagreement = ((mu - mu_mean.unsqueeze(1)) ** 2).mean(dim=1).mean(dim=0)
-                var = torch.exp(2 * log_std) + m.noise_floor
-                penalty = (disagreement / (var.mean(dim=1) + 1e-6)).mean()
-                losses.append(loss + λ_reg * penalty)
-
-            for m, opt, loss in zip(ensemble, optimizers, losses):
-                opt.zero_grad()
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(m.parameters(), max_norm=5.0)
-                opt.step()
-
-        for idx, m in enumerate(ensemble):
-            save_kernel_model(copy.deepcopy(m).cpu(), dataset_name, specific_dataset, step, idx)
+        for idx, ts in enumerate(train_states):
+            save_kernel_model(ts.params, dataset_name, specific_dataset, step, idx)
         print("Kernel model saved")
 
     if accelerator is not None:
@@ -1088,28 +1142,32 @@ def train_kernel_mog(
     threshold = None
     if x_generated_plans is not None:
         kernel_state_dicts, _, _ = get_kernel(dataset_name, specific_dataset, step)
-        eval_ensemble = [
-            MoGTransitionKernel(obs_dim, act_dim, num_modes, num_hidden_layers, hidden_dim, kernel_noise_floor).to(device)
-            for _ in range(len(kernel_state_dicts))
-        ]
-        for m, sd in zip(eval_ensemble, kernel_state_dicts):
-            m.load_state_dict(sd)
-            m.eval()
-
         kernel_stats = get_kernel_stats(dataset_name, specific_dataset, step)
+        # TODO(checkpoint-bridge): rebuild each MoG kernel as a TrainState; legacy torch state_dicts need the
+        # per-Dense remap (weight (out,in)->kernel (in,out).T) before from_state_dict. Kernels stay a list (§11).
+        eval_ensemble = []
+        for sd in kernel_state_dicts:
+            m = MoGTransitionKernel(obs_dim, act_dim, num_modes, num_hidden_layers, hidden_dim, kernel_noise_floor)
+            s_ex = jnp.zeros((1, obs_dim), dtype=jnp.float32)
+            a_ex = jnp.zeros((1, act_dim), dtype=jnp.float32)
+            rng, init_rng = jax.random.split(rng)
+            params = m.init(init_rng, s_ex, a_ex)['params']
+            ts = TrainState.create(m, params, tx=None)
+            ts = flax.serialization.from_state_dict(ts, sd) if isinstance(sd, dict) and 'params' in sd else ts.replace(params=sd)
+            eval_ensemble.append(ts)
 
         local_plans = x_generated_plans[rank::world]
         local_values = []
         for x in local_plans:
             for j in range(1, len(x) - 1):
-                obs = torch.tensor(kernel_stats.norm_obs(x[j, :obs_dim].copy()), dtype=torch.float32).unsqueeze(0).to(device)
-                act = torch.tensor(x[j, obs_dim:obs_dim + act_dim].copy(), dtype=torch.float32).unsqueeze(0).to(device)
-                s_next = torch.tensor(kernel_stats.norm_obs(x[j + 1, :obs_dim].copy()), dtype=torch.float32).unsqueeze(0).to(device)
+                obs = jnp.asarray(kernel_stats.norm_obs(x[j, :obs_dim].copy()), dtype=jnp.float32)[None]
+                act = jnp.asarray(x[j, obs_dim:obs_dim + act_dim].copy(), dtype=jnp.float32)[None]
+                s_next = jnp.asarray(kernel_stats.norm_obs(x[j + 1, :obs_dim].copy()), dtype=jnp.float32)[None]
 
                 if ctype == "log_prob":
-                    v = compute_log_density_mog(eval_ensemble, obs, act, s_next).item()
+                    v = float(compute_log_density_mog(eval_ensemble, obs, act, s_next))
                 else:
-                    v = compute_total_mahalanobis_score_mog(eval_ensemble, obs, act, s_next).item()
+                    v = float(compute_total_mahalanobis_score_mog(eval_ensemble, obs, act, s_next))
                 local_values.append(v)
 
         if accelerator is not None:
@@ -1129,11 +1187,17 @@ def train_kernel_mog(
         else:
             threshold = 0.0
 
-        if accelerator is not None and torch.distributed.is_available() and torch.distributed.is_initialized():
-            t = torch.tensor([threshold], device=device, dtype=torch.float32)
-            torch.distributed.broadcast(t, src=0)
-            threshold = float(t.item())
-    
+        # broadcast scalar threshold: torch.distributed removed. Non-main ranks recompute from gathered values.
+        if accelerator is not None and not is_main and gathered is not None:
+            values = []
+            for chunk in gathered:
+                values.extend(chunk)
+            if len(values) > 0:
+                if ctype == "log_prob":
+                    threshold = float(np.quantile(values, 1 - quantile))
+                else:
+                    threshold = float(np.quantile(values, quantile))
+
     if accelerator is not None:
         accelerator.wait_for_everyone()
 
@@ -1144,13 +1208,13 @@ def compute_threshold_mog(kernels, kernel_stats, obs_dim, act_dim, x, constraint
     values = []
     for i in range(len(x)):
        for j in range(1, len(x[i])-1):
-           obs = torch.tensor(kernel_stats.norm_obs(x[i][j, :obs_dim].copy()), dtype = torch.float32).unsqueeze(0).to(device)
-           act = torch.tensor(x[i][j, obs_dim:(obs_dim+act_dim)].copy(), dtype = torch.float32).unsqueeze(0).to(device)
-           s_next = torch.tensor(kernel_stats.norm_obs(x[i][j+1, :obs_dim].copy()), dtype = torch.float32).unsqueeze(0).to(device)
+           obs = jnp.asarray(kernel_stats.norm_obs(x[i][j, :obs_dim].copy()), dtype=jnp.float32)[None]
+           act = jnp.asarray(x[i][j, obs_dim:(obs_dim+act_dim)].copy(), dtype=jnp.float32)[None]
+           s_next = jnp.asarray(kernel_stats.norm_obs(x[i][j+1, :obs_dim].copy()), dtype=jnp.float32)[None]
            if(constraint_type == 'log_prob'):
-               value = compute_log_density_mog(kernels, obs, act, s_next).item()
+               value = float(compute_log_density_mog(kernels, obs, act, s_next))
            else:
-               value = compute_total_mahalanobis_score_mog(kernels, obs, act, s_next).item()
+               value = float(compute_total_mahalanobis_score_mog(kernels, obs, act, s_next))
            values.append(value)
     if(constraint_type == 'log_prob'):
          threshold = np.quantile(values, (1 - quantile))
@@ -1165,13 +1229,13 @@ def compute_threshold(kernels, kernel_stats, obs_dim, act_dim, x, constraint_typ
     values = []
     for i in range(len(x)):
        for j in range(1, len(x[i])-1):
-           obs = torch.tensor(kernel_stats.norm_obs(x[i][j, :obs_dim].copy()), dtype = torch.float32).unsqueeze(0).to(device)
-           act = torch.tensor(x[i][j, obs_dim:(obs_dim+act_dim)].copy(), dtype = torch.float32).unsqueeze(0).to(device)
-           s_next = torch.tensor(kernel_stats.norm_obs(x[i][j+1, :obs_dim].copy()), dtype = torch.float32).unsqueeze(0).to(device)
+           obs = jnp.asarray(kernel_stats.norm_obs(x[i][j, :obs_dim].copy()), dtype=jnp.float32)[None]
+           act = jnp.asarray(x[i][j, obs_dim:(obs_dim+act_dim)].copy(), dtype=jnp.float32)[None]
+           s_next = jnp.asarray(kernel_stats.norm_obs(x[i][j+1, :obs_dim].copy()), dtype=jnp.float32)[None]
            if(constraint_type == 'log_prob'):
-                value = compute_log_density(kernels, obs, act, s_next).item()
+                value = float(compute_log_density(kernels, obs, act, s_next))
            else:
-                value = compute_total_mahalanobis_score(kernels, obs, act, s_next).item()
+                value = float(compute_total_mahalanobis_score(kernels, obs, act, s_next))
            values.append(value)
     if(constraint_type == 'log_prob'):
          threshold = np.quantile(values, (1 - quantile))
@@ -1234,43 +1298,35 @@ class Critic_Buffer():
                                   momentum)
        
      
-    def obtain_training_data(self, target_critic: nn.Module, batch_size: int, device: str):
-        loader = cycle(DataLoader(
-            self.data, 
-            batch_size=batch_size, 
-            shuffle=True, 
-            drop_last=True,
-            num_workers=0,
-            pin_memory=torch.cuda.is_available(),
-        ))
-        obs_chunks, rews_chunks = next(loader)      # (B, T, dim), (B, T)
-        obs_chunks = obs_chunks.to(device)
-        rews_chunks = rews_chunks.to(device)
+    def obtain_training_data(self, target_critic, batch_size: int, device: str):
+        obs_chunks, rews_chunks = self.data.sample(batch_size)   # (B, T, dim), (B, T)
+        obs_chunks = jnp.asarray(obs_chunks)
+        rews_chunks = jnp.asarray(rews_chunks)
         B, T = obs_chunks.shape[0], obs_chunks.shape[1]
 
-        with torch.no_grad():
-            values = target_critic(obs_chunks)            # (B, T)
+        # target_critic is a frozen TrainState; calling it without params= stops gradients (== torch no_grad).
+        values = target_critic(obs_chunks)            # (B, T)
 
-            deltas = (
-                  rews_chunks[:, :-1]
-                  + self.gamma * values[:, 1:]
-                   - values[:, :-1]
-              )                                             # (B, T-1)
+        deltas = (
+              rews_chunks[:, :-1]
+              + self.gamma * values[:, 1:]
+               - values[:, :-1]
+          )                                             # (B, T-1)
 
-            advantages = torch.zeros(B, T - 1, device=device)
-            last_adv = torch.zeros(B, device=device)
-            for t in reversed(range(T - 1)):
-                last_adv = deltas[:, t] + self.gamma * self.lam * last_adv
-                advantages[:, t] = last_adv
+        advantages = jnp.zeros((B, T - 1))
+        last_adv = jnp.zeros((B,))
+        for t in reversed(range(T - 1)):
+            last_adv = deltas[:, t] + self.gamma * self.lam * last_adv
+            advantages = advantages.at[:, t].set(last_adv)
 
-            value_targets = values[:, 0] + advantages[:, 0]   # (B,)
+        value_targets = values[:, 0] + advantages[:, 0]   # (B,)
 
         return obs_chunks[:, 0], value_targets
 
-class CriticDataset(Dataset):
-    def __init__(self, dataset_name: str, 
-                       specific_dataset: str, 
-                       trajs: List[TrajectoryDict], 
+class CriticDataset:
+    def __init__(self, dataset_name: str,
+                       specific_dataset: str,
+                       trajs: List[TrajectoryDict],
                        sigma: float,
                        target_reward: Optional[float] = None,
                        horizon: int = 32,
@@ -1329,50 +1385,60 @@ class CriticDataset(Dataset):
     def __getitem__(self, idx):
         obs_chunk, rews_chunk = self.transitions[idx]
         return (
-            torch.tensor(obs_chunk, dtype = torch.float32),
-            torch.tensor(rews_chunk, dtype = torch.float32)
+            np.asarray(obs_chunk, dtype=np.float32),
+            np.asarray(rews_chunk, dtype=np.float32),
         )
     def __len__(self):
         return len(self.transitions)
+
+    def sample(self, batch_size):
+        # fql-style host-side sampling: returns numpy batch (obs_chunks, rews_chunks).
+        idxs = np.random.randint(0, len(self.transitions), size=batch_size)
+        obs = np.stack([np.asarray(self.transitions[i][0], dtype=np.float32) for i in idxs], axis=0)
+        rews = np.stack([np.asarray(self.transitions[i][1], dtype=np.float32) for i in idxs], axis=0)
+        return obs, rews
 
     def boost_signal(self, target_reward, rews):
         rews = np.asarray(rews, dtype=np.float64).copy()
         rews = rews * target_reward
         return rews
 
-def train_critic(trajs: List[TrajectoryDict], 
-                 dataset_name: str, 
-                 specific_dataset: str, 
-                 hidden_layers: int, 
-                 hidden_dim: int, 
-                 sigma: float, 
-                 batch_size, 
-                 num_steps, 
-                 gamma, lam, horizon, 
-                 lr, 
-                 min_lr, 
-                 tau, 
-                 old_step: Optional[int] = None, 
-                 new_step: int = 0, 
-                 momentum: float = 0.005, 
-                 target_reward = 1.0, 
-                 task_id: Optional[int] = None):
-    device = check_device()
+def train_critic(trajs: List[TrajectoryDict],
+                 dataset_name: str,
+                 specific_dataset: str,
+                 hidden_layers: int,
+                 hidden_dim: int,
+                 sigma: float,
+                 batch_size,
+                 num_steps,
+                 gamma, lam, horizon,
+                 lr,
+                 min_lr,
+                 tau,
+                 old_step: Optional[int] = None,
+                 new_step: int = 0,
+                 momentum: float = 0.005,
+                 target_reward = 1.0,
+                 task_id: Optional[int] = None,
+                 *, rng=None):  # API-CHANGE: rng= threaded for param init (was implicitly stochastic)
+    if rng is None:
+        rng = jax.random.PRNGKey(0)
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
-    critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
+    critic = Critic(obs_dim, hidden_dim, hidden_layers)
+    s_ex = jnp.zeros((1, obs_dim), dtype=jnp.float32)
+    rng, init_rng = jax.random.split(rng)
+    params = critic.init(init_rng, s_ex)['params']
     if(old_step is not None):
+        # TODO(checkpoint-bridge): get_critic_model returns the saved flax param tree (new ckpts) or a torch
+        # state_dict (legacy) needing the per-Dense remap (weight (out,in)->kernel (in,out).T). For new flax
+        # checkpoints the returned dict IS the params; restore into the template via from_state_dict.
         critic_state_dict, _ = get_critic_model(dataset_name, specific_dataset, task_id = task_id, step = old_step)
-        critic.load_state_dict(critic_state_dict)
-    target_critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
-    target_critic.load_state_dict(critic.state_dict())
-    target_critic.eval()
-    optimizer = optim.AdamW(critic.parameters(), lr = lr, weight_decay = 1e-2)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max = num_steps,   # one scheduler step per training step
-            eta_min = min_lr
-        )
-    critic.train()
+        params = flax.serialization.from_state_dict(params, critic_state_dict)
+    schedule = optax.cosine_decay_schedule(lr, num_steps, alpha=min_lr / lr)
+    tx = optax.chain(optax.clip_by_global_norm(1.0), optax.adamw(schedule, weight_decay=1e-2))
+    train_state = TrainState.create(critic, params, tx=tx)
+    # target network: a frozen TrainState (no optimizer) updated via Polyak (target_update).
+    target_state = TrainState.create(critic, copy.deepcopy(params), tx=None)
     buffer = Critic_Buffer(
             dataset_name=dataset_name,
             specific_dataset=specific_dataset,
@@ -1387,163 +1453,35 @@ def train_critic(trajs: List[TrajectoryDict],
             new_step=new_step,
             momentum=momentum)
     print(f"Training critic for {dataset_name}-{specific_dataset}")
+
+    @jax.jit
+    def _update(train_state, target_state, s, target_value):
+        def loss_fn(params):
+            q_pred = train_state(s, params=params)
+            loss = jnp.mean(optax.huber_loss(q_pred, target_value, delta=1.0))
+            #loss = jnp.mean((q_pred - target_value) ** 2)
+            return loss, {'loss': loss}
+        new_state, info = train_state.apply_loss_fn(loss_fn)
+        # Soft update target network: tgt = (1 - tau) * tgt + tau * online == target_update(online, tgt, tau).
+        new_target_params = target_update(new_state.params, target_state.params, tau)
+        return new_state, target_state.replace(params=new_target_params), info
+
     total_loss = 0.0
     for k in range(1, num_steps + 1):  # number of passes over dataset
-           s, target_value = buffer.obtain_training_data(target_critic, batch_size, device)
-           s = s.to(device)
-           target_value = target_value.to(device)
+           s, target_value = buffer.obtain_training_data(target_state, batch_size, None)
+           s = jnp.asarray(s)
+           target_value = jnp.asarray(target_value)
 
-           # Predicted Q-values
-           q_pred = critic(s)
-           loss = F.smooth_l1_loss(q_pred, target_value, beta = 1.0)
-           #loss = F.mse_loss(q_pred, target_value)
-           total_loss += loss.item()
+           train_state, target_state, info = _update(train_state, target_state, s, target_value)
+           total_loss += float(info['loss'])
 
-           optimizer.zero_grad()
-           loss.backward()
-           torch.nn.utils.clip_grad_norm_(critic.parameters(), max_norm=1.0)
-           optimizer.step()
-           scheduler.step()
-           
            if(k % 1000 == 0):
                 print(f"Critic Training step {k} loss: {total_loss/200}")
                 total_loss = 0.0
-            
-           # Soft update target network
-           for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):
-               tgt_param.data.mul_(1 - tau)
-               tgt_param.data.add_(tau * param.data)
-    target_critic.eval()
-    save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
+    save_critic(target_state.params, dataset_name, specific_dataset, task_id, new_step)
     print(f"critic model saved")
 
-"""
-class Critic_Test_Dataset(Dataset):
-    def __init__(self, 
-                 dataset_name: str, 
-                 specific_dataset: str, 
-                 checkpoint_step: int,
-                 trajs: List[TrajectoryDict],
-                 sigma: Optional[float] = None,
-                 task_id: Optional[int] = None,
-                 target_reward: Optional[float] = None,
-                 horizon: int = 32,
-                 gamma: float = 0.99):
-        
-        self.stats = get_critic_stats(dataset_name, specific_dataset, task_id, checkpoint_step)
-        self.horizon = horizon
-        self.gamma = gamma
-
-        transitions = []
-        for traj in trajs:
-            obs = traj['observations']
-            rews = traj['rewards'].copy()
-             
-            
-            if target_reward is not None:
-                rews = self.boost_signal(target_reward, rews)
-            if sigma is not None:
-                rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate=200/sigma)
-
-            for t in range(len(obs) - horizon):        # consistent with training
-                obs_t = self.stats.norm_obs(obs[t])
-                rews_chunk = rews[t : t + horizon]
-                transitions.append((obs_t, rews_chunk))
-
-        self.transitions = transitions
-        print(f"Test dataset created: {len(self.transitions)} samples (horizon={horizon})")
-
-    def boost_signal(self, target_reward, rews):
-        rews = np.asarray(rews, dtype=np.float64).copy()
-        rews = rews * target_reward
-        return rews
-
-    def __len__(self):
-        return len(self.transitions)
-
-    def __getitem__(self, idx):
-        obs_t, rews_chunk = self.transitions[idx]
-        return (
-            torch.tensor(obs_t, dtype=torch.float32),
-            torch.tensor(rews_chunk, dtype=torch.float32)
-        )
-
-def test_critic(dataset_name: str,
-                specific_dataset: str,
-                finetune: bool,
-                hidden_layers: int,
-                hidden_dim: int,
-                checkpoint_step: int,
-                gamma: float = 0.99,
-                horizon: int = 32,
-                sigma: Optional[float] = None,
-                target_reward: float = 1.0,
-                trajs: List[TrajectoryDict] = None,
-                task_id: Optional[int] = None):
-    
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
-    if(finetune):
-        dataset = Critic_Test_Dataset(
-           dataset_name, specific_dataset, 0, trajs,
-           sigma, task_id, target_reward, horizon, gamma
-        )
-    else:
-        dataset = Critic_Test_Dataset(
-           dataset_name, specific_dataset, checkpoint_step, trajs,
-           sigma, task_id, target_reward, horizon, gamma
-        )
-
-
-    dataloader = DataLoader(dataset, batch_size=100, shuffle=False, drop_last=False)
-
-    # Load model
-    model_state_dict, obs_dim = get_critic_model(dataset_name, specific_dataset, task_id, checkpoint_step)
-    model = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
-    model.load_state_dict(model_state_dict)
-    model.eval()
-
-    total_loss = 0.0
-    all_preds = []
-    all_targets = []
-
-    print(f"Testing critic at checkpoint {checkpoint_step} (consistent with training)...")
-
-    with torch.no_grad():
-        for s, rews_chunk in dataloader:
-            s = s.to(device)
-            rews_chunk = rews_chunk.to(device)          # (B, horizon)
-
-            pred = model(s)                             # V(s) - shape (B, 1) or (B,)
-
-            if pred.dim() == 2:
-                pred = pred.squeeze(1)
-
-            # Compute same style target as training: n-step return
-            target = torch.zeros_like(pred)
-            for i in range(rews_chunk.shape[1]):
-                target += (gamma ** i) * rews_chunk[:, i]
-
-            loss = F.smooth_l1_loss(pred, target, beta=1.0)
-            total_loss += loss.item() * s.size(0)
-
-            all_preds.extend(pred.cpu().numpy())
-            all_targets.extend(target.cpu().numpy())
-
-    avg_loss = total_loss / len(dataset)
-    mae = np.mean(np.abs(np.array(all_preds) - np.array(all_targets)))
-
-    print(f"Test Results (Checkpoint {checkpoint_step}):")
-    print(f"   Smooth L1 Loss : {avg_loss:.4f}")
-    print(f"   MAE            : {mae:.4f}")
-    print(f"   Mean Pred      : {np.mean(all_preds):.3f}")
-    print(f"   Mean Target    : {np.mean(all_targets):.3f}")
-    print(f"   Pred Std       : {np.std(all_preds):.3f}")
-
-    return avg_loss, mae
-"""
-
-class Critic_Test_Dataset(Dataset):
+class Critic_Test_Dataset:
     def __init__(self,
                  dataset_name: str,
                  specific_dataset: str,
@@ -1587,9 +1525,17 @@ class Critic_Test_Dataset(Dataset):
     def __getitem__(self, idx):
         obs_t, rews_chunk = self.transitions[idx]
         return (
-            torch.tensor(obs_t, dtype=torch.float32),
-            torch.tensor(rews_chunk, dtype=torch.float32)
+            np.asarray(obs_t, dtype=np.float32),
+            np.asarray(rews_chunk, dtype=np.float32),
         )
+
+    def iterate(self, batch_size):
+        # fql-style deterministic, ordered iteration (replaces DataLoader(shuffle=False, drop_last=False)).
+        for start in range(0, len(self.transitions), batch_size):
+            chunk = self.transitions[start:start + batch_size]
+            obs = np.stack([np.asarray(c[0], dtype=np.float32) for c in chunk], axis=0)
+            rews = np.stack([np.asarray(c[1], dtype=np.float32) for c in chunk], axis=0)
+            yield obs, rews
 
 def test_critic(dataset_name: str,
                 specific_dataset: str,
@@ -1601,20 +1547,24 @@ def test_critic(dataset_name: str,
                 sigma: Optional[float] = None,
                 target_reward: float = 10.0,      # ← must match reward model
                 trajs: List[TrajectoryDict] = None,
-                task_id: Optional[int] = None):
-    device = check_device()
-    
+                task_id: Optional[int] = None,
+                *, rng=None):  # API-CHANGE: rng= threaded for param-template init (was implicitly stochastic)
+    if rng is None:
+        rng = jax.random.PRNGKey(0)
+
     dataset = Critic_Test_Dataset(
         dataset_name, specific_dataset, checkpoint_step, trajs,
         sigma, task_id, target_reward, horizon, gamma
     )
-    dataloader = DataLoader(dataset, batch_size=256, shuffle=False, drop_last=False)
 
     # Load model
     model_state_dict, obs_dim = get_critic_model(dataset_name, specific_dataset, task_id, checkpoint_step)
-    model = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
-    model.load_state_dict(model_state_dict)
-    model.eval()
+    model = Critic(obs_dim, hidden_dim, hidden_layers)
+    rng, init_rng = jax.random.split(rng)
+    params = model.init(init_rng, jnp.zeros((1, obs_dim), dtype=jnp.float32))['params']
+    # TODO(checkpoint-bridge): restore saved flax params (new ckpt) / torch-remapped (legacy) into template.
+    params = flax.serialization.from_state_dict(params, model_state_dict)
+    model_state = TrainState.create(model, params, tx=None)
 
     total_loss = 0.0
     all_preds = []
@@ -1622,27 +1572,27 @@ def test_critic(dataset_name: str,
 
     print(f"Testing critic at checkpoint {checkpoint_step}...")
 
-    with torch.no_grad():
-        for s, rews_chunk in dataloader:               # s: (B,), rews_chunk: (B, horizon)
-            s = s.to(device)
-            rews_chunk = rews_chunk.to(device)
+    # frozen TrainState: call without params= to stop gradients (== torch no_grad / eval).
+    for s, rews_chunk in dataset.iterate(256):               # s: (B,), rews_chunk: (B, horizon)
+        s = jnp.asarray(s)
+        rews_chunk = jnp.asarray(rews_chunk)
 
-            pred = model(s).squeeze(-1)                # (B,)  ← normalized V(s)
+        pred = jnp.squeeze(model_state(s), axis=-1)          # (B,)  ← normalized V(s)
 
-            # Compute raw n-step return
-            gamma_pow = torch.tensor([gamma ** i for i in range(horizon)], device=device, dtype=torch.float32)
-            raw_target = (gamma_pow.unsqueeze(0) * rews_chunk).sum(dim=1)
+        # Compute raw n-step return
+        gamma_pow = jnp.asarray([gamma ** i for i in range(horizon)], dtype=jnp.float32)
+        raw_target = (gamma_pow[None] * rews_chunk).sum(axis=1)
 
-            # === Normalize target (CRITICAL) ===
-            tgt_mean = raw_target.mean()
-            tgt_std = raw_target.std(unbiased=False) + 1e-8
-            target = (raw_target - tgt_mean) / tgt_std
+        # === Normalize target (CRITICAL) ===
+        tgt_mean = raw_target.mean()
+        tgt_std = raw_target.std() + 1e-8
+        target = (raw_target - tgt_mean) / tgt_std
 
-            loss = F.smooth_l1_loss(pred, target, beta=1.0)
-            total_loss += loss.item() * s.size(0)
+        loss = jnp.mean(optax.huber_loss(pred, target, delta=1.0))
+        total_loss += float(loss) * s.shape[0]
 
-            all_preds.extend(pred.cpu().numpy())
-            all_targets.extend(target.cpu().numpy())
+        all_preds.extend(np.asarray(pred))
+        all_targets.extend(np.asarray(target))
 
     avg_loss = total_loss / len(dataset)
     mae = np.mean(np.abs(np.array(all_preds) - np.array(all_targets)))
@@ -1677,7 +1627,7 @@ def get_success_trajs(trajs):
             success_trajs.append(traj)
     return success_trajs
 
-class PlannerDataset(Dataset):
+class PlannerDataset:
     def __init__(self, trajs: List[TrajectoryDict], horizon: int, dataset_name: str, specific_dataset: str, task_id: Optional[int] = None, cutoff_length: Optional[int] = None):
         self.trajs = copy.deepcopy(trajs)
         if(cutoff_length is not None):
@@ -1690,14 +1640,19 @@ class PlannerDataset(Dataset):
             obs = traj['observations']
             for t in range(len(obs)):
                 s_norm = self.planner_processor.preprocess(obs[t])
-                s_norm = torch.tensor(s_norm, dtype=torch.float32)
+                s_norm = np.asarray(s_norm, dtype=np.float32)
                 self.conditions.append(s_norm)
-    
+
     def __len__(self):
         return len(self.conditions)
-   
+
     def __getitem__(self, idx):
         return self.conditions[idx]
+
+    def sample(self, batch_size):
+        # fql-style host-side sampling: returns a numpy batch of planner-normalized conditions.
+        idxs = np.random.randint(0, len(self.conditions), size=batch_size)
+        return np.stack([np.asarray(self.conditions[i], dtype=np.float32) for i in idxs], axis=0)
 
 def cycle(dl):
     while True:
@@ -1713,14 +1668,14 @@ class EMA():
         self.beta = beta
 
     def update_model_average(self, ma_model, current_model):
-        for current_params, ma_params in zip(current_model.parameters(), ma_model.parameters()):
-            old_weight, up_weight = ma_params.data, current_params.data
-            ma_params.data = self.update_average(old_weight, up_weight)
+        # API-CHANGE: returns the updated EMA param pytree (JAX params are immutable, no in-place mutation).
+        # ma = beta * ma + (1 - beta) * current == target_update(current, ma, tau=1 - beta) (guide §5).
+        return target_update(current_model, ma_model, 1 - self.beta)
 
     def update_average(self, old, new):
         if old is None:
             return new
-        return old * self.beta + (1 - self.beta) * new
+        return jax.tree_util.tree_map(lambda o, n: o * self.beta + (1 - self.beta) * n, old, new)
 
 class RewardTracker:
     """Track and plot rewards during finetuning (mirrors LossTracker API)."""
@@ -1826,32 +1781,32 @@ def karras_beta_schedule(
     num_steps: int,
     sigma_min: float,
     sigma_max: float,
-    device: torch.device
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    device: str
+) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """
     Returns: t_grid, beta_grid, sigma_grid
     beta(t) computed from VP-SDE marginals using Karras timesteps.
     """
-    t = torch.linspace(1.0, 0.0, num_steps + 1, device=device)
+    t = jnp.linspace(1.0, 0.0, num_steps + 1)
     sigma_k = sigma_min * (sigma_max / sigma_min) ** t
-    alpha = 1.0 / torch.sqrt(1.0 + sigma_k**2)
+    alpha = 1.0 / jnp.sqrt(1.0 + sigma_k**2)
     sigma = sigma_k * alpha
 
     # Compute β(t) from dσ²/dt = β(t) * σ²(t)
     # From VP-SDE: dσ²/dt = β(t) * (1 - σ²(t))
     # But we use numerical diff for stability
-    
+
     sigma_sq = sigma**2
-    d_sigma_sq = torch.diff(sigma_sq, dim=0)
-    dt = torch.diff(t, dim=0)
+    d_sigma_sq = jnp.diff(sigma_sq, axis=0)
+    dt = jnp.diff(t, axis=0)
     beta = d_sigma_sq / (1 - sigma_sq[:-1]) / dt
-    beta = torch.cat([beta, beta[-1].unsqueeze(0)])  # pad last
+    beta = jnp.concatenate([beta, beta[-1][None]])  # pad last
 
     return t, beta, sigma
 
-def clip_actions(x: torch.Tensor, d_s: int) -> torch.Tensor:
-    actions = torch.clamp(x[..., d_s:], -1.0, 1.0)
-    x[..., d_s:] = actions
+def clip_actions(x: jnp.ndarray, d_s: int) -> jnp.ndarray:
+    actions = jnp.clip(x[..., d_s:], -1.0, 1.0)
+    x = x.at[..., d_s:].set(actions)
     return x
 
 def get_normalized_score(trajs, expert_score: Optional[float] = None):
@@ -1895,57 +1850,61 @@ def load_hyperparameters(filepath: str) -> Dict:
     return hyperparams
 
 def rollout_parallel(
-    env_name, 
-    specific_env, 
-    horizon = 32, 
-    steps_T = 50, 
-    num_karras = 10, 
-    eta = 0.8, 
-    episode_length = 4000, 
-    checkpoint_step = 1000000, 
-    num_envs = 8, 
-    goal_cell = None, 
-    start_cells = None, 
-    device: torch.device = None, 
-    seed_base: int = 0):
+    env_name,
+    specific_env,
+    horizon = 32,
+    steps_T = 50,
+    num_karras = 10,
+    eta = 0.8,
+    episode_length = 4000,
+    checkpoint_step = 1000000,
+    num_envs = 8,
+    goal_cell = None,
+    start_cells = None,
+    device: str = None,
+    seed_base: int = 0,
+    *, rng=None):  # API-CHANGE: rng= threaded for the diffusion sampler (was implicitly stochastic)
      #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
      #print(f"Running {num_envs} environments in parallel")
-     if device is None:
-          device = "cuda" if torch.cuda.is_available() else "cpu"
      trajs = []
      #print(f"Using device {device}")
-     
+
      # Uses Accelerate's RANK env var (automatically set in DDP)
      rank = int(os.environ.get("RANK", 0))
      np.random.seed(12345 + rank + seed_base)
-     torch.manual_seed(12345 + rank + seed_base)
-     
+     if rng is None:
+          rng = jax.random.PRNGKey(12345 + rank + seed_base)
+
      # Create environment factory function
      _, d_s, d_a = get_env(env_name, specific_env)
      def make_env():
          env, _, _ = get_env(env_name, specific_env)
          return env
-     
+
      # Create vectorized environment
      vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
      #maze = env.unwrapped.maze  # Access the internal Maze object
      #maze_map = maze.maze_map
      #rows, cols = len(maze_map), len(maze_map[0])
-    
+
      # Get Planner
      state_dict = get_planner(env_name, specific_env, checkpoint_step)
      if env_name == 'kitchen':
-         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier")
      elif env_name == 'pointmaze':
-         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier")
      else:
          raise ValueError(f"Invalid Environment: {env_name}")
-     model.load_state_dict(state_dict)
-     model.eval()
-     
+     # TODO(checkpoint-bridge): restore planner params (new flax ckpt / torch-remapped legacy) into a frozen
+     # TrainState; the diffusion sampler calls it without params= (== torch eval / no_grad).
+     rng, init_rng = jax.random.split(rng)
+     params = model.init(init_rng, jnp.zeros((1, horizon, d_s + d_a)), jnp.zeros((1,)))['params']
+     params = flax.serialization.from_state_dict(params, state_dict)
+     model = TrainState.create(model, params, tx=None)
+
      # Get Processor
      planner_processor = Planner_Processor(env_name, specific_env)
-     
+
      # <<< MODIFIED: Unique env reset seeds per process to prevent identical trajectories across GPUs
      reset_seeds = list(range(seed_base, seed_base + num_envs))
      
@@ -2011,7 +1970,8 @@ def rollout_parallel(
                  continue
              current_state = current_states[env_idx]
              current_state_norm = planner_processor.preprocess(current_state)
-             x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+             rng, sub = jax.random.split(rng)
+             x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device, rng=sub)
              action = x[0, d_s:(d_s+d_a)].copy()
              actions[env_idx] = action
          
@@ -2060,34 +2020,34 @@ def rollout_parallel(
      return trajs, score, total_steps
 
 def rollout_parallel2(
-     env_name, 
-     specific_env, 
-     horizon = 32, 
-     steps_T = 50, 
-     num_karras = 10, 
-     eta = 0.8, 
-     episode_length = 4000, 
-     checkpoint_step = 1000000, 
-     num_envs = 8, 
-     goal_cell: Optional[np.ndarray] = None, 
-     start_cells: Optional[List[np.ndarray]] = None, 
-     task_id: Optional[int] = None, 
-     device: torch.device = None, 
-     seed_base: int = 0, 
-     continual_rollout = False, 
-     chunk_size = 5):
+     env_name,
+     specific_env,
+     horizon = 32,
+     steps_T = 50,
+     num_karras = 10,
+     eta = 0.8,
+     episode_length = 4000,
+     checkpoint_step = 1000000,
+     num_envs = 8,
+     goal_cell: Optional[np.ndarray] = None,
+     start_cells: Optional[List[np.ndarray]] = None,
+     task_id: Optional[int] = None,
+     device: str = None,
+     seed_base: int = 0,
+     continual_rollout = False,
+     chunk_size = 5,
+     *, rng=None):  # API-CHANGE: rng= threaded for the diffusion sampler (was implicitly stochastic)
      #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
      #print(f"Running {num_envs} environments in parallel")
-     if device is None:
-          device = "cuda" if torch.cuda.is_available() else "cpu"
      trajs = []
      #print(f"Using device {device}")
-     
+
      # Uses Accelerate's RANK env var (automatically set in DDP)
      rank = int(os.environ.get("RANK", 0))
      np.random.seed(12345 + rank + seed_base)
-     torch.manual_seed(12345 + rank + seed_base)
-     
+     if rng is None:
+          rng = jax.random.PRNGKey(12345 + rank + seed_base)
+
      # Create environment factory function
      _, d_s, d_a = get_env(env_name, specific_env, task_id = task_id)
      def make_env():
@@ -2103,19 +2063,24 @@ def rollout_parallel2(
      # Get Planner
      state_dict = get_planner(env_name, specific_env, checkpoint_step, task_id)
      if env_name == 'kitchen':
-         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier")
      elif env_name == 'pointmaze':
-         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier")
      elif(env_name == 'antmaze'):
-         model = DiT1d(in_dim = d_s, emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+         model = DiT1d(in_dim = d_s, emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
      elif env_name == 'cube':
-         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier")
      elif env_name == 'ogpointmaze':
-         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier")
      else:
          raise ValueError(f"Invalid Environment: {env_name}")
-     model.load_state_dict(state_dict)
-     model.eval()
+     # TODO(checkpoint-bridge): restore planner params (new flax ckpt / torch-remapped legacy) into a frozen
+     # TrainState; the diffusion sampler calls it without params= (== torch eval / no_grad).
+     in_dim = d_s if env_name == 'antmaze' else (d_s + d_a)
+     rng, init_rng = jax.random.split(rng)
+     params = model.init(init_rng, jnp.zeros((1, horizon, in_dim)), jnp.zeros((1,)))['params']
+     params = flax.serialization.from_state_dict(params, state_dict)
+     model = TrainState.create(model, params, tx=None)
      
      # Get Processor
      planner_processor = Planner_Processor(env_name, specific_env, task_id)
@@ -2163,22 +2128,24 @@ def rollout_parallel2(
                    if(len(Temp_acts[env_idx]) == 0):
                       current_state = current_states[env_idx]
                       current_state_norm = planner_processor.preprocess(current_state)
-                      x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                      rng, sub = jax.random.split(rng)
+                      x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device, rng=sub)
                       for k in range(len(x)):
                           Temp_acts[env_idx].append(x[k, d_s:(d_s+d_a)].copy())
-                    
+
                    actions[env_idx] = Temp_acts[env_idx][0].copy()
                    Temp_acts[env_idx] = Temp_acts[env_idx][1:].copy()
                else:
                    current_state = current_states[env_idx]
                    current_state_norm = planner_processor.preprocess(current_state)
-                   x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                   rng, sub = jax.random.split(rng)
+                   x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device, rng=sub)
                    action = x[0, d_s:(d_s+d_a)].copy()
                    actions[env_idx] = action
-         
+
             # Step all environments at once
             obs_vec, rewards_vec, terminated_vec, truncated_vec, info_vec = vec_env.step(actions)
-         
+
              # Update trajectories
             for env_idx in range(num_envs):
                if done_envs[env_idx]:
@@ -2240,16 +2207,18 @@ def rollout_parallel2(
                    if(len(Temp_acts[env_idx]) == 0):
                       current_state = current_states[env_idx]
                       current_state_norm = planner_processor.preprocess(current_state)
-                      x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                      rng, sub = jax.random.split(rng)
+                      x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device, rng=sub)
                       for k in range(chunk_size):
                           Temp_acts[env_idx].append(x[k, d_s:(d_s+d_a)].copy())
-                    
+
                    actions[env_idx] = Temp_acts[env_idx][0].copy()
                    Temp_acts[env_idx] = Temp_acts[env_idx][1:].copy()
                else:
                    current_state = current_states[env_idx]
                    current_state_norm = planner_processor.preprocess(current_state)
-                   x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                   rng, sub = jax.random.split(rng)
+                   x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device, rng=sub)
                    action = x[0, d_s:(d_s+d_a)].copy()
                    actions[env_idx] = action
          
@@ -2307,21 +2276,20 @@ def rollout_parallel3(
     goal_cell: Optional[np.ndarray] = None,
     start_cells: Optional[List[np.ndarray]] = None,
     task_id: Optional[int] = None,
-    device: torch.device = None,
+    device: str = None,
     seed_base: int = 0,
     continual_rollout=False,
     chunk_size=10,          # currently unused
+    *, rng=None,  # API-CHANGE: rng= threaded for the diffusion sampler (was implicitly stochastic)
 ):
-    if device is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-
     trajs = []
     total_steps = 0
 
     # Seeding
     rank = int(os.environ.get("RANK", 0))
     np.random.seed(12345 + rank + seed_base)
-    torch.manual_seed(12345 + rank + seed_base)
+    if rng is None:
+        rng = jax.random.PRNGKey(12345 + rank + seed_base)
 
     # Environment & Vector Env
     _, d_s, d_a = get_env(env_name, specific_env, task_id = task_id)
@@ -2339,24 +2307,29 @@ def rollout_parallel3(
         model = DiT1d(
             in_dim=(d_s + d_a), emb_dim=128, d_model=256,
             n_heads=256//64, depth=2, timestep_emb_type="fourier"
-        ).to(device)
+        )
     elif env_name == 'antmaze':
         model = DiT1d(
             in_dim=d_s, emb_dim=128, d_model=256,
             n_heads=256//64, depth=2, timestep_emb_type="fourier"
-        ).to(device)
+        )
     else:
         raise ValueError(f"Invalid Environment: {env_name}")
 
-    model.load_state_dict(state_dict)
-    model.eval()
+    # TODO(checkpoint-bridge): restore planner params (new flax ckpt / torch-remapped legacy) into a frozen
+    # TrainState; the diffusion sampler calls it without params= (== torch eval / no_grad).
+    in_dim = d_s if env_name == 'antmaze' else (d_s + d_a)
+    rng, init_rng = jax.random.split(rng)
+    params = model.init(init_rng, jnp.zeros((1, horizon, in_dim)), jnp.zeros((1,)))['params']
+    params = flax.serialization.from_state_dict(params, state_dict)
+    model = TrainState.create(model, params, tx=None)
 
     planner_processor = Planner_Processor(env_name, specific_env)
     reset_seeds = list(range(seed_base, seed_base + num_envs))
 
     def run_rollout(options_list: Optional[dict] = None):
         """Helper to run one batch of environments (avoids duplication)."""
-        nonlocal total_steps
+        nonlocal total_steps, rng
         
         if(options_list is not None):
              obs, info = vec_env.reset(seed=reset_seeds, options=options_list)
@@ -2394,9 +2367,10 @@ def rollout_parallel3(
                 if continual_rollout and len(Temp_acts[env_idx]) > 0:
                     action = Temp_acts[env_idx].pop(0)
                 else:
+                    rng, sub = jax.random.split(rng)
                     x = sample_euler_karras(
                         current_state_norm, model, d_s, d_a,
-                        horizon, steps_T, num_karras, eta, device
+                        horizon, steps_T, num_karras, eta, device, rng=sub
                     )
                     if continual_rollout:
                         Temp_acts[env_idx] = [x[k, d_s:(d_s + d_a)].copy() 
@@ -2523,29 +2497,26 @@ def check_success_rate(trajs: List[TrajectoryDict]):
     return success / len(trajs)
  
 def check_device():
-    if torch.backends.mps.is_available():
-        device = torch.device("mps")
-        print("✅ Using M3 GPU (MPS backend)")
-    elif torch.cuda.is_available():
-        device = torch.device("cuda")
-        print("✅ Using NVIDIA CUDA GPU")
+    device = jax.default_backend()
+    if device == 'gpu':
+        print("✅ Using GPU backend")
+    elif device == 'tpu':
+        print("✅ Using TPU backend")
     else:
-        device = torch.device("cpu")
         print("⚠️  Falling back to CPU (no GPU acceleration)")
-    return device 
+    return device
       
 def compute_threshold_mahalanobis(kernels, dataloader, quantile):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     all_D2_total = []
     for i, (s, a, s_next) in enumerate(dataloader):
-        s = s.to(device)
-        a = a.to(device)
-        s_next = s_next.to(device)
+        s = jnp.asarray(s)
+        a = jnp.asarray(a)
+        s_next = jnp.asarray(s_next)
         #compute total mahalanobis distance
-        with torch.no_grad():
-            D2_total = compute_total_mahalanobis_score(kernels, s, a, s_next)
-        all_D2_total.extend(D2_total.detach().cpu().numpy())
-    
+        # kernels is a list of (model_def, params); calling apply does not flow gradients (== torch no_grad).
+        D2_total = compute_total_mahalanobis_score(kernels, s, a, s_next)
+        all_D2_total.extend(np.asarray(D2_total))
+
     all_D2_total = np.array(all_D2_total)
     mean_D2_total = float(all_D2_total.mean())
     min_D2_total = float(all_D2_total.min())
@@ -2561,34 +2532,32 @@ def compute_threshold_mahalanobis(kernels, dataloader, quantile):
 
 def compute_threshold_mahalanobis_mog(kernels, dataloader, quantile, device):
     chunks = []
-    with torch.no_grad():
-        for s, a, s_next in dataloader:
-            s = s.to(device, non_blocking=True)
-            a = a.to(device, non_blocking=True)
-            s_next = s_next.to(device, non_blocking=True)
-            d2 = compute_total_mahalanobis_score_mog(kernels, s, a, s_next)
-            chunks.append(d2.detach().float().cpu())
-    all_vals = torch.cat(chunks, dim=0)
-    tau = torch.quantile(all_vals, quantile).item()
-    print(f"mean_D2_total = {all_vals.mean().item():.4f}")
-    print(f"min_D2_total = {all_vals.min().item():.4f}")
-    print(f"max_D2_total = {all_vals.max().item():.4f}")
-    print(f"variance_D2_total = {all_vals.var(unbiased=False).item():.4f}")
+    for s, a, s_next in dataloader:
+        s = jnp.asarray(s)
+        a = jnp.asarray(a)
+        s_next = jnp.asarray(s_next)
+        d2 = compute_total_mahalanobis_score_mog(kernels, s, a, s_next)
+        chunks.append(np.asarray(d2, dtype=np.float32))
+    all_vals = np.concatenate(chunks, axis=0)
+    tau = float(np.quantile(all_vals, quantile))
+    print(f"mean_D2_total = {float(all_vals.mean()):.4f}")
+    print(f"min_D2_total = {float(all_vals.min()):.4f}")
+    print(f"max_D2_total = {float(all_vals.max()):.4f}")
+    print(f"variance_D2_total = {float(all_vals.var()):.4f}")
     print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
     return tau
 
 def compute_threshold_log_prob(kernels, dataloader, quantile):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     all_log_density_total = []
     for i, (s, a, s_next) in enumerate(dataloader):
-        s = s.to(device)
-        a = a.to(device)
-        s_next = s_next.to(device)
+        s = jnp.asarray(s)
+        a = jnp.asarray(a)
+        s_next = jnp.asarray(s_next)
         #compute total mahalanobis distance
-        with torch.no_grad():
-            log_density_total = compute_log_density(kernels, s, a, s_next)
-        all_log_density_total.extend(log_density_total.detach().cpu().numpy())
-    
+        # kernels is a list of (model_def, params); calling apply does not flow gradients (== torch no_grad).
+        log_density_total = compute_log_density(kernels, s, a, s_next)
+        all_log_density_total.extend(np.asarray(log_density_total))
+
     all_log_density_total = np.array(all_log_density_total)
     mean_log_density_total = float(all_log_density_total.mean())
     min_log_density_total = float(all_log_density_total.min())
@@ -2601,22 +2570,21 @@ def compute_threshold_log_prob(kernels, dataloader, quantile):
     print(f"variance_D2_total = {var_log_density_total:.4f}")
     print(f"τ ({(1 - quantile)*100:.0f}th percentile) : {tau:.4f}")
     return tau
-    
+
 def compute_threshold_log_prob_mog(kernels, dataloader, quantile, device):
     chunks = []
-    with torch.no_grad():
-        for s, a, s_next in dataloader:
-            s = s.to(device, non_blocking=True)
-            a = a.to(device, non_blocking=True)
-            s_next = s_next.to(device, non_blocking=True)
-            lp = compute_log_density_mog(kernels, s, a, s_next)
-            chunks.append(lp.detach().float().cpu())
-    all_vals = torch.cat(chunks, dim=0)
-    tau = torch.quantile(all_vals, 1.0 - quantile).item()
-    print(f"mean_log_density_total = {all_vals.mean().item():.4f}")
-    print(f"min_log_density_total = {all_vals.min().item():.4f}")
-    print(f"max_log_density_total = {all_vals.max().item():.4f}")
-    print(f"variance_log_density_total = {all_vals.var(unbiased=False).item():.4f}")
+    for s, a, s_next in dataloader:
+        s = jnp.asarray(s)
+        a = jnp.asarray(a)
+        s_next = jnp.asarray(s_next)
+        lp = compute_log_density_mog(kernels, s, a, s_next)
+        chunks.append(np.asarray(lp, dtype=np.float32))
+    all_vals = np.concatenate(chunks, axis=0)
+    tau = float(np.quantile(all_vals, 1.0 - quantile))
+    print(f"mean_log_density_total = {float(all_vals.mean()):.4f}")
+    print(f"min_log_density_total = {float(all_vals.min()):.4f}")
+    print(f"max_log_density_total = {float(all_vals.max()):.4f}")
+    print(f"variance_log_density_total = {float(all_vals.var()):.4f}")
     print(f"τ ({(1-quantile)*100:.0f}th percentile) : {tau:.4f}")
     return tau
 
@@ -2644,100 +2612,122 @@ def train_critic_with_planner(
     new_step: int = 0,
     task_id: Optional[int] = None,
     log_every: int = 1000,
+    *, rng=None,  # API-CHANGE: rng= threaded for param init + diffusion sampler (was implicitly stochastic)
 ):
-    @torch.no_grad()
+    if rng is None:
+        rng = jax.random.PRNGKey(0)
+
     def _generate_plans_batch(
            s0_planner_norm: np.ndarray,   # (B, d_s) in planner-normalized space
-           planner: nn.Module,
+           planner,
            d_s: int, d_a: int, horizon: int,
            steps_T: int, num_karras: int, eta: float,
-           device: torch.device,
-    ) -> torch.Tensor:
-   
+           device: str,
+           *, rng,
+    ):
+        # planner is a frozen TrainState; sample_euler_karras calls it without params= (== torch no_grad).
         plans = []
         for s0 in s0_planner_norm:
+           rng, sub = jax.random.split(rng)
            x = sample_euler_karras(
                s0, planner, d_s, d_a, horizon,
-               num_steps=steps_T, num_karras=num_karras, eta=eta, device=device,
+               num_steps=steps_T, num_karras=num_karras, eta=eta, device=device, rng=sub,
            )
            plans.append(x)
-        return torch.from_numpy(np.stack(plans, axis=0)).float().to(device)
+        return jnp.asarray(np.stack(plans, axis=0), dtype=jnp.float32)
 
-    
     device = check_device()
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
 
     # ------------------------------------------------------------------ critic
-    critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
+    critic = Critic(obs_dim, hidden_dim, hidden_layers)
+    s_ex = jnp.zeros((1, obs_dim), dtype=jnp.float32)
+    rng, init_rng = jax.random.split(rng)
+    params = critic.init(init_rng, s_ex)['params']
+    # TODO(checkpoint-bridge): get_critic_model returns the saved flax param tree (new ckpts) or a torch
+    # state_dict (legacy) needing the per-Dense remap (weight (out,in)->kernel (in,out).T).
     critic_state, _ = get_critic_model(
         dataset_name, specific_dataset, task_id=task_id, step=0,
     )
-    critic.load_state_dict(critic_state)
+    params = flax.serialization.from_state_dict(params, critic_state)
+    schedule = optax.cosine_decay_schedule(lr, num_steps, alpha=min_lr / lr)
+    tx = optax.chain(optax.clip_by_global_norm(1.0), optax.adam(schedule))
+    critic_state_train = TrainState.create(critic, params, tx=tx)
 
-    target_critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
-    target_critic.load_state_dict(critic.state_dict())
-    target_critic.eval()
-    for p in target_critic.parameters():
-        p.requires_grad_(False)
+    # target network: a frozen TrainState (no optimizer) updated via Polyak (target_update).
+    target_critic = TrainState.create(critic, copy.deepcopy(params), tx=None)
 
     # ----------------------------------------------------------------- planner
-    planner = DiT1d(
+    planner_def = DiT1d(
         in_dim=(obs_dim + act_dim), emb_dim=128, d_model=256,
         n_heads=256 // 64, depth=2, timestep_emb_type="fourier",
-    ).to(device)
-    planner.load_state_dict(
-        get_planner(dataset_name, specific_dataset, planner_checkpoint, task_id)
     )
-    planner.eval()
-    for p in planner.parameters():
-        p.requires_grad_(False)
+    rng, init_rng = jax.random.split(rng)
+    planner_params = planner_def.init(
+        init_rng, jnp.zeros((1, horizon, obs_dim + act_dim)), jnp.zeros((1,))
+    )['params']
+    # TODO(checkpoint-bridge): restore planner params (new flax ckpt / torch-remapped legacy) into a frozen
+    # TrainState; the diffusion sampler calls it without params= (== torch eval / no_grad).
+    planner_params = flax.serialization.from_state_dict(
+        planner_params, get_planner(dataset_name, specific_dataset, planner_checkpoint, task_id)
+    )
+    planner = TrainState.create(planner_def, planner_params, tx=None)
 
     planner_proc = Planner_Processor(dataset_name, specific_dataset, task_id)
-    planner_mean = torch.as_tensor(planner_proc.stats.obs_mean, device=device, dtype=torch.float32)
-    planner_std  = torch.as_tensor(
-        np.maximum(planner_proc.stats.obs_std, 1e-3), device=device, dtype=torch.float32,
+    planner_mean = jnp.asarray(planner_proc.stats.obs_mean, dtype=jnp.float32)
+    planner_std  = jnp.asarray(
+        np.maximum(planner_proc.stats.obs_std, 1e-3), dtype=jnp.float32,
     )
 
     # ----------------------------------------------------------- reward model
     reward_state, _, _ = get_reward_model(
         dataset_name, specific_dataset, reward_checkpoint, task_id,
     )
-    reward_net = SimpleReward(
+    reward_def = SimpleReward(
         obs_dim, act_dim, reward_hidden_dim, reward_hidden_layers,
-    ).to(device)
-    reward_net.load_state_dict(reward_state)
-    reward_net.eval()
-    for p in reward_net.parameters():
-        p.requires_grad_(False)
+    )
+    rng, init_rng = jax.random.split(rng)
+    reward_params = reward_def.init(
+        init_rng, jnp.zeros((1, obs_dim), dtype=jnp.float32), jnp.zeros((1, act_dim), dtype=jnp.float32)
+    )['params']
+    # TODO(checkpoint-bridge): restore reward params (new flax ckpt / torch-remapped legacy) into a frozen
+    # TrainState; called without params= (== torch eval / no_grad).
+    reward_params = flax.serialization.from_state_dict(reward_params, reward_state)
+    reward_net = TrainState.create(reward_def, reward_params, tx=None)
 
     reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint, task_id)
-    r_mean = torch.as_tensor(reward_stat.obs_mean, device=device, dtype=torch.float32)
-    r_std  = torch.as_tensor(np.maximum(reward_stat.obs_std, 1e-3), device=device, dtype=torch.float32)
+    r_mean = jnp.asarray(reward_stat.obs_mean, dtype=jnp.float32)
+    r_std  = jnp.asarray(np.maximum(reward_stat.obs_std, 1e-3), dtype=jnp.float32)
 
     # ----------------------------------- critic stats: load once, never save
     critic_stat = get_critic_stats(
         dataset_name, specific_dataset,
         task_id=task_id, step=old_critic_checkpoint,
     )
-    c_mean = torch.as_tensor(critic_stat.obs_mean, device=device, dtype=torch.float32)
-    c_std  = torch.as_tensor(np.maximum(critic_stat.obs_std, 1e-3), device=device, dtype=torch.float32)
+    c_mean = jnp.asarray(critic_stat.obs_mean, dtype=jnp.float32)
+    c_std  = jnp.asarray(np.maximum(critic_stat.obs_std, 1e-3), dtype=jnp.float32)
 
     # ---------------------------------------------------- starting-state pool
     s0_pool = np.concatenate([t['observations'] for t in trajs], axis=0).astype(np.float32)
 
-    # ----------------------------------------------------------------- optim
-    optimizer = optim.Adam(critic.parameters(), lr=lr)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=num_steps, eta_min=min_lr,
-    )
-
     n = horizon - 1
-    gamma_pow_t = torch.tensor(
-        [gamma ** t for t in range(n)], device=device, dtype=torch.float32,
+    gamma_pow_t = jnp.asarray(
+        [gamma ** t for t in range(n)], dtype=jnp.float32,
     )                                                                       # (n,)
     gamma_n = gamma ** n
 
-    critic.train()
+    @jax.jit
+    def _update(critic_state_train, target_critic, s0_critic, target_value):
+        def loss_fn(params):
+            v_pred = critic_state_train(s0_critic, params=params)            # (B,)
+            #loss   = jnp.mean((v_pred - target_value) ** 2)
+            loss = jnp.mean(optax.huber_loss(v_pred, target_value, delta=1.0))
+            return loss, {'loss': loss}
+        new_state, info = critic_state_train.apply_loss_fn(loss_fn)
+        # Polyak target update: tgt = (1 - tau) * tgt + tau * online == target_update(online, tgt, tau).
+        new_target_params = target_update(new_state.params, target_critic.params, tau)
+        return new_state, target_critic.replace(params=new_target_params), info
+
     running = 0.0
 
     for k in range(1, num_steps + 1):
@@ -2745,80 +2735,72 @@ def train_critic_with_planner(
         idx    = np.random.randint(0, len(s0_pool), size=batch_size)
         s0_raw = s0_pool[idx]                                                # (B, d_s)
 
-        with torch.no_grad():
-            # 2) plan with the diffusion planner
-            s0_p  = np.stack([planner_proc.preprocess(o) for o in s0_raw])
-            plans = _generate_plans_batch(
-                s0_p, planner, obs_dim, act_dim, horizon,
-                steps_T, num_karras, eta, device,
-            )                                                                # (B, H, d_s+d_a)
+        # 2) plan with the diffusion planner
+        s0_p  = np.stack([planner_proc.preprocess(o) for o in s0_raw])
+        rng, sub = jax.random.split(rng)
+        plans = _generate_plans_batch(
+            s0_p, planner, obs_dim, act_dim, horizon,
+            steps_T, num_karras, eta, device, rng=sub,
+        )                                                                    # (B, H, d_s+d_a)
 
-            # 3) recover RAW states from planner-norm; actions are already raw
-            s_planner = plans[..., :obs_dim]                                 # (B, H, d_s)
-            actions   = plans[..., obs_dim:]                                 # (B, H, d_a)
-            s_raw     = s_planner * planner_std + planner_mean               # (B, H, d_s)
+        # 3) recover RAW states from planner-norm; actions are already raw
+        s_planner = plans[..., :obs_dim]                                     # (B, H, d_s)
+        actions   = plans[..., obs_dim:]                                     # (B, H, d_a)
+        s_raw     = s_planner * planner_std + planner_mean                   # (B, H, d_s)
 
-            # 4) reward model: r̂(s_t, a_t) for t = 0..n-1
-            B, H, _ = s_raw.shape
-            s_for_r = (s_raw[:, :n] - r_mean) / r_std
-            r_hat   = reward_net(
-                s_for_r.reshape(B * n, -1),
-                actions[:, :n].reshape(B * n, -1),
-            ).reshape(B, n)                                                  # (B, n)
+        # 4) reward model: r̂(s_t, a_t) for t = 0..n-1
+        # reward_net is a frozen TrainState; called without params= (== torch no_grad).
+        B, H, _ = s_raw.shape
+        s_for_r = (s_raw[:, :n] - r_mean) / r_std
+        r_hat   = reward_net(
+            s_for_r.reshape(B * n, -1),
+            actions[:, :n].reshape(B * n, -1),
+        ).reshape(B, n)                                                      # (B, n)
 
-            # 5) discounted return + bootstrapped target value
-            disc_return  = (gamma_pow_t.unsqueeze(0) * r_hat).sum(dim=1)     # (B,)
-            s_n_critic   = (s_raw[:, n] - c_mean) / c_std                    # (B, d_s)
-            v_bootstrap  = target_critic(s_n_critic)                         # (B,)
-            target_value = disc_return + gamma_n * v_bootstrap               # (B,)
+        # 5) discounted return + bootstrapped target value
+        disc_return  = (gamma_pow_t[None] * r_hat).sum(axis=1)              # (B,)
+        s_n_critic   = (s_raw[:, n] - c_mean) / c_std                       # (B, d_s)
+        v_bootstrap  = target_critic(s_n_critic)                            # (B,)
+        target_value = disc_return + gamma_n * v_bootstrap                   # (B,)
 
-            # 6) input for V_β(s_0)
-            s0_critic = (s_raw[:, 0] - c_mean) / c_std                       # (B, d_s)
+        # 6) input for V_β(s_0)
+        s0_critic = (s_raw[:, 0] - c_mean) / c_std                          # (B, d_s)
 
-        # 7) gradient step on V_β
-        v_pred = critic(s0_critic)                                           # (B,)
-        #loss   = F.mse_loss(v_pred, target_value)
-        loss = F.smooth_l1_loss(v_pred, target_value, beta = 1.0)
+        # 7) gradient step on V_β + Polyak target update
+        critic_state_train, target_critic, info = _update(
+            critic_state_train, target_critic, s0_critic, target_value
+        )
 
-        optimizer.zero_grad()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(critic.parameters(), max_norm=1.0)
-        optimizer.step()
-        scheduler.step()
-
-        # 8) Polyak target update
-        with torch.no_grad():
-            for p, tp in zip(critic.parameters(), target_critic.parameters()):
-                tp.data.mul_(1 - tau).add_(tau * p.data)
-
-        running += loss.item()
+        running += float(info['loss'])
         if k % log_every == 0:
             print(f"  step {k:>6}/{num_steps}   loss = {running / log_every:.4f}")
             running = 0.0
 
-    target_critic.eval()
-    save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
+    save_critic(target_critic.params, dataset_name, specific_dataset, task_id, new_step)
     print("critic saved.")
 
-class CriticDataset_Reward(Dataset):
-    def __init__(self, dataset_name: str, 
-                       specific_dataset: str, 
+class CriticDataset_Reward:
+    def __init__(self, dataset_name: str,
+                       specific_dataset: str,
                        reward_hidden_layers: int,
                        reward_hidden_dim: int,
                        reward_checkpoint: int,
-                       trajs: List[TrajectoryDict], 
+                       trajs: List[TrajectoryDict],
                        horizon: int = 32,
-                       old_step: Optional[int] = None,  
-                       new_step: int = 0, 
+                       old_step: Optional[int] = None,
+                       new_step: int = 0,
                        momentum: float = 0.005,
-                       task_id: Optional[int] = None):
+                       task_id: Optional[int] = None,
+                       *, rng=None):  # API-CHANGE: rng= threaded for reward param-template init
+        if rng is None:
+            rng = jax.random.PRNGKey(0)
         # ----- gather raw obs/actions to fit stats -----
 
         obs_all = []
         for traj in trajs:
             obs_all.append(traj['observations'])
         obs_all = np.concatenate(obs_all, axis = 0)
-        
+
         #get stats
         stats = SAStats()
         stats.obs_mean = obs_all.mean(axis=0)
@@ -2827,42 +2809,45 @@ class CriticDataset_Reward(Dataset):
              self.stats = update_critic_stats(dataset_name, specific_dataset, stats, task_id, old_step, momentum)
         else:
              self.stats = stats
-        
+
         device = check_device()
         _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
         reward_state, _, _ = get_reward_model(
             dataset_name, specific_dataset, reward_checkpoint, task_id,
         )
-        reward_net = SimpleReward(
+        reward_def = SimpleReward(
             obs_dim, act_dim, reward_hidden_dim, reward_hidden_layers,
-        ).to(device)
-        reward_net.load_state_dict(reward_state)
-        reward_net.eval()
-        for p in reward_net.parameters():
-            p.requires_grad_(False)
+        )
+        rng, init_rng = jax.random.split(rng)
+        reward_params = reward_def.init(
+            init_rng, jnp.zeros((1, obs_dim), dtype=jnp.float32), jnp.zeros((1, act_dim), dtype=jnp.float32)
+        )['params']
+        # TODO(checkpoint-bridge): restore reward params (new flax ckpt / torch-remapped legacy) into a frozen
+        # TrainState; called without params= (== torch eval / no_grad).
+        reward_params = flax.serialization.from_state_dict(reward_params, reward_state)
+        reward_net = TrainState.create(reward_def, reward_params, tx=None)
         reward_stat = get_reward_stats(
             dataset_name, specific_dataset, reward_checkpoint, task_id,
         )
 
         transitions = []
-        
+
         for traj in trajs:
-            obs = traj['observations'] 
-            acts = traj['actions']   
+            obs = traj['observations']
+            acts = traj['actions']
             T_traj = min(len(obs), len(acts))
-            
+
             if T_traj < horizon:
                 continue
-            
-            with torch.no_grad():
-                obs_for_r = reward_stat.norm_obs(obs[:T_traj]).astype(np.float32)
-                s_t = torch.as_tensor(obs_for_r, dtype=torch.float32, device=device)
-                a_t = torch.as_tensor(acts[:T_traj], dtype=torch.float32, device=device)
-                rews = reward_net(s_t, a_t).cpu().numpy().astype(np.float32)   # (T_traj,)  
-                # Scale down predicted rewards from reward model
-                rews = np.clip(rews, -20.0, 20.0)      # adjust bounds if needed
-                rews = rews / 5.0                      # or use a running std
-            
+
+            obs_for_r = reward_stat.norm_obs(obs[:T_traj]).astype(np.float32)
+            s_t = jnp.asarray(obs_for_r, dtype=jnp.float32)
+            a_t = jnp.asarray(acts[:T_traj], dtype=jnp.float32)
+            rews = np.asarray(reward_net(s_t, a_t)).astype(np.float32)   # (T_traj,)
+            # Scale down predicted rewards from reward model
+            rews = np.clip(rews, -20.0, 20.0)      # adjust bounds if needed
+            rews = rews / 5.0                      # or use a running std
+
             for t in range(len(obs) - horizon):
                  obs_chunk = self.stats.norm_obs(obs[t : t + horizon]).astype(np.float32)
                  rews_chunk = rews[t: min(t+horizon, len(rews))]
@@ -2870,7 +2855,7 @@ class CriticDataset_Reward(Dataset):
 
         self.transitions = transitions
         self.save_stats(dataset_name, specific_dataset, task_id, new_step)
-    
+
     def save_stats(self, dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
         critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
         stats_name =  str(critic_name) + f'_Critic_stats_{str(step)}.pkl'
@@ -2884,11 +2869,18 @@ class CriticDataset_Reward(Dataset):
     def __getitem__(self, idx):
         obs_chunk, rews_chunk = self.transitions[idx]
         return (
-            torch.tensor(obs_chunk, dtype = torch.float32),
-            torch.tensor(rews_chunk, dtype = torch.float32)
+            np.asarray(obs_chunk, dtype=np.float32),
+            np.asarray(rews_chunk, dtype=np.float32),
         )
     def __len__(self):
         return len(self.transitions)
+
+    def sample(self, batch_size):
+        # fql-style host-side sampling: returns numpy batch (obs_chunks, rews_chunks).
+        idxs = np.random.randint(0, len(self.transitions), size=batch_size)
+        obs = np.stack([np.asarray(self.transitions[i][0], dtype=np.float32) for i in idxs], axis=0)
+        rews = np.stack([np.asarray(self.transitions[i][1], dtype=np.float32) for i in idxs], axis=0)
+        return obs, rews
 
 class Critic_Buffer_Reward():
     def __init__(self, dataset_name: str,
@@ -2922,64 +2914,54 @@ class Critic_Buffer_Reward():
         )
        
      
-    def obtain_training_data(self, target_critic: nn.Module, batch_size: int, device: str):
-        loader = cycle(DataLoader(
-            self.data, 
-            batch_size=batch_size, 
-            shuffle=True, 
-            drop_last=True,
-            num_workers=0,
-            pin_memory=torch.cuda.is_available(),
-        ))
-        obs_chunks, rews_chunks = next(loader)      # (B, T, dim), (B, T)
-        obs_chunks = obs_chunks.to(device)
-        rews_chunks = rews_chunks.to(device)
+    def obtain_training_data(self, target_critic, batch_size: int, device: str):
+        obs_chunks, rews_chunks = self.data.sample(batch_size)   # (B, T, dim), (B, T)
+        obs_chunks = jnp.asarray(obs_chunks)
+        rews_chunks = jnp.asarray(rews_chunks)
         B, T = obs_chunks.shape[0], obs_chunks.shape[1]
 
-        with torch.no_grad():
-            values = target_critic(obs_chunks)            # (B, T)
+        # target_critic is a frozen TrainState; calling it without params= stops gradients (== torch no_grad).
+        values = target_critic(obs_chunks)            # (B, T)
 
-            deltas = (
-                  rews_chunks[:, :-1]
-                  + self.gamma * values[:, 1:]
-                   - values[:, :-1]
-              )                                             # (B, T-1)
+        deltas = (
+              rews_chunks[:, :-1]
+              + self.gamma * values[:, 1:]
+               - values[:, :-1]
+          )                                             # (B, T-1)
 
-            advantages = torch.zeros(B, T - 1, device=device)
-            last_adv = torch.zeros(B, device=device)
-            for t in reversed(range(T - 1)):
-                last_adv = deltas[:, t] + self.gamma * self.lam * last_adv
-                advantages[:, t] = last_adv
+        advantages = jnp.zeros((B, T - 1))
+        last_adv = jnp.zeros((B,))
+        for t in reversed(range(T - 1)):
+            last_adv = deltas[:, t] + self.gamma * self.lam * last_adv
+            advantages = advantages.at[:, t].set(last_adv)
 
-            #value_targets = values[:, 0] + advantages[:, 0]   # (B,)
-            with torch.no_grad():
-                 values = target_critic(obs_chunks)                      # (B, T)
-                 deltas = (
-                       rews_chunks[:, :-1]
-                       + self.gamma * values[:, 1:]
-                       - values[:, :-1]
-                 )                                                       # (B, T-1)
+        #value_targets = values[:, 0] + advantages[:, 0]   # (B,)
+        values = target_critic(obs_chunks)                      # (B, T)
+        deltas = (
+              rews_chunks[:, :-1]
+              + self.gamma * values[:, 1:]
+              - values[:, :-1]
+        )                                                       # (B, T-1)
 
-                  # GAE advantages
-                 advantages = torch.zeros_like(deltas)
-                 last_adv = torch.zeros(B, device=device)
-                 for t in reversed(range(deltas.shape[1])):
-                     last_adv = deltas[:, t] + self.gamma * self.lam * last_adv
-                     advantages[:, t] = last_adv
+        # GAE advantages
+        advantages = jnp.zeros_like(deltas)
+        last_adv = jnp.zeros((B,))
+        for t in reversed(range(deltas.shape[1])):
+            last_adv = deltas[:, t] + self.gamma * self.lam * last_adv
+            advantages = advantages.at[:, t].set(last_adv)
 
-                 # === ADD NORMALIZATION HERE ===
-                 value_targets = values[:, 0] + advantages[:, 0]         # raw targets
-            
-                 # Normalize advantages and targets (running stats or batch stats)
-                 adv_mean = advantages.mean()
-                 adv_std  = advantages.std() + 1e-8
-                 advantages = (advantages - adv_mean) / adv_std
-            
-                 tgt_mean = value_targets.mean()
-                 tgt_std  = value_targets.std() + 1e-8
-                 value_targets = (value_targets - tgt_mean) / tgt_std
-                 # =================================
-            
+        # === ADD NORMALIZATION HERE ===
+        value_targets = values[:, 0] + advantages[:, 0]         # raw targets
+
+        # Normalize advantages and targets (running stats or batch stats)
+        adv_mean = advantages.mean()
+        adv_std  = advantages.std() + 1e-8
+        advantages = (advantages - adv_mean) / adv_std
+
+        tgt_mean = value_targets.mean()
+        tgt_std  = value_targets.std() + 1e-8
+        value_targets = (value_targets - tgt_mean) / tgt_std
+        # =================================
 
         return obs_chunks[:, 0], value_targets
 
@@ -2997,28 +2979,29 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
                  lr, 
                  min_lr, 
                  tau, 
-                 old_step: Optional[int] = None, 
-                 new_step: int = 0, 
-                 momentum: float = 0.005, 
-                 task_id: Optional[int] = None):
+                 old_step: Optional[int] = None,
+                 new_step: int = 0,
+                 momentum: float = 0.005,
+                 task_id: Optional[int] = None,
+                 *, rng=None):  # API-CHANGE: rng= threaded for param init (was implicitly stochastic)
+    if rng is None:
+        rng = jax.random.PRNGKey(0)
     device = check_device()
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
-    critic = Critic(obs_dim, critic_hidden_dim, critic_hidden_layers).to(device)
+    critic = Critic(obs_dim, critic_hidden_dim, critic_hidden_layers)
+    s_ex = jnp.zeros((1, obs_dim), dtype=jnp.float32)
+    rng, init_rng = jax.random.split(rng)
+    params = critic.init(init_rng, s_ex)['params']
     if(old_step is not None):
+        # TODO(checkpoint-bridge): get_critic_model returns the saved flax param tree (new ckpts) or a torch
+        # state_dict (legacy) needing the per-Dense remap (weight (out,in)->kernel (in,out).T).
         critic_state_dict, _ = get_critic_model(dataset_name, specific_dataset, task_id = task_id, step = old_step)
-        critic.load_state_dict(critic_state_dict)
-    target_critic = Critic(obs_dim, critic_hidden_dim, critic_hidden_layers).to(device)
-    target_critic.load_state_dict(critic.state_dict())
-    target_critic.eval()
-    for p in target_critic.parameters():
-        p.requires_grad_(False)
-    optimizer = optim.AdamW(critic.parameters(), lr = lr, weight_decay = 1e-2)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max = num_steps,   # one scheduler step per training step
-            eta_min = min_lr
-        )
-    critic.train()
+        params = flax.serialization.from_state_dict(params, critic_state_dict)
+    schedule = optax.cosine_decay_schedule(lr, num_steps, alpha=min_lr / lr)
+    tx = optax.chain(optax.clip_by_global_norm(1.0), optax.adamw(schedule, weight_decay=1e-2))
+    train_state = TrainState.create(critic, params, tx=tx)
+    # target network: a frozen TrainState (no optimizer) updated via Polyak (target_update).
+    target_state = TrainState.create(critic, copy.deepcopy(params), tx=None)
     buffer = Critic_Buffer_Reward(
                        dataset_name,
                        specific_dataset,
@@ -3030,38 +3013,36 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
                        gamma,
                        lam,
                        task_id,
-                       old_step,  
-                       new_step, 
+                       old_step,
+                       new_step,
                        momentum)
     print(f"Training critic for {dataset_name}-{specific_dataset}")
+
+    @jax.jit
+    def _update(train_state, target_state, s, target_value):
+        def loss_fn(params):
+            q_pred = train_state(s, params=params)
+            loss = jnp.mean(optax.huber_loss(q_pred, target_value, delta=1.0))
+            #loss = jnp.mean((q_pred - target_value) ** 2)
+            return loss, {'loss': loss}
+        new_state, info = train_state.apply_loss_fn(loss_fn)
+        # Soft update target network: tgt = (1 - tau) * tgt + tau * online == target_update(online, tgt, tau).
+        new_target_params = target_update(new_state.params, target_state.params, tau)
+        return new_state, target_state.replace(params=new_target_params), info
+
     total_loss = 0.0
     for k in range(1, num_steps + 1):  # number of passes over dataset
-           s, target_value = buffer.obtain_training_data(target_critic, batch_size, device)
-           s = s.to(device)
-           target_value = target_value.to(device)
+           s, target_value = buffer.obtain_training_data(target_state, batch_size, device)
+           s = jnp.asarray(s)
+           target_value = jnp.asarray(target_value)
 
-           # Predicted Q-values
-           q_pred = critic(s)
-           loss = F.smooth_l1_loss(q_pred, target_value, beta = 1.0)
-           #loss = F.mse_loss(q_pred, target_value)
-           total_loss += loss.item()
+           train_state, target_state, info = _update(train_state, target_state, s, target_value)
+           total_loss += float(info['loss'])
 
-           optimizer.zero_grad()
-           loss.backward()
-           torch.nn.utils.clip_grad_norm_(critic.parameters(), max_norm=1.0)
-           optimizer.step()
-           scheduler.step()
-           
            if(k % 1000 == 0):
                 print(f"Critic Training step {k} loss: {total_loss/1000}")
                 total_loss = 0.0
-            
-           # Soft update target network
-           for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):
-               tgt_param.data.mul_(1 - tau)
-               tgt_param.data.add_(tau * param.data)
-    target_critic.eval()
-    save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
+    save_critic(target_state.params, dataset_name, specific_dataset, task_id, new_step)
     print(f"critic model saved")
 
 @dataclass
@@ -3101,7 +3082,10 @@ def train_critic_with_planner2(
     new_step: int = 0,
     task_id: Optional[int] = None,
     log_every: int = 1,
+    *, rng=None,  # API-CHANGE: rng= threaded for param init + diffusion sampler (was implicitly stochastic)
 ):
+    if rng is None:
+        rng = jax.random.PRNGKey(0)
 
     # ---------------------------------------------------------------- helpers
     def load_kernel_ensemble(
@@ -3110,24 +3094,29 @@ def train_critic_with_planner2(
         kernel_config: KernelConfig,
         obs_dim: int,
         act_dim: int,
-        device: torch.device,
+        device: str,
+        *, rng,
     ):
         kernel_state_dicts, _, _ = get_kernel(
             dataset_name, specific_dataset, kernel_config.checkpoint,
         )
 
+        # TODO(checkpoint-bridge): rebuild each kernel as a (model_def, params) pair; legacy torch state_dicts
+        # need the per-Dense remap (weight (out,in)->kernel (in,out).T) before from_state_dict. Kernels stay a
+        # python list of independently-loaded models (§11), called via model_def.apply (no grad flows).
+        s_ex = jnp.zeros((1, obs_dim), dtype=jnp.float32)
+        a_ex = jnp.zeros((1, act_dim), dtype=jnp.float32)
         kernels = []
         if kernel_config.type_kernel == 'robust':
             for sd in kernel_state_dicts:
                 k_net = RobustTransitionKernel(
                     obs_dim, act_dim,
                     kernel_config.num_hidden_layers, kernel_config.hidden_dim,
-                ).to(device)
-                k_net.load_state_dict(sd)
-                k_net.eval()
-                for p in k_net.parameters():
-                    p.requires_grad_(False)
-                kernels.append(k_net)
+                )
+                rng, init_rng = jax.random.split(rng)
+                k_params = k_net.init(init_rng, s_ex, a_ex)['params']
+                k_params = flax.serialization.from_state_dict(k_params, sd)
+                kernels.append((k_net, k_params))
         else:  # 'mog'
             for sd in kernel_state_dicts:
                 k_net = MoGTransitionKernel(
@@ -3135,61 +3124,57 @@ def train_critic_with_planner2(
                     kernel_config.num_modes,
                     kernel_config.num_hidden_layers, kernel_config.hidden_dim,
                     noise_floor=kernel_config.noise_floor,
-                ).to(device)
-                k_net.load_state_dict(sd)
-                k_net.eval()
-                for p in k_net.parameters():
-                    p.requires_grad_(False)
-                kernels.append(k_net)
+                )
+                rng, init_rng = jax.random.split(rng)
+                k_params = k_net.init(init_rng, s_ex, a_ex)['params']
+                k_params = flax.serialization.from_state_dict(k_params, sd)
+                kernels.append((k_net, k_params))
 
         kernel_stat = get_kernel_stats(
             dataset_name, specific_dataset, kernel_config.checkpoint,
         )
-        k_mean = torch.as_tensor(
-            kernel_stat.obs_mean, device=device, dtype=torch.float32,
-        )
-        k_std = torch.as_tensor(
-            np.maximum(kernel_stat.obs_std, 1e-3), device=device, dtype=torch.float32,
+        k_mean = jnp.asarray(kernel_stat.obs_mean, dtype=jnp.float32)
+        k_std = jnp.asarray(
+            np.maximum(kernel_stat.obs_std, 1e-3), dtype=jnp.float32,
         )
         return kernels, k_mean, k_std
 
-    @torch.no_grad()
     def is_plan_feasible(
-        s_raw_plan:    torch.Tensor,        # (H, d_s)
-        a_raw_plan:    torch.Tensor,        # (H, d_a)
-        kernels:       List[nn.Module],
-        k_mean:        torch.Tensor,        # (d_s,)
-        k_std:         torch.Tensor,        # (d_s,)
+        s_raw_plan,                         # (H, d_s)
+        a_raw_plan,                         # (H, d_a)
+        kernels,
+        k_mean,                             # (d_s,)
+        k_std,                              # (d_s,)
         kernel_config: KernelConfig,
-        device:        torch.device,
+        device:        str,
     ) -> bool:
+        # kernels is a list of (model_def, params); calling apply does not flow gradients (== torch no_grad).
         s_k   = (s_raw_plan - k_mean) / k_std
         s_t   = s_k[:-1]
         a_t   = a_raw_plan[:-1]
         s_tp1 = s_k[1:]
 
         if kernel_config.type_kernel == 'robust':
-            total = torch.zeros(s_t.shape[0], device=device)
-            for k_net in kernels:
-                mu, log_std = k_net(s_t, a_t)
-                lp = k_net.log_prob(s_tp1, mu, log_std)
+            total = jnp.zeros(s_t.shape[0])
+            for model_def, params in kernels:
+                mu, log_std = model_def.apply({'params': params}, s_t, a_t)
+                lp = model_def.apply({'params': params}, s_tp1, mu, log_std, method=model_def.log_prob)
                 total = total + lp
             avg_lp = total / len(kernels)
         else:  # 'mog'
             avg_lp = compute_log_density_mog(kernels, s_t, a_t, s_tp1)
 
-        return bool((avg_lp > kernel_config.min_log_prob).all().item())
+        return bool((avg_lp > kernel_config.min_log_prob).all())
 
-    @torch.no_grad()
     def _generate_feasible_plans(
         s0_pool:        np.ndarray,
-        planner:        nn.Module,
+        planner,
         planner_proc:   Planner_Processor,
-        planner_mean:   torch.Tensor,
-        planner_std:    torch.Tensor,
-        kernels:        List[nn.Module],
-        k_mean:         torch.Tensor,
-        k_std:          torch.Tensor,
+        planner_mean,
+        planner_std,
+        kernels,
+        k_mean,
+        k_std,
         kernel_config:  KernelConfig,
         obs_dim:        int,
         act_dim:        int,
@@ -3198,7 +3183,8 @@ def train_critic_with_planner2(
         num_karras:     int,
         eta:            float,
         batch_size:     int,
-        device:         torch.device,
+        device:         str,
+        *, rng,
     ):
         accepted_plans = []
         accepted_s0    = []
@@ -3209,13 +3195,15 @@ def train_critic_with_planner2(
             idx    = np.random.randint(0, len(s0_pool))
             s0_raw = s0_pool[idx]
             s0_p   = planner_proc.preprocess(s0_raw)
+            # planner is a frozen TrainState; sample_euler_karras calls it without params= (== torch no_grad).
+            rng, sub = jax.random.split(rng)
             x      = sample_euler_karras(
                 s0_p, planner, obs_dim, act_dim, horizon,
                 num_steps=steps_T, num_karras=num_karras,
-                eta=eta, device=device,
+                eta=eta, device=device, rng=sub,
             )
 
-            x_t       = torch.from_numpy(x).float().to(device)
+            x_t       = jnp.asarray(x, dtype=jnp.float32)
             s_planner = x_t[..., :obs_dim]
             a_raw     = x_t[..., obs_dim:]
             s_raw_pl  = s_planner * planner_std + planner_mean
@@ -3244,7 +3232,7 @@ def train_critic_with_planner2(
                   f"feasible plans after {attempts} attempts "
                   f"(min_log_prob={kernel_config.min_log_prob}); proceeding")
 
-        plans      = torch.stack(accepted_plans, dim=0)
+        plans      = jnp.stack(accepted_plans, axis=0)
         s0_raw_acc = np.stack(accepted_s0, axis=0)
         return plans, s0_raw_acc
 
@@ -3253,64 +3241,74 @@ def train_critic_with_planner2(
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
 
     # ------------------------------------------------------------------ critic
-    critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
+    critic = Critic(obs_dim, hidden_dim, hidden_layers)
+    s_ex = jnp.zeros((1, obs_dim), dtype=jnp.float32)
+    rng, init_rng = jax.random.split(rng)
+    params = critic.init(init_rng, s_ex)['params']
+    # TODO(checkpoint-bridge): get_critic_model returns the saved flax param tree (new ckpts) or a torch
+    # state_dict (legacy) needing the per-Dense remap (weight (out,in)->kernel (in,out).T).
     critic_state, _ = get_critic_model(
         dataset_name, specific_dataset, task_id=task_id, step=old_critic_checkpoint,
     )
-    critic.load_state_dict(critic_state)
+    params = flax.serialization.from_state_dict(params, critic_state)
+    schedule = optax.cosine_decay_schedule(lr, num_steps, alpha=min_lr / lr)
+    tx = optax.chain(optax.clip_by_global_norm(1.0), optax.adamw(schedule, weight_decay=1e-2))
+    critic_state_train = TrainState.create(critic, params, tx=tx)
 
-    target_critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
-    target_critic.load_state_dict(critic.state_dict())
-    target_critic.eval()
-    for p in target_critic.parameters():
-        p.requires_grad_(False)
+    # target network: a frozen TrainState (no optimizer) updated via Polyak (target_update).
+    target_critic = TrainState.create(critic, copy.deepcopy(params), tx=None)
 
     # ----------------------------------------------------------------- planner
-    planner = DiT1d(
+    planner_def = DiT1d(
         in_dim=(obs_dim + act_dim), emb_dim=128, d_model=256,
         n_heads=256 // 64, depth=2, timestep_emb_type="fourier",
-    ).to(device)
-    planner.load_state_dict(
-        get_planner(dataset_name, specific_dataset, planner_checkpoint, task_id)
     )
-    planner.eval()
-    for p in planner.parameters():
-        p.requires_grad_(False)
+    rng, init_rng = jax.random.split(rng)
+    planner_params = planner_def.init(
+        init_rng, jnp.zeros((1, horizon, obs_dim + act_dim)), jnp.zeros((1,))
+    )['params']
+    # TODO(checkpoint-bridge): restore planner params (new flax ckpt / torch-remapped legacy) into a frozen
+    # TrainState; the diffusion sampler calls it without params= (== torch eval / no_grad).
+    planner_params = flax.serialization.from_state_dict(
+        planner_params, get_planner(dataset_name, specific_dataset, planner_checkpoint, task_id)
+    )
+    planner = TrainState.create(planner_def, planner_params, tx=None)
 
     planner_proc = Planner_Processor(dataset_name, specific_dataset, task_id)
-    planner_mean = torch.as_tensor(
-        planner_proc.stats.obs_mean, device=device, dtype=torch.float32,
-    )
-    planner_std  = torch.as_tensor(
-        np.maximum(planner_proc.stats.obs_std, 1e-3), device=device, dtype=torch.float32,
+    planner_mean = jnp.asarray(planner_proc.stats.obs_mean, dtype=jnp.float32)
+    planner_std  = jnp.asarray(
+        np.maximum(planner_proc.stats.obs_std, 1e-3), dtype=jnp.float32,
     )
 
     # ----------------------------------------------------------- reward model
     reward_state, _, _ = get_reward_model(
         dataset_name, specific_dataset, reward_checkpoint, task_id,
     )
-    reward_net = SimpleReward(
+    reward_def = SimpleReward(
         obs_dim, act_dim, reward_hidden_dim, reward_hidden_layers,
-    ).to(device)
-    reward_net.load_state_dict(reward_state)
-    reward_net.eval()
-    for p in reward_net.parameters():
-        p.requires_grad_(False)
+    )
+    rng, init_rng = jax.random.split(rng)
+    reward_params = reward_def.init(
+        init_rng, jnp.zeros((1, obs_dim), dtype=jnp.float32), jnp.zeros((1, act_dim), dtype=jnp.float32)
+    )['params']
+    # TODO(checkpoint-bridge): restore reward params (new flax ckpt / torch-remapped legacy) into a frozen
+    # TrainState; called without params= (== torch eval / no_grad).
+    reward_params = flax.serialization.from_state_dict(reward_params, reward_state)
+    reward_net = TrainState.create(reward_def, reward_params, tx=None)
 
     reward_stat = get_reward_stats(
         dataset_name, specific_dataset, reward_checkpoint, task_id,
     )
-    r_mean = torch.as_tensor(
-        reward_stat.obs_mean, device=device, dtype=torch.float32,
-    )
-    r_std  = torch.as_tensor(
-        np.maximum(reward_stat.obs_std, 1e-3), device=device, dtype=torch.float32,
+    r_mean = jnp.asarray(reward_stat.obs_mean, dtype=jnp.float32)
+    r_std  = jnp.asarray(
+        np.maximum(reward_stat.obs_std, 1e-3), dtype=jnp.float32,
     )
 
     # ------------------------------------------------------------------ kernel
+    rng, kern_rng = jax.random.split(rng)
     kernels, k_mean, k_std = load_kernel_ensemble(
         dataset_name, specific_dataset, kernel_config,
-        obs_dim, act_dim, device,
+        obs_dim, act_dim, device, rng=kern_rng,
     )
 
     # ----------------------------------- critic stats: load once, never save
@@ -3318,122 +3316,114 @@ def train_critic_with_planner2(
         dataset_name, specific_dataset,
         task_id=task_id, step=0,
     )
-    c_mean = torch.as_tensor(
-        critic_stat.obs_mean, device=device, dtype=torch.float32,
-    )
-    c_std  = torch.as_tensor(
-        np.maximum(critic_stat.obs_std, 1e-3), device=device, dtype=torch.float32,
+    c_mean = jnp.asarray(critic_stat.obs_mean, dtype=jnp.float32)
+    c_std  = jnp.asarray(
+        np.maximum(critic_stat.obs_std, 1e-3), dtype=jnp.float32,
     )
 
     # ---------------------------------------------------- starting-state pool
     s0_pool = np.concatenate(
         [t['observations'] for t in trajs], axis=0,
     ).astype(np.float32)
-    
+
     # === NEW: Running stats for targets ===
-    running_tgt_mean = torch.zeros(1, device=device)
-    running_tgt_std  = torch.ones(1, device=device)
+    running_tgt_mean = jnp.zeros(1)
+    running_tgt_std  = jnp.ones(1)
     alpha = 0.99   # momentum
     # ======================================
 
-    # ----------------------------------------------------------------- optim
-    optimizer = optim.AdamW(critic.parameters(), lr=lr, weight_decay = 1e-2)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=num_steps, eta_min=min_lr,
-    )
-
     n = horizon - 1
-    gamma_pow_t = torch.tensor(
-        [gamma ** t for t in range(n)], device=device, dtype=torch.float32,
+    gamma_pow_t = jnp.asarray(
+        [gamma ** t for t in range(n)], dtype=jnp.float32,
     )
     gamma_n = gamma ** n
 
-    critic.train()
+    @jax.jit
+    def _update(critic_state_train, target_critic, s0_critic, normalized_target):
+        def loss_fn(params):
+            v_pred = critic_state_train(s0_critic, params=params)              # (B',)
+            loss   = jnp.mean(optax.huber_loss(v_pred, normalized_target, delta=1.0))
+            return loss, {'loss': loss}
+        new_state, info = critic_state_train.apply_loss_fn(loss_fn)
+        # Polyak target update: tgt = (1 - tau) * tgt + tau * online == target_update(online, tgt, tau).
+        new_target_params = target_update(new_state.params, target_critic.params, tau)
+        return new_state, target_critic.replace(params=new_target_params), info
+
     running = 0.0
 
     for k in range(1, num_steps + 1):
-        with torch.no_grad():
-            # 1) sample feasible plans (handles s_0 sampling internally)
-            plans, _ = _generate_feasible_plans(
-                s0_pool       = s0_pool,
-                planner       = planner,
-                planner_proc  = planner_proc,
-                planner_mean  = planner_mean,
-                planner_std   = planner_std,
-                kernels       = kernels,
-                k_mean        = k_mean,
-                k_std         = k_std,
-                kernel_config = kernel_config,
-                obs_dim       = obs_dim,
-                act_dim       = act_dim,
-                horizon       = horizon,
-                steps_T       = steps_T,
-                num_karras    = num_karras,
-                eta           = eta,
-                batch_size    = batch_size,
-                device        = device,
-            )                                                                 # (B', H, d_s+d_a)
+        # 1) sample feasible plans (handles s_0 sampling internally)
+        rng, sub = jax.random.split(rng)
+        plans, _ = _generate_feasible_plans(
+            s0_pool       = s0_pool,
+            planner       = planner,
+            planner_proc  = planner_proc,
+            planner_mean  = planner_mean,
+            planner_std   = planner_std,
+            kernels       = kernels,
+            k_mean        = k_mean,
+            k_std         = k_std,
+            kernel_config = kernel_config,
+            obs_dim       = obs_dim,
+            act_dim       = act_dim,
+            horizon       = horizon,
+            steps_T       = steps_T,
+            num_karras    = num_karras,
+            eta           = eta,
+            batch_size    = batch_size,
+            device        = device,
+            rng           = sub,
+        )                                                                     # (B', H, d_s+d_a)
 
-            # 2) split planner output: states (planner-norm) and raw actions
-            s_planner = plans[..., :obs_dim]                                  # (B', H, d_s)
-            actions   = plans[..., obs_dim:]                                  # (B', H, d_a)
-            s_raw     = s_planner * planner_std + planner_mean                # (B', H, d_s)
+        # 2) split planner output: states (planner-norm) and raw actions
+        s_planner = plans[..., :obs_dim]                                      # (B', H, d_s)
+        actions   = plans[..., obs_dim:]                                      # (B', H, d_a)
+        s_raw     = s_planner * planner_std + planner_mean                    # (B', H, d_s)
 
-            # 3) reward model: r̂(s_t, a_t) for t = 0..n-1
-            B, H, _ = s_raw.shape
-            s_for_r = (s_raw[:, :n] - r_mean) / r_std
-            r_hat   = reward_net(
-                s_for_r.reshape(B * n, -1),
-                actions[:, :n].reshape(B * n, -1),
-            ).reshape(B, n)  
-            
-            # NEW: Strong scaling
-            r_hat = torch.clamp(r_hat, -10.0, 10.0)
-            r_hat = r_hat / 5.0                                                 # (B', n)
+        # 3) reward model: r̂(s_t, a_t) for t = 0..n-1
+        # reward_net is a frozen TrainState; called without params= (== torch no_grad).
+        B, H, _ = s_raw.shape
+        s_for_r = (s_raw[:, :n] - r_mean) / r_std
+        r_hat   = reward_net(
+            s_for_r.reshape(B * n, -1),
+            actions[:, :n].reshape(B * n, -1),
+        ).reshape(B, n)
 
-            # 4) discounted return + bootstrapped target value
-            disc_return  = (gamma_pow_t.unsqueeze(0) * r_hat).sum(dim=1)      # (B',)
-            s_n_critic   = (s_raw[:, n] - c_mean) / c_std                     # (B', d_s)
-            v_bootstrap  = target_critic(s_n_critic)                          # (B',)
-            target_value = disc_return + gamma_n * v_bootstrap                # (B',)
+        # NEW: Strong scaling
+        r_hat = jnp.clip(r_hat, -10.0, 10.0)
+        r_hat = r_hat / 5.0                                                     # (B', n)
 
+        # 4) discounted return + bootstrapped target value
+        disc_return  = (gamma_pow_t[None] * r_hat).sum(axis=1)                # (B',)
+        s_n_critic   = (s_raw[:, n] - c_mean) / c_std                         # (B', d_s)
+        v_bootstrap  = target_critic(s_n_critic)                             # (B',)
+        target_value = disc_return + gamma_n * v_bootstrap                    # (B',)
 
-            # === NEW: Running normalization ===
-            batch_mean = target_value.mean()
-            batch_std  = target_value.std(unbiased=False) + 1e-8
+        # === NEW: Running normalization ===
+        batch_mean = target_value.mean()
+        batch_std  = target_value.std() + 1e-8
 
-            running_tgt_mean = alpha * running_tgt_mean + (1 - alpha) * batch_mean
-            running_tgt_std  = alpha * running_tgt_std  + (1 - alpha) * batch_std
+        running_tgt_mean = alpha * running_tgt_mean + (1 - alpha) * batch_mean
+        running_tgt_std  = alpha * running_tgt_std  + (1 - alpha) * batch_std
 
-            normalized_target = (target_value - running_tgt_mean) / running_tgt_std
-            # =================================
+        normalized_target = (target_value - running_tgt_mean) / running_tgt_std
+        # =================================
 
-            # 5) input for V_β(s_0)
-            s0_critic = (s_raw[:, 0] - c_mean) / c_std                        # (B', d_s)
+        # 5) input for V_β(s_0)
+        s0_critic = (s_raw[:, 0] - c_mean) / c_std                            # (B', d_s)
 
-        # 6) gradient step on V_β
-        v_pred = critic(s0_critic)                                            # (B',)
-        loss   = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
+        # 6) gradient step on V_β + 7) Polyak target update
+        critic_state_train, target_critic, info = _update(
+            critic_state_train, target_critic, s0_critic, normalized_target
+        )
 
-        optimizer.zero_grad()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(critic.parameters(), max_norm=1.0)
-        optimizer.step()
-        scheduler.step()
-
-        # 7) Polyak target update
-        with torch.no_grad():
-            for p, tp in zip(critic.parameters(), target_critic.parameters()):
-                tp.data.mul_(1 - tau).add_(tau * p.data)
-
-        running += loss.item()
+        running += float(info['loss'])
         """
         if k % log_every == 0:
             print(f"  step {k:>6}/{num_steps}   loss = {running / log_every:.4f}")
             running = 0.0
         """
 
-    target_critic.eval()
-    save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
+    save_critic(target_critic.params, dataset_name, specific_dataset, task_id, new_step)
     print("critic saved.")
 

@@ -1,7 +1,8 @@
+'''Neural-network backbone base class for the Diffusion (score-matching) model — JAX/Flax port.'''
 from typing import Optional
 
-import torch
-import torch.nn as nn
+import flax.linen as nn
+import jax.numpy as jnp
 
 from .utils import SUPPORTED_TIMESTEP_EMBEDDING
 
@@ -18,19 +19,18 @@ class BaseNNDiffusion(nn.Module):
      which are inputted as a tensor dictionary, or a single condition, directly inputted as a tensor.
     """
 
-    def __init__(
-        self, emb_dim: int, 
-        timestep_emb_type: str = "positional",
-        timestep_emb_params: Optional[dict] = None
-    ):
-        assert timestep_emb_type in SUPPORTED_TIMESTEP_EMBEDDING.keys()
-        super().__init__()
-        timestep_emb_params = timestep_emb_params or {}
-        self.map_noise = SUPPORTED_TIMESTEP_EMBEDDING[timestep_emb_type](emb_dim, **timestep_emb_params)
+    emb_dim: int
+    timestep_emb_type: str = 'positional'
+    timestep_emb_params: Optional[dict] = None
 
-    def forward(self,
-                x: torch.Tensor, noise: torch.Tensor,
-                condition: Optional[torch.Tensor] = None):
+    def setup(self):
+        assert self.timestep_emb_type in SUPPORTED_TIMESTEP_EMBEDDING.keys()
+        timestep_emb_params = self.timestep_emb_params or {}
+        self.map_noise = SUPPORTED_TIMESTEP_EMBEDDING[self.timestep_emb_type](self.emb_dim, **timestep_emb_params)
+
+    def __call__(self,
+                 x: jnp.ndarray, noise: jnp.ndarray,
+                 condition: Optional[jnp.ndarray] = None):
         """
         Input:
             x:          (b, horizon, in_dim)

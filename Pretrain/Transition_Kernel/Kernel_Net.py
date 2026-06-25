@@ -1,184 +1,165 @@
-import torch
-import torch.nn as nn
+'''Gaussian / Mixture-of-Gaussians forward dynamics models (JAX/Flax port).
+
+Inputs (s, a); outputs mean and log_std of s' (and mixture weights for the MoG variant).
+'''
 import math
-import torch.nn.functional as F
+
+import jax
+import jax.numpy as jnp
+import flax.linen as nn
+
+from JAX_PORT.jax_utils import default_init
 
 # Define the Gaussian forward dynamics model: inputs (s, a), outputs mean and log_std of s'
 
 
 class RobustTransitionKernel(nn.Module):
-    def __init__(
-        self,
-        obs_dim,
-        act_dim,
-        num_hidden_layers=2,
-        hidden_dim=256,
-        min_log_std=-6.0,
-        max_log_std=4.0,
-        noise_floor=1e-2,
-    ):
-        super().__init__()
-        assert num_hidden_layers >= 1, "num_hidden_layers must be >= 1"
+    obs_dim: int
+    act_dim: int
+    num_hidden_layers: int = 2
+    hidden_dim: int = 256
+    min_log_std: float = -6.0
+    max_log_std: float = 4.0
+    noise_floor: float = 1e-2
 
+    def setup(self):
+        assert self.num_hidden_layers >= 1, 'num_hidden_layers must be >= 1'
+
+        # nn.Sequential -> inline list of submodules (§2). Linen infers in_features.
         layers = []
         # first layer
-        layers.append(nn.Linear(obs_dim + act_dim, hidden_dim))
-        layers.append(nn.LayerNorm(hidden_dim))
-        layers.append(nn.ReLU())
+        layers.append(nn.Dense(self.hidden_dim, kernel_init=default_init()))  # init: fql-style (not torch-identical)
+        layers.append(nn.LayerNorm())
+        layers.append(nn.relu)
 
         # additional hidden layers
-        for _ in range(num_hidden_layers - 1):
-            layers.append(nn.Linear(hidden_dim, hidden_dim))
-            layers.append(nn.ReLU())
+        for _ in range(self.num_hidden_layers - 1):
+            layers.append(nn.Dense(self.hidden_dim, kernel_init=default_init()))  # init: fql-style
+            layers.append(nn.relu)
 
-        self.net = nn.Sequential(*layers)
-        self.mean_head = nn.Linear(hidden_dim, obs_dim)
-        self.log_std_head = nn.Linear(hidden_dim, obs_dim)
-        self.min_log_std = min_log_std
-        self.max_log_std = max_log_std
-        self.noise_floor = noise_floor
+        self.net = layers
+        self.mean_head = nn.Dense(self.obs_dim, kernel_init=default_init())  # init: fql-style
+        self.log_std_head = nn.Dense(self.obs_dim, kernel_init=default_init())  # init: fql-style
 
-    def forward(self, s, a):
-        x = torch.cat([s, a], dim=-1)
-        h = self.net(x)
+    def __call__(self, s, a):
+        x = jnp.concatenate([s, a], axis=-1)
+        h = x
+        for layer in self.net:
+            h = layer(h)
         mu = self.mean_head(h)
         raw_log_std = self.log_std_head(h)
-        log_std = self.min_log_std + F.softplus(raw_log_std - self.min_log_std)
-        log_std = torch.clamp(log_std, max=self.max_log_std)
+        log_std = self.min_log_std + jax.nn.softplus(raw_log_std - self.min_log_std)
+        log_std = jnp.clip(log_std, a_max=self.max_log_std)
         return mu, log_std
-    
+
     def gaussian_nll(self, s_next, mu, log_std):
         # x, mu: (..., obs_dim); log_std: (..., obs_dim)
-        var_pred = torch.exp(2 * log_std)
+        var_pred = jnp.exp(2 * log_std)
         var = var_pred + self.noise_floor  # additive floor
         # optional: clamp or clip residuals
         res = s_next - mu
         max_res = 10.0
-        res = torch.clamp(res, -max_res, +max_res)
-        nll = 0.5 * (torch.log(2 * math.pi * var) + (res ** 2) / var)
+        res = jnp.clip(res, -max_res, +max_res)
+        nll = 0.5 * (jnp.log(2 * math.pi * var) + (res ** 2) / var)
         # sum over state dims, but keep batch dims
-        return nll.sum(dim=-1).mean()
-    
-    """
-    def log_prob(self, s_next, mu, log_std):
-        var_pred = torch.exp(2 * log_std)
-        var = var_pred + self.noise_floor
-        var = torch.clamp(var, min=1e-8)
-        res = s_next - mu
-        res = torch.clamp(res, -10.0, 10.0)  
-        mahal = 0.5 * (res ** 2 / var).sum(dim=-1)
-        log_det = torch.log(var).sum(dim=-1)
-        const = res.size(-1) * 0.5 * math.log(2 * math.pi)
-        nll = const + 0.5 * log_det + mahal
-        return -nll  
-    """
-   
+        return nll.sum(axis=-1).mean()
+
     def log_prob(self, s_next, mu, log_std):
         # Compute log prob (not negative) — useful for testing / diagnostics
-        var = torch.exp(2 * log_std) + self.noise_floor
-        var = torch.clamp(var, min=1e-8)  # Prevent log(0)
-        D = s_next.size(-1)
+        var = jnp.exp(2 * log_std) + self.noise_floor
+        var = jnp.clip(var, a_min=1e-8)  # Prevent log(0)
+        D = s_next.shape[-1]
         # log prob per dimension
-        lp = -0.5 * (((s_next - mu) ** 2) / var).sum(dim=-1)
-        lp = lp - 0.5 * (D * math.log(2 * math.pi) + 2 * log_std.sum(dim=-1))
+        lp = -0.5 * (((s_next - mu) ** 2) / var).sum(axis=-1)
+        lp = lp - 0.5 * (D * math.log(2 * math.pi) + 2 * log_std.sum(axis=-1))
         return lp  # tensor of shape batch
 
     def mahalanobis_distance_squared(self, s_next, s, a):
-        """
+        '''
         Compute squared Mahalanobis distance D² for batch of transitions.
         Returns tensor of shape (batch_size,)
-        """
-        mu, log_std = self.forward(s, a)          # (batch, obs_dim), (batch, obs_dim)
-        var_pred = torch.exp(2 * log_std)         # predicted variance
+        '''
+        mu, log_std = self(s, a)                  # (batch, obs_dim), (batch, obs_dim)
+        var_pred = jnp.exp(2 * log_std)           # predicted variance
         var = var_pred + self.noise_floor         # same as in your log_prob
-        var = torch.clamp(var, min=1e-8)
+        var = jnp.clip(var, a_min=1e-8)
         residual = s_next - mu
         # Optional: mild clipping for stability (you already do this in NLL)
-        residual = torch.clamp(residual, -10.0, 10.0)
+        residual = jnp.clip(residual, -10.0, 10.0)
         # Squared Mahalanobis (diagonal covariance)
-        D2 = ((residual ** 2) / var).sum(dim=-1)   # sum over state dimensions
+        D2 = ((residual ** 2) / var).sum(axis=-1)  # sum over state dimensions
         return D2
-    
+
     def computeD(self, s, a, s_next):
-        mu, log_std = self.forward(s, a) 
-        var = torch.exp(2 * log_std) + self.noise_floor
-        var = torch.clamp(var, min=1e-8)  # Prevent log(0)
-        D = s_next.size(-1)
-        Temp = 0.5 * (D * math.log(2 * math.pi) + 2 * log_std.sum(dim=-1))
+        mu, log_std = self(s, a)
+        var = jnp.exp(2 * log_std) + self.noise_floor
+        var = jnp.clip(var, a_min=1e-8)  # Prevent log(0)
+        D = s_next.shape[-1]
+        Temp = 0.5 * (D * math.log(2 * math.pi) + 2 * log_std.sum(axis=-1))
         return Temp
 
 
 class MoGTransitionKernel(nn.Module):
-   
-    def __init__(
-        self,
-        obs_dim: int,
-        act_dim: int,
-        num_modes: int = 8,
-        num_hidden_layers: int = 3,
-        hidden_dim: int = 512,
-        min_log_std: float = -6.0,
-        max_log_std: float = 4.0,
-        noise_floor: float = 1e-4,
-    ):
-        super().__init__()
-        self.obs_dim = obs_dim
-        self.num_modes = num_modes
-        self.noise_floor = noise_floor
-        self.min_log_std = min_log_std
-        self.max_log_std = max_log_std
+    obs_dim: int
+    act_dim: int
+    num_modes: int = 8
+    num_hidden_layers: int = 3
+    hidden_dim: int = 512
+    min_log_std: float = -6.0
+    max_log_std: float = 4.0
+    noise_floor: float = 1e-4
 
-        # Shared Backbone
-        layers = [nn.Linear(obs_dim + act_dim, hidden_dim),
-                  nn.LayerNorm(hidden_dim), nn.ReLU()]
-        for _ in range(num_hidden_layers - 1):
-            layers += [nn.Linear(hidden_dim, hidden_dim),
-                       nn.LayerNorm(hidden_dim), nn.ReLU()]
-        self.backbone = nn.Sequential(*layers)
+    def setup(self):
+        # Shared Backbone (nn.Sequential -> inline list of submodules, §2).
+        layers = [nn.Dense(self.hidden_dim, kernel_init=default_init()),  # init: fql-style
+                  nn.LayerNorm(), nn.relu]
+        for _ in range(self.num_hidden_layers - 1):
+            layers += [nn.Dense(self.hidden_dim, kernel_init=default_init()),  # init: fql-style
+                       nn.LayerNorm(), nn.relu]
+        self.backbone = layers
 
-        self.head = nn.Linear(hidden_dim, num_modes * (obs_dim * 2 + 1))
+        self.head = nn.Dense(self.num_modes * (self.obs_dim * 2 + 1), kernel_init=default_init())  # init: fql-style
 
-    def forward(self, s, a):
-        x = torch.cat([s, a], dim=-1)
-        h = self.backbone(x)
-        out = self.head(h).view(-1, self.num_modes, 2*self.obs_dim + 1)
-        
+    def __call__(self, s, a):
+        x = jnp.concatenate([s, a], axis=-1)
+        h = x
+        for layer in self.backbone:
+            h = layer(h)
+        out = self.head(h).reshape(-1, self.num_modes, 2 * self.obs_dim + 1)
+
         mu = out[..., :self.obs_dim]
-        log_std = out[..., self.obs_dim:2*self.obs_dim]
+        log_std = out[..., self.obs_dim:2 * self.obs_dim]
         logits = out[..., -1]
-        
-        log_std = self.min_log_std + F.softplus(log_std - self.min_log_std)
-        log_std = torch.clamp(log_std, max=self.max_log_std)
-        
-        weights = F.softmax(logits, dim=-1)
-        
+
+        log_std = self.min_log_std + jax.nn.softplus(log_std - self.min_log_std)
+        log_std = jnp.clip(log_std, a_max=self.max_log_std)
+
+        weights = jax.nn.softmax(logits, axis=-1)
+
         return mu, log_std, weights
 
-    def log_prob(self, s_next: torch.Tensor, mu, log_std, weights):
-       
-        var = torch.exp(2 * log_std) + self.noise_floor
-        var = torch.clamp(var, min=1e-6)
-        
-        residual = s_next.unsqueeze(1) - mu
-        residual = torch.clamp(residual, -10.0, 10.0)
-        
-        mahal = ((residual ** 2) / var).sum(dim=-1)
+    def log_prob(self, s_next, mu, log_std, weights):
+
+        var = jnp.exp(2 * log_std) + self.noise_floor
+        var = jnp.clip(var, a_min=1e-6)
+
+        residual = jnp.expand_dims(s_next, 1) - mu
+        residual = jnp.clip(residual, -10.0, 10.0)
+
+        mahal = ((residual ** 2) / var).sum(axis=-1)
         log_prob_per_mode = -0.5 * (
-            mahal 
-            + self.obs_dim * math.log(2 * math.pi) 
-            + torch.log(var).sum(dim=-1)
+            mahal
+            + self.obs_dim * math.log(2 * math.pi)
+            + jnp.log(var).sum(axis=-1)
         )
-        
+
         # Mixture log probability
-        log_prob = torch.logsumexp(
-            log_prob_per_mode + torch.log(weights + 1e-8), 
-            dim=-1
+        log_prob = jax.scipy.special.logsumexp(
+            log_prob_per_mode + jnp.log(weights + 1e-8),
+            axis=-1
         )
         return log_prob                     # ← Positive log probability
 
-    def mog_nll(self, s_next: torch.Tensor, mu, log_std, weights):
-       
+    def mog_nll(self, s_next, mu, log_std, weights):
+
         return -self.log_prob(s_next, mu, log_std, weights).mean()
-
-
-

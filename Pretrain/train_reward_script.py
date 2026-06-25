@@ -22,13 +22,13 @@ def check_trajs_exit(env_name, specific_env, task_id, step):
              trajs = pickle.load(f)
         return trajs
 
-def check_cube_single_goal_reach(trajs, task_id):   
-    goals = {'task_1': np.array( [ 0.0,       -1.0,        0.199599]), 
+def check_cube_single_goal_reach(trajs, task_id):
+    goals = {'task_1': np.array( [ 0.0,       -1.0,        0.199599]),
          'task_2': np.array([7.50000000e-01, 8.02418254e-18, 1.99598996e-01]),
          'task_3': np.array([-7.50000000e-01,  1.21832368e-19,  1.99598996e-01]),
          'task_4': np.array([0.75,     2.0,       0.199599]),
          'task_5': np.array([ 0.75,     -2.0,        0.199599])}
-    
+
     total_dist = 0.0
     for traj in trajs:
            position = traj['observations'][-1][19:22]
@@ -41,14 +41,15 @@ def check_cube_single_goal_reach(trajs, task_id):
 """
 
 if __name__ == '__main__':
-    set_seed(1)
+    # JAX has no global RNG: set_seed now returns a PRNGKey to thread (CONVERSION_GUIDE §8).
+    rng = set_seed(1)
     train_reward(
     dataset_name = 'pointmaze',
     hidden_layers = 1,
     hidden_dim = 32,
-    batch_size = 256, 
-    num_steps = 400, 
-    save_freq = 200,  
+    batch_size = 256,
+    num_steps = 400,
+    save_freq = 200,
     lr = 1e-4,
     sigma = 7.0,
     target_reward = 20.0,
@@ -58,14 +59,15 @@ if __name__ == '__main__':
 """
 """
 if __name__ == '__main__':
-    set_seed(1)
+    # JAX has no global RNG: set_seed now returns a PRNGKey to thread (CONVERSION_GUIDE §8).
+    rng = set_seed(1)
     train_reward(
     dataset_name = 'pointmaze',
     hidden_layers = 2,
     hidden_dim = 128,
-    batch_size = 512, 
-    num_steps = 1000, 
-    save_freq = 500,  
+    batch_size = 512,
+    num_steps = 1000,
+    save_freq = 500,
     lr = 1e-04,
     sigma = 2.0,
     target_reward = 20.0,
@@ -76,24 +78,25 @@ if __name__ == '__main__':
 
 
 if __name__ == '__main__':
-    set_seed(1)
-    
+    # JAX has no global RNG: set_seed now returns a PRNGKey to thread (CONVERSION_GUIDE §8).
+    rng = set_seed(1)
+
     dataset_name = 'cube'
     specific_dataset = 'double'
     task_id = 4
     traj_length = None
-    
+
     """
     path = f'./Finetuning/Rollouts/{dataset_name}/{specific_dataset}-play/task_{task_id}/trajs_task{task_id}_success_0.pkl'
     with open(path, 'rb') as f:
           trajs = pickle.load(f)
     """
-    
+
     """
     train_reward_ensemble(
         dataset_name = dataset_name,
         hidden_layers = 3,
-        hidden_dim = 256, 
+        hidden_dim = 256,
         batch_size = 256,
         num_steps = 30000,
         save_freq = 5000,
@@ -116,20 +119,20 @@ if __name__ == '__main__':
         log_every = 2000
     )
     """
-    
-    train_reward(dataset_name = dataset_name, 
-                 hidden_layers = 4, 
-                 hidden_dim = 512, 
-                 batch_size = 256, 
-                 num_steps = 100000, 
-                 save_freq = 100000, 
-                 lr = 1e-04, 
-                 min_lr = 5e-06, 
+
+    train_reward(dataset_name = dataset_name,
+                 hidden_layers = 4,
+                 hidden_dim = 512,
+                 batch_size = 256,
+                 num_steps = 100000,
+                 save_freq = 100000,
+                 lr = 1e-04,
+                 min_lr = 5e-06,
                  sigma = 4.0,
-                 alpha = None, 
+                 alpha = None,
                  target_reward = 300.0,
-                 specific_dataset = specific_dataset, 
-                 task_id = task_id, 
+                 specific_dataset = specific_dataset,
+                 task_id = task_id,
                  traj_length = traj_length)
 
     """
@@ -150,7 +153,7 @@ if __name__ == '__main__':
           traj_length = traj_length,
           pos_weight = 25.0)
     """
-    
+
     """
     path = f'./Finetuning/Rollouts/{dataset_name}/{specific_dataset}-play/task_{task_id}/trajs_task{task_id}_success_0.pkl'
     with open(path, 'rb') as f:
@@ -158,35 +161,34 @@ if __name__ == '__main__':
     """
     """
     test_Model_ensemble(
-        dataset_name = dataset_name, 
-        hidden_layers = 3, 
+        dataset_name = dataset_name,
+        hidden_layers = 3,
         hidden_dim = 256,
         ensemble_size = 5,
-        specific_dataset = specific_dataset, 
+        specific_dataset = specific_dataset,
         trajs = None,
         sigma = 4.0,
         #sigma = None,
         #alpha = None,
-        #alpha = 0.99, 
+        #alpha = 0.99,
         target_reward = 500.0,
         task_id = task_id,
         traj_length = traj_length,
-        save_freq = 30000, 
+        save_freq = 30000,
         num_steps = 30000)
     """
-    test_Model(dataset_name, 
-               hidden_layers = 4, 
-               hidden_dim = 512, 
-               specific_dataset = specific_dataset, 
-               trajs = None, 
-               sigma = 4.0, 
-               alpha = None, 
-               target_reward = 300.0, 
+    test_Model(dataset_name,
+               hidden_layers = 4,
+               hidden_dim = 512,
+               specific_dataset = specific_dataset,
+               trajs = None,
+               sigma = 4.0,
+               alpha = None,
+               target_reward = 300.0,
                task_id = task_id,
-               traj_length = traj_length, 
-               save_freq = 100000, 
+               traj_length = traj_length,
+               save_freq = 100000,
                num_steps = 100000)
-    
 
 
 
@@ -194,19 +196,20 @@ if __name__ == '__main__':
 """
 
 if __name__ == '__main__':
-    set_seed(1)
-    
+    # JAX has no global RNG: set_seed now returns a PRNGKey to thread (CONVERSION_GUIDE §8).
+    rng = set_seed(1)
+
     dataset_name = 'ogpointmaze'
     specific_dataset = 'medium'
     task_id = 1
-    
-    
-    
-    
+
+
+
+
     train_reward(
         dataset_name = dataset_name,
         hidden_layers = 1,
-        hidden_dim = 32, 
+        hidden_dim = 32,
         batch_size = 256,
         num_steps = 12000,
         save_freq = 2000,
@@ -220,19 +223,19 @@ if __name__ == '__main__':
         traj_length = None,
         trajs = None
     )
-    
-    test_Model(dataset_name = dataset_name, 
-               hidden_layers = 1, 
-               hidden_dim = 32, 
-               specific_dataset  = specific_dataset, 
-               trajs = None, 
-               sigma = 7.0, 
-               alpha = None, 
+
+    test_Model(dataset_name = dataset_name,
+               hidden_layers = 1,
+               hidden_dim = 32,
+               specific_dataset  = specific_dataset,
+               trajs = None,
+               sigma = 7.0,
+               alpha = None,
                target_reward = 50.0,
-               goal= None, 
-               task_id = task_id, 
-               traj_length = None, 
-               save_freq = 2000, 
+               goal= None,
+               task_id = task_id,
+               traj_length = None,
+               save_freq = 2000,
                num_steps = 12000)
 
 """

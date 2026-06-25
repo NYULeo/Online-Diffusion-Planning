@@ -1,20 +1,30 @@
+'''Reward backbone training/eval for ODP (JAX/Flax port, FQL-style).
+
+Faithful torch->JAX conversion of the reward training/eval pipeline. Public API (class/function names,
+call signatures, hyperparameters, magic numbers) is preserved exactly; only the framework internals
+change. The reward nets (SimpleReward/EnsembleReward) are linen modules from Pretrain/Rewards/nets.py
+and are built via `model_def.init(rng, *example)` + a TrainState, not torch `.to(device)`/`.parameters()`.
+'''
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(project_root)
 from typing import Optional
+
+import jax
+import jax.numpy as jnp
+import flax
+import flax.linen as nn
+import numpy as np
+import optax
+
 from Dataset import CubeDataset_Singletask, KitchenDataset, PointMazeDataset, get_dataset, get_env, CubeDataset, OGPointmazeDataset_Singletask
 import random
-from torch.utils.data import Dataset, DataLoader
-import torch
-import torch.optim as optim
-import numpy as np
 try:
     from Pretrain.utils import set_seed, SAStats, ema_smooth, cycle, check_device
 except ModuleNotFoundError:
     from utils import set_seed, SAStats, ema_smooth, cycle, check_device
-import torch.nn as nn
 import pickle
 try:
     from Pretrain.Rewards.nets import Reward, MLPNetwork, ScalarReward, SimpleReward, EnsembleReward
@@ -26,10 +36,14 @@ import os
 from scipy.ndimage import gaussian_filter1d, convolve
 import copy
 from sympy import Predicate, factorint
-import torch.nn.functional as F
-import numpy as np
 import json
 from typing import TypedDict, List
+
+# Shared port plumbing (mirrors fql).
+from JAX_PORT.jax_utils import (
+    MLP, ModuleDict, TrainState, nonpytree_field, default_init, ensemblize,
+    target_update, save_agent, restore_agent, supply_rng,
+)
 
 
 def make_reward_increase(trajs) -> List[TrajectoryDict]:
@@ -160,97 +174,6 @@ def get_reward_name(dataset_name, specific_dataset: Optional[str] = None, task_i
     reward_name = f"{name}_Reward"
     return reward_name
 
-"""
-def save_reward_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, alpha, 
-                                  obs_dim, act_dim, reward_name, optimizer, reward_net, filepath: Optional[str] = None, 
-                                  specific_dataset: Optional[str] = None, target_reward: Optional[float] = None,
-                                  goal: Optional[np.array] = None, task_id: Optional[int] = None, pos_weight: Optional[float] = None):
-    
-    if filepath is None:
-        os.makedirs(f"./Pretrain/Rewards/{reward_name}/args/", exist_ok=True)
-        filepath = f"./Pretrain/Rewards/{reward_name}/args/hyperparameters.json"
-
-    
-    def convert_to_json_serializable(obj):
-      
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        elif isinstance(obj, np.generic):
-            return obj.item()
-        elif isinstance(obj, torch.device):
-            return str(obj)
-        elif isinstance(obj, (np.integer, np.floating)):
-            return obj.item()
-        elif obj is None:
-            return None
-        elif isinstance(obj, dict):
-            return {k: convert_to_json_serializable(v) for k, v in obj.items()}
-        elif isinstance(obj, (list, tuple)):
-            return [convert_to_json_serializable(item) for item in obj]
-        elif hasattr(obj, '__dict__') and not isinstance(obj, (str, int, float, bool, type(None))):
-            return str(obj)
-        return obj
-    
-    # Get optimizer info
-    optimizer_type = type(optimizer).__name__
-    optimizer_params = {
-        'type': optimizer_type,
-        'lr': lr,
-        'weight_decay': optimizer.param_groups[0].get('weight_decay', 0)
-    }
-    
-    # Get model architecture info
-    model_info = {
-        'model_type': type(reward_net).__name__,
-        'obs_dim': int(obs_dim),
-        'act_dim': int(act_dim),
-    }
-    
-    # Add model-specific parameters if available
-    if hasattr(reward_net, 'hidden_dim'):
-        model_info['hidden_dim'] = int(reward_net.hidden_dim)
-    if hasattr(reward_net, 'num_layers'):
-        model_info['num_layers'] = int(reward_net.num_layers)
-    if hasattr(reward_net, 'output_dim'):
-        model_info['output_dim'] = int(reward_net.output_dim)
-    
-    # Compile all hyperparameters
-    hyperparams = {
-        'env_details': {
-            'dataset_name': dataset_name,
-            'specific_dataset': specific_dataset,
-            'obs_dim': int(obs_dim),
-            'act_dim': int(act_dim),
-            'reward_name': reward_name,
-        },
-        'model_architecture': model_info,
-        'training_hyperparameters': {
-            'num_steps': num_steps,
-            'batch_size': batch_size,
-            'lr': lr,
-            'optimizer': optimizer_params,
-            'pos_weight': pos_weight,
-
-        },
-        'reward_processing': {
-            'sigma': float(sigma) if sigma is not None else None,
-            'alpha': float(alpha) if alpha is not None else None,
-            'target_reward': target_reward,
-            'goal': convert_to_json_serializable(goal),
-            'task_id': task_id
-        }
-    }
-    
-    # Handle numpy arrays, torch.device, and other non-JSON-serializable types
-    hyperparams = convert_to_json_serializable(hyperparams)
-    
-    # Save with pretty printing (indent=4 makes it human-readable)
-    with open(filepath, 'w') as f:
-        json.dump(hyperparams, f, indent=4, sort_keys=False)
-    
-    print(f"Reward pretraining hyperparameters saved to {filepath}", flush=True)
-"""
-
 def save_reward_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, alpha,
                                   obs_dim, act_dim, reward_name, optimizer, reward_net, filepath: Optional[str] = None,
                                   specific_dataset: Optional[str] = None, target_reward: Optional[float] = None,
@@ -269,8 +192,6 @@ def save_reward_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, 
             return obj.tolist()
         elif isinstance(obj, np.generic):
             return obj.item()
-        elif isinstance(obj, torch.device):
-            return str(obj)
         elif isinstance(obj, (np.integer, np.floating)):
             return obj.item()
         elif obj is None:
@@ -283,12 +204,18 @@ def save_reward_hyperparameters(dataset_name, batch_size, num_steps, lr, sigma, 
             return str(obj)
         return obj
 
-    # Get optimizer info
-    optimizer_type = type(optimizer).__name__
+    # Get optimizer info. In the JAX port `optimizer` is a small dict of optax hyperparameters
+    # ({'type': ..., 'weight_decay': ...}); fall back gracefully if a raw optax tx is passed.
+    if isinstance(optimizer, dict):
+        optimizer_type = optimizer.get('type', 'AdamW')
+        weight_decay = optimizer.get('weight_decay', 0)
+    else:
+        optimizer_type = type(optimizer).__name__
+        weight_decay = 0
     optimizer_params = {
         'type': optimizer_type,
         'lr': lr,
-        'weight_decay': optimizer.param_groups[0].get('weight_decay', 0)
+        'weight_decay': weight_decay,
     }
 
     # Prefer the explicit kwarg; otherwise infer from the model itself.
@@ -364,16 +291,17 @@ def reward_filter(obs, rews, goal):
     return rews
 
 def save_to_finetuning(reward_net, dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
-    reward_net.eval()
+    # `reward_net` is a flax params pytree (or TrainState) for the converted linen reward net.
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
-    net_dict = reward_net.state_dict()
+    net_dict = flax.serialization.to_state_dict(reward_net)
     if(specific_dataset is None):
         os.makedirs(f'./Finetuning/Rewards/{dataset_name}/Models/', exist_ok=True)
         save_path = f'./Finetuning/Rewards/{dataset_name}/Models/{reward_name}_{str(0)}.pkl'
     else:
         os.makedirs(f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
         save_path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{reward_name}_{str(0)}.pkl'
-    torch.save(net_dict, save_path)
+    with open(save_path, 'wb') as f:
+        pickle.dump(net_dict, f)
     print(f"reward model save to {save_path}")
 
 def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
@@ -390,13 +318,14 @@ def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str
     print(f"saved stats to {savepath}")
 
 def save_model(reward_net, dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None, num_steps: int = 0):
-    reward_net.eval()
+    # `reward_net` is a flax params pytree (or TrainState) for the converted linen reward net.
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
-    net_dict = reward_net.state_dict()
+    net_dict = flax.serialization.to_state_dict(reward_net)
     os.makedirs(f'./Pretrain/Rewards/{reward_name}/Models/', exist_ok=True)
     save_path = f'./Pretrain/Rewards/{reward_name}/Models/{reward_name}_{num_steps}.pkl'
     print("Exists:", os.path.isfile(save_path), "Size:", os.path.getsize(save_path) if os.path.isfile(save_path) else None)
-    torch.save(net_dict, save_path)
+    with open(save_path, 'wb') as f:
+        pickle.dump(net_dict, f)
     print(f"reward model save to {reward_name}_{num_steps}.pkl")
 
 def load_model( dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None, num_steps: int = 0):
@@ -410,8 +339,11 @@ def load_model( dataset_name, specific_dataset: Optional[str] = None, task_id: O
         "Models",
         f"{reward_name}_{num_steps}.pkl",
     )
-    #state_dict = torch.load(load_path, map_location='cpu')
-    state_dict = torch.load(load_path, weights_only=True, map_location='cpu')
+    # TODO(checkpoint-bridge): pre-port checkpoints were torch state_dicts written via torch.save; the
+    # JAX port writes flax serialization state_dicts via pickle. Ingesting a legacy torch .pkl requires
+    # remapping torch Linear/LayerNorm keys to the flax param tree (see CONVERSION_GUIDE.md §10).
+    with open(load_path, 'rb') as f:
+        state_dict = pickle.load(f)
     return state_dict
 
 def check_trajs_exit(env_name, specific_env, task_id, step):
@@ -538,10 +470,10 @@ def reward_filter_goals(trajs: List[TrajectoryDict], goal) -> List[TrajectoryDic
         new_trajs2.append({'observations':traj['observations'][-200:], 'actions': traj['actions'][-200:], 'rewards': traj['rewards'][-200:]})
     return new_trajs2
 
-class RewardDataset(Dataset):
+class RewardDataset:
     def __init__(self, trajs, reward_name, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None):
-            
-    
+
+
         # ----- gather raw obs/actions to fit stats -----
         obs_list, act_list = [], []
         for traj in trajs:
@@ -550,22 +482,18 @@ class RewardDataset(Dataset):
             obs_list.append(obs[:L])
             act_list.append(acts[:L])
         obs_all = np.concatenate(obs_list, axis=0)  # [N, d_s]
-        
+
         allowed_values = [0.0, 1.0]
         #get stats
         self.stats = SAStats()
         self.stats.obs_mean = obs_all.mean(axis=0)
         self.stats.obs_std = obs_all.std(axis=0)+ 1e-8
-        
+
         transitions = []
         for traj in trajs:
             obs = np.asarray(traj['observations'])
             acts = np.asarray(traj['actions'])
             rews = np.asarray(traj['rewards'])
-            """
-            if(not np.all(np.isin(rews, allowed_values))):
-                raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
-            """
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
             if(sigma is not None):
@@ -577,10 +505,14 @@ class RewardDataset(Dataset):
                 a_t   = acts[t]
                 r_t   = rews[t]
                 transitions.append((obs_t, a_t, r_t))
-            
+
         self.transitions = transitions
+        # Stacked numpy arrays for fql-style batched sampling (host-side numpy; §13).
+        self._obs = np.asarray([t[0] for t in transitions], dtype=np.float32)
+        self._act = np.asarray([t[1] for t in transitions], dtype=np.float32)
+        self._rew = np.asarray([t[2] for t in transitions], dtype=np.float32)
         self.save_stats(reward_name)
-    
+
     def save_stats(self, reward_name):
         stats_name =  str(reward_name) + '_stats.pkl'
         stats_dir = f'./Pretrain/Rewards/{reward_name}/Stats/'
@@ -589,7 +521,7 @@ class RewardDataset(Dataset):
         with open(savepath, 'wb') as f:
               pickle.dump(self.stats, f)
         print(f"saved stats to {savepath}")
-    
+
     def boost_signal(self, target_reward, rews):
         rews = np.asarray(rews, dtype=np.float64).copy()
         rews = rews * target_reward
@@ -601,69 +533,92 @@ class RewardDataset(Dataset):
     def __getitem__(self, idx):
         s, a, r = self.transitions[idx]
         return (
-            torch.tensor(s, dtype=torch.float32),
-            torch.tensor(a, dtype=torch.float32),
-            torch.tensor(r, dtype=torch.float32),
+            np.asarray(s, dtype=np.float32),
+            np.asarray(a, dtype=np.float32),
+            np.asarray(r, dtype=np.float32),
         )
-    
-def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, save_freq, lr, min_lr, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, task_id: Optional[int] = None, goal: Optional[np.array] = None,traj_length: Optional[int] = None, trajs: Optional[list] = None):
-    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    def sample(self, batch_size):
+        # fql-style host-side numpy sampling (random index sampling via np.random; see CONVERSION_GUIDE §13).
+        idx = np.random.randint(0, len(self._obs), size=batch_size)
+        return self._obs[idx], self._act[idx], self._rew[idx]
+
+
+def _reward_batches(dataset, batch_size):
+    # Generator of (s, a, r) numpy batches; wrap with `cycle` to mimic the old infinite DataLoader.
+    while True:
+        yield dataset.sample(batch_size)
+
+
+def _eval_batches(dataset, batch_size):
+    # One shuffled full pass over the dataset in fixed-size numpy chunks (replaces eval DataLoader).
+    n = len(dataset)
+    order = np.random.permutation(n)
+    for start in range(0, n, batch_size):
+        idx = order[start:start + batch_size]
+        yield dataset._obs[idx], dataset._act[idx], dataset._rew[idx]
+
+def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_size, num_steps, save_freq, lr, min_lr, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, specific_dataset: Optional[str] = None, task_id: Optional[int] = None, goal: Optional[np.array] = None,traj_length: Optional[int] = None, trajs: Optional[list] = None, *, rng=None):
+    # API-CHANGE: trailing keyword-only `rng=` added (linen param init is stochastic; see CONVERSION_GUIDE §8).
     device = check_device()
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
-    if(trajs is  None): 
+    if(trajs is  None):
          trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, goal, traj_length)
     else:
          train_trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, goal, traj_length)
          trajs = trajs + train_trajs
-    print(f"Training reward approximator for {dataset_name} Dataset") 
+    print(f"Training reward approximator for {dataset_name} Dataset")
     dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward)
-    dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
-    reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
-    optimizer = optim.AdamW(reward_net.parameters(), lr = lr, weight_decay = 1e-4)
+    dataloader = cycle(_reward_batches(dataset, batch_size))
+
+    if rng is None:
+        rng = jax.random.PRNGKey(0)
+    rng, init_rng = jax.random.split(rng)
+    reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers)
+    ex_s = jnp.zeros((1, obs_dim), dtype=jnp.float32)
+    ex_a = jnp.zeros((1, act_dim), dtype=jnp.float32)
+    params = reward_net.init(init_rng, ex_s, ex_a)['params']
+    # optax: clip_by_global_norm(1.0) chained with AdamW(cosine_decay_schedule, weight_decay=1e-4).
+    schedule = optax.cosine_decay_schedule(lr, num_steps, alpha=min_lr / lr)
+    tx = optax.chain(optax.clip_by_global_norm(1.0), optax.adamw(schedule, weight_decay=1e-4))
+    train_state = TrainState.create(reward_net, params, tx=tx)
+
+    @jax.jit
+    def update(state, s, a, r):
+        def loss_fn(p):
+            pred = state(s, a, params=p)
+            loss = jnp.mean(optax.huber_loss(pred, r, delta=1.0))
+            return loss, {'loss': loss}
+        return state.apply_loss_fn(loss_fn)
+
     if(check_specific_dataset(dataset_name)):
         SD = specific_dataset
     else:
         SD = None
-    
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max = num_steps,   # one scheduler step per training step
-            eta_min = min_lr
-        )
+
     total_loss = 0
     step = 0
     for i in range(num_steps):
            s, a, r = next(dataloader)
-           s = s.to(device)
-           a = a.to(device)
-           r = r.to(device)
-        
-           # Predicted Reward
-           optimizer.zero_grad()
-           #pred = reward_net(torch.cat([s, a], dim = 1))
-           pred = reward_net(s, a)
-           #loss = F.mse_loss(pred, r)
-           loss = F.smooth_l1_loss(pred, r, beta = 1.0)
-           #loss = reward_net.loss(s, a, r)
-           
-          
-           loss.backward()
-           torch.nn.utils.clip_grad_norm_(reward_net.parameters(), max_norm = 1.0)
-           optimizer.step()
-           scheduler.step()
-           total_loss += loss.item()
+           s = jnp.asarray(s)
+           a = jnp.asarray(a)
+           r = jnp.asarray(r)
+
+           # Predicted Reward (grad + clip + step via TrainState).
+           train_state, info = update(train_state, s, a, r)
+           total_loss += float(info['loss'])
            step += 1
 
            if step % 2000 == 0:
               avg_loss = total_loss / 2000
               print(f"Step {step}, loss {avg_loss:.4f}")
               total_loss = 0
-        
+
            if step % save_freq == 0:
-              checkpoint = copy.deepcopy(reward_net)
+              checkpoint = copy.deepcopy(train_state.params)
               save_model(checkpoint, dataset_name, specific_dataset, task_id, step)
-           
-    save_to_finetuning(reward_net, dataset_name, SD, task_id)
+
+    save_to_finetuning(train_state.params, dataset_name, SD, task_id)
     stats = get_pretrained_reward_stats(reward_name)
     save_stats_to_finetuning(stats, dataset_name, SD, task_id)
 
@@ -685,8 +640,10 @@ def train_reward_pos_weight(
     traj_length: Optional[int] = None,
     trajs: Optional[list] = None,
     pos_weight: float = 25.0,                # tuned down a bit
-    device=None
+    device=None,
+    *, rng=None,
 ):
+    # API-CHANGE: trailing keyword-only `rng=` added (linen param init is stochastic; see CONVERSION_GUIDE §8).
     device = check_device() if device is None else device
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
 
@@ -699,22 +656,41 @@ def train_reward_pos_weight(
     print(f"Training reward approximator for {dataset_name}-{specific_dataset} | pos_weight={pos_weight}")
 
     dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward)
-    dataloader = cycle(DataLoader(dataset, batch_size=batch_size, shuffle=True,
-                                  pin_memory=True, num_workers=8))
+    dataloader = cycle(_reward_batches(dataset, batch_size))
 
-    reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
-    optimizer = optim.AdamW(reward_net.parameters(), lr=lr, weight_decay=1e-4)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_steps, eta_min=min_lr)
+    if rng is None:
+        rng = jax.random.PRNGKey(0)
+    rng, init_rng = jax.random.split(rng)
+    reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers)
+    ex_s = jnp.zeros((1, obs_dim), dtype=jnp.float32)
+    ex_a = jnp.zeros((1, act_dim), dtype=jnp.float32)
+    params = reward_net.init(init_rng, ex_s, ex_a)['params']
+    schedule = optax.cosine_decay_schedule(lr, num_steps, alpha=min_lr / lr)
+    tx = optax.chain(optax.clip_by_global_norm(1.0), optax.adamw(schedule, weight_decay=1e-4))
+    train_state = TrainState.create(reward_net, params, tx=tx)
+
+    @jax.jit
+    def update(state, s, a, r):
+        def loss_fn(p):
+            pred = state(s, a, params=p)                 # (B,)
+            # === Weighted Loss (Improved) ===
+            weights = jnp.where(r > 0.01, pos_weight, 1.0)
+            loss = (weights * optax.huber_loss(pred, r, delta=1.0)).mean()
+            # Positive regularization
+            pos_reg = jnp.mean(jax.nn.relu(pred) ** 2) * 0.02   # lowered coefficient
+            total_loss_val = loss + pos_reg
+            return total_loss_val, {'loss': loss}
+        return state.apply_loss_fn(loss_fn)
 
     if check_specific_dataset(dataset_name):
         SD = specific_dataset
     else:
         SD = None
 
-    # Save hyperparameters
+    # Save hyperparameters. `optimizer` info is a plain dict in the JAX port (no torch param_groups).
     save_reward_hyperparameters(
         dataset_name, batch_size, num_steps, lr, sigma, alpha,
-        obs_dim, act_dim, reward_name, optimizer, reward_net,
+        obs_dim, act_dim, reward_name, {'type': 'AdamW', 'weight_decay': 1e-4}, reward_net,
         filepath=None, specific_dataset=specific_dataset,
         target_reward=target_reward, goal=goal, task_id=task_id,
         pos_weight=pos_weight
@@ -723,50 +699,39 @@ def train_reward_pos_weight(
     total_loss = 0.0
     for step in range(1, num_steps + 1):
         s, a, r = next(dataloader)
-        s = s.to(device)
-        a = a.to(device)
-        r = r.to(device)
+        s = jnp.asarray(s)
+        a = jnp.asarray(a)
+        r = jnp.asarray(r)
 
-        optimizer.zero_grad()
-        pred = reward_net(s, a)                     # (B,)
+        train_state, info = update(train_state, s, a, r)
 
-        # === Weighted Loss (Improved) ===
-        weights = torch.where(r > 0.01, pos_weight, 1.0)
-        loss = (weights * F.smooth_l1_loss(pred, r, beta=1.0, reduction='none')).mean()
-
-        # Positive regularization
-        pos_reg = torch.mean(torch.relu(pred) ** 2) * 0.02   # lowered coefficient
-        total_loss_val = loss + pos_reg
-
-        total_loss_val.backward()
-        torch.nn.utils.clip_grad_norm_(reward_net.parameters(), max_norm=1.0)  # tighter clip
-        optimizer.step()
-        scheduler.step()
-
-        total_loss += loss.item()
+        total_loss += float(info['loss'])
 
         if step % 2000 == 0:                                 # more frequent log
             avg_loss = total_loss / 2000
-            pos_ratio = (r > 0.01).float().mean().item()
-            current_lr = scheduler.get_last_lr()[0]
+            pos_ratio = float((r > 0.01).mean())
+            current_lr = float(schedule(train_state.step - 1))
             print(f"Step {step:6d} | Loss: {avg_loss:.6f} | "
                   f"Pos Ratio: {pos_ratio:.4f} | LR: {current_lr:.2e}")
             total_loss = 0.0
 
         if step % save_freq == 0 or step == num_steps:
-            checkpoint = copy.deepcopy(reward_net).cpu()
+            checkpoint = copy.deepcopy(train_state.params)
             save_model(checkpoint, dataset_name, specific_dataset, task_id, step)
 
-    save_to_finetuning(reward_net, dataset_name, SD, task_id)
+    save_to_finetuning(train_state.params, dataset_name, SD, task_id)
     stats = get_pretrained_reward_stats(reward_name)
     save_stats_to_finetuning(stats, dataset_name, SD, task_id)
     print("Reward model training finished!")
-    return reward_net
+    return train_state.params
 
-def _bootstrap_per_member(s, a, r, ensemble_size, device):
+def _bootstrap_per_member(s, a, r, ensemble_size, *, rng):
+    # API-CHANGE: torch passed a `device`; the JAX port replaces it with a keyword-only `rng` (keyed
+    # bootstrap index sampling via jax.random.randint; see CONVERSION_GUIDE §8).
     B = s.shape[0]
-    idx = torch.randint(0, B, (ensemble_size, B), device=device)
+    idx = jax.random.randint(rng, (ensemble_size, B), 0, B)
     return s[idx], a[idx], r[idx]
+
 
 def train_reward_ensemble(
     dataset_name: str,
@@ -791,8 +756,9 @@ def train_reward_ensemble(
     weight_decay: float = 1e-4,
     grad_clip: Optional[float] = 1.0,
     log_every: int = 2000,
+    *, rng=None,
 ):
-    
+    # API-CHANGE: trailing keyword-only `rng=` added (linen param init + keyed bootstrap sampling).
     device = check_device()
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     # --- build dataset
@@ -810,28 +776,41 @@ def train_reward_ensemble(
           f"{dataset_name}/{specific_dataset} task={task_id}  "
           f"(obs_dim={obs_dim}, act_dim={act_dim})")
     dataset = RewardDataset(trajs, reward_name, sigma, alpha, target_reward)
-    dataloader = cycle(DataLoader(
-        dataset, batch_size=batch_size, shuffle=True,
-        pin_memory=True, num_workers=8,
-    ))
+    dataloader = cycle(_reward_batches(dataset, batch_size))
     # --- build model + optim
+    if rng is None:
+        rng = jax.random.PRNGKey(0)
+    rng, init_rng = jax.random.split(rng)
     reward_net = EnsembleReward(
         obs_dim, act_dim, hidden_dim, hidden_layers,
         ensemble_size=ensemble_size,
-    ).to(device)
-    optimizer = optim.AdamW(
-        reward_net.parameters(), lr=lr, weight_decay=weight_decay,
     )
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=num_steps, eta_min=min_lr,
-    )
+    ex_s = jnp.zeros((1, obs_dim), dtype=jnp.float32)
+    ex_a = jnp.zeros((1, act_dim), dtype=jnp.float32)
+    params = reward_net.init(init_rng, ex_s, ex_a)['params']
+    schedule = optax.cosine_decay_schedule(lr, num_steps, alpha=min_lr / lr)
+    # optax: optional clip_by_global_norm(grad_clip) chained with AdamW(schedule, weight_decay).
+    if grad_clip is not None:
+        tx = optax.chain(optax.clip_by_global_norm(grad_clip), optax.adamw(schedule, weight_decay=weight_decay))
+    else:
+        tx = optax.adamw(schedule, weight_decay=weight_decay)
+    train_state = TrainState.create(reward_net, params, tx=tx)
+
+    @jax.jit
+    def update(state, s_e, a_e, r_e):
+        def loss_fn(p):
+            pred_e = state(s_e, a_e, params=p)            # (E, B)
+            loss = jnp.mean(optax.huber_loss(pred_e, r_e, delta=1.0))
+            return loss, {'loss': loss}
+        return state.apply_loss_fn(loss_fn)
+
     SD = specific_dataset if check_specific_dataset(dataset_name) else None
     # --- persist hyperparams (works because save_reward_hyperparameters reads
     # whatever attrs the model exposes; EnsembleReward exposes hidden_dim,
-    # hidden_layers, ensemble_size).
+    # hidden_layers, ensemble_size). `optimizer` info is a plain dict in the JAX port.
     save_reward_hyperparameters(
         dataset_name, batch_size, num_steps, lr, sigma, alpha,
-        obs_dim, act_dim, reward_name, optimizer, reward_net,
+        obs_dim, act_dim, reward_name, {'type': 'AdamW', 'weight_decay': weight_decay}, reward_net,
         filepath=None,
         specific_dataset=specific_dataset,
         target_reward=target_reward,
@@ -843,53 +822,40 @@ def train_reward_ensemble(
     running_loss = 0.0
     for step in range(1, num_steps + 1):
         s, a, r = next(dataloader)
-        s = s.to(device, non_blocking=True)
-        a = a.to(device, non_blocking=True)
-        r = r.to(device, non_blocking=True)
+        s = jnp.asarray(s)
+        a = jnp.asarray(a)
+        r = jnp.asarray(r)
         if bootstrap and ensemble_size > 1:
-            s_e, a_e, r_e = _bootstrap_per_member(s, a, r, ensemble_size, device)
+            rng, boot_rng = jax.random.split(rng)
+            s_e, a_e, r_e = _bootstrap_per_member(s, a, r, ensemble_size, rng=boot_rng)
         else:
             # diversity from random init only
-            s_e = s.unsqueeze(0).expand(ensemble_size, -1, -1)
-            a_e = a.unsqueeze(0).expand(ensemble_size, -1, -1)
-            r_e = r.unsqueeze(0).expand(ensemble_size, -1)
-        optimizer.zero_grad()
-        pred_e = reward_net(s_e, a_e)                     # (E, B)
+            s_e = jnp.broadcast_to(s[None], (ensemble_size,) + s.shape)
+            a_e = jnp.broadcast_to(a[None], (ensemble_size,) + a.shape)
+            r_e = jnp.broadcast_to(r[None], (ensemble_size,) + r.shape)
+        train_state, info = update(train_state, s_e, a_e, r_e)
         # mean over (E*B) ≡ mean of per-member SmoothL1 losses
-        """
-        per_elem = F.smooth_l1_loss(pred_e, r_e, beta=1.0, reduction='none')
-        positive_weight = 50.0                       # try 8.0 ~ 30.0
-        weights = torch.where(r_e > 0, positive_weight, 1.0)
-        loss = (weights * per_elem).mean()
-        """
-        loss = F.smooth_l1_loss(pred_e, r_e, beta=1.0)
-        loss.backward()
-        if grad_clip is not None:
-            torch.nn.utils.clip_grad_norm_(reward_net.parameters(), grad_clip)
-        optimizer.step()
-        scheduler.step()
-        running_loss += loss.item()
+        running_loss += float(info['loss'])
         if step % log_every == 0:
-            with torch.no_grad():
-                # quick diagnostic: ensemble disagreement on the current batch
-                shared_pred = reward_net(s, a)             # (E, B)
-                disagree = shared_pred.std(dim=0).mean().item()
+            # quick diagnostic: ensemble disagreement on the current batch (no grads; call w/o params=).
+            shared_pred = train_state(s, a)            # (E, B)
+            disagree = float(shared_pred.std(axis=0).mean())
             avg_loss = running_loss / log_every
-            lr_now = optimizer.param_groups[0]["lr"]
+            lr_now = float(schedule(train_state.step - 1))
             print(f"step {step:>7d} | loss {avg_loss:.4f} | "
                   f"ens_std {disagree:.4f} | lr {lr_now:.2e}")
             running_loss = 0.0
         if step % save_freq == 0:
-            checkpoint = copy.deepcopy(reward_net)
+            checkpoint = copy.deepcopy(train_state.params)
             save_model(checkpoint, dataset_name, specific_dataset, task_id, step)
     # final artifacts for finetuning
-    save_to_finetuning(reward_net, dataset_name, SD, task_id)
+    save_to_finetuning(train_state.params, dataset_name, SD, task_id)
     stats = get_pretrained_reward_stats(reward_name)
     save_stats_to_finetuning(stats, dataset_name, SD, task_id)
     print("ensemble reward training finished.")
-    return reward_net
+    return train_state.params
 
-class test_dataset(Dataset):
+class test_dataset:
     def __init__(self, trajs, Reward_name, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, goal: Optional[np.array] = None):
         self.stats = get_pretrained_reward_stats(Reward_name)
         transitions = []
@@ -913,7 +879,11 @@ class test_dataset(Dataset):
                 transitions.append((obs_t, a_t, r_t))
 
         self.transitions = transitions
-    
+        # Stacked numpy arrays for fql-style batched evaluation (host-side numpy; §13).
+        self._obs = np.asarray([t[0] for t in transitions], dtype=np.float32)
+        self._act = np.asarray([t[1] for t in transitions], dtype=np.float32)
+        self._rew = np.asarray([t[2] for t in transitions], dtype=np.float32)
+
     def boost_signal(self, target_reward, rews):
         for t in range(len(rews)):
             if(rews[t] == 1):
@@ -926,10 +896,14 @@ class test_dataset(Dataset):
     def __getitem__(self, idx):
         s, a, r = self.transitions[idx]
         return (
-            torch.tensor(s, dtype=torch.float32),
-            torch.tensor(a, dtype=torch.float32),
-            torch.tensor(r, dtype=torch.float32),
+            np.asarray(s, dtype=np.float32),
+            np.asarray(a, dtype=np.float32),
+            np.asarray(r, dtype=np.float32),
         )
+
+    def sample(self, batch_size):
+        idx = np.random.randint(0, len(self._obs), size=batch_size)
+        return self._obs[idx], self._act[idx], self._rew[idx]
 
 def test_Model_ensemble(
     dataset_name,
@@ -948,6 +922,7 @@ def test_Model_ensemble(
     num_steps: int = 500,
     batch_size: int = 256,
     report_per_member: bool = True,
+    *, rng=None,
 ):
     """Evaluate ensemble reward checkpoints saved under
     ./Pretrain/Rewards/<reward_name>/Models/<reward_name>_<step>.pkl
@@ -958,6 +933,7 @@ def test_Model_ensemble(
       - Reports per-member loss + ensemble disagreement (std across members)
         as mean / max / 95th percentile.
     """
+    # API-CHANGE: trailing keyword-only `rng=` added (linen param init template is stochastic).
     device = check_device()
     print(f"Using device {device}")
     print(f"Testing reward ensemble (size={ensemble_size}) for "
@@ -980,56 +956,61 @@ def test_Model_ensemble(
         dataset = test_dataset(trajs, reward_name, sigma, alpha, target_reward, goal)
 
     print(f"Testing on {len(dataset)} samples")
-    dataloader = DataLoader(
-        dataset, batch_size=batch_size, shuffle=True,
-        pin_memory=True, num_workers=8,
+
+    if rng is None:
+        rng = jax.random.PRNGKey(0)
+    rng, init_rng = jax.random.split(rng)
+    reward_net = EnsembleReward(
+        obs_dim, act_dim, hidden_dim, hidden_layers,
+        ensemble_size=ensemble_size,
     )
+    ex_s = jnp.zeros((1, obs_dim), dtype=jnp.float32)
+    ex_a = jnp.zeros((1, act_dim), dtype=jnp.float32)
+    template_params = reward_net.init(init_rng, ex_s, ex_a)['params']
 
     num = save_freq
     while num <= num_steps:
         state_dict = load_model(dataset_name, specific_dataset, task_id, num)
 
-        reward_net = EnsembleReward(
-            obs_dim, act_dim, hidden_dim, hidden_layers,
-            ensemble_size=ensemble_size,
-        ).to(device)
-        reward_net.load_state_dict(state_dict)
-        reward_net.eval()
+        # TODO(checkpoint-bridge): legacy torch state_dicts need key remapping; here we restore a flax
+        # serialization state_dict produced by this port into the param template.
+        params = flax.serialization.from_state_dict(template_params, state_dict)
+        reward_state = TrainState.create(reward_net, params)
 
         total_mean_loss = 0.0
         total_reward_mean = 0.0
-        total_member_loss = torch.zeros(ensemble_size, device=device)
+        total_member_loss = np.zeros(ensemble_size)
         all_means = []
         all_stds = []
 
-        with torch.no_grad():
-            for s, a, r in dataloader:
-                s = s.to(device)
-                a = a.to(device)
-                r = r.to(device)
+        n_batches = 0
+        for s, a, r in _eval_batches(dataset, batch_size):
+            s = jnp.asarray(s)
+            a = jnp.asarray(a)
+            r = jnp.asarray(r)
 
-                # (E, B) — single forward gets every member's prediction
-                pred_e = reward_net(s, a)
-                mean_pred = pred_e.mean(dim=0)          # (B,)
-                std_pred = pred_e.std(dim=0)            # (B,)
+            # (E, B) — single forward gets every member's prediction (no grads; call w/o params=).
+            pred_e = reward_state(s, a)
+            mean_pred = pred_e.mean(axis=0)          # (B,)
+            std_pred = pred_e.std(axis=0)            # (B,)
 
-                # Loss of the ensemble mean (what you'd use at inference)
-                loss = F.smooth_l1_loss(mean_pred, r, beta=1.0)
-                total_mean_loss += loss.item()
-                total_reward_mean += mean_pred.mean().item()
+            # Loss of the ensemble mean (what you'd use at inference)
+            loss = jnp.mean(optax.huber_loss(mean_pred, r, delta=1.0))
+            total_mean_loss += float(loss)
+            total_reward_mean += float(mean_pred.mean())
 
-                # Per-member losses
-                if report_per_member:
-                    r_e = r.unsqueeze(0).expand_as(pred_e)
-                    per_member = F.smooth_l1_loss(
-                        pred_e, r_e, beta=1.0, reduction='none',
-                    ).mean(dim=1)                        # (E,)
-                    total_member_loss += per_member
+            # Per-member losses
+            if report_per_member:
+                r_e = jnp.broadcast_to(r[None], pred_e.shape)
+                per_member = optax.huber_loss(
+                    pred_e, r_e, delta=1.0,
+                ).mean(axis=1)                        # (E,)
+                total_member_loss += np.asarray(per_member)
 
-                all_means.append(mean_pred.cpu().numpy())
-                all_stds.append(std_pred.cpu().numpy())
+            all_means.append(np.asarray(mean_pred))
+            all_stds.append(np.asarray(std_pred))
+            n_batches += 1
 
-        n_batches = len(dataloader)
         avg_mean_loss = total_mean_loss / n_batches
         avg_reward = total_reward_mean / n_batches
         means_np = np.concatenate(all_means)
@@ -1049,22 +1030,22 @@ def test_Model_ensemble(
         print(f"ensemble std (p95):    {np.percentile(stds_np, 95):.4f}")
 
         if report_per_member:
-            per_member_avg = (total_member_loss / n_batches).cpu().numpy()
+            per_member_avg = (total_member_loss / n_batches)
             for i, l in enumerate(per_member_avg):
                 print(f"  member {i}: loss {l:.4f}")
             print(f"  member-loss spread: "
                   f"{per_member_avg.max() - per_member_avg.min():.4f}")
 
         num += save_freq
-   
-def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None, traj_length: Optional[int] = 100, save_freq: int = 50, num_steps: int = 500):
-    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, goal: Optional[np.array] = None, task_id: Optional[int] = None, traj_length: Optional[int] = 100, save_freq: int = 50, num_steps: int = 500, *, rng=None):
+    # API-CHANGE: trailing keyword-only `rng=` added (linen param init template is stochastic).
     device = check_device()
     print(f"Using device {device}")
     print(f"Testing the reward model for {dataset_name}-{specific_dataset} Dataset")
     print(f"Target reward: {target_reward}, Sigma: {sigma}, Alpha: {alpha}")
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
-    if(trajs is None): 
+    if(trajs is None):
         train_trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, goal, traj_length)
         dataset = RewardDataset(train_trajs, reward_name, sigma, alpha, target_reward)
     else:
@@ -1074,36 +1055,38 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
     print(f"Testing the reward model on {len(dataset)} samples")
     a = factorint(len(dataset))
     batch_size = 256
-    dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8)
+    if rng is None:
+        rng = jax.random.PRNGKey(0)
+    rng, init_rng = jax.random.split(rng)
+    reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers)
+    ex_s = jnp.zeros((1, obs_dim), dtype=jnp.float32)
+    ex_a = jnp.zeros((1, act_dim), dtype=jnp.float32)
+    template_params = reward_net.init(init_rng, ex_s, ex_a)['params']
     num = save_freq
     while num <= num_steps:
          Rewards = []
          state_dict = load_model(dataset_name, specific_dataset, task_id, num)
-         reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
-         #reward_net = DeepScaledReward(obs_dim, act_dim).to(device)
-         #reward_net = Reward(obs_dim, act_dim).to(device)
-         #reward_net = MLPNetwork(input_dim = obs_dim + act_dim, out_dim = 1, hidden_dims = [200, 200, 200, 200], act_fn = 'swish', out_act_fn = 'identity').to(device)
-         reward_net.load_state_dict(state_dict)
-         reward_net.eval()
+         # TODO(checkpoint-bridge): restore the port's flax serialization state_dict into the template.
+         params = flax.serialization.from_state_dict(template_params, state_dict)
+         reward_state = TrainState.create(reward_net, params)
          total_mean_loss = 0.0
          total_reward = 0.0
-         for s, a, r in dataloader:
-             s = s.to(device)
-             a = a.to(device)
-             r = r.to(device)
-             #pred = reward_net(torch.cat([s, a], dim = 1))
-             pred = reward_net(s, a)
-             #loss = F.mse_loss(pred, r)
-             loss = F.smooth_l1_loss(pred, r, beta = 1.0)
-             #loss = reward_net.loss(s, a, r)
-             total_mean_loss += loss.item()
-             total_reward += pred.mean().item()
-             Rewards.extend(pred.detach().cpu().numpy())
-             
-         avg_mean_loss = total_mean_loss / len(dataloader)
-         avg_reward = total_reward / len(dataloader)
+         n_batches = 0
+         for s, a, r in _eval_batches(dataset, batch_size):
+             s = jnp.asarray(s)
+             a = jnp.asarray(a)
+             r = jnp.asarray(r)
+             pred = reward_state(s, a)                  # no grads; call w/o params=
+             loss = jnp.mean(optax.huber_loss(pred, r, delta=1.0))
+             total_mean_loss += float(loss)
+             total_reward += float(pred.mean())
+             Rewards.extend(np.asarray(pred))
+             n_batches += 1
+
+         avg_mean_loss = total_mean_loss / n_batches
+         avg_reward = total_reward / n_batches
          print(f"model {num}, Loss {avg_mean_loss:.4f}, Reward: {avg_reward:.4f}")
-         
+
          Rewards = np.array(Rewards)
          mean_R = Rewards.mean()
          std_R = Rewards.std()
@@ -1113,7 +1096,7 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
          print(f'std_reward: {std_R:.4f}')
          print(f"max_reward: {max_R:.4f}")
          print(f"min_reward: {min_R:.4f}")
-        
+
          num += save_freq
 
 def get_pretrained_reward(dataset_name, checkpoints, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
@@ -1136,68 +1119,3 @@ def get_pretrained_reward_stats(reward_name):
         stats = pickle.load(f)
     return stats
 
-
-'''
-def test_Single_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: float = 3, target_reward: Optional[float] = None, num: int = 10000):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device {device}")
-    if(trajs is None): 
-        train_Trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
-        dataset = RewardDataset(train_Trajs, sigma, reward_name, target_reward)
-    else:
-        _, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
-        dataset = test_dataset(trajs, sigma, reward_name, target_reward)
-    print(f"Testing the reward model on {len(dataset)} samples")
-    a = factorint(len(dataset))
-    batch_size = int(np.min(list(a.keys())))
-    dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8)
-    
-    state_dict = load_model(reward_name, num)
-    reward_net = ScalarReward(obs_dim, act_dim).to(device)
-    reward_net.load_state_dict(state_dict)
-    reward_net.eval()
-    total_mean_loss = 0
-    total_var = 0
-    for s, a, r in dataloader:
-        s = s.to(device)
-        a = a.to(device)
-        r = r.to(device)
-        mean = reward_net.predict(s, a)
-        var = reward_net.variance(s, a)
-        mean_loss = ((mean - r).abs()).mean()
-        total_mean_loss += mean_loss.item()
-        total_var += var.mean().item()
-    avg_mean_loss = total_mean_loss / len(dataloader)
-    avg_var = total_var / len(dataloader)
-    print(f"model {num}, Loss {avg_mean_loss:.4f}, Variance {avg_var:.4f}")
-
-
-
-def grad_norm(s, a, reward_net):
-     s.requires_grad_(True)
-     a.requires_grad_(True)
-     pred = reward_net(s, a)
-     
-     # Compute gradients with respect to the full batch
-     grad_outputs = torch.ones_like(pred)
-     grads_s, grads_a = torch.autograd.grad(
-         outputs=pred,
-         inputs=(s, a),
-         grad_outputs=grad_outputs,
-         create_graph=False,
-         retain_graph=False,
-         allow_unused=True  # In case one input is not used
-     )
-     
-     # Handle case where one input might not be used
-     if grads_s is None:
-         grads_s = torch.zeros_like(s)
-     if grads_a is None:
-         grads_a = torch.zeros_like(a)
-     
-     # Compute per-sample gradient norms
-     grad_norms = torch.cat([grads_s, grads_a], dim=-1).norm(p=2, dim=-1)  # [batch_size]
-     grad_norm_avg = grad_norms.mean().item()
-     
-     return pred, grad_norm_avg
-'''

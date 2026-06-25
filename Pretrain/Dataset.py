@@ -1,3 +1,10 @@
+'''ODP datasets / env builders (gym + minari + ogbench glue), ported to the JAX port.
+
+Per CONVERSION_GUIDE.md §13 this file is mostly numpy/gym glue with no torch autograd: tensor fields are
+stored as numpy `float32` arrays, `.to(device)` is dropped, and `torch.utils.data.Dataset` is replaced by a
+plain class that still exposes `__len__`/`__getitem__`. The public API (class/function names + signatures)
+is preserved exactly.
+'''
 from optparse import Option
 from pathlib import Path
 
@@ -15,8 +22,6 @@ import gymnasium_robotics
 import ogbench
 warnings.filterwarnings("ignore", category=UserWarning)
 from collections import namedtuple
-import torch
-from torch.utils.data import Dataset
 import pickle
 try:
     from Pretrain.utils import SAStats
@@ -29,7 +34,7 @@ from itertools import permutations
 
 class TrajectoryDict(TypedDict):
     observations: np.ndarray
-    actions: np.ndarray  
+    actions: np.ndarray
     rewards: np.ndarray
 
 
@@ -62,7 +67,7 @@ def merger(traj_1, traj_2):
                     }
           return trajectory
      else:
-          return None   
+          return None
 
 def sparse_reward_processor(rewards):
         Temp = []
@@ -98,18 +103,18 @@ def reward_processor(rewards, name: str):
          dist = 0 - Min
          rews = rewards + dist
          return rews
-    
+
     if(name in ('cube', 'ogpointmaze', 'antmaze', 'humanoidmaze', 'puzzle', 'scene')):
          return ogbench_reward_processor(rewards)
     else:
          return spare_reward_processor(rewards)
-    
+
 def get_dataset(name: str, specific_name: str, task_id: Optional[int] = None, goal: Optional[np.array] = None, traj_length: Optional[int] = None, mode: Optional[str] = None):
        if(name == 'kitchen'):
             return KitchenDataset(specific_name)
        elif(name == 'pointmaze'):
             return PointMazeDataset(specific_name, goal, mode)
-       elif(name == 'antmaze'): 
+       elif(name == 'antmaze'):
             return AntMazeDataset(specific_name)
        elif(name == 'ogpointmaze'):
              if(task_id is None):
@@ -121,9 +126,9 @@ def get_dataset(name: str, specific_name: str, task_id: Optional[int] = None, go
                 return CubeDataset(specific_name)
             else:
                 return CubeDataset_Singletask(specific_name, task_id, traj_length)
-       
+
        else:
-            raise ValueError(f"Invalid Dataset name: {name}")     
+            raise ValueError(f"Invalid Dataset name: {name}")
 
 class KitchenDataset():
      def __init__(self, name: str):
@@ -132,10 +137,10 @@ class KitchenDataset():
           elif name == 'complete':
               self.dataset = minari.load_dataset('D4RL/kitchen/complete-v2',  download=True)
           elif name == 'mixed':
-              self.dataset = minari.load_dataset('D4RL/kitchen/mixed-v2',  download=True) 
+              self.dataset = minari.load_dataset('D4RL/kitchen/mixed-v2',  download=True)
           else:
               raise ValueError(f"Invalid Dataset name: {name}")
-          
+
      def get_trajectories(self):
           trajectories = []
           for episode in self.dataset.iterate_episodes():
@@ -145,18 +150,18 @@ class KitchenDataset():
               terminated = episode.terminations
               truncated = episode.truncations
               done_seq = np.logical_or(terminated, truncated)
-              
+
               for i in range(len(actions)):
                    if(done_seq[i]):
                         observations = observations[:i+2]
                         actions = actions[:i+1]
                         rewards = rewards[:i+1]
                         break
-              
-              
+
+
               if(len(actions) < 10):
                   continue
-              else: 
+              else:
                  new_rewards = self.spare_reward_kitchen(rewards)
                  if(not self.reward_checker(rewards, new_rewards)):
                        print('No')
@@ -165,21 +170,10 @@ class KitchenDataset():
                       'actions': actions,
                       'rewards': new_rewards
                     }
-                 """
-                 if(len(trajectories) != 0):
-                      Temp = merger(trajectories[len(trajectories)-1], trajectory)
-                      if(Temp is not None):
-                            trajectories.pop()
-                            trajectories.append(Temp)
-                      else:
-                            trajectories.append(trajectory)
-                 else:
-                      trajectories.append(trajectory)
-                 """
                  trajectories.append(trajectory)
 
-          return trajectories  
-     
+          return trajectories
+
      def reward_checker(self, rewards, new_rewards):
          if(len(rewards) != len(new_rewards)):
                return False
@@ -203,30 +197,30 @@ class KitchenDataset():
                   new_rewards[i] = 1
              else:
                   new_rewards[i] = 0
-         return np.array(new_rewards, dtype = np.float64) 
-     
+         return np.array(new_rewards, dtype = np.float64)
+
      def get_state_dim(self):
           return self.dataset._observation_space['observation'].shape[0]
-    
+
      def get_action_dim(self):
           return self.dataset._action_space.shape[0]
-    
+
      def get_env(self, render_mode):
           # Use headless mode for servers without display capabilities
           return self.dataset.recover_environment(render_mode = render_mode)
           #env_spec = self.dataset.spec.env_spec
           #return gym.make(env_spec, render_mode='rgb_array')
           #return gym.make(env_spec, render_mode = None)
-     
+
      def get_ref_max_score(self):
           return self.dataset.storage.metadata.get('ref_max_score')
 
      def get_ref_min_score(self):
           return self.dataset.storage.metadata.get('ref_min_score')
-     
+
      def get_total_steps(self):
           return self.dataset.total_steps
-     
+
 class PointMazeDataset():
      def __init__(self, name: str, goal: Optional[np.array] = None, mode: Optional[str] = None):
           self.name = name
@@ -256,7 +250,7 @@ class PointMazeDataset():
                self.dataset = minari.load_dataset('D4RL/pointmaze/open-v2', download = True)
           else:
               raise ValueError(f"Invalid Dataset name: {name}")
-          
+
      def get_trajectories(self):
           trajectories = []
           for episode in self.dataset.iterate_episodes():
@@ -266,23 +260,23 @@ class PointMazeDataset():
               terminated = episode.terminations
               truncated = episode.truncations
               done_seq = np.logical_or(terminated, truncated)
-              
+
               for i in range(len(actions)):
                    if(done_seq[i]):
                         observations = observations[:i+2]
                         actions = actions[:i+1]
                         rewards = rewards[:i+1]
                         break
-              
+
               if(len(actions) < 10):
                     continue
-              else: 
+              else:
                     trajectory = {
                         'observations': observations,
                         'actions': actions,
                         'rewards': rewards
                       }
-                    
+
                     if(self.mode != 'critic'):
                        if(len(trajectories) != 0):
                            Temp = merger(trajectories[len(trajectories)-1], trajectory)
@@ -295,7 +289,7 @@ class PointMazeDataset():
                            trajectories.append(trajectory)
                     else:
                         trajectories.append(trajectory)
-          
+
           if (self.goal is not None):
                if(self.mode == 'critic'):
                    trajectories = self.reward_filter_goals(trajectories, self.goal)
@@ -304,24 +298,24 @@ class PointMazeDataset():
                else:
                    raise ValueError(f"Invalid mode: {self.mode}")
           return trajectories
-     
+
      def get_state_dim(self):
           return self.dataset._observation_space['observation'].shape[0]
-    
+
      def get_action_dim(self):
           return self.dataset._action_space.shape[0]
-    
+
      def reward_filter_goals(self, trajs: List[TrajectoryDict], goal) -> List[TrajectoryDict]:
         def reward_filter2(traj: TrajectoryDict, goal) -> List[TrajectoryDict]:
           last_step = 1
           new_trajs = []
           new_rews = [0]*len(traj['rewards'])
           traj['rewards'] = new_rews
-        
+
           for i in range(1, len(traj['observations'])):
               pos = traj['observations'][i][:2]
               g = np.asarray(goal, dtype=np.float32).reshape(-1)
-              dist = np.linalg.norm(pos - g) 
+              dist = np.linalg.norm(pos - g)
               if(dist < 0.5):
                 if((i - last_step) < 10):
                     continue
@@ -336,17 +330,17 @@ class PointMazeDataset():
         for traj in trajs:
             new_trajs.extend(reward_filter2(traj, goal))
         return new_trajs
-     
+
      def reward_filter(self, trajs: List[TrajectoryDict], goal) -> List[TrajectoryDict]:
           new_trajs = []
           for traj in trajs:
                new_rews = [0]*len(traj['rewards'])
                traj['rewards'] = new_rews
                for i in range(1, len(traj['observations'])):
-                     pos = traj['observations'][i][:2] 
+                     pos = traj['observations'][i][:2]
                      g = np.asarray(goal, dtype=np.float32).reshape(-1)
-                     #goal_coord = np.asarray(goal_coord, dtype=np.float32).reshape(-1)  
-                     dist = np.linalg.norm(pos - g) 
+                     #goal_coord = np.asarray(goal_coord, dtype=np.float32).reshape(-1)
+                     dist = np.linalg.norm(pos - g)
                      if (dist < 0.5):
                            traj['rewards'][i-1] = 1
                      else:
@@ -355,7 +349,7 @@ class PointMazeDataset():
           return new_trajs
 
      def get_env(self, render_mode):
-          
+
           gym.register_envs(gymnasium_robotics)
 
           if(self.name == 'medium'):
@@ -367,9 +361,9 @@ class PointMazeDataset():
           else:
               raise ValueError(f'Invalid dataset name')
           return env
-          
-        
-          
+
+
+
           #return self.dataset.recover_environment(render_mode = 'rgb_array', continuing_task=True, reset_target=False, eval_env=True)
 
      def get_ref_max_score(self):
@@ -398,7 +392,7 @@ class AntMazeDataset():
               self.dataset = minari.load_dataset('D4RL/antmaze/umaze-v1', download=True)
           else:
               raise ValueError(f"Invalid Dataset name: {name}")
-          
+
      def get_trajectories(self):
           trajectories = []
           for episode in self.dataset.iterate_episodes():
@@ -410,17 +404,17 @@ class AntMazeDataset():
               terminated = episode.terminations
               truncated = episode.truncations
               done_seq = np.logical_or(terminated, truncated)
-              
+
               for i in range(len(actions)):
                    if(done_seq[i]):
                         observations = observations[:i+2]
                         actions = actions[:i+1]
                         rewards = rewards[:i+1]
                         break
-              
+
               if(len(actions) < 10):
                   continue
-              else: 
+              else:
                  trajectory = {
                       'observations': observations,
                       'actions': actions,
@@ -437,15 +431,15 @@ class AntMazeDataset():
                       trajectories.append(trajectory)
 
           return trajectories
-     
+
      def get_state_dim(self):
           return self.dataset._observation_space['observation'].shape[0]
-    
+
      def get_action_dim(self):
           return self.dataset._action_space.shape[0]
-    
+
      def get_env(self, render_mode):
-          
+
           gym.register_envs(gymnasium_robotics)
           if self.name in ['umaze', 'umaze_diverse']:
               env = gym.make('AntMaze_UMaze-v4', max_episode_steps=1000, render_mode=render_mode, continuing_task=False)
@@ -456,9 +450,9 @@ class AntMazeDataset():
           else:
               raise ValueError(f'Invalid dataset name')
           return env
-          
+
           #return self.dataset.recover_environment(render_mode = render_mode)
-         
+
      def get_ref_max_score(self):
           return self.dataset.storage.metadata.get('ref_max_score')
 
@@ -470,7 +464,7 @@ class AntMazeDataset():
 
 class CubeDataset:
     def __init__(self, name: str, task_id: Optional[int] = None):
-        
+
         self.name = name
         if(task_id is None):
            name_to_id = {
@@ -499,15 +493,15 @@ class CubeDataset:
             raise ValueError(f"Invalid dataset name: {name}")
 
         self.dataset_id = name_to_id[name]
-        
-        
+
+
         self.env, self.dataset, self.eval_dataset = ogbench.make_env_and_datasets(
                  self.dataset_id, render_mode="rgb_array"
             )
 
 
     def get_trajectories(self) -> List[Dict[str, np.ndarray]]:
-       
+
         trajectories = []
         last_start = 0
         N = len(self.dataset["observations"])
@@ -542,95 +536,9 @@ class CubeDataset:
         env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
         return env
 
-"""
-class CubeDataset_Singletask:
-    def __init__(self, name: str, task_id, traj_length: Optional[int] = None):
-        
-        self.name = name
-        self.traj_length = traj_length
-        name_to_id = {
-            "single-play": f"cube-single-play-singletask-task{task_id}-v0",
-            "single-noisy": f"cube-single-noisy-singletask-task{task_id}-v0",
-            "double-play": f"cube-double-play-singletask-task{task_id}-v0",
-            "double-noisy": f"cube-double-noisy-singletask-task{task_id}-v0",
-            "triple-play": f"cube-triple-play-singletask-task{task_id}-v0",
-            "triple-noisy": f"cube-triple-noisy-singletask-task{task_id}-v0",
-            "quadruple-play": f"cube-quadruple-play-singletask-task{task_id}-v0",
-            "quadruple-noisy": f"cube-quadruple-noisy-singletask-task{task_id}-v0",
-        }
-
-        if name not in name_to_id:
-            raise ValueError(f"Invalid dataset name: {name}")
-
-        self.dataset_id = name_to_id[name]
-
-        self.env, self.dataset, self.eval_dataset = ogbench.make_env_and_datasets(
-                 self.dataset_id, render_mode="rgb_array"
-            )
-
-    def get_trajectories(self) -> List[Dict[str, np.ndarray]]:
-       
-        trajectories = []
-        last_start = 0
-        N = len(self.dataset["observations"])
-
-        for i in range(N):
-            # End of a natural episode (terminal or dataset end)
-            if self.dataset["rewards"][i] == 0 or self.dataset['terminals'][i] == 1:
-                     obs_slice = self.dataset["observations"][last_start : i]
-                     act_slice = self.dataset["actions"][last_start : i]
-                     rews = np.zeros(len(act_slice))
-                     L = len(obs_slice)
-                     if(self.traj_length is not None):
-                           index = L - self.traj_length
-                           if(index < 0):
-                                index = 0
-                     else:
-                            index =  0
-                
-                     
-                     if len(act_slice) < 10:
-                          last_start = i + 1
-                          continue
-                     
-
-                     if(self.dataset['rewards'][i] == 0):
-                         rews[-1] = 1.0
-                         trajectory = {
-                           "observations": obs_slice[index:],
-                           "actions": act_slice[index:],
-                           'rewards': rews[index:]
-                          }
-                         
-                         trajectories.append(trajectory)
-                         last_start = i + 1
-                     else:
-                         
-                         trajectory = {
-                           "observations": obs_slice[index:],
-                           "actions": act_slice[index:],
-                           'rewards': rews[index:]
-                          }
-                         
-                         trajectories.append(trajectory)
-                         last_start = i + 1
-
-        return trajectories
-
-    def get_state_dim(self) -> int:
-        return int(self.dataset["observations"].shape[-1])
-
-    def get_action_dim(self) -> int:
-        return int(self.dataset["actions"].shape[-1])
-
-    def get_env(self, render_mode: str = "rgb_array"):
-        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
-        return env
-"""
-
 class OGPointmazeDataset:
     def __init__(self, name: str):
-        
+
         self.name = name
 
         name_to_id = {
@@ -643,16 +551,16 @@ class OGPointmazeDataset:
             raise ValueError(f"Invalid dataset name: {name}")
 
         self.dataset_id = name_to_id[name]
-        
-        
+
+
         self.env, self.dataset, self.eval_dataset = ogbench.make_env_and_datasets(
                  self.dataset_id, render_mode="rgb_array"
             )
-       
+
 
 
     def get_trajectories(self) -> List[Dict[str, np.ndarray]]:
-       
+
         trajectories = []
         last_start = 0
         N = len(self.dataset["observations"])
@@ -689,7 +597,7 @@ class OGPointmazeDataset:
 
 class OGPointmazeDataset_Singletask:
     def __init__(self, name: str, task_id, traj_length: Optional[int] = None, mode: Optional[str] = 'reward'):
-        
+
         self.name = name
         self.traj_length = traj_length
         if(mode is not None):
@@ -712,7 +620,7 @@ class OGPointmazeDataset_Singletask:
             )
 
     def get_trajectories(self) -> List[Dict[str, np.ndarray]]:
-       
+
         trajectories = []
         last_start = 0
         N = len(self.dataset["observations"])
@@ -730,12 +638,12 @@ class OGPointmazeDataset_Singletask:
                                 index = 0
                      else:
                             index =  0
-                
-                    
+
+
                      if len(act_slice) < 3:
                           last_start = i + 1
                           continue
-                     
+
 
                      if(self.dataset['rewards'][i] == 0):
                          rews[-1] = 1.0
@@ -744,12 +652,12 @@ class OGPointmazeDataset_Singletask:
                            "actions": act_slice[index:],
                            'rewards': rews[index:]
                           }
-                         
+
                          trajectories.append(trajectory)
                          last_start = i + 1
                      else:
                          last_start = i + 1
-            
+
         elif(self.mode == 'reward'):
              rews = np.zeros(len(self.dataset['rewards']))
              for i in range(N):
@@ -788,7 +696,7 @@ class OGPointmazeDataset_Singletask:
 
 class CubeDataset_Singletask:
     def __init__(self, name: str, task_id, traj_length: Optional[int] = None):
-        
+
         self.name = name
         self.traj_length = traj_length
         name_to_id = {
@@ -812,7 +720,7 @@ class CubeDataset_Singletask:
             )
 
     def get_trajectories(self) -> List[Dict[str, np.ndarray]]:
-       
+
         trajectories = []
         last_start = 0
         N = len(self.dataset["observations"])
@@ -824,8 +732,8 @@ class CubeDataset_Singletask:
                      act_slice = self.dataset["actions"][last_start : i].copy()
                      #rews = sparse_reward_processor(self.dataset['rewards'][last_start+1: i+1].copy())
                      rews = rewards[last_start+1: i+1].copy()
-                     
-            
+
+
                      L = len(obs_slice)
                      if(self.traj_length is not None):
                            index = L - self.traj_length
@@ -833,23 +741,23 @@ class CubeDataset_Singletask:
                                 index = 0
                      else:
                             index =  0
-                
-                     
+
+
                      if len(act_slice) < 10:
                           last_start = i + 1
                           continue
-                     
+
                      if(sum(rews) == 0):
                           last_start = i + 1
-                          continue 
-                    
-                         
+                          continue
+
+
                      trajectory = {
                            "observations": obs_slice[index:],
                            "actions": act_slice[index:],
                            "rewards": rews[index:]
                      }
-                         
+
                      trajectories.append(trajectory)
                      last_start = i + 1
 
@@ -870,84 +778,6 @@ class CubeDataset_Singletask:
 #-------------------------------------------------------------------------------------#
 #---------------------------------- Planner Dataset ----------------------------------#
 #-------------------------------------------------------------------------------------#
-
-"""
-def get_PlannerName(env_name, specific_env):
-     if(env_name == 'kitchen'):
-          if(specific_env == 'complete'):
-               return 'Kitchen_High_Planner'
-          elif(specific_env == 'partial'):
-               return 'Kitchen_Medium_Planner'
-          elif(specific_env == 'mixed'):
-               return 'Kitchen_Mixed_Planner'
-          else:
-               raise ValueError(f"Invalid specific environment: {specific_env}")
-     elif(env_name == 'pointmaze'):
-          if specific_env == 'open_dense':
-               return 'PointMaze_OpenDense_Planner'
-          elif specific_env == 'umaze':
-               return 'PointMaze_Umaze_Planner'
-          elif specific_env == 'large_dense':
-               return 'PointMaze_LargeDense_Planner'
-          elif specific_env== 'medium':
-               return 'PointMaze_Medium_Planner'
-          elif specific_env == 'umaze_dense':
-               return 'PointMaze_UmazeDense_Planner'
-          elif specific_env == 'large':
-               return 'PointMaze_Large_Planner'
-          elif specific_env == 'open':
-               return 'PointMaze_Open_Planner'
-          else:
-              raise ValueError(f"Invalid specific environment: {specific_env}")
-     elif(env_name == 'antmaze'):
-          if specific_env == 'medium_play':
-               return 'AntMaze_MediumPlay_Planner'
-          elif specific_env == 'umaze_diverse':
-               return 'AntMaze_UmazeDiverse_Planner'
-          elif specific_env == 'large_diverse':
-               return 'AntMaze_LargeDiverse_Planner'
-          elif specific_env == 'large_play':
-               return 'AntMaze_LargePlay_Planner'
-          elif specific_env == 'medium_diverse':
-               return 'AntMaze_MediumDiverse_Planner'
-          elif specific_env == 'umaze':
-               return 'AntMaze_Umaze_Planner'
-          else:
-              raise ValueError(f"Invalid Dataset name: {specific_env}")
-
-     elif(env_name == 'cube'):
-         if specific_env == 'single-play':
-              return 'Cube_SinglePlay_Planner'
-         elif specific_env == 'single-noisy':
-              return 'Cube_SingleNoisy_Planner'
-         elif specific_env == 'double-play':
-              return 'Cube_DoublePlay_Planner'
-         elif specific_env == 'double-noisy':
-              return 'Cube_DoubleNoisy_Planner'
-         elif specific_env == 'triple-play':
-              return 'Cube_TriplePlay_Planner'
-         elif specific_env == 'triple-noisy':
-              return 'Cube_TripleNoisy_Planner'
-         elif specific_env == 'quadruple-play':
-              return 'Cube_QuadruplePlay_Planner'
-         elif specific_env == 'quadruple-noisy':
-              return 'Cube_QuadrupleNoisy_Planner'
-         else:
-              raise ValueError(f"Invalid cube dataset name: {specific_env}")
-
-     elif(env_name == 'ogpointmaze'):
-         if specific_env == 'medium':
-              return 'OG2DMaze_Medium_Planner'
-         elif specific_env == 'large':
-              return 'OG2DMaze_Large_Planner'
-         elif specific_env == 'giant':
-              return 'OG2DMaze_Giant_Planner'
-         else:
-              raise ValueError(f"Invalid ogpointmaze dataset name: {specific_env}")
-
-     else:
-         raise ValueError(f"Invalid environment name: {env_name}")
-"""
 
 
 def _get_planner_base(env_name, specific_env):
@@ -1049,7 +879,9 @@ def get_PlannerName(env_name, specific_env, task_id=None):
 
 
 
-class PlannerDataset(Dataset):
+class PlannerDataset:
+    # API-CHANGE: dropped the `torch.utils.data.Dataset` base class (§13). Windows/conditions are stored as
+    # numpy float32 arrays instead of torch tensors; `__len__`/`__getitem__` are preserved unchanged.
     def __init__(self, dataset_name, specific_dataset, task_id, horizon, state_dim, action_dim, stride: Optional[int] = 1):
         data = get_dataset(dataset_name, specific_dataset, task_id)
         self.planner_name = get_PlannerName(dataset_name, specific_dataset, task_id)
@@ -1063,8 +895,8 @@ class PlannerDataset(Dataset):
            self.stride = stride
         else:
            self.stride = 1
-        
-        
+
+
 
         # ----- gather raw obs/actions to fit stats -----
         obs_list, act_list = [], []
@@ -1079,12 +911,12 @@ class PlannerDataset(Dataset):
         self.stats = SAStats()
         self.stats.obs_mean = obs_all.mean(axis=0)
         self.stats.obs_std = obs_all.std(axis=0)
-       
+
 
         # ----- build normalized sliding windows -----
         for traj in self.traj:
             obs, acts = traj['observations'], traj['actions']
-            L = min(len(obs), len(acts))     
+            L = min(len(obs), len(acts))
             # per-step normalize then concat [s_t, a_t]
             sa_pairs = []
             if(self.stride == 1):
@@ -1102,8 +934,8 @@ class PlannerDataset(Dataset):
               # sliding horizon, then flatten to 1D
               for start in range(0, L - horizon + 1):
                   segment = np.array(sa_pairs[start : start + horizon])  # [H, d_s+d_a]
-                  self.windows.append(torch.from_numpy(segment).float())
-                  self.conditions.append(torch.from_numpy(sa_pairs[start][:self.state_dim]).float())
+                  self.windows.append(np.asarray(segment, dtype=np.float32))
+                  self.conditions.append(np.asarray(sa_pairs[start][:self.state_dim], dtype=np.float32))
             else:
                 max_start = L - ((horizon - 1) * self.stride)
                 if max_start <= 0:
@@ -1111,22 +943,11 @@ class PlannerDataset(Dataset):
                 for start in range(0, max_start):
                     idxs = start + (self.stride * np.arange(horizon))
                     segment = np.array([sa_pairs[i] for i in idxs])  # [H, d_s]
-                    self.windows.append(torch.from_numpy(segment).float())
-                    self.conditions.append(torch.from_numpy(sa_pairs[start]).float())
-                
-        
+                    self.windows.append(np.asarray(segment, dtype=np.float32))
+                    self.conditions.append(np.asarray(sa_pairs[start], dtype=np.float32))
+
+
         self.save_stats(dataset_name, specific_dataset)
-    """
-    def save_stats(self, dataset_name, specific_dataset):
-     
-        stats_name =  str(self.planner_name) + '_stats.pkl'
-        stats_dir = f'./Pretrain/Planners/{dataset_name}/{specific_dataset}/Stats/'
-        os.makedirs(stats_dir, exist_ok=True)
-        savepath = os.path.join(stats_dir, stats_name)
-        with open(savepath, 'wb') as f:
-              pickle.dump(self.stats, f)
-        print(f"saved stats to {savepath}")
-     """
 
     def save_stats(self, dataset_name, specific_dataset):
        stats_dir = PRETRAIN_DIR / "Planners" / dataset_name / specific_dataset / "Stats"
@@ -1136,72 +957,13 @@ class PlannerDataset(Dataset):
        with open(savepath, "wb") as f:
           pickle.dump(self.stats, f)
        print(f"saved stats to {savepath}")
- 
+
 
     def __len__(self):
         return len(self.windows)
 
     def __getitem__(self, idx):
         return self.windows[idx], self.conditions[idx]
- 
-"""
-class PlannerDataset_debug(Dataset):
-    def __init__(self, dataset_name, specific_dataset, horizon, index):
-        data = get_dataset(dataset_name, specific_dataset)
-        self.planner_name = get_PlannerName(dataset_name, specific_dataset)
-        self.traj = data.get_trajectories()
-        self.horizon = horizon
-        self.windows = []
-
-
-        # ----- gather raw obs/actions to fit stats -----
-        obs_list, act_list = [], []
-        obs, acts = self.traj[index]['observations'], self.traj[index]['actions']
-        L = min(len(obs), len(acts))
-        obs_list.append(obs[:L])
-        act_list.append(acts[:L])
-        
-        obs_all = np.concatenate(obs_list, axis = 0)  # [N, d_s]
-        act_all = np.concatenate(act_list, axis = 0)
-        total = [obs_all, act_all]
-        with open('total.pkl', 'wb') as f:
-            pickle.dump(total, f)
-
-
-        #get stats
-        self.stats = SAStats()
-        self.stats.obs_mean=obs_all.mean(axis=0)
-        self.stats.obs_std =obs_all.std(axis=0)
-        self.save_stats()
-
-        # ----- build normalized sliding windows -----
-        #for traj in self.traj:
-        obs, acts = self.traj[index]['observations'], self.traj[index]['actions']
-        L = min(len(obs), len(acts))     
-        sa_pairs = []
-        for t in range(L):
-             s_norm = self.stats.norm_obs(obs[t])
-             a_norm = self.stats.norm_act(acts[t])
-             sa_pairs.append(np.concatenate([s_norm, a_norm], axis=0))
-        
-        # sliding horizon, then flatten to 1D
-        for start in range(0, L - horizon + 1):
-                segment = np.array(sa_pairs[start:start + horizon])  # [H, d_s+d_a]
-                self.windows.append(torch.from_numpy(segment).float())
-            
-
-    def save_stats(self):
-        stats_name = self.planner_name.replace('.pt', '_stats.pkl')
-        with open(stats_name, 'wb') as f:
-              pickle.dump(self.stats, f)
-
- 
-    def __len__(self):
-        return len(self.windows)
-
-    def __getitem__(self, idx):
-        return self.windows[idx]
-"""
 
 class Planner_Processor():
      """
@@ -1210,7 +972,7 @@ class Planner_Processor():
           stats_name = Planner_name + '_stats.pkl'  # Remove .pt replacement since Planner_name doesn't have .pt
           stats_dir = f'./Pretrain/Planners/{dataset_name}/{specific_dataset}/Stats/'
           stats_path = os.path.join(stats_dir, stats_name)
-          
+
 
           # Check if stats file exists
           if not os.path.exists(stats_path):
@@ -1228,20 +990,22 @@ class Planner_Processor():
                raise FileNotFoundError(f"Stats file not found: {stats_path}")
           with open(stats_path, "rb") as f:
                self.stats = pickle.load(f)
-    
+
      def preprocess(self, obs):
           obs = self.stats.norm_obs(obs)
           return obs
-     
+
      def norm_act(self, act):
           act = self.stats.norm_act(act)
           return act
-     
+
      def postprocess(self, act):
           act = self.stats.denorm_act(act)
           return  act
 
-class PlannerDataset_Rollout(Dataset):
+class PlannerDataset_Rollout:
+    # API-CHANGE: dropped the `torch.utils.data.Dataset` base class (§13). Windows/conditions are stored as
+    # numpy float32 arrays instead of torch tensors; `__len__`/`__getitem__` are preserved unchanged.
     def __init__(self, dataset_name, specific_dataset, specific_train_dataset, horizon, state_dim, action_dim):
         data = get_dataset(dataset_name, specific_dataset)
         self.traj = data.get_trajectories()
@@ -1251,11 +1015,11 @@ class PlannerDataset_Rollout(Dataset):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.planner_processor = Planner_Processor(dataset_name, specific_train_dataset)
-        
+
         # ----- build normalized sliding windows -----
         for traj in self.traj:
             obs, acts = traj['observations'], traj['actions']
-            L = min(len(obs), len(acts))     
+            L = min(len(obs), len(acts))
             # per-step normalize then concat [s_t, a_t]
             sa_pairs = []
             for t in range(L):
@@ -1263,12 +1027,12 @@ class PlannerDataset_Rollout(Dataset):
                 #a_norm = self.planner_processor.norm_act(acts[t])
                 a_norm = acts[t]
                 sa_pairs.append(np.concatenate([s_norm, a_norm], axis=0))
-               
+
             # sliding horizon, then flatten to 1D
             for start in range(0, L - horizon + 1):
                 segment = np.array(sa_pairs[start : start + horizon])  # [H, d_s+d_a]
-                self.windows.append(torch.from_numpy(segment).float())
-                self.conditions.append(torch.from_numpy(sa_pairs[start][:self.state_dim]).float())
+                self.windows.append(np.asarray(segment, dtype=np.float32))
+                self.conditions.append(np.asarray(sa_pairs[start][:self.state_dim], dtype=np.float32))
 
 
     def __len__(self):
@@ -1282,140 +1046,5 @@ class PlannerDataset_Rollout(Dataset):
 
 #env, d_s, d_a = get_env('antmaze', 'medium_play')
 #data = PlannerDataset('antmaze', 'medium_play', 40, d_s, d_a)
-"""
-vectors = []
-data = get_dataset('kitchen', 'partial')
-trajs = data.get_trajectories()
-for traj in trajs:
-     for i in range(len(traj['rewards'])):
-         if(traj['rewards'][i] == 1):
-             vectors.append(traj['observations'][i])
-vectors = np.array(vectors)
-
-
-
-import numpy as np
-from sklearn.cluster import KMeans
-from scipy.spatial.distance import cdist
-
-def verify_four_clusters(vectors):
-   
-    vectors = np.array(vectors)
-    
-    # Fit K-means with 4 clusters
-    kmeans = KMeans(n_clusters=4, random_state=42, n_init=10)
-    assignments = kmeans.fit_predict(vectors)
-    
-    # Compute distances to assigned cluster centers
-    centers = kmeans.cluster_centers_
-    distances = cdist(vectors, centers, metric='euclidean')
-    min_distances = distances[np.arange(len(vectors)), assignments]
-    
-    # Inertia (within-cluster sum of squares)
-    inertia = kmeans.inertia_
-    
-    stats = {
-        'inertia': inertia,
-        'mean_distance_to_center': np.mean(min_distances),
-        'max_distance_to_center': np.max(min_distances),
-        'cluster_counts': np.bincount(assignments, minlength=4),
-        'cluster_percentages': np.bincount(assignments, minlength=4) / len(vectors) * 100,
-        'cluster_centers': centers
-    }
-    
-    return kmeans, assignments, centers, stats
-
-
-# Usage:
-kmeans, assignments, centers, stats = verify_four_clusters(vectors)
-
-
-import sklearn
-print(f"Cluster distribution: {stats['cluster_counts']}")
-print(f"Cluster percentages: {stats['cluster_percentages']}")
-print(f"Inertia (within-cluster sum of squares): {stats['inertia']:.4f}")
-print(f"Mean distance to center: {stats['mean_distance_to_center']:.4f}")
-print(f"Max distance to center: {stats['max_distance_to_center']:.4f}")
-print(f"\nCluster centers:\n{stats['cluster_centers']}")
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-from sklearn.decomposition import PCA
-from sklearn.cluster import KMeans
-
-def visualize_clusters(vectors, assignments, cluster_centers, title_prefix=""):
-   
-    vectors = np.array(vectors)
-    n_clusters = len(cluster_centers)
-    colors = cm.get_cmap('tab10')(np.linspace(0, 1, n_clusters))
-    
-    # 1. 2D PCA plot
-    pca_2d = PCA(n_components=2)
-    vectors_2d = pca_2d.fit_transform(vectors)
-    centers_2d = pca_2d.transform(cluster_centers)
-    
-    fig, axes = plt.subplots(2, 2, figsize=(14, 12))
-    
-    # 2D scatter
-    ax = axes[0, 0]
-    for i in range(n_clusters):
-        mask = assignments == i
-        ax.scatter(vectors_2d[mask, 0], vectors_2d[mask, 1], 
-                  c=[colors[i]], label=f'Cluster {i}', alpha=0.6, s=50)
-        ax.scatter(centers_2d[i, 0], centers_2d[i, 1], 
-                  c=[colors[i]], marker='x', s=200, linewidths=3, 
-                  edgecolors='black')
-    ax.set_xlabel(f'PC1 ({pca_2d.explained_variance_ratio_[0]:.2%})')
-    ax.set_ylabel(f'PC2 ({pca_2d.explained_variance_ratio_[1]:.2%})')
-    ax.set_title(f'{title_prefix}2D PCA Visualization')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    
-    # Distance histogram
-    ax = axes[0, 1]
-    from scipy.spatial.distance import cdist
-    distances = cdist(vectors, cluster_centers, metric='euclidean')
-    min_distances = distances[np.arange(len(vectors)), assignments]
-    ax.hist(min_distances, bins=30, edgecolor='black', alpha=0.7)
-    ax.axvline(np.mean(min_distances), color='red', linestyle='--', 
-               label=f'Mean: {np.mean(min_distances):.4f}')
-    ax.set_xlabel('Distance to Cluster Center')
-    ax.set_ylabel('Frequency')
-    ax.set_title('Distance Distribution')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    
-    # Box plot by cluster
-    ax = axes[1, 0]
-    cluster_distances = [min_distances[assignments == i] for i in range(n_clusters)]
-    bp = ax.boxplot(cluster_distances, labels=[f'C{i}' for i in range(n_clusters)])
-    ax.set_ylabel('Distance to Center')
-    ax.set_title('Distance by Cluster')
-    ax.grid(True, alpha=0.3, axis='y')
-    
-    # Distance matrix
-    ax = axes[1, 1]
-    from scipy.spatial.distance import pdist, squareform
-    center_distances = squareform(pdist(cluster_centers, metric='euclidean'))
-    im = ax.imshow(center_distances, cmap='viridis', aspect='auto')
-    plt.colorbar(im, ax=ax, label='Distance')
-    ax.set_xticks(range(n_clusters))
-    ax.set_yticks(range(n_clusters))
-    ax.set_xticklabels([f'C{i}' for i in range(n_clusters)])
-    ax.set_yticklabels([f'C{i}' for i in range(n_clusters)])
-    ax.set_title('Inter-Cluster Distances')
-    for i in range(n_clusters):
-        for j in range(n_clusters):
-            text = ax.text(j, i, f'{center_distances[i, j]:.2f}',
-                          ha="center", va="center", 
-                          color="white" if center_distances[i, j] > center_distances.max()/2 else "black")
-    
-    plt.tight_layout()
-    plt.show()
-
-# Usage:
-visualize_clusters(vectors, assignments, stats['cluster_centers'], "Kitchen Rewards: ")
-
-"""
 
 """Count training windows for horizon 32 vs 70 on pointmaze large."""
-
