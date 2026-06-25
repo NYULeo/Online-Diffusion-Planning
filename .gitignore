@@ -45,3 +45,15 @@ Finetuning/Rollouts/
 Pretrain/**/Models/
 Pretrain/**/Stats/
 Pretrain/**/logs/
+
+## Author run-artifacts / training outputs (regenerated; keep out of git)
+*_output.txt
+*Train_output.txt
+MUJOCO_LOG.TXT
+**/args/hyperparameters.json
+Pretrain/Rollouts/
+Finetuning/Results/
+exp/
+wandb/
+plots/
+logs/
