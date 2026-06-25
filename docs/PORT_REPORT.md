@@ -5,7 +5,7 @@
 This port converts the ODP codebase from PyTorch to JAX/Flax in an FQL (Flow-Q-Learning) style.
 The framework target is **Flax `linen`** for all networks (`forward` → `__call__`, `nn.Module` →
 `flax.linen.Module` with dataclass attributes, `@nn.compact`/`setup()` idioms) and the
-`JAX_PORT/jax_utils.py` plumbing (`TrainState` / `ModuleDict`, `ensemblize`, `target_update`,
+`flax_utils.py` plumbing (`TrainState` / `ModuleDict`, `ensemblize`, `target_update`,
 `default_init`, `save_agent`/`restore_agent`) for training and parameter management. Optimizers move
 to `optax` (`adamw` + `cosine_decay_schedule` + `clip_by_global_norm`), in-place tensor writes become
 `.at[...].set(...)`, autograd/input-gradients become `jax.grad`/`jax.vjp`/`jax.jvp`/`jax.jacrev`, and

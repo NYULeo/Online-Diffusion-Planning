@@ -4,7 +4,7 @@ Authoritative mapping rules for porting `/Users/kaiwenhu/ODP` (PyTorch) to JAX/F
 `/Users/kaiwenhu/fql` (Flow Q-Learning). Every conversion agent MUST follow this document so that
 ~30 files converted in parallel stay mutually consistent and import-compatible.
 
-Shared plumbing lives in `JAX_PORT/jax_utils.py` (mirrors fql's `utils/flax_utils.py` +
+Shared plumbing lives in `flax_utils.py` (mirrors fql's `utils/flax_utils.py` +
 `utils/networks.py`). Import framework primitives from there — do **not** re-implement them.
 
 ---

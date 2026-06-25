@@ -138,9 +138,9 @@ pip install -U "jax[cpu]" flax optax distrax einops chex ml_collections \
                wandb tqdm "numpy<2.0" matplotlib loguru "gymnasium<1.0.0" ogbench minari h5py
 ```
 
-> Reference dependency lists from the original project live in `requirements/` (these still pin **torch**,
-> which the JAX port does not require — install it only if you also want to run the original torch code or
-> ingest legacy torch checkpoints; see §5 checkpoint bridge).
+> The original project's torch-based dependency lists (the old `requirements/` folder) were removed in
+> favor of this port's single `requirements.txt`. PyTorch is not required to run the JAX port — install it
+> only if you also want to run the original torch code or ingest legacy torch checkpoints (see §5).
 
 ### 4.5 Weights & Biases
 

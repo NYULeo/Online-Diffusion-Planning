@@ -1,0 +1,32 @@
+# ODP (JAX/Flax port) — Python dependencies. No PyTorch: the port runs entirely on JAX.
+#
+# Install the jax build that matches your hardware FIRST, then this file:
+#   CPU :  pip install "jax[cpu]"
+#   CUDA:  pip install "jax[cuda12]"
+#   (Apple Silicon: use the CPU build, or experimental "jax-metal")
+# then:
+#   pip install -r requirements.txt
+
+# --- core JAX stack ---
+jax>=0.4.26
+flax>=0.8.4
+optax
+distrax>=0.1.5
+einops
+
+# --- numerics / logging / plotting ---
+numpy<2.0
+scipy
+sympy
+wandb
+tqdm
+matplotlib
+seaborn
+mediapy
+
+# --- environments / datasets ---
+gymnasium<1.0.0
+gymnasium-robotics>=1.4.0
+ogbench
+minari
+h5py>=3.0.0
