@@ -526,29 +526,30 @@ def train_mog_kernel(
 
     # Create ensemble of MoG kernels. MEDIUM FIX: construct with KEYWORDS so the 6th positional does
     # NOT bind to min_log_std; pass noise_floor by keyword (Kernel_Net.py field order is unchanged).
-    model_defs = [
-        MoGTransitionKernel(
-            obs_dim=obs_dim,
-            act_dim=act_dim,
-            num_modes=num_modes,
-            num_hidden_layers=num_hidden_layers,
-            hidden_dim=hidden_dim,
-            noise_floor=noise_floor,
-        )
-        for _ in range(ensemble_size)
-    ]
+    # PERF: all members share ONE model_def + ONE optax tx so the jitted `mog_update` compiles ONCE
+    # (these are static/nonpytree fields of TrainState; distinct objects per member would force a
+    # separate XLA compilation for each of the `ensemble_size` members on the first step). Only the
+    # params (a pytree leaf) differ per member, which is the actual ensemble.
+    model_def = MoGTransitionKernel(
+        obs_dim=obs_dim,
+        act_dim=act_dim,
+        num_modes=num_modes,
+        num_hidden_layers=num_hidden_layers,
+        hidden_dim=hidden_dim,
+        noise_floor=noise_floor,
+    )
+    model_defs = [model_def] * ensemble_size
 
     # optax: grad-clip(5.0) chained before adamw(weight_decay=1e-5) (§5).
-    def make_tx():
-        return optax.chain(optax.clip_by_global_norm(5.0), optax.adamw(lr, weight_decay=1e-5))
+    tx = optax.chain(optax.clip_by_global_norm(5.0), optax.adamw(lr, weight_decay=1e-5))
 
     example_s = jnp.asarray(dataset.s[:1])
     example_a = jnp.asarray(dataset.a[:1])
     train_states = []
-    for model_def in model_defs:
+    for _ in range(ensemble_size):
         rng, init_rng = jax.random.split(rng)
         params = model_def.init(init_rng, example_s, example_a)['params']
-        train_states.append(TrainState.create(model_def, params, tx=make_tx()))
+        train_states.append(TrainState.create(model_def, params, tx=tx))
 
     # Save hyperparameters (you may need to adjust this function for MoG)
     save_kernel_hyperparameters(
@@ -651,20 +652,21 @@ def train_kernel(dataset_name, specific_dataset: str = None,
            trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
     dataset = KernelDataset(trajs, kernel_name)
 
-    # Create ensemble of models
-    model_defs = [RobustTransitionKernel(obs_dim, act_dim, hidden_layers, hidden_dim) for _ in range(ensemble_size)]
+    # Create ensemble of models. PERF: share ONE model_def + ONE optax tx across members so the jitted
+    # update compiles ONCE (static/nonpytree TrainState fields); only params differ per member.
+    model_def = RobustTransitionKernel(obs_dim, act_dim, hidden_layers, hidden_dim)
+    model_defs = [model_def] * ensemble_size
 
     # optax: adamw with weight_decay=1e-5 (§5).
-    def make_tx():
-        return optax.adamw(lr, weight_decay=1e-5)
+    tx = optax.adamw(lr, weight_decay=1e-5)
 
     example_s = jnp.asarray(dataset.s[:1])
     example_a = jnp.asarray(dataset.a[:1])
     train_states = []
-    for model_def in model_defs:
+    for _ in range(ensemble_size):
         rng, init_rng = jax.random.split(rng)
         params = model_def.init(init_rng, example_s, example_a)['params']
-        train_states.append(TrainState.create(model_def, params, tx=make_tx()))
+        train_states.append(TrainState.create(model_def, params, tx=tx))
 
     # Save hyperparameters at the start of training
     save_kernel_hyperparameters(
