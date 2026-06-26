@@ -82,8 +82,10 @@ class FinalLayer1d(nn.Module):
 
 
 class DiT1d(BaseNNDiffusion):
-    in_dim: int
-    emb_dim: int
+    # NOTE: `in_dim` carries a default only to satisfy flax's dataclass field ordering — it follows the
+    # defaulted fields inherited from BaseNNDiffusion (timestep_emb_type/params). Callers always pass it.
+    in_dim: int = 0
+    emb_dim: int = 0
     d_model: int = 384
     n_heads: int = 6
     depth: int = 12
@@ -149,8 +151,8 @@ class DiT1d(BaseNNDiffusion):
 
 
 class DiT1Ref(DiT1d):
-    in_dim: int
-    emb_dim: int
+    in_dim: int = 0
+    emb_dim: int = 0
     d_model: int = 384
     n_heads: int = 6
     depth: int = 12

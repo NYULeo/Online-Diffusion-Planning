@@ -49,7 +49,7 @@ class RobustTransitionKernel(nn.Module):
         mu = self.mean_head(h)
         raw_log_std = self.log_std_head(h)
         log_std = self.min_log_std + jax.nn.softplus(raw_log_std - self.min_log_std)
-        log_std = jnp.clip(log_std, a_max=self.max_log_std)
+        log_std = jnp.clip(log_std, None, self.max_log_std)
         return mu, log_std
 
     def gaussian_nll(self, s_next, mu, log_std):
@@ -67,7 +67,7 @@ class RobustTransitionKernel(nn.Module):
     def log_prob(self, s_next, mu, log_std):
         # Compute log prob (not negative) — useful for testing / diagnostics
         var = jnp.exp(2 * log_std) + self.noise_floor
-        var = jnp.clip(var, a_min=1e-8)  # Prevent log(0)
+        var = jnp.clip(var, 1e-8)  # Prevent log(0)
         D = s_next.shape[-1]
         # log prob per dimension
         lp = -0.5 * (((s_next - mu) ** 2) / var).sum(axis=-1)
@@ -82,7 +82,7 @@ class RobustTransitionKernel(nn.Module):
         mu, log_std = self(s, a)                  # (batch, obs_dim), (batch, obs_dim)
         var_pred = jnp.exp(2 * log_std)           # predicted variance
         var = var_pred + self.noise_floor         # same as in your log_prob
-        var = jnp.clip(var, a_min=1e-8)
+        var = jnp.clip(var, 1e-8)
         residual = s_next - mu
         # Optional: mild clipping for stability (you already do this in NLL)
         residual = jnp.clip(residual, -10.0, 10.0)
@@ -93,7 +93,7 @@ class RobustTransitionKernel(nn.Module):
     def computeD(self, s, a, s_next):
         mu, log_std = self(s, a)
         var = jnp.exp(2 * log_std) + self.noise_floor
-        var = jnp.clip(var, a_min=1e-8)  # Prevent log(0)
+        var = jnp.clip(var, 1e-8)  # Prevent log(0)
         D = s_next.shape[-1]
         Temp = 0.5 * (D * math.log(2 * math.pi) + 2 * log_std.sum(axis=-1))
         return Temp
@@ -132,7 +132,7 @@ class MoGTransitionKernel(nn.Module):
         logits = out[..., -1]
 
         log_std = self.min_log_std + jax.nn.softplus(log_std - self.min_log_std)
-        log_std = jnp.clip(log_std, a_max=self.max_log_std)
+        log_std = jnp.clip(log_std, None, self.max_log_std)
 
         weights = jax.nn.softmax(logits, axis=-1)
 
@@ -141,7 +141,7 @@ class MoGTransitionKernel(nn.Module):
     def log_prob(self, s_next, mu, log_std, weights):
 
         var = jnp.exp(2 * log_std) + self.noise_floor
-        var = jnp.clip(var, a_min=1e-6)
+        var = jnp.clip(var, 1e-6)
 
         residual = jnp.expand_dims(s_next, 1) - mu
         residual = jnp.clip(residual, -10.0, 10.0)

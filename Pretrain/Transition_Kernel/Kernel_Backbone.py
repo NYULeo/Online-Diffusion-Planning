@@ -961,7 +961,7 @@ def compute_total_mahalanobis_score(kernels: List[RobustTransitionKernel], s, a,
     var_epistemic = mus.var(axis=0)   # population variance (common in MBRL)
     # 4. Total variance
     var_total = var_aleatoric + var_epistemic
-    var_total = jnp.clip(var_total, a_min=1e-8)
+    var_total = jnp.clip(var_total, 1e-8)
     # 5. Squared Mahalanobis Distance (Total Score)
     residual = s_next - mu_total
     #residual = jnp.clip(residual, -10.0, 10.0)   # stability
@@ -1034,7 +1034,7 @@ def compute_total_mahalanobis_score_mog(
         var_epi_mix = jnp.sum(jnp.expand_dims(weights, -1) * (mu_centered ** 2), axis=1)
 
         var_mix = var_ale_mix + var_epi_mix
-        var_mix = jnp.clip(var_mix, a_min=1e-6)
+        var_mix = jnp.clip(var_mix, 1e-6)
 
         mu_list.append(mu_mix)
         var_list.append(var_mix)
@@ -1049,7 +1049,7 @@ def compute_total_mahalanobis_score_mog(
     var_epistemic = mu_ensemble.var(axis=0)
 
     var_total = var_aleatoric + var_epistemic
-    var_total = jnp.clip(var_total, a_min=1e-6)
+    var_total = jnp.clip(var_total, 1e-6)
 
     # === Mahalanobis ===
     residual = s_next - mu_total
