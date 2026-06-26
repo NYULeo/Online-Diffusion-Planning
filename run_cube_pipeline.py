@@ -165,20 +165,21 @@ def stage_kernel(args, group):
         noise_floor=5e-4,
         rng=train_rng,
     )
-    test_kernel_mog(
-        dataset_name=ENV_NAME,
-        specific_dataset=SPECIFIC_DATA,
-        trajs=None,
-        save_freq=save_freq,
-        num_steps=num_steps,
-        num_hidden_layers=4,
-        hidden_dim=514,
-        ensemble_size=10,
-        num_modes=10,
-        quantile=0.99,
-        noise_floor=5e-4,
-        rng=test_rng,
-    )
+    if args.eval:
+        test_kernel_mog(
+            dataset_name=ENV_NAME,
+            specific_dataset=SPECIFIC_DATA,
+            trajs=None,
+            save_freq=save_freq,
+            num_steps=num_steps,
+            num_hidden_layers=4,
+            hidden_dim=514,
+            ensemble_size=10,
+            num_modes=10,
+            quantile=0.99,
+            noise_floor=5e-4,
+            rng=test_rng,
+        )
     finish_run()
 
 
@@ -213,20 +214,21 @@ def stage_reward(args, group):
         traj_length=None,
         rng=rng,
     )
-    test_Model(
-        ENV_NAME,
-        hidden_layers=4,
-        hidden_dim=512,
-        specific_dataset=SPECIFIC_DATA,
-        trajs=None,
-        sigma=4.0,
-        alpha=None,
-        target_reward=300.0,
-        task_id=TASK_ID,
-        traj_length=None,
-        save_freq=save_freq,
-        num_steps=num_steps,
-    )
+    if args.eval:
+        test_Model(
+            ENV_NAME,
+            hidden_layers=4,
+            hidden_dim=512,
+            specific_dataset=SPECIFIC_DATA,
+            trajs=None,
+            sigma=4.0,
+            alpha=None,
+            target_reward=300.0,
+            task_id=TASK_ID,
+            traj_length=None,
+            save_freq=save_freq,
+            num_steps=num_steps,
+        )
     finish_run()
 
 
@@ -267,19 +269,20 @@ def stage_critic(args, group):
         task_id=TASK_ID,
         rng=rng,
     )
-    test_critic(
-        dataset_name=ENV_NAME,
-        specific_dataset=SPECIFIC_PLAY,
-        hidden_layers=5,
-        hidden_dim=512,
-        checkpoint_step=num_steps,
-        gamma=0.99,
-        horizon=HORIZON,
-        sigma=8.0,
-        target_reward=50.0,
-        trajs=trajs,
-        task_id=TASK_ID,
-    )
+    if args.eval:
+        test_critic(
+            dataset_name=ENV_NAME,
+            specific_dataset=SPECIFIC_PLAY,
+            hidden_layers=5,
+            hidden_dim=512,
+            checkpoint_step=num_steps,
+            gamma=0.99,
+            horizon=HORIZON,
+            sigma=8.0,
+            target_reward=50.0,
+            trajs=trajs,
+            task_id=TASK_ID,
+        )
     finish_run()
 
 
@@ -357,6 +360,10 @@ def main():
                    help="cube dataset suffix for the planner/critic/finetune naming (default: play).")
     p.add_argument('--task', type=int, default=4, help='cube singletask task id (default: 4; valid 1-5).')
     p.add_argument('--smoke', action='store_true', help='tiny step counts to verify wiring end-to-end.')
+    p.add_argument('--eval', action='store_true',
+                   help='also run the per-stage diagnostic eval (test_kernel_mog/test_Model/test_critic). '
+                        'OFF by default: these do a slow full-dataset eager pass and are not needed for the '
+                        'train->checkpoint->finetune chain.')
     p.add_argument('--no-wandb', action='store_true', help='disable wandb (logging becomes a no-op).')
     p.add_argument('--wandb-group', default=None,
                    help='wandb group name tying the stage-runs together (default: cube-<variant>-<seed>).')
