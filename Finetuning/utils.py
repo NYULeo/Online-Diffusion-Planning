@@ -31,7 +31,7 @@ from Pretrain.Rewards.nets import SimpleReward, EnsembleReward
 from Pretrain.Transition_Kernel.Kernel_Net import MoGTransitionKernel, RobustTransitionKernel
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_total_mahalanobis_score, compute_log_density_mog, compute_log_density, compute_total_mahalanobis_score_mog
 from Pretrain.Dataset import KitchenDataset, PointMazeDataset, get_env, get_dataset, Planner_Processor
-from gymnasium.vector import AsyncVectorEnv
+from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Critic.nets import Critic
@@ -266,12 +266,16 @@ def save_planner(model, dataset_name, specific_dataset, step: int,
     # TODO(checkpoint-bridge): `model` is now (model_def, params)/params for the flax DiT1d (was a torch
     # nn.Module). The 'ema' field holds flax.serialization.to_state_dict(params); the torch->flax remap
     # (Dense weight (out,in)->kernel (in,out).T, bias->bias, LayerNorm weight->scale) is documented in get_planner.
+    # `model` may be a TrainState (the finetuner passes self.ema_model) or a raw param tree. Store the
+    # PARAM TREE only — get_planner's consumers load 'ema' into a DiT1d param tree, and SDETrainer saves
+    # ema params the same way. Saving a full TrainState state-dict (step/params/opt_state) would break the load.
+    ema_params = model.params if hasattr(model, 'params') else model
     data = {
         'dataset_name': dataset_name,
         'specific_dataset': specific_dataset,
         'task_id': task_id,                                   # NEW field
         'step': step,
-        'ema': flax.serialization.to_state_dict(model),
+        'ema': flax.serialization.to_state_dict(ema_params),
     }
     base = getName(dataset_name, specific_dataset)
     tid  = f"_task{task_id}" if task_id is not None else ""
@@ -294,7 +298,12 @@ def get_planner(dataset_name, specific_dataset, step,
     if not os.path.exists(path):
         raise FileNotFoundError(f"Checkpoint not found: {path}")
     with open(path, 'rb') as f:
-        return pickle.load(f)['ema']
+        ema = pickle.load(f)['ema']
+    # Tolerate checkpoints that stored a full TrainState state-dict ({'step','params','opt_state'})
+    # instead of the bare param tree: return just the params so consumers get a DiT1d param tree.
+    if isinstance(ema, dict) and 'params' in ema and 'step' in ema:
+        ema = ema['params']
+    return ema
 
 def save_critic(model, dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
     # TODO(checkpoint-bridge): `model` is now (model_def, params)/params for the flax Critic (was a torch
@@ -1879,7 +1888,7 @@ def rollout_parallel(
          return env
 
      # Create vectorized environment
-     vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
+     vec_env = SyncVectorEnv([make_env for _ in range(num_envs)])
      #maze = env.unwrapped.maze  # Access the internal Maze object
      #maze_map = maze.maze_map
      #rows, cols = len(maze_map), len(maze_map[0])
@@ -2052,7 +2061,7 @@ def rollout_parallel2(
          return env
      
      # Create vectorized environment
-     vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
+     vec_env = SyncVectorEnv([make_env for _ in range(num_envs)])
      #maze = env.unwrapped.maze  # Access the internal Maze object
      #maze_map = maze.maze_map
      #rows, cols = len(maze_map), len(maze_map[0])
@@ -2295,7 +2304,7 @@ def rollout_parallel3(
         env, _, _ = get_env(env_name, specific_env, task_id = task_id)
         return env
 
-    vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
+    vec_env = SyncVectorEnv([make_env for _ in range(num_envs)])
 
     # Load model
     state_dict = get_planner(env_name, specific_env, checkpoint_step, task_id)
