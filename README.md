@@ -19,6 +19,10 @@ wandb login                    # optional, for online logging
 ```
 
 That's it — `pip install -r requirements.txt` installs JAX (GPU) + Flax/optax/distrax + the envs.
+> Tip: if `pip install` warns about conflicts with `torch`/`gymnasium-robotics`/`pettingzoo`, your env
+> isn't fresh (those are leftovers, not used by cube). Use a clean env — `bash scripts/setup_env.sh` does
+> the `conda create` + install for you.
+
 
 - **CPU only / macOS**, or a non-CUDA-12 server: edit the first line of `requirements.txt`
   (`jax[cuda12]>=0.4.26`) to `jax[cpu]>=0.4.26` (or `jax[cuda11_pip]>=0.4.26`) before installing.
