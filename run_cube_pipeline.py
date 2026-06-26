@@ -300,16 +300,19 @@ def stage_finetune(args, group):
     from Finetuning.acc_adjoint_matching import Acc_AdjointMatchingConfig
     from Finetuning.traj_reward import RewardConfig
 
-    # Finetune does AM training rounds, each followed by an env rollout. Keep smoke tiny (1 short round)
-    # so it's a fast wiring check rather than 10 rounds x 1000-step rollouts.
+    # Finetune does AM training rounds, each followed by an env rollout. The AM `step` runs EAGERLY
+    # (not jitted) and per step samples finetune_batch_size * batch_per_sample trajectories, each doing
+    # diffusion_steps forward + adjoint steps + a horizon-long reward loop -> very heavy. Keep smoke tiny.
     if args.smoke:
-        num_steps, finetune_rounds, rollout_length, rollout_num_envs = 20, 1, 50, 2
+        num_steps, finetune_rounds, rollout_length, rollout_num_envs = 2, 1, 20, 1
+        ft_diffusion_steps, ft_batch_size, ft_batch_per_sample = 4, 2, 1
     else:
         num_steps, finetune_rounds, rollout_length, rollout_num_envs = FINETUNE_STEPS, 10, 1000, 8
+        ft_diffusion_steps, ft_batch_size, ft_batch_per_sample = 30, 12, 3
     init_run('finetune', group,
                      config=dict(stage='finetune', env=ENV_NAME, specific=SPECIFIC_PLAY, task_id=TASK_ID,
                                  finetune_steps=num_steps, finetune_rounds=finetune_rounds,
-                                 rollout_length=rollout_length, finetune_lr=2e-4, finetune_batch_size=12,
+                                 rollout_length=rollout_length, finetune_lr=2e-4, finetune_batch_size=ft_batch_size,
                                  planner_ckpt=0, reward_ckpt=0, kernel_ckpt=0, critic_ckpt=0))
     _banner('finetune', 'finetune')
 
@@ -345,7 +348,9 @@ def stage_finetune(args, group):
         finetune_rounds=finetune_rounds,
         rollout_length=rollout_length,
         rollout_num_envs=rollout_num_envs,
-        finetune_batch_size=12,
+        finetune_batch_size=ft_batch_size,
+        finetune_batch_per_sample=ft_batch_per_sample,
+        diffusion_steps=ft_diffusion_steps,
         finetune_lr=2e-4,
     )
     random.seed(args.seed)
