@@ -28,6 +28,60 @@ from Finetuning.utils import get_reward_model, get_kernel, get_reward_stats, get
 from flax_utils import TrainState
 
 
+# ----------------------------------------------------------------------------------------------------------
+# Infer a frozen net's architecture FROM its saved checkpoint, so we rebuild the exact module that was saved
+# (regardless of config values or stale files). Avoids ScopeParamShapeError when loading reward/kernel ckpts.
+# ----------------------------------------------------------------------------------------------------------
+def _dense_kernels(state_dict):
+    '''Every Dense weight ('kernel', 2-D) in a flax param state-dict, as a list of np arrays (LayerNorm has
+    'scale'/'bias', not 'kernel', so it is naturally skipped).'''
+    out = []
+
+    def walk(d):
+        if isinstance(d, dict):
+            for k, v in d.items():
+                if k == 'kernel' and hasattr(v, 'shape') and np.asarray(v).ndim == 2:
+                    out.append(np.asarray(v))
+                else:
+                    walk(v)
+
+    walk(state_dict)
+    return out
+
+
+def _infer_reward_dims(state_dict, in_dim):
+    '''SimpleReward(@nn.compact): Dense_0 (in_dim->hidden) .. hidden Denses .. final Dense(->1).
+    hidden_dim = first Dense out-features; hidden_layers = (#Dense) - 2.'''
+    ks = _dense_kernels(state_dict)
+    first = next((k for k in ks if k.shape[0] == in_dim), ks[0])
+    hidden_dim = int(first.shape[1])
+    hidden_layers = max(len(ks) - 2, 0)
+    return hidden_dim, hidden_layers
+
+
+def _infer_mog_kernel_dims(state_dict, in_dim, obs_dim):
+    '''MoGTransitionKernel: backbone Denses (all out=hidden_dim) + one head Dense
+    (out=num_modes*(2*obs_dim+1)). Returns (hidden_dim, num_hidden_layers, num_modes). Order-independent:
+    the head is the Dense whose out-dim != hidden_dim (falls back to the last Dense if they coincide).'''
+    ks = _dense_kernels(state_dict)
+    first = next((k for k in ks if k.shape[0] == in_dim), ks[0])
+    hidden_dim = int(first.shape[1])
+    head_candidates = [k for k in ks if int(k.shape[1]) != hidden_dim]
+    head = head_candidates[-1] if head_candidates else ks[-1]
+    num_modes = max(int(head.shape[1]) // (2 * obs_dim + 1), 1)
+    num_hidden_layers = max(len(ks) - 1, 1)                  # all Denses except the head
+    return hidden_dim, num_hidden_layers, num_modes
+
+
+def _infer_robust_kernel_dims(state_dict, in_dim):
+    '''RobustTransitionKernel: backbone Denses (->hidden_dim) + mean_head + log_std_head (->obs_dim each).'''
+    ks = _dense_kernels(state_dict)
+    first = next((k for k in ks if k.shape[0] == in_dim), ks[0])
+    hidden_dim = int(first.shape[1])
+    num_hidden_layers = max(len(ks) - 2, 1)                  # minus mean_head + log_std_head
+    return hidden_dim, num_hidden_layers
+
+
 @dataclass
 class RewardConfig:
     """Configuration for the adjoint matching fine‑tuner."""
@@ -96,7 +150,9 @@ class TotalReward:
         # TODO(checkpoint-bridge): `reward_state_dict` is a torch state_dict (Finetuning.utils.get_reward_model
         # still torch.load); map torch Linear weight (out,in)->flax kernel (in,out) transposed + LayerNorm
         # weight->scale before building params. We hold (model_def, params) and apply via TrainState.
-        reward_def = SimpleReward(obs_dim, act_dim, self.config.hidden_dim_reward, self.config.num_hidden_layers_reward)
+        # Rebuild the reward net to match the SAVED checkpoint's dims (not config) so it always loads.
+        r_hidden, r_layers = _infer_reward_dims(reward_state_dict, obs_dim + act_dim)
+        reward_def = SimpleReward(obs_dim, act_dim, r_hidden, r_layers)
         reward_params = reward_state_dict  # torch state_dict; converted by the checkpoint bridge.
         self.reward_net = TrainState.create(reward_def, reward_params)
         self.kernels = []
@@ -104,17 +160,19 @@ class TotalReward:
         kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
         if self.config.type_kernel == 'robust':
             for sd in kernel_state_dicts:
+                k_hidden, k_layers = _infer_robust_kernel_dims(sd, obs_dim + act_dim)
                 kernel_def = RobustTransitionKernel(
-                    obs_dim, act_dim, self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel
+                    obs_dim, act_dim, k_layers, k_hidden,
+                    noise_floor=self.config.kernel_noise_floor,
                 )
                 # TODO(checkpoint-bridge): `sd` is a torch kernel state_dict; remap to flax params.
                 self.kernels.append(TrainState.create(kernel_def, sd))
         else:
             for sd in kernel_state_dicts:
+                k_hidden, k_layers, k_modes = _infer_mog_kernel_dims(sd, obs_dim + act_dim, obs_dim)
                 kernel_def = MoGTransitionKernel(
-                    obs_dim, act_dim, self.config.kernel_num_modes,
-                    self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel,
-                    noise_floor=self.config.kernel_noise_floor
+                    obs_dim, act_dim, k_modes, k_layers, k_hidden,
+                    noise_floor=self.config.kernel_noise_floor,
                 )
                 # TODO(checkpoint-bridge): `sd` is a torch kernel state_dict; remap to flax params.
                 # §11: the mog branch is consumed by compute_log_density_mog, which iterates
@@ -286,7 +344,9 @@ class TotalReward_Critic:
         reward_state_dict, obs_dim, act_dim = get_reward_model(dataset_name, specific_dataset, reward_checkpoint, task_id)
         self.config.device = device
         # TODO(checkpoint-bridge): `reward_state_dict` is a torch state_dict; remap to flax params.
-        reward_def = SimpleReward(obs_dim, act_dim, self.config.hidden_dim_reward, self.config.num_hidden_layers_reward)
+        # Rebuild reward net to match the SAVED checkpoint's dims (config-independent).
+        r_hidden, r_layers = _infer_reward_dims(reward_state_dict, obs_dim + act_dim)
+        reward_def = SimpleReward(obs_dim, act_dim, r_hidden, r_layers)
         self.reward_net = TrainState.create(reward_def, reward_state_dict)
         self.kernels = []
         self.config.delta = _torch_softplus(jnp.asarray(0.0), self.config.beta)
@@ -300,17 +360,19 @@ class TotalReward_Critic:
         kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
         if self.config.type_kernel == 'robust':
             for sd in kernel_state_dicts:
+                k_hidden, k_layers = _infer_robust_kernel_dims(sd, obs_dim + act_dim)
                 kernel_def = RobustTransitionKernel(
-                    obs_dim, act_dim, self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel
+                    obs_dim, act_dim, k_layers, k_hidden,
+                    noise_floor=self.config.kernel_noise_floor,
                 )
                 # TODO(checkpoint-bridge): `sd` is a torch kernel state_dict; remap to flax params.
                 self.kernels.append(TrainState.create(kernel_def, sd))
         else:
             for sd in kernel_state_dicts:
+                k_hidden, k_layers, k_modes = _infer_mog_kernel_dims(sd, obs_dim + act_dim, obs_dim)
                 kernel_def = MoGTransitionKernel(
-                    obs_dim, act_dim, self.config.kernel_num_modes,
-                    self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel,
-                    noise_floor=self.config.kernel_noise_floor
+                    obs_dim, act_dim, k_modes, k_layers, k_hidden,
+                    noise_floor=self.config.kernel_noise_floor,
                 )
                 # TODO(checkpoint-bridge): `sd` is a torch kernel state_dict; remap to flax params.
                 # §11: the mog branch is consumed by compute_log_density_mog, which iterates
