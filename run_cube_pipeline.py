@@ -52,6 +52,14 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT_ROOT)
 os.chdir(PROJECT_ROOT)
 
+# XLA GPU autotuning is slow/unstable on some driver+jaxlib combos (symptom: repeated
+# "dot_search_space ... All configs were filtered out" warnings + a multi-minute first-step compile, or
+# the "Could not load symbol cuFuncGetName" fallback). Default it OFF here — set BEFORE jax is imported,
+# so every entry point (smoke/train/sweep all go through this file) benefits. Override with your own
+# XLA_FLAGS, or set ODP_AUTOTUNE=1 to keep XLA's autotuner on.
+if 'XLA_FLAGS' not in os.environ and os.environ.get('ODP_AUTOTUNE', '0') != '1':
+    os.environ['XLA_FLAGS'] = '--xla_gpu_autotune_level=0'
+
 import jax
 import wandb
 

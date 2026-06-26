@@ -18,6 +18,11 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 os.chdir(PROJECT_ROOT)
 
+# Default XLA GPU autotuning OFF (slow/unstable on some driver+jaxlib combos) — set before importing jax.
+# Override with your own XLA_FLAGS, or ODP_AUTOTUNE=1 to keep autotuning on.
+if 'XLA_FLAGS' not in os.environ and os.environ.get('ODP_AUTOTUNE', '0') != '1':
+    os.environ['XLA_FLAGS'] = '--xla_gpu_autotune_level=0'
+
 import jax
 import jax.numpy as jnp
 

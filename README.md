@@ -74,6 +74,9 @@ docs/                    # CONVERSION_GUIDE.md, PORT_REPORT.md, JAX_PORT_README.
 
 ## Notes
 
+- XLA GPU autotuning is disabled by default (it's slow/unstable on some driver+jaxlib combos and was
+  causing multi-minute first-step compiles). Re-enable with `ODP_AUTOTUNE=1`, or override `XLA_FLAGS`.
+
 - Stages chain via checkpoints (each saves at a step the finetuner then loads); the step constants are at
   the top of `run_cube_pipeline.py`.
 - Loading the original authors' **PyTorch** checkpoints is not supported (a torch→flax key remap is still a
