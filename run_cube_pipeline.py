@@ -304,8 +304,7 @@ def stage_finetune(args, group):
     init_run('finetune', group,
                      config=dict(stage='finetune', env=ENV_NAME, specific=SPECIFIC_PLAY, task_id=TASK_ID,
                                  finetune_steps=num_steps, finetune_lr=2e-4, finetune_batch_size=12,
-                                 planner_ckpt=PRETRAIN_STEPS, reward_ckpt=REWARD_STEPS,
-                                 kernel_ckpt=KERNEL_STEPS, critic_ckpt=CRITIC_STEPS))
+                                 planner_ckpt=0, reward_ckpt=0, kernel_ckpt=0, critic_ckpt=0))
     _banner('finetune', 'finetune')
 
     AMConfig = Acc_AdjointMatchingConfig(horizon=HORIZON)
@@ -318,11 +317,15 @@ def stage_finetune(args, group):
         AlphaConfig=AlphaConfig,
         dataset_name=ENV_NAME,
         specific_dataset=SPECIFIC_PLAY,
-        planner_checkpoint=PRETRAIN_STEPS,
-        reward_model_checkpoint=REWARD_STEPS,
-        kernel_model_checkpoint=KERNEL_STEPS,
-        critic_model_checkpoint=CRITIC_STEPS,
-        train_reward_config=Train_Reward_Config(),
+        # All four stages save their finetuning-side checkpoints under step 0 (save_to_finetuning /
+        # SDETrainer final save), so finetune loads them at step 0 — NOT the training step counts.
+        planner_checkpoint=0,
+        reward_model_checkpoint=0,
+        kernel_model_checkpoint=0,
+        critic_model_checkpoint=0,
+        # task_id is threaded into finetune via train_reward_config.task_id (used for PlannerDataset,
+        # get_planner/get_reward/get_kernel/get_critic, and AMConfig.task_id).
+        train_reward_config=Train_Reward_Config(task_id=TASK_ID),
         train_kernel_config=Train_Kernel_Config(),
         train_critic_config=Train_Critic_Config(),
         finetune_steps=num_steps,
