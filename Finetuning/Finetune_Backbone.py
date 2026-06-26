@@ -75,6 +75,7 @@ class _SingleDeviceAccelerator:
         self.is_main_process = True
         self.num_processes = 1
         self.process_index = 0
+        self.sync_gradients = True  # single device always "syncs" (no grad accumulation across procs)
 
     def wait_for_everyone(self):
         pass
@@ -95,6 +96,29 @@ class _SingleDeviceAccelerator:
             yield inputs
 
         return _cm()
+
+    def prepare(self, *args):
+        # accelerate.prepare wraps models/optimizers/dataloaders for distributed training; on a single
+        # device it's a passthrough. Returns a tuple matching the inputs (or the single object).
+        return args[0] if len(args) == 1 else args
+
+    def unwrap_model(self, model):
+        # No DDP/wrapping on a single device.
+        return model
+
+    def reduce(self, tensor, reduction='mean'):
+        # Nothing to reduce across a single process.
+        return tensor
+
+    def autocast(self):
+        # No mixed-precision autocast (JAX/optax handles dtypes); no-op context manager.
+        from contextlib import nullcontext
+        return nullcontext()
+
+    def accumulate(self, *models):
+        # Gradient accumulation is handled in the optax chain, not here; no-op context manager.
+        from contextlib import nullcontext
+        return nullcontext()
 
 
 @dataclass
