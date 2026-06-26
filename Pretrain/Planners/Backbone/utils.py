@@ -208,17 +208,12 @@ class FourierEmbedding(nn.Module):
 
     @nn.compact
     def __call__(self, x, *, rng=None):
-        # `freqs` is a frozen (requires_grad=False) buffer initialized from randn * scale.
-        # In linen it is a non-trainable variable in the 'consts' collection. The init draws a
-        # fresh sample at .init time; numerics are not torch-identical (init: fql-style).
-        # API-CHANGE: added keyword-only `rng=` to allow seeding the const buffer init (otherwise
-        # uses the module's 'params' rng stream).
-        def _freqs_init(key, shape, dtype=jnp.float32):
-            return jax.random.normal(key, shape, dtype) * self.scale
-        freqs = self.variable(
-            'consts', 'freqs',
-            lambda: _freqs_init(rng if rng is not None else self.make_rng('params'), (self.dim // 8,)),
-        ).value
+        # `freqs` is a frozen (requires_grad=False) buffer initialized from randn * scale. To survive a
+        # params-only TrainState (the planner/sampler call `apply` with only {'params'}), it is computed
+        # as a deterministic constant from a fixed key instead of a 'consts'-collection variable — i.e.
+        # drawn once-equivalent: identical on every call, never trained. init: fql-style (not torch-identical).
+        key = rng if rng is not None else jax.random.PRNGKey(0)
+        freqs = jax.random.normal(key, (self.dim // 8,)) * self.scale
         emb = jnp.einsum('...i,j->...ij', x, (2 * np.pi * freqs).astype(x.dtype))
         # emb = x.ger((2 * np.pi * self.freqs).to(x.dtype))
         emb = jnp.concatenate([jnp.cos(emb), jnp.sin(emb)], -1)
@@ -235,14 +230,10 @@ class UntrainableFourierEmbedding(nn.Module):
 
     @nn.compact
     def __call__(self, x, *, rng=None):
-        # Frozen (requires_grad=False) buffer; non-trainable 'consts' variable. init: fql-style.
-        # API-CHANGE: added keyword-only `rng=` to allow seeding the const buffer init.
-        def _freqs_init(key, shape, dtype=jnp.float32):
-            return jax.random.normal(key, shape, dtype) * self.scale
-        freqs = self.variable(
-            'consts', 'freqs',
-            lambda: _freqs_init(rng if rng is not None else self.make_rng('params'), (self.dim // 2,)),
-        ).value
+        # Frozen (requires_grad=False) buffer; computed as a deterministic constant from a fixed key
+        # (not a 'consts' variable) so it survives a params-only TrainState. init: fql-style.
+        key = rng if rng is not None else jax.random.PRNGKey(0)
+        freqs = jax.random.normal(key, (self.dim // 2,)) * self.scale
         emb = jnp.einsum('...i,j->...ij', x, (2 * np.pi * freqs).astype(x.dtype))
         # emb = x.ger((2 * np.pi * self.freqs).to(x.dtype))
         emb = jnp.concatenate([jnp.cos(emb), jnp.sin(emb)], -1)

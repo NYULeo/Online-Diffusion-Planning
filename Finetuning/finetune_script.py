@@ -5,14 +5,14 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
-from Finetune_Backbone import (
+from Finetuning.Finetune_Backbone import (
     OnlineFinetuner, FinetuningConfig,
     Train_Reward_Config, Train_Kernel_Config, Train_Critic_Config,
 )
 from Finetuning.utils import AlphaSchedulerConfig
-from adjoint_matching import AdjointMatchingConfig
-from acc_adjoint_matching import Acc_AdjointMatchingConfig
-from traj_reward import RewardConfig
+from Finetuning.adjoint_matching import AdjointMatchingConfig
+from Finetuning.acc_adjoint_matching import Acc_AdjointMatchingConfig
+from Finetuning.traj_reward import RewardConfig
 import random
 import numpy as np
 import jax

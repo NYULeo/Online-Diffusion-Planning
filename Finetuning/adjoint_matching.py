@@ -22,7 +22,7 @@ from Pretrain.Planners.Backbone.utils import (
     cosine_alpha_sigma, cosine_beta, compute_dot_alpha_beta, get_pretrained_planner,
 )
 from Finetuning.utils import Lambda, function
-from traj_reward import RewardConfig, TotalReward
+from Finetuning.traj_reward import RewardConfig, TotalReward
 from Pretrain.Planners.Backbone.UNet import TemporalUnet
 from Pretrain.Dataset import get_env
 
