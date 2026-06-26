@@ -82,6 +82,16 @@ def _infer_robust_kernel_dims(state_dict, in_dim):
     return hidden_dim, num_hidden_layers
 
 
+def _infer_kernel_type(state_dict):
+    '''Detect 'robust' vs 'mog' from the saved kernel's top-level submodule names, so the right kernel
+    CLASS is rebuilt regardless of config (RobustTransitionKernel -> net_*/mean_head/log_std_head;
+    MoGTransitionKernel -> backbone_*/head).'''
+    keys = set(state_dict.keys()) if isinstance(state_dict, dict) else set()
+    if 'mean_head' in keys or 'log_std_head' in keys or any(str(k).startswith('net_') for k in keys):
+        return 'robust'
+    return 'mog'
+
+
 @dataclass
 class RewardConfig:
     """Configuration for the adjoint matching fine‑tuner."""
@@ -158,6 +168,10 @@ class TotalReward:
         self.kernels = []
         self.config.delta = _torch_softplus(jnp.asarray(0.0), self.config.beta)
         kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
+        # Detect robust-vs-MoG from the saved checkpoint and set config.type_kernel so BOTH the rebuild
+        # below and the consumer (sigmoid) use the kernel class that was actually trained.
+        if kernel_state_dicts:
+            self.config.type_kernel = _infer_kernel_type(kernel_state_dicts[0])
         if self.config.type_kernel == 'robust':
             for sd in kernel_state_dicts:
                 k_hidden, k_layers = _infer_robust_kernel_dims(sd, obs_dim + act_dim)
@@ -358,6 +372,8 @@ class TotalReward_Critic:
         self.critic = TrainState.create(critic_def, critic_state_dict)
 
         kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
+        if kernel_state_dicts:
+            self.config.type_kernel = _infer_kernel_type(kernel_state_dicts[0])
         if self.config.type_kernel == 'robust':
             for sd in kernel_state_dicts:
                 k_hidden, k_layers = _infer_robust_kernel_dims(sd, obs_dim + act_dim)
