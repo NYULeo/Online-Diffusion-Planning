@@ -13,12 +13,18 @@ from sympy.vector.coordsysrect import Str
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PRETRAIN_DIR = PROJECT_ROOT / "Pretrain"
 import numpy as np
-import minari
+try:
+    import minari  # only needed for the D4RL / maze loaders (not cube/ogbench)
+except ImportError:
+    minari = None
 from sympy.core import I
 #import mediapy as media
 import warnings
 import gymnasium as gym
-import gymnasium_robotics
+try:
+    import gymnasium_robotics  # registers FrankaKitchen; only needed for the kitchen env (not cube)
+except ImportError:
+    gymnasium_robotics = None
 import ogbench
 warnings.filterwarnings("ignore", category=UserWarning)
 from collections import namedtuple

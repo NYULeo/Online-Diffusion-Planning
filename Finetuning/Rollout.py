@@ -19,7 +19,10 @@ from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv
 import pickle
 import random
 import gymnasium as gym
-import gymnasium_robotics
+try:
+    import gymnasium_robotics  # registers FrankaKitchen; only needed for the kitchen env (not cube)
+except ImportError:
+    gymnasium_robotics = None
 from Pretrain.Dataset import get_dataset
 from gymnasium.wrappers import TimeLimit
 from typing import Optional

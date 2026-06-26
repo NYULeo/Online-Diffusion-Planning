@@ -1,10 +1,10 @@
 # ODP (JAX/Flax port) — Python dependencies. No PyTorch: the port runs entirely on JAX.
 #
-# One-shot install (inside a conda/venv env):  pip install -r requirements.txt
+# One-shot install (inside a conda env):  pip install -r requirements.txt
 #
-# The jax line below pulls the CUDA 12 GPU build so a single `pip install -r` works on a CUDA server.
-#   * CPU only / macOS: replace `jax[cuda12]>=0.4.26` with `jax[cpu]>=0.4.26`
-#   * CUDA 11 server:    replace with `jax[cuda11_pip]>=0.4.26`
+# jax: CUDA 12 GPU build so a single `pip install -r` works on a CUDA server.
+#   * CPU only / macOS: change `jax[cuda12]>=0.4.26` to `jax[cpu]>=0.4.26`
+#   * CUDA 11 server:   change to `jax[cuda11_pip]>=0.4.26`
 
 # --- core JAX stack ---
 jax[cuda12]>=0.4.26
@@ -23,9 +23,14 @@ matplotlib
 seaborn
 mediapy
 
-# --- environments / datasets ---
-gymnasium<1.0.0
-gymnasium-robotics>=1.4.0
-ogbench
-minari
+# --- environments / datasets (cube tasks come from ogbench) ---
+gymnasium==0.29.1
+ogbench==1.1.0
 h5py>=3.0.0
+
+# --- OPTIONAL: kitchen / D4RL-maze envs only (NOT needed for cube) ---
+# gymnasium-robotics (kitchen) and minari (D4RL maze) require gymnasium>=1.2, which CONFLICTS with the
+# ogbench/cube stack pinned above. The code imports them lazily, so cube runs fine without them. If you
+# actually train the kitchen/maze envs, install these in a SEPARATE environment:
+#   gymnasium-robotics>=1.4.0
+#   minari

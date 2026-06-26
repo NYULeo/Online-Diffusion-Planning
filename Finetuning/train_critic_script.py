@@ -7,14 +7,20 @@ import mediapy as media
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-import minari
+try:
+    import minari  # only needed for the D4RL / maze loaders (not cube/ogbench)
+except ImportError:
+    minari = None
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 import gymnasium as gym
-import gymnasium_robotics  # registers the envs
+try:
+    import gymnasium_robotics  # registers FrankaKitchen; only needed for the kitchen env (not cube)
+except ImportError:
+    gymnasium_robotics = None
 import numpy as np
 import pickle
 from scipy.ndimage import gaussian_filter1d
