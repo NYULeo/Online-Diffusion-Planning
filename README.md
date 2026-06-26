@@ -34,7 +34,11 @@ Shell entry points live in `scripts/` (they wrap `run_cube_pipeline.py`). Overri
 extra flags pass through to the runner.
 
 ```bash
-# 0) verify the whole pipeline wiring with tiny step counts (do this first on a new machine):
+# 0a) data-free check: import + init/apply every network, surfaces ALL runtime errors at once
+#     (only needs the odp env; no dataset download):
+python scripts/verify.py
+
+# 0b) end-to-end wiring with tiny step counts (downloads cube data on first run):
 bash scripts/smoke.sh
 
 # 1) one full run: pretrain -> kernel -> reward -> critic -> finetune
