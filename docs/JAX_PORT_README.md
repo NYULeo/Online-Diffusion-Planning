@@ -80,63 +80,21 @@ the trainer/callee (which then self-seeds with `PRNGKey(0)`). If `seed=1` matter
 
 ## 4. Installation
 
-The port targets **Python 3.10** (recommended for OGBench/D4RL compatibility) and the JAX stack — **no
-PyTorch is needed to run the converted code**. Nothing is installed in this checkout, so set up a fresh
-environment first.
-
-### 4.1 Create an environment
+The port targets **Python 3.10** and the JAX stack — **no PyTorch is needed to run the converted code**.
+Set up a conda env and install the single `requirements.txt` (one-shot; it pins the CUDA 12 GPU build of
+JAX):
 
 ```bash
-# from the repo root (/Users/kaiwenhu/ODP)
-python3.10 -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install -U pip wheel setuptools
+conda create -n odp python=3.10 -y
+conda activate odp
+pip install -r requirements.txt
 ```
 
-(or with conda: `conda create -n odp python=3.10 -y && conda activate odp`)
+That installs JAX (GPU) + Flax/optax/distrax/einops + numerics + the environments (`gymnasium`, `ogbench`
+for cube, `minari`/`h5py` for the D4RL/maze loaders) in one go.
 
-### 4.2 Install the JAX runtime
-
-Pick the `jax`/`jaxlib` build that matches your hardware — this is the one install that is
-accelerator-specific:
-
-```bash
-# CPU (works everywhere; slow for full training):
-pip install -U "jax[cpu]"
-
-# NVIDIA GPU (CUDA 12):
-pip install -U "jax[cuda12]"
-
-# Apple Silicon (experimental Metal backend) — CPU is the safer default on macOS:
-#   pip install -U jax-metal      # optional; otherwise use the CPU build above
-```
-
-Then the framework layer used by the converted code:
-
-```bash
-pip install -U flax optax distrax einops chex ml_collections
-```
-
-### 4.3 Install logging, data, and environment deps
-
-```bash
-# logging + utilities
-pip install -U wandb tqdm numpy "numpy<2.0" matplotlib loguru
-
-# environments / datasets (cube-double comes from OGBench)
-pip install -U "gymnasium<1.0.0" ogbench minari h5py
-```
-
-`ogbench` provides the **cube** tasks (`cube-double-play-*`) used by the default pipeline. `gymnasium`'s
-`AsyncVectorEnv` backs the parallel rollouts. `minari`/`h5py` back the other (D4RL/maze) loaders in
-`Pretrain/Dataset.py` — only needed if you train those envs.
-
-### 4.4 One-line install (CPU)
-
-```bash
-pip install -U "jax[cpu]" flax optax distrax einops chex ml_collections \
-               wandb tqdm "numpy<2.0" matplotlib loguru "gymnasium<1.0.0" ogbench minari h5py
-```
+- **CPU only / macOS**, or a non-CUDA-12 server: edit the first line of `requirements.txt`
+  (`jax[cuda12]>=0.4.26`) to `jax[cpu]>=0.4.26` (or `jax[cuda11_pip]>=0.4.26`) before installing.
 
 > The original project's torch-based dependency lists (the old `requirements/` folder) were removed in
 > favor of this port's single `requirements.txt`. PyTorch is not required to run the JAX port — install it

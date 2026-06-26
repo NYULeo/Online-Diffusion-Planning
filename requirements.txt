@@ -1,14 +1,13 @@
 # ODP (JAX/Flax port) — Python dependencies. No PyTorch: the port runs entirely on JAX.
 #
-# Install the jax build that matches your hardware FIRST, then this file:
-#   CPU :  pip install "jax[cpu]"
-#   CUDA:  pip install "jax[cuda12]"
-#   (Apple Silicon: use the CPU build, or experimental "jax-metal")
-# then:
-#   pip install -r requirements.txt
+# One-shot install (inside a conda/venv env):  pip install -r requirements.txt
+#
+# The jax line below pulls the CUDA 12 GPU build so a single `pip install -r` works on a CUDA server.
+#   * CPU only / macOS: replace `jax[cuda12]>=0.4.26` with `jax[cpu]>=0.4.26`
+#   * CUDA 11 server:    replace with `jax[cuda11_pip]>=0.4.26`
 
 # --- core JAX stack ---
-jax>=0.4.26
+jax[cuda12]>=0.4.26
 flax>=0.8.4
 optax
 distrax>=0.1.5

@@ -7,17 +7,22 @@ trains from scratch in JAX and checkpoints in Flax format.
 
 ## Install
 
-Python 3.10. Install the `jax` build for your hardware first, then the rest:
+Python 3.10, via conda. `requirements.txt` is one-shot (it pins the CUDA 12 GPU build of JAX), so on a
+CUDA server this is all you need:
 
 ```bash
-python3.10 -m venv .venv && source .venv/bin/activate
-pip install -U pip wheel
-
-pip install "jax[cuda12]"      # GPU  (or  pip install "jax[cpu]"  for CPU)
+conda create -n odp python=3.10 -y
+conda activate odp
 pip install -r requirements.txt
 
 wandb login                    # optional, for online logging
 ```
+
+That's it — `pip install -r requirements.txt` installs JAX (GPU) + Flax/optax/distrax + the envs.
+
+- **CPU only / macOS**, or a non-CUDA-12 server: edit the first line of `requirements.txt`
+  (`jax[cuda12]>=0.4.26`) to `jax[cpu]>=0.4.26` (or `jax[cuda11_pip]>=0.4.26`) before installing.
+- Verify the GPU is visible: `python -c "import jax; print(jax.devices())"`.
 
 ## Run
 
