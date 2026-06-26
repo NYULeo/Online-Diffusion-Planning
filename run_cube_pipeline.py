@@ -314,7 +314,14 @@ def stage_finetune(args, group):
     _banner('finetune', 'finetune')
 
     AMConfig = Acc_AdjointMatchingConfig(horizon=HORIZON)
-    RWConfig = RewardConfig(beta=1.0, min_log_prob=150.0, explore=False)
+    # TotalReward rebuilds the reward + kernel nets from these dims to load the checkpoints into, so they
+    # MUST match the architectures trained in stage_reward / stage_kernel (else a param-shape mismatch).
+    RWConfig = RewardConfig(
+        beta=1.0, min_log_prob=150.0, explore=False,
+        hidden_dim_reward=512, num_hidden_layers_reward=4,                       # matches stage_reward
+        type_kernel='mog', kernel_num_modes=10, num_hidden_layers_kernel=4,      # matches stage_kernel (MoG)
+        hidden_dim_kernel=514, kernel_noise_floor=5e-4,
+    )
     AlphaConfig = AlphaSchedulerConfig(alpha_start=1.0, alpha_end=1.0, total_steps=num_steps)
 
     FTConfig = FinetuningConfig(
