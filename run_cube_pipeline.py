@@ -300,10 +300,16 @@ def stage_finetune(args, group):
     from Finetuning.acc_adjoint_matching import Acc_AdjointMatchingConfig
     from Finetuning.traj_reward import RewardConfig
 
-    num_steps = SMOKE['finetune'] if args.smoke else FINETUNE_STEPS
+    # Finetune does AM training rounds, each followed by an env rollout. Keep smoke tiny (1 short round)
+    # so it's a fast wiring check rather than 10 rounds x 1000-step rollouts.
+    if args.smoke:
+        num_steps, finetune_rounds, rollout_length, rollout_num_envs = 20, 1, 50, 2
+    else:
+        num_steps, finetune_rounds, rollout_length, rollout_num_envs = FINETUNE_STEPS, 10, 1000, 8
     init_run('finetune', group,
                      config=dict(stage='finetune', env=ENV_NAME, specific=SPECIFIC_PLAY, task_id=TASK_ID,
-                                 finetune_steps=num_steps, finetune_lr=2e-4, finetune_batch_size=12,
+                                 finetune_steps=num_steps, finetune_rounds=finetune_rounds,
+                                 rollout_length=rollout_length, finetune_lr=2e-4, finetune_batch_size=12,
                                  planner_ckpt=0, reward_ckpt=0, kernel_ckpt=0, critic_ckpt=0))
     _banner('finetune', 'finetune')
 
@@ -329,15 +335,18 @@ def stage_finetune(args, group):
         train_kernel_config=Train_Kernel_Config(),
         train_critic_config=Train_Critic_Config(),
         finetune_steps=num_steps,
+        finetune_rounds=finetune_rounds,
+        rollout_length=rollout_length,
+        rollout_num_envs=rollout_num_envs,
         finetune_batch_size=12,
         finetune_lr=2e-4,
     )
     random.seed(args.seed)
     np.random.seed(args.seed)
-    rng = jax.random.PRNGKey(args.seed)
 
     finetuner = OnlineFinetuner(FTConfig)
-    finetuner.finetune_planner(seed=rng)
+    # finetune_planner takes an INTEGER seed (it builds the PRNGKey internally), not a key array.
+    finetuner.finetune_planner(seed=args.seed)
     finish_run()
 
 
