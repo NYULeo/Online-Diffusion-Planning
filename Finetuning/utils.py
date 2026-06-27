@@ -992,9 +992,10 @@ def train_kernel(
         # every rank loads saved kernels
         kernel_state_dicts, _, _ = get_kernel(dataset_name, specific_dataset, step)
         kernel_stats = get_kernel_stats(dataset_name, specific_dataset, step)
-        # TODO(checkpoint-bridge): rebuild each kernel as a TrainState; legacy torch state_dicts need the
-        # per-Dense remap (weight (out,in)->kernel (in,out).T) before from_state_dict. We init a template and
-        # restore the saved flax params. Kernels stay a python list (independently-loaded models, §11).
+        # TODO(checkpoint-bridge): rebuild each kernel as (model_def, params); legacy torch state_dicts need
+        # the per-Dense remap (weight (out,in)->kernel (in,out).T) before from_state_dict. Kernels stay a
+        # python list of (model_def, params) TUPLES — that is what compute_log_density / *_mahalanobis_score
+        # iterate over (§11); a TrainState is NOT unpackable there.
         eval_ensemble = []
         for sd in kernel_state_dicts:
             m = RobustTransitionKernel(obs_dim, act_dim, num_hidden_layers, hidden_dim)
@@ -1002,9 +1003,13 @@ def train_kernel(
             a_ex = jnp.zeros((1, act_dim), dtype=jnp.float32)
             rng, init_rng = jax.random.split(rng)
             params = m.init(init_rng, s_ex, a_ex)['params']
-            ts = TrainState.create(m, params, tx=None)
-            ts = flax.serialization.from_state_dict(ts, sd) if isinstance(sd, dict) and 'params' in sd else ts.replace(params=sd)
-            eval_ensemble.append(ts)
+            if isinstance(sd, dict) and 'params' in sd:
+                params = flax.serialization.from_state_dict(params, sd['params'])
+            elif isinstance(sd, dict):
+                params = flax.serialization.from_state_dict(params, sd)
+            else:
+                params = sd
+            eval_ensemble.append((m, params))
 
         # shard plans across ranks
         local_plans = x_generated_plans[rank::world]
