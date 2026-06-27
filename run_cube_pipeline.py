@@ -306,12 +306,13 @@ def stage_finetune(args, group):
     if args.smoke:
         num_steps, finetune_rounds, rollout_length, rollout_num_envs = 2, 1, 20, 1
         ft_diffusion_steps, ft_batch_size, ft_batch_per_sample = 4, 2, 1
+        ft_reward_steps, ft_kernel_steps = 50, 50
     elif args.mid_finetune:
-        # Light "does the full finetune complete end-to-end overnight" check: teammate diffusion=10 but a
-        # SMALL trajectory batch so each eager AM step is ~1-2 min, not ~30. Real metrics need --variant
-        # full scale, but this proves the whole loop (AM + rollout + kernel/reward retrain) runs to the end.
+        # Light "does the full finetune complete end-to-end overnight" check: small AM batch AND small
+        # per-round reward/kernel retrains, so all 3 rounds finish quickly. Not for real metrics.
         num_steps, finetune_rounds, rollout_length, rollout_num_envs = 6, 3, 200, 1
         ft_diffusion_steps, ft_batch_size, ft_batch_per_sample = 10, 4, 1
+        ft_reward_steps, ft_kernel_steps = 200, 200
     else:
         # Use the teammate's cube-single SCALE (finetune_script2): 90 total AM steps over 30 rounds
         # (per_round=3), diffusion_steps=10, batch 32x8. The old 1M/10 (=100k AM steps/round) was the
@@ -319,6 +320,7 @@ def stage_finetune(args, group):
         # the teammate's full critic=True/offline/eta=0 config is a separate, to-be-confirmed switch.)
         num_steps, finetune_rounds, rollout_length, rollout_num_envs = 90, 30, 1000, 1
         ft_diffusion_steps, ft_batch_size, ft_batch_per_sample = 10, 32, 8
+        ft_reward_steps, ft_kernel_steps = 30000, 5000   # teammate per-round retrain step counts
     init_run('finetune', group,
                      config=dict(stage='finetune', env=ENV_NAME, specific=SPECIFIC_PLAY, task_id=TASK_ID,
                                  finetune_steps=num_steps, finetune_rounds=finetune_rounds,
@@ -354,8 +356,11 @@ def stage_finetune(args, group):
         critic_model_checkpoint=0,
         # task_id is threaded into finetune via train_reward_config.task_id (used for PlannerDataset,
         # get_planner/get_reward/get_kernel/get_critic, and AMConfig.task_id).
-        train_reward_config=Train_Reward_Config(task_id=TASK_ID),
-        train_kernel_config=Train_Kernel_Config(),
+        # Per-round retrains use the SAME verified path the smoke run completed on (default robust
+        # Train_Kernel_Config); only num_steps is shrunk for the lighter modes. The TotalReward used by AM
+        # is built once at init from the original MoG kernels, so the per-round retrain class is independent.
+        train_reward_config=Train_Reward_Config(task_id=TASK_ID, num_steps=ft_reward_steps),
+        train_kernel_config=Train_Kernel_Config(num_steps=ft_kernel_steps),
         train_critic_config=Train_Critic_Config(),
         finetune_steps=num_steps,
         finetune_rounds=finetune_rounds,
