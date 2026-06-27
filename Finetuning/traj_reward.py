@@ -368,7 +368,10 @@ class TotalReward_Critic:
 
         critic_state_dict, critic_obs_dim = get_critic_model(dataset_name, specific_dataset, task_id, critic_checkpoint)
         # TODO(checkpoint-bridge): `critic_state_dict` is a torch state_dict; remap to flax params.
-        critic_def = Critic(critic_obs_dim, self.config.hidden_dim_critic, self.config.num_hidden_layers_critic)
+        # Critic shares SimpleReward's Dense layout (Dense_0 out=hidden, #Dense=hidden_layers+2), so infer
+        # its dims from the saved checkpoint (config-independent) — input is just obs (no action concat).
+        c_hidden, c_layers = _infer_reward_dims(critic_state_dict, critic_obs_dim)
+        critic_def = Critic(critic_obs_dim, c_hidden, c_layers)
         self.critic = TrainState.create(critic_def, critic_state_dict)
 
         kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
