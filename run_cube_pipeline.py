@@ -320,16 +320,19 @@ def stage_finetune(args, group):
                                  planner_ckpt=0, reward_ckpt=0, kernel_ckpt=0, critic_ckpt=0))
     _banner('finetune', 'finetune')
 
-    AMConfig = Acc_AdjointMatchingConfig(horizon=HORIZON)
-    # TotalReward rebuilds the reward + kernel nets from these dims to load the checkpoints into, so they
-    # MUST match the architectures trained in stage_reward / stage_kernel (else a param-shape mismatch).
+    # AM/reward/alpha scalars aligned to the teammate cube-single config (finetune_script2), EXCEPT the
+    # untested branch flags: this keeps the verified critic=False / offline=False path for an overnight run.
+    # (To fully reproduce the teammate result later: set critic=True, offline=True, update_kernel=False,
+    # rollout_length=4000, rollout_num_envs=8, continual_rollout=True — see docs/cube_single_combination.md.)
+    AMConfig = Acc_AdjointMatchingConfig(horizon=HORIZON, eta=0.0)        # teammate: deterministic sampling
+    # TotalReward rebuilds reward+kernel nets from these dims; they MUST match stage_reward / stage_kernel.
     RWConfig = RewardConfig(
-        beta=1.0, min_log_prob=150.0, explore=False,
-        hidden_dim_reward=512, num_hidden_layers_reward=4,                       # matches stage_reward
-        type_kernel='mog', kernel_num_modes=10, num_hidden_layers_kernel=4,      # matches stage_kernel (MoG)
+        beta=1.0, min_log_prob=-110.0, explore=False,                    # teammate min_log_prob
+        hidden_dim_reward=512, num_hidden_layers_reward=4,               # matches stage_reward
+        type_kernel='mog', kernel_num_modes=10, num_hidden_layers_kernel=4,  # matches stage_kernel (MoG)
         hidden_dim_kernel=514, kernel_noise_floor=5e-4,
     )
-    AlphaConfig = AlphaSchedulerConfig(alpha_start=1.0, alpha_end=1.0, total_steps=num_steps)
+    AlphaConfig = AlphaSchedulerConfig(alpha_start=1.0, alpha_end=0.1, total_steps=300, decay=True)  # teammate
 
     FTConfig = FinetuningConfig(
         AMConfig=AMConfig,
@@ -355,7 +358,12 @@ def stage_finetune(args, group):
         finetune_batch_size=ft_batch_size,
         finetune_batch_per_sample=ft_batch_per_sample,
         diffusion_steps=ft_diffusion_steps,
-        finetune_lr=2e-4,
+        karras_percent=0.1,                  # teammate: num_karras = ceil(10*0.1) = 1
+        finetune_lr=2e-5,                    # teammate
+        initial_lam=0.05,                    # teammate
+        eta_lam=0.5,                         # teammate
+        update_lambda_every=1,               # teammate
+        reward_scaling_factor=150,           # teammate
     )
     random.seed(args.seed)
     np.random.seed(args.seed)
