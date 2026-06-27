@@ -124,6 +124,12 @@ class Acc_AdjointMatchingFineTuner:
 
         self.set_old_score_net(planner_checkpoint)
         self.set_new_score_net()
+        # SPEED (logic-identical): the DiT forward is a pure fn (train=False, dropout=0, deterministic
+        # Fourier emb), so jitting model_def.apply computes the SAME values in the SAME order — it just
+        # compiles once per input shape and caches, instead of eagerly re-dispatching + re-autotuning the
+        # matmuls on every call (the `dot_search_space` storm). old/new share the architecture, so one
+        # jitted apply serves both; params are passed as a traced arg so grads still flow when needed.
+        self._score_apply = jax.jit(self.old_score_net.model_def.apply)
         self.set_ema_model()
         self.set_optimizer_and_scheduler()
         self.set_alpha_scheduler()
@@ -136,6 +142,12 @@ class Acc_AdjointMatchingFineTuner:
         '''Split the trainer's RNG and return a fresh subkey (state mutates in place).'''
         self.rng, subkey = jax.random.split(self.rng)
         return subkey
+
+    def _score(self, score_net, x, t):
+        '''Frozen DiT forward through the jitted apply. Identical to score_net(x, t) (same params, same
+        math) but compiled/cached per shape instead of eagerly re-autotuned each call. Use ONLY where the
+        call is frozen (no param-grad): sampling + the adjoint jvp. The gradient path keeps the plain call.'''
+        return self._score_apply({'params': score_net.params}, x, t)
 
     def Accelerate_Prepare(self, dataloader, reward_model: Union[TotalReward, TotalReward_Critic], round: int):
          if round == 1:
@@ -335,7 +347,7 @@ class Acc_AdjointMatchingFineTuner:
         for i in range(len(self.t_asc) - 1):
             t_now, t_next = self.t_asc[i], self.t_asc[i + 1]
             dt = (t_next - t_now).item()
-            score = self.new_score_net(x, t_now[None])
+            score = self._score(self.new_score_net, x, t_now[None])
             #drift = self.k[i] * x
 
             if self.config.eta > 0:
@@ -383,7 +395,7 @@ class Acc_AdjointMatchingFineTuner:
              # Drift
              drift = -0.5 * beta_now * x
              # Score
-             score = self.new_score_net(x, t_now[None])
+             score = self._score(self.new_score_net, x, t_now[None])
             # Euler step
              if self.config.eta > 0:
                  rng, kn = jax.random.split(rng)
@@ -412,7 +424,7 @@ class Acc_AdjointMatchingFineTuner:
         #gradient = gradient * (1.0 / grad_norm)
         #print(f"Reward Gradeint Norm: {gradient.norm().item()}")
         if(self.config.MaxEnt):
-            score = self.old_score_net(T, jnp.asarray(0.0)[None])
+            score = self._score(self.old_score_net, T, jnp.asarray(0.0)[None])
             EntGrad = -1 * score
             EntGrad = jax.lax.stop_gradient(EntGrad)
         else:
@@ -449,7 +461,7 @@ class Acc_AdjointMatchingFineTuner:
             # jvp of the frozen old_score_net w.r.t. its input T, tangent = current_a (the t-input has
             # zero tangent). Was: torch.autograd.functional.jvp(self.old_score_net, (T, t_now[None]),
             #                                                    (current_a, zeros_like(t_now[None]))).
-            y, jvp_out = jax.jvp(lambda x: self.old_score_net(x, t_now[None]), (T,), (current_a,))
+            y, jvp_out = jax.jvp(lambda x: self._score(self.old_score_net, x, t_now[None]), (T,), (current_a,))
             Jov_a = jvp_out
             new_a = current_a  + dt * ( (k_reversed[i] * current_a) + (2 * k_reversed[i] * Jov_a) )
             new_a = jax.lax.stop_gradient(new_a)
