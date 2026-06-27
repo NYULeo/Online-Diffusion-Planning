@@ -305,8 +305,14 @@ class SDETrainer:
         print(self.device)
         dataset = PlannerDataset(self.dataset_name, self.specific_dataset, self.task_id, self.horizon,
                                  self.state_dim, self.action_dim, self.stride)
-        # fql-style numpy batching: cycle yields (traj, cond) numpy batches (no torch DataLoader).
-        dataloader = cycle(self._batches(dataset, self.batch_size, shuffle=True))
+        # NOTE: cycle(gen) hangs after one epoch because `_batches` is a ONE-SHOT generator (once exhausted,
+        # `while True: for x in dead_gen` spins forever yielding nothing). Build an infinite loader that
+        # RE-CREATES (reshuffles) `_batches` each epoch instead.
+        def _infinite_batches():
+            while True:
+                for batch in self._batches(dataset, self.batch_size, shuffle=True):
+                    yield batch
+        dataloader = _infinite_batches()
         print(f"Training planner for {self.dataset_name}-{self.specific_dataset} Dataset")
         print(f"Backbone:{self.backbone_name}, Horizon: {self.horizon}, Epochs: {self.num_steps}, Batch Size: {self.batch_size}, Learning Rate; {self.lr}")
 

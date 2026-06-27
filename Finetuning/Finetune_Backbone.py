@@ -597,15 +597,19 @@ class OnlineFinetuner():
 
     def _sample_planner_batch(self, batch_size, *, rng, shuffle=True, drop_last=True):
          # numpy-backed mini-batch generator over the planner conditions, replacing the torch DataLoader +
-         # DistributedSampler. Yields jnp batches of conditions (CONVERSION_GUIDE §13). One pass per round.
+         # DistributedSampler. INFINITE: the AM finetuner consumes `per_round_steps` batches per round via
+         # next(dataloader), which exceeds one epoch — so loop forever, reshuffling each epoch (a one-shot
+         # generator wrapped in cycle() would hang once exhausted).
          num = len(self.PlannerDataset)
          conditions = jnp.stack([jnp.asarray(self.PlannerDataset[i]) for i in range(num)], axis=0)
-         rng, perm_key = jax.random.split(rng)
-         order = jax.random.permutation(perm_key, num) if shuffle else jnp.arange(num)
          num_batches = num // batch_size if drop_last else math.ceil(num / batch_size)
-         for b in range(num_batches):
-             idx = order[b * batch_size:(b + 1) * batch_size]
-             yield conditions[idx]
+         num_batches = max(num_batches, 1)   # never 0 (would make the loop spin without yielding -> hang)
+         while True:
+             rng, perm_key = jax.random.split(rng)
+             order = jax.random.permutation(perm_key, num) if shuffle else jnp.arange(num)
+             for b in range(num_batches):
+                 idx = order[b * batch_size:(b + 1) * batch_size]
+                 yield conditions[idx]
 
     def finetune_planner(self, *, seed=None):
         rng = jax.random.PRNGKey(0) if seed is None else jax.random.PRNGKey(seed)
