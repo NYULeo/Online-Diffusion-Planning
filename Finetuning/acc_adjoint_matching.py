@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Callable, List, Tuple
 import sys
 import os
+import time
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -648,7 +649,11 @@ class Acc_AdjointMatchingFineTuner:
         #conds = next(dataloader)
         while step < self.config.per_round_steps:
              conds = next(dataloader)
+             _t0 = time.time()
              loss, avg_reward, avg_C = self.step(conds, reward_model)
+             if self.accelerator.is_main_process:
+                 print(f"[AM] round {round} step {step}/{self.config.per_round_steps} "
+                       f"took {time.time() - _t0:.1f}s (loss={float(loss):.4g})", flush=True)
 
              self.accelerator.wait_for_everyone()
 

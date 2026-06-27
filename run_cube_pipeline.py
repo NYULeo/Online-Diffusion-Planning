@@ -306,6 +306,12 @@ def stage_finetune(args, group):
     if args.smoke:
         num_steps, finetune_rounds, rollout_length, rollout_num_envs = 2, 1, 20, 1
         ft_diffusion_steps, ft_batch_size, ft_batch_per_sample = 4, 2, 1
+    elif args.mid_finetune:
+        # Light "does the full finetune complete end-to-end overnight" check: teammate diffusion=10 but a
+        # SMALL trajectory batch so each eager AM step is ~1-2 min, not ~30. Real metrics need --variant
+        # full scale, but this proves the whole loop (AM + rollout + kernel/reward retrain) runs to the end.
+        num_steps, finetune_rounds, rollout_length, rollout_num_envs = 6, 3, 200, 1
+        ft_diffusion_steps, ft_batch_size, ft_batch_per_sample = 10, 4, 1
     else:
         # Use the teammate's cube-single SCALE (finetune_script2): 90 total AM steps over 30 rounds
         # (per_round=3), diffusion_steps=10, batch 32x8. The old 1M/10 (=100k AM steps/round) was the
@@ -396,6 +402,9 @@ def main():
                    help="cube dataset suffix for the planner/critic/finetune naming (default: play).")
     p.add_argument('--task', type=int, default=4, help='cube singletask task id (default: 4; valid 1-5).')
     p.add_argument('--smoke', action='store_true', help='tiny step counts to verify wiring end-to-end.')
+    p.add_argument('--mid-finetune', dest='mid_finetune', action='store_true',
+                   help='lighter finetune (6 steps/3 rounds, tiny traj batch) so the full loop completes '
+                        'in a sane time — for an overnight "does it run to the end" check, not real metrics.')
     p.add_argument('--eval', action='store_true',
                    help='also run the per-stage diagnostic eval (test_kernel_mog/test_Model/test_critic). '
                         'OFF by default: these do a slow full-dataset eager pass and are not needed for the '
