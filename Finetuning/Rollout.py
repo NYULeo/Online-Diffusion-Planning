@@ -619,9 +619,9 @@ def compute_log_prob(kernels, kernel_stats, x, obs_dim, act_dim, type: str = 'lo
         act = jnp.asarray(x[i, obs_dim:(obs_dim+act_dim)].copy(), dtype=jnp.float32)[None]
         s_next = jnp.asarray(kernel_stats.norm_obs(x[i+1, :obs_dim].copy()), dtype=jnp.float32)[None]
         if(type == 'log_density'):
-            value = float(compute_log_density_mog(kernels, obs, act, s_next))
+            value = float(compute_log_density_mog(kernels, obs, act, s_next)[0])
         else:
-            value = float(compute_total_mahalanobis_score_mog(kernels, obs, act, s_next))
+            value = float(compute_total_mahalanobis_score_mog(kernels, obs, act, s_next)[0])
         values.append(value)
     return np.mean(values)
 

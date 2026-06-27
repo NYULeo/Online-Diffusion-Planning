@@ -1021,9 +1021,9 @@ def train_kernel(
                 s_next = jnp.asarray(kernel_stats.norm_obs(x[j + 1, :obs_dim].copy()), dtype=jnp.float32)[None]
 
                 if ctype == "log_prob":
-                    v = float(compute_log_density(eval_ensemble, obs, act, s_next))
+                    v = float(compute_log_density(eval_ensemble, obs, act, s_next)[0])
                 else:
-                    v = float(compute_total_mahalanobis_score(eval_ensemble, obs, act, s_next))
+                    v = float(compute_total_mahalanobis_score(eval_ensemble, obs, act, s_next)[0])
                 local_values.append(v)
 
         # gather local values from all ranks
@@ -1176,9 +1176,9 @@ def train_kernel_mog(
                 s_next = jnp.asarray(kernel_stats.norm_obs(x[j + 1, :obs_dim].copy()), dtype=jnp.float32)[None]
 
                 if ctype == "log_prob":
-                    v = float(compute_log_density_mog(eval_ensemble, obs, act, s_next))
+                    v = float(compute_log_density_mog(eval_ensemble, obs, act, s_next)[0])
                 else:
-                    v = float(compute_total_mahalanobis_score_mog(eval_ensemble, obs, act, s_next))
+                    v = float(compute_total_mahalanobis_score_mog(eval_ensemble, obs, act, s_next)[0])
                 local_values.append(v)
 
         if accelerator is not None:
@@ -1223,9 +1223,9 @@ def compute_threshold_mog(kernels, kernel_stats, obs_dim, act_dim, x, constraint
            act = jnp.asarray(x[i][j, obs_dim:(obs_dim+act_dim)].copy(), dtype=jnp.float32)[None]
            s_next = jnp.asarray(kernel_stats.norm_obs(x[i][j+1, :obs_dim].copy()), dtype=jnp.float32)[None]
            if(constraint_type == 'log_prob'):
-               value = float(compute_log_density_mog(kernels, obs, act, s_next))
+               value = float(compute_log_density_mog(kernels, obs, act, s_next)[0])
            else:
-               value = float(compute_total_mahalanobis_score_mog(kernels, obs, act, s_next))
+               value = float(compute_total_mahalanobis_score_mog(kernels, obs, act, s_next)[0])
            values.append(value)
     if(constraint_type == 'log_prob'):
          threshold = np.quantile(values, (1 - quantile))
@@ -1244,9 +1244,9 @@ def compute_threshold(kernels, kernel_stats, obs_dim, act_dim, x, constraint_typ
            act = jnp.asarray(x[i][j, obs_dim:(obs_dim+act_dim)].copy(), dtype=jnp.float32)[None]
            s_next = jnp.asarray(kernel_stats.norm_obs(x[i][j+1, :obs_dim].copy()), dtype=jnp.float32)[None]
            if(constraint_type == 'log_prob'):
-                value = float(compute_log_density(kernels, obs, act, s_next))
+                value = float(compute_log_density(kernels, obs, act, s_next)[0])
            else:
-                value = float(compute_total_mahalanobis_score(kernels, obs, act, s_next))
+                value = float(compute_total_mahalanobis_score(kernels, obs, act, s_next)[0])
            values.append(value)
     if(constraint_type == 'log_prob'):
          threshold = np.quantile(values, (1 - quantile))
