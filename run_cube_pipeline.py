@@ -78,7 +78,7 @@ WANDB_PROJECT = 'odp-cube'
 PRETRAIN_STEPS = 1_000_000
 KERNEL_STEPS = 5_000
 REWARD_STEPS = 100_000
-CRITIC_STEPS = 50_000
+CRITIC_STEPS = 70_000
 FINETUNE_STEPS = 1_000_000
 
 # Smoke-test overrides (tiny, just to exercise the full code path quickly).
@@ -254,17 +254,17 @@ def stage_critic(args, group):
     train_critic(
         dataset_name=ENV_NAME,
         specific_dataset=SPECIFIC_PLAY,
-        hidden_layers=5,
+        hidden_layers=4,
         hidden_dim=512,
         batch_size=256,
         num_steps=num_steps,
         gamma=0.99,
         horizon=HORIZON,
-        lr=1e-5,
+        lr=5e-5,
         min_lr=1e-6,
         tau=0.005,
-        sigma=8.0,
-        target_reward=50.0,
+        sigma=3.0,
+        target_reward=80.0,
         trajs=trajs,
         task_id=TASK_ID,
         rng=rng,
@@ -273,13 +273,13 @@ def stage_critic(args, group):
         test_critic(
             dataset_name=ENV_NAME,
             specific_dataset=SPECIFIC_PLAY,
-            hidden_layers=5,
+            hidden_layers=4,
             hidden_dim=512,
             checkpoint_step=num_steps,
             gamma=0.99,
             horizon=HORIZON,
-            sigma=8.0,
-            target_reward=50.0,
+            sigma=3.0,
+            target_reward=80.0,
             trajs=trajs,
             task_id=TASK_ID,
         )
@@ -314,28 +314,27 @@ def stage_finetune(args, group):
         ft_diffusion_steps, ft_batch_size, ft_batch_per_sample = 10, 4, 1
         ft_reward_steps, ft_kernel_steps = 200, 200
     else:
-        # Use the teammate's cube-single SCALE (finetune_script2): 90 total AM steps over 30 rounds
-        # (per_round=3), diffusion_steps=10, batch 32x8. The old 1M/10 (=100k AM steps/round) was the
-        # kitchen default — eager AM at that scale takes days. (Still the verified critic=False path;
-        # the teammate's full critic=True/offline/eta=0 config is a separate, to-be-confirmed switch.)
-        num_steps, finetune_rounds, rollout_length, rollout_num_envs = 90, 30, 1000, 1
+        # EXACT teammate cube-single finetune config (finetune_script2): critic=True, offline=True
+        # (offline -> loop `continue`s after rollout, so NO per-round kernel/reward retrain -> the good
+        # pretrained MoG kernel stays fixed, which avoids the divergence we saw with update_kernel).
+        num_steps, finetune_rounds, rollout_length, rollout_num_envs = 90, 30, 4000, 8
         ft_diffusion_steps, ft_batch_size, ft_batch_per_sample = 10, 32, 8
-        ft_reward_steps, ft_kernel_steps = 30000, 5000   # teammate per-round retrain step counts
+        ft_reward_steps, ft_kernel_steps = 30000, 5000   # only used if offline=False; offline skips them
     init_run('finetune', group,
                      config=dict(stage='finetune', env=ENV_NAME, specific=SPECIFIC_PLAY, task_id=TASK_ID,
                                  finetune_steps=num_steps, finetune_rounds=finetune_rounds,
-                                 rollout_length=rollout_length, finetune_lr=2e-4, finetune_batch_size=ft_batch_size,
+                                 rollout_length=rollout_length, finetune_lr=2e-5, finetune_batch_size=ft_batch_size,
                                  planner_ckpt=0, reward_ckpt=0, kernel_ckpt=0, critic_ckpt=0))
     _banner('finetune', 'finetune')
 
-    # AM/reward/alpha scalars aligned to the teammate cube-single config (finetune_script2), EXCEPT the
-    # untested branch flags: this keeps the verified critic=False / offline=False path for an overnight run.
-    # (To fully reproduce the teammate result later: set critic=True, offline=True, update_kernel=False,
-    # rollout_length=4000, rollout_num_envs=8, continual_rollout=True — see docs/cube_single_combination.md.)
+    # smoke/mid stay on the verified critic=False/offline=False path; the full run uses the EXACT teammate
+    # config (critic=True/offline=True/eta=0). See docs/cube_single_combination.md.
+    teammate = not (args.smoke or args.mid_finetune)
     AMConfig = Acc_AdjointMatchingConfig(horizon=HORIZON, eta=0.0)        # teammate: deterministic sampling
     # TotalReward rebuilds reward+kernel nets from these dims; they MUST match stage_reward / stage_kernel.
     RWConfig = RewardConfig(
         beta=1.0, min_log_prob=-110.0, explore=False,                    # teammate min_log_prob
+        number_of_generated_plans=50, quantile=0.999, critic_gamma=0.99,
         hidden_dim_reward=512, num_hidden_layers_reward=4,               # matches stage_reward
         type_kernel='mog', kernel_num_modes=10, num_hidden_layers_kernel=4,  # matches stage_kernel (MoG)
         hidden_dim_kernel=514, kernel_noise_floor=5e-4,
@@ -354,11 +353,19 @@ def stage_finetune(args, group):
         reward_model_checkpoint=0,
         kernel_model_checkpoint=0,
         critic_model_checkpoint=0,
+        # teammate flags: critic uses the trained critic in the reward gradient; offline=True skips the
+        # per-round kernel/reward retrain entirely (so the per-round train_*_config below is unused).
+        offline=teammate,
+        critic=teammate,
+        update_critic=True,
+        kernel=True,
+        update_kernel=not teammate,          # teammate: False (kernel fixed)
+        buffer_size=200000 if teammate else 100000,
+        finetune_buffer_cutoff_length=100 if teammate else None,
+        train_buffer_cutoff_length=200 if teammate else None,
         # task_id is threaded into finetune via train_reward_config.task_id (used for PlannerDataset,
-        # get_planner/get_reward/get_kernel/get_critic, and AMConfig.task_id).
-        # Per-round retrains use the SAME verified path the smoke run completed on (default robust
-        # Train_Kernel_Config); only num_steps is shrunk for the lighter modes. The TotalReward used by AM
-        # is built once at init from the original MoG kernels, so the per-round retrain class is independent.
+        # get_planner/get_reward/get_kernel/get_critic, and AMConfig.task_id). num_steps only matters on
+        # the non-offline (smoke/mid) path.
         train_reward_config=Train_Reward_Config(task_id=TASK_ID, num_steps=ft_reward_steps),
         train_kernel_config=Train_Kernel_Config(num_steps=ft_kernel_steps),
         train_critic_config=Train_Critic_Config(),
@@ -366,6 +373,8 @@ def stage_finetune(args, group):
         finetune_rounds=finetune_rounds,
         rollout_length=rollout_length,
         rollout_num_envs=rollout_num_envs,
+        continual_rollout=teammate,          # teammate: True (chunk_size below)
+        chunk_size=31 if teammate else 10,
         finetune_batch_size=ft_batch_size,
         finetune_batch_per_sample=ft_batch_per_sample,
         diffusion_steps=ft_diffusion_steps,
