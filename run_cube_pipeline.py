@@ -76,7 +76,7 @@ WANDB_PROJECT = 'odp-cube'
 
 # Checkpoint steps each stage trains to / saves at (and that finetune then loads).
 PRETRAIN_STEPS = 1_000_000
-KERNEL_STEPS = 50_000
+KERNEL_STEPS = 5_000
 REWARD_STEPS = 100_000
 CRITIC_STEPS = 50_000
 FINETUNE_STEPS = 1_000_000
@@ -143,7 +143,7 @@ def stage_kernel(args, group):
     from Pretrain.Transition_Kernel.Kernel_Backbone import train_mog_kernel, test_kernel_mog
 
     num_steps = SMOKE['kernel'] if args.smoke else KERNEL_STEPS
-    save_freq = SMOKE['kernel_save'] if args.smoke else 10_000
+    save_freq = SMOKE['kernel_save'] if args.smoke else 1_000  # original train_kernel_script save_freq
     init_run('kernel', group,
                      config=dict(stage='kernel', env=ENV_NAME, specific=SPECIFIC_DATA, num_steps=num_steps,
                                  ensemble_size=10, num_modes=10, hidden_dim=514, num_hidden_layers=4))
@@ -307,7 +307,7 @@ def stage_finetune(args, group):
         num_steps, finetune_rounds, rollout_length, rollout_num_envs = 2, 1, 20, 1
         ft_diffusion_steps, ft_batch_size, ft_batch_per_sample = 4, 2, 1
     else:
-        num_steps, finetune_rounds, rollout_length, rollout_num_envs = FINETUNE_STEPS, 10, 1000, 8
+        num_steps, finetune_rounds, rollout_length, rollout_num_envs = FINETUNE_STEPS, 10, 1000, 1
         ft_diffusion_steps, ft_batch_size, ft_batch_per_sample = 30, 12, 3
     init_run('finetune', group,
                      config=dict(stage='finetune', env=ENV_NAME, specific=SPECIFIC_PLAY, task_id=TASK_ID,
