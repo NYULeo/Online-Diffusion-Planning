@@ -307,8 +307,12 @@ def stage_finetune(args, group):
         num_steps, finetune_rounds, rollout_length, rollout_num_envs = 2, 1, 20, 1
         ft_diffusion_steps, ft_batch_size, ft_batch_per_sample = 4, 2, 1
     else:
-        num_steps, finetune_rounds, rollout_length, rollout_num_envs = FINETUNE_STEPS, 10, 1000, 1
-        ft_diffusion_steps, ft_batch_size, ft_batch_per_sample = 30, 12, 3
+        # Use the teammate's cube-single SCALE (finetune_script2): 90 total AM steps over 30 rounds
+        # (per_round=3), diffusion_steps=10, batch 32x8. The old 1M/10 (=100k AM steps/round) was the
+        # kitchen default — eager AM at that scale takes days. (Still the verified critic=False path;
+        # the teammate's full critic=True/offline/eta=0 config is a separate, to-be-confirmed switch.)
+        num_steps, finetune_rounds, rollout_length, rollout_num_envs = 90, 30, 1000, 1
+        ft_diffusion_steps, ft_batch_size, ft_batch_per_sample = 10, 32, 8
     init_run('finetune', group,
                      config=dict(stage='finetune', env=ENV_NAME, specific=SPECIFIC_PLAY, task_id=TASK_ID,
                                  finetune_steps=num_steps, finetune_rounds=finetune_rounds,
