@@ -437,6 +437,7 @@ def rollout(env_name,
             chunk_size = 5,
             device = None,
             selector: Optional[Selector] = None,
+            return_traj: bool = False,
             *,
             rng=None):
      # API-CHANGE: added keyword-only `rng=` (planner sampling is stochastic). Defaults from base_seed.
@@ -601,6 +602,8 @@ def rollout(env_name,
      #return traj
      
      #return rewards[-1], len(observations)
+     if return_traj:
+         return sum(rewards), traj   # full episode dict (for success-traj generation)
      return sum(rewards), len(observations)
      #print(get_normalized_score([traj]))
  
