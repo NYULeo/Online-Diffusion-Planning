@@ -28,6 +28,12 @@ from Finetuning.utils import get_reward_model, get_kernel, get_reward_stats, get
 from flax_utils import TrainState
 
 
+# DIAG: set ODP_PREDICT_DEBUG=1 to make TotalReward_Critic.predict print its reward decomposition
+# (reward-net sum vs critic terminal vs constraint). Evaluated at import/trace time so it has ZERO cost
+# when unset. Use a 1-round/1-step finetune to read it (see docs).
+_PREDICT_DEBUG = os.environ.get('ODP_PREDICT_DEBUG', '0') == '1'
+
+
 # ----------------------------------------------------------------------------------------------------------
 # Infer a frozen net's architecture FROM its saved checkpoint, so we rebuild the exact module that was saved
 # (regardless of config values or stale files). Avoids ScopeParamShapeError when loading reward/kernel ckpts.
@@ -503,6 +509,8 @@ class TotalReward_Critic:
     def predict(self, x: jnp.ndarray, lam: float):
         H, D = x.shape
         total_reward = jnp.asarray(0.0)
+        reward_net_sum = jnp.asarray(0.0)   # DIAG: Σ critic_gamma^i * r_i (reward-net contribution only)
+        constraint_sum = jnp.asarray(0.0)   # DIAG: Σ c_i (raw softplus, pre-lam)
         for i in range(H-1):
             s = x[i][:self.config.d_s]
             s_norm_reward = self.reward_processor(s)[None]
@@ -517,6 +525,8 @@ class TotalReward_Critic:
             r = self.reward_net(s_norm_reward, a)
             c = self.sigmoid(s_norm_kernel, a, s_next_norm_kernel)
             total_reward += ((self.config.critic_gamma**i)*(jnp.squeeze(r, 0))) - (lam  *  jnp.squeeze(c, 0))
+            reward_net_sum += (self.config.critic_gamma**i) * jnp.squeeze(r, 0)
+            constraint_sum += jnp.squeeze(c, 0)
 
         s = x[H-1][:self.config.d_s]
         s_norm_reward = self.reward_processor(s)[None]
@@ -526,8 +536,18 @@ class TotalReward_Critic:
         final_s_norm_critic = self.critic_processor(final_s_critic)[None]
         v = self.critic(final_s_norm_critic)
         #total_reward +=   ((self.config.critic_gamma**(H-1))*(r.squeeze(0))) + ( (self.config.critic_gamma**(H-1)) * v.squeeze(0))
-        total_reward +=   ( (self.config.critic_gamma**(H-1)) * jnp.squeeze(v, 0))
+        critic_term = (self.config.critic_gamma**(H-1)) * jnp.squeeze(v, 0)   # DIAG
+        total_reward +=   critic_term
         total_reward = total_reward + (lam  * self.config.delta)
+        # DIAG (env ODP_PREDICT_DEBUG=1): decompose the printed "reward" into reward-net vs critic-terminal so
+        # the reward~50-vs-3.5 culprit is observed, not guessed. critic_term = 0.99^(H-1)*v should be ~O(1)
+        # once the critic is the normalized planner-rollout critic; a value of ~50 means a mis-scaled critic.
+        if _PREDICT_DEBUG:
+            jax.debug.print(
+                "[predict-decomp] reward_net_sum={r:.4f}  critic_v={v:.4f}  critic_term={c:.4f}  "
+                "constraint_sum={k:.4f}  total={t:.4f}",
+                r=reward_net_sum, v=jnp.squeeze(v, 0), c=critic_term, k=constraint_sum, t=total_reward,
+            )
         return total_reward
 
     def __call__(self, x: jnp.ndarray, lam: float):

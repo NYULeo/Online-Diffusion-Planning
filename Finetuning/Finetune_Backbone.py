@@ -28,7 +28,7 @@ from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Dataset import get_PlannerName, get_dataset, Planner_Processor
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 from typing import List
-from Finetuning.utils import TrajectoryDict, rollout_parallel, get_planner, rollout_parallel2, save_planner, train_reward, train_kernel, train_kernel_mog, train_critic, save_trajs, AlphaSchedulerConfig, checktrajs, rollout_parallel3, train_reward_ensemble
+from Finetuning.utils import TrajectoryDict, rollout_parallel, get_planner, rollout_parallel2, save_planner, train_reward, train_kernel, train_kernel_mog, train_critic, save_trajs, AlphaSchedulerConfig, checktrajs, rollout_parallel3, train_reward_ensemble, train_critic_with_planner2, KernelConfig
 from Pretrain.Dataset import get_env
 
 import jax
@@ -341,6 +341,20 @@ class OnlineFinetuner():
         self.config.AMConfig.update_lambda_every = self.config.update_lambda_every
         self.config.AMConfig.MaxEnt = self.config.MaxEnt
         self.config.AMConfig.Entropy_Scaling_Factor = self.config.Entropy_Scaling_Factor
+
+        # Kernel feasibility config for the offline per-round critic retrain (train_critic_with_planner2).
+        # Mirrors torch Finetune_Backbone2.__init__ (lines 255-264): the critic is trained on the planner's
+        # rollouts, gated to plans the MoG kernel deems feasible (log_density > min_log_prob).
+        self.kernel_config = KernelConfig(
+            checkpoint=self.config.kernel_model_checkpoint,
+            type_kernel=self.config.train_kernel_config.type_kernel,
+            num_hidden_layers=self.config.train_kernel_config.num_hidden_layers,
+            hidden_dim=self.config.train_kernel_config.hidden_dim,
+            num_modes=self.config.train_kernel_config.kernel_num_modes,
+            noise_floor=self.config.train_kernel_config.kernel_noise_floor,
+            min_log_prob=self.config.RewardConfig.min_log_prob,
+            oversample=5,
+        )
 
         #self.accelerator = Accelerator(mixed_precision = 'bf16')
         self.accelerator = _SingleDeviceAccelerator(
@@ -749,7 +763,7 @@ class OnlineFinetuner():
             update_reward = self.gather_and_sync_trajs_and_buffer(trajs)
             self.accelerator.wait_for_everyone()
 
-            if self.config.critic:
+            if self.config.critic and not self.config.offline:
                  critic_buffer, update_critic = self.collect_critic_buffer(trajs)
                  if self.accelerator.is_main_process:
                      print(f"Number of trajectories for critic training: {len(critic_buffer)}")
@@ -798,9 +812,61 @@ class OnlineFinetuner():
             self.accelerator.wait_for_everyone()
 
             if(self.config.offline):
+                _critic_retrained = False
                 if(self.accelerator.is_main_process):
+                     # FAITHFUL to torch Finetune_Backbone2.finetune_planner (lines 698-733): in the offline
+                     # path the critic is RETRAINED EACH ROUND on the planner's own (kernel-feasible) rollouts
+                     # via train_critic_with_planner2 (normalized target, clamp(±10)/5 reward scaling). This is
+                     # what keeps the critic's terminal value v on a STANDARDIZED scale (~O(1)). Skipping it
+                     # (the previous `continue`) left a frozen, offline-dataset-fit critic whose v was ~14x too
+                     # large -> the predict() terminal term 0.99^(H-1)*v dominated and printed "reward ~50".
+                     if self.config.critic and self.config.update_critic:
+                         print(f"Starting Critic Training with Planner")
+                         rng, critic_key = jax.random.split(rng)
+                         # FAIL-SAFE: a single round's retrain (e.g. the kernel finds no feasible plans for a
+                         # transiently-bad planner, or any error in this dead-until-now path) must NOT kill a
+                         # multi-hour run. On failure we keep the last good critic checkpoint and continue; the
+                         # warning is loud so a persistent failure is visible in the log.
+                         try:
+                             train_critic_with_planner2(
+                                   trajs                  = self.Base_Critic_Buffer,
+                                   dataset_name           = self.config.dataset_name,
+                                   specific_dataset       = self.config.specific_dataset,
+                                   planner_checkpoint     = ((step+1) * self.config.AMConfig.per_round_steps),
+                                   reward_checkpoint      = self.config.reward_model_checkpoint,
+                                   old_critic_checkpoint  = self.config.critic_model_checkpoint,
+                                   hidden_layers          = self.config.train_critic_config.hidden_layers,
+                                   hidden_dim             = self.config.train_critic_config.hidden_dim,
+                                   kernel_config          = self.kernel_config,
+                                   reward_hidden_layers   = self.config.train_reward_config.hidden_layers,
+                                   reward_hidden_dim      = self.config.train_reward_config.hidden_dim,
+                                   batch_size             = self.config.train_critic_config.batch_size,
+                                   num_steps              = self.config.train_critic_config.num_steps,
+                                   horizon                = self.config.AMConfig.horizon,
+                                   gamma                  = self.config.train_critic_config.gamma,
+                                   lr                     = self.config.train_critic_config.lr,
+                                   min_lr                 = self.config.train_critic_config.min_lr,
+                                   tau                    = self.config.train_critic_config.tau,
+                                   steps_T                = self.config.diffusion_steps,
+                                   num_karras             = self.config.AMConfig.num_karras,
+                                   eta                    = self.config.AMConfig.eta,
+                                   new_step               = ((step+1) * self.config.AMConfig.per_round_steps),
+                                   task_id                = self.config.train_reward_config.task_id,
+                                   rng                    = critic_key)
+                             _critic_retrained = True
+                         except Exception as _e:
+                             print(f"[critic-retrain] round {step+1} SKIPPED "
+                                   f"({type(_e).__name__}: {_e}); keeping critic checkpoint "
+                                   f"{self.config.critic_model_checkpoint}")
                      print(f"Finetuning round {step+1} completed")
                      print()
+                self.accelerator.wait_for_everyone()
+                # Bump the loaded checkpoint to the one just saved, then rebuild the reward model so the NEXT
+                # round's predict()/gradient uses the freshly-retrained critic (torch lines 728-732). Only when
+                # the retrain actually SAVED a new checkpoint (else get_critic_model would load a missing file).
+                if self.config.critic and self.config.update_critic and _critic_retrained:
+                      self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
+                      self.set_reward_model(self.device)
                 self.accelerator.wait_for_everyone()
                 continue
 

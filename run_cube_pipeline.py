@@ -85,7 +85,7 @@ WANDB_PROJECT = 'odp-cube'
 # Checkpoint steps each stage trains to / saves at (and that finetune then loads).
 PRETRAIN_STEPS = 1_000_000
 KERNEL_STEPS = 5_000
-REWARD_STEPS = 100_000
+REWARD_STEPS = 30_000   # teammate finetune_script2 cube/single-play: Train_Reward_Config.num_steps=30000
 CRITIC_STEPS = 70_000
 FINETUNE_STEPS = 1_000_000
 
@@ -212,11 +212,11 @@ def stage_reward(args, group):
         batch_size=256,
         num_steps=num_steps,
         save_freq=save_freq,
-        lr=1e-4,
-        min_lr=5e-6,
+        lr=5e-3,            # teammate Train_Reward_Config.lr = 5e-03
+        min_lr=5e-4,        # teammate Train_Reward_Config.min_lr = 5e-04
         sigma=4.0,
         alpha=None,
-        target_reward=300.0,
+        target_reward=500.0,  # teammate Train_Reward_Config.target_reward = 500.0
         specific_dataset=SPECIFIC_DATA,
         task_id=TASK_ID,
         traj_length=None,
@@ -231,7 +231,7 @@ def stage_reward(args, group):
             trajs=None,
             sigma=4.0,
             alpha=None,
-            target_reward=300.0,
+            target_reward=500.0,
             task_id=TASK_ID,
             traj_length=None,
             save_freq=save_freq,
@@ -246,53 +246,80 @@ def stage_reward(args, group):
 def stage_critic(args, group):
     from Pretrain.utils import set_seed
     from Pretrain.Dataset import get_dataset
-    from Pretrain.Critic.train_critic import train_critic, test_critic
+    from Pretrain.Critic.train_critic import train_critic
+    from Finetuning.utils import train_critic_with_planner2, KernelConfig
 
-    num_steps = SMOKE['critic'] if args.smoke else CRITIC_STEPS
+    # Teammate (finetune_script2 cube/single-play) does NOT regress the critic on the offline EXPERT dataset.
+    # The critic is trained on the PLANNER's kernel-feasible rollouts via train_critic_with_planner2, whose
+    # target is RUNNING-NORMALIZED (zero-mean/unit-var) over clamp(±10)/5-scaled reward-net outputs -> the
+    # value v(s) sits on a STANDARDIZED scale (~O(1)). The old stage trained the critic on the offline data
+    # (70k steps, target_reward=80) -> v~=68 -> predict()'s terminal 0.99^31*v ~= 50, i.e. the "reward ~50"
+    # bug. We reproduce the teammate exactly:
+    #   (1) a short train_critic pass ONLY to materialize the critic obs-normalization stats + an initial
+    #       loadable checkpoint 0 (the params are immediately overwritten in step 2; the obs stats it computes
+    #       are independent of target_reward/sigma);
+    #   (2) train_critic_with_planner2(old=0, new=0) to overwrite checkpoint 0 on the normalized scale.
+    # The finetune loop then retrains it every round (update_critic=True) on the *improving* planner.
+    init_steps = SMOKE['critic'] if args.smoke else 2000
+    planner_steps = SMOKE['critic'] if args.smoke else 200
     init_run('critic', group,
                      config=dict(stage='critic', env=ENV_NAME, specific=SPECIFIC_PLAY, task_id=TASK_ID,
-                                 num_steps=num_steps, hidden_dim=512, hidden_layers=5, gamma=0.99,
-                                 horizon=HORIZON, tau=0.005, sigma=8.0))
+                                 init_steps=init_steps, planner_steps=planner_steps, hidden_dim=512,
+                                 hidden_layers=4, gamma=0.99, horizon=HORIZON, tau=0.005))
     _banner('critic', 'critic')
     rng = set_seed(args.seed)
-    # Critic regresses on the offline cube dataset trajectories. (Torch's train_critic_script2 also adds a
-    # success-rollout file, but for cube-single that file is generated only AFTER finetune reaches the goal,
-    # so on a from-scratch run the dataset is the available source -- same as our reward stage.)
     data = get_dataset(ENV_NAME, SPECIFIC_PLAY, task_id=TASK_ID, traj_length=200)
     trajs = data.get_trajectories()
 
+    # (1) critic obs-norm stats + an initial (throwaway) checkpoint 0.
     train_critic(
         dataset_name=ENV_NAME,
         specific_dataset=SPECIFIC_PLAY,
         hidden_layers=4,
         hidden_dim=512,
         batch_size=256,
-        num_steps=num_steps,
+        num_steps=init_steps,
         gamma=0.99,
         horizon=HORIZON,
         lr=5e-5,
         min_lr=1e-6,
         tau=0.005,
-        sigma=3.0,
-        target_reward=80.0,
+        sigma=4.0,
+        target_reward=500.0,
         trajs=trajs,
         task_id=TASK_ID,
         rng=rng,
     )
-    if args.eval:
-        test_critic(
-            dataset_name=ENV_NAME,
-            specific_dataset=SPECIFIC_PLAY,
-            hidden_layers=4,
-            hidden_dim=512,
-            checkpoint_step=num_steps,
-            gamma=0.99,
-            horizon=HORIZON,
-            sigma=3.0,
-            target_reward=80.0,
-            trajs=trajs,
-            task_id=TASK_ID,
-        )
+    # (2) normalized planner-rollout critic -> overwrites checkpoint 0 (same path get_critic_model loads).
+    rng2 = set_seed(args.seed + 1)
+    kcfg = KernelConfig(checkpoint=0, type_kernel='mog', num_hidden_layers=4, hidden_dim=514,
+                        num_modes=10, noise_floor=5e-4, min_log_prob=-110.0, oversample=5)
+    train_critic_with_planner2(
+        trajs=trajs,
+        dataset_name=ENV_NAME,
+        specific_dataset=SPECIFIC_PLAY,
+        planner_checkpoint=0,
+        reward_checkpoint=0,
+        old_critic_checkpoint=0,
+        hidden_layers=4,
+        hidden_dim=512,
+        kernel_config=kcfg,
+        reward_hidden_layers=4,
+        reward_hidden_dim=512,
+        batch_size=128,
+        num_steps=planner_steps,
+        horizon=HORIZON,
+        gamma=0.99,
+        lr=5e-5,
+        min_lr=1e-6,
+        tau=0.005,
+        steps_T=10,
+        num_karras=1,
+        eta=0.0,
+        new_step=0,
+        task_id=TASK_ID,
+        rng=rng2,
+    )
     finish_run()
 
 
@@ -318,9 +345,12 @@ def stage_finetune(args, group):
         ft_diffusion_steps, ft_batch_size, ft_batch_per_sample = 4, 2, 1
         ft_reward_steps, ft_kernel_steps = 50, 50
     elif args.mid_finetune:
-        # Light "does the full finetune complete end-to-end overnight" check: small AM batch AND small
-        # per-round reward/kernel retrains, so all 3 rounds finish quickly. Not for real metrics.
-        num_steps, finetune_rounds, rollout_length, rollout_num_envs = 6, 3, 200, 1
+        # Fast validation of the REAL offline+critic path (teammate config below), with tiny AM batch and few
+        # rounds so it completes quickly. Use with fully-trained upstream models (e.g.
+        # `--stages critic,finetune --mid-finetune`) so train_critic_with_planner2's kernel-feasibility filter
+        # has a real planner/kernel to draw feasible plans from. Set ODP_PREDICT_DEBUG=1 to read the reward
+        # decomposition. NOT for real metrics.
+        num_steps, finetune_rounds, rollout_length, rollout_num_envs = 6, 2, 200, 1
         ft_diffusion_steps, ft_batch_size, ft_batch_per_sample = 10, 4, 1
         ft_reward_steps, ft_kernel_steps = 200, 200
     else:
@@ -337,9 +367,10 @@ def stage_finetune(args, group):
                                  planner_ckpt=0, reward_ckpt=0, kernel_ckpt=0, critic_ckpt=0))
     _banner('finetune', 'finetune')
 
-    # smoke/mid stay on the verified critic=False/offline=False path; the full run uses the EXACT teammate
-    # config (critic=True/offline=True/eta=0). See docs/cube_single_combination.md.
-    teammate = not (args.smoke or args.mid_finetune)
+    # smoke stays on the verified critic=False/offline=False path (barely-trained models can't pass planner2's
+    # feasibility filter). --mid-finetune AND the full run use the EXACT teammate config (critic=True/
+    # offline=True/eta=0 + the per-round train_critic_with_planner2 retrain). See docs/cube_single_combination.md.
+    teammate = not args.smoke
     AMConfig = Acc_AdjointMatchingConfig(horizon=HORIZON, eta=0.0)        # teammate: deterministic sampling
     # TotalReward rebuilds reward+kernel nets from these dims; they MUST match stage_reward / stage_kernel.
     RWConfig = RewardConfig(
@@ -374,11 +405,20 @@ def stage_finetune(args, group):
         finetune_buffer_cutoff_length=100 if teammate else None,
         train_buffer_cutoff_length=200 if teammate else None,
         # task_id is threaded into finetune via train_reward_config.task_id (used for PlannerDataset,
-        # get_planner/get_reward/get_kernel/get_critic, and AMConfig.task_id). num_steps only matters on
-        # the non-offline (smoke/mid) path.
-        train_reward_config=Train_Reward_Config(task_id=TASK_ID, num_steps=ft_reward_steps),
+        # get_planner/get_reward/get_kernel/get_critic, and AMConfig.task_id). hidden_layers/hidden_dim MUST
+        # match the saved reward net (4/512): the per-round critic retrain (train_critic_with_planner2)
+        # rebuilds the reward net from these dims to load it. sigma/target_reward mirror stage_reward.
+        train_reward_config=Train_Reward_Config(task_id=TASK_ID, num_steps=ft_reward_steps,
+                                                 hidden_layers=4, hidden_dim=512,
+                                                 sigma=4.0, target_reward=500.0),
         train_kernel_config=Train_Kernel_Config(num_steps=ft_kernel_steps),
-        train_critic_config=Train_Critic_Config(),
+        # teammate cube/single-play TrainCriticConfig: the per-round online retrain runs num_steps=20 at
+        # lr=1e-5 (the offline path uses AMConfig.horizon=32, not this horizon field). hidden 4/512 must
+        # match the saved critic. momentum/data_conservation per teammate.
+        train_critic_config=Train_Critic_Config(hidden_layers=4, hidden_dim=512, batch_size=256,
+                                                 num_steps=20, lr=1e-5, min_lr=1e-6, tau=0.005,
+                                                 gamma=0.99, horizon=HORIZON,
+                                                 data_conservation=True, momentum=0.1),
         finetune_steps=num_steps,
         finetune_rounds=finetune_rounds,
         rollout_length=rollout_length,
