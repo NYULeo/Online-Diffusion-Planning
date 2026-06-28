@@ -1,8 +1,7 @@
 from optparse import Option
 from pathlib import Path
 
-from sympy import true
-from sympy.vector.coordsysrect import Str
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PRETRAIN_DIR = PROJECT_ROOT / "Pretrain"
 import numpy as np

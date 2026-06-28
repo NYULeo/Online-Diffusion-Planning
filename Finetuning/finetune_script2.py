@@ -488,7 +488,6 @@ if __name__ == "__main__":
                             num_steps = 20,
                             lr = 1e-05,
                             min_lr = 1e-06,
-                            horizon = 128,
                             tau = 0.005,
                             gamma = 0.99,
                             data_conservation = True,
