@@ -833,9 +833,9 @@ if __name__ == "__main__":
     import ogbench
     horizon = 32  # pyright: ignore[reportUnreachable]
     env_name = 'cube'
-    specific_train_dataset = 'double-play'
+    specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 15
+    checkpoint = 39
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -860,12 +860,13 @@ if __name__ == "__main__":
     #for seed in [10001, 20002, 30003, 40004, 50005, 60006, 70007, 80008, 90009, 100010, 110011, 120012]:
     set_seed(1)
     
-    while(checkpoint < 18):
+    while(checkpoint < 42):
          print(f"Running checkpoing: {checkpoint}")
          total_return = 0.0
          for j in range(1, 51):
            return_value = 0.0
            chunk_size_index = 0
+           
            while((return_value != 1.0) and (chunk_size_index < len(chunk_size))):
               return_value, _ = rollout(
                   env_name, 
@@ -885,6 +886,8 @@ if __name__ == "__main__":
                   #chunk_size = 1,
                   device = device)
               chunk_size_index += 1
+        
+           print(chunk_size[chunk_size_index-1])
            print(return_value)
            #print(f"Chunk Size: {chunk_size[chunk_size_index]}")
            total_return += return_value

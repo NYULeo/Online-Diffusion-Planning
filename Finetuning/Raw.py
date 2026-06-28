@@ -79,7 +79,8 @@ env, dataset, eval_dataset = ogbench.make_env_and_datasets(
                  "cube-double-play-singletask-task4-v0", render_mode="rgb_array"
                   )
 last_start = 0
-
+print(len(dataset['actions'][1]))
+exit()
 for i in range(1, len(dataset['rewards'])):
     if(dataset['rewards'][i] == 0  or dataset['terminals'][i] == 1):
           if(not check_increase(dataset['rewards'][last_start: i+1])):

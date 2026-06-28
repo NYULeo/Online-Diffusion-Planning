@@ -563,7 +563,6 @@ class Acc_AdjointMatchingFineTuner:
         Loss = Loss / len(traj_x)
         return Loss
     
-
     def step(self, s0_batch: torch.Tensor, reward_model: Union[TotalReward, TotalReward_Critic]) -> Tuple[float, float, float]:
         # 1. Split batch across processes
         base_reward_model = self.accelerator.unwrap_model(reward_model)
@@ -679,7 +678,6 @@ class Acc_AdjointMatchingFineTuner:
             avg_reward = float(all_rewards.mean().item())
             return avg_loss, avg_reward, total_avgC    
         return 0, 0, 0
-
 
     def finetune_planner(self, dataloader: DataLoader, reward_model: Union[TotalReward, TotalReward_Critic], round: int, old_planner_checkpoint: Optional[int] = None):
         if old_planner_checkpoint is not None:
