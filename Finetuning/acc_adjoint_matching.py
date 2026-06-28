@@ -42,6 +42,12 @@ import pickle
 from flax_utils import TrainState, target_update
 
 
+# SPEED: when ODP_VMAP=1, the AM step processes all trajectories as ONE batched (B,H,dim) pass via
+# jax.vmap instead of a 256x sequential Python loop. vmap(f) is mathematically identical to looping f
+# (same math, same order per element), so this is logic-preserving; the sequential path stays the default.
+_USE_VMAP = os.environ.get('ODP_VMAP', '0') == '1'
+
+
 def broadcast(tensor, from_process=0):
     '''Single-device no-op replacement for `accelerate.utils.broadcast`.
 
@@ -450,8 +456,8 @@ class Acc_AdjointMatchingFineTuner:
         #max_norm = 5.0
         #a0 =   a0 * jnp.clip(max_norm / jnp.linalg.norm(a0), a_max=1.0)
         #print(f"a0: {a0.norm().item()}")
-        if(jnp.linalg.norm(a0).item() == 0.0):
-            print(f"a0 is 0")
+        # (removed a debug `if norm(a0).item()==0: print` — its .item() host-sync/Python branch is not
+        # vmap/jit-safe and it had no effect on the computation.)
 
         a.append(a0)
 
@@ -500,8 +506,119 @@ class Acc_AdjointMatchingFineTuner:
         return Loss
 
 
+    def _step_vmapped(self, s0_batch, reward_model, rng):
+        '''Batched equivalent of `step` for eta==0 (deterministic sampling): processes all
+        S = len(s0_batch) * batch_per_sample trajectories as ONE (S,H,dim) pass instead of a Python loop.
+        Every primitive mirrors the sequential path; reward/constraint use jax.vmap over the SAME per-traj
+        predict/get_c/__call__ (vmap(f) == looping f). With eta==0 there is no per-step sampling noise, so
+        the result is mathematically identical to the sequential loop (verify: same loss/reward/constraint).'''
+        base = self.accelerator.unwrap_model(reward_model)
+        lam = self.Lam.get_lam()
+        d_s, d_a = self.config.d_s, self.config.d_a
+        dim = d_s + d_a
+        H = self.config.horizon
+        # S0 repeated batch_per_sample times (matches the `for s0: for j in range(bps)` ordering).
+        S0 = jnp.concatenate([jnp.repeat(s0_batch, self.config.batch_per_sample, axis=0)], axis=0)  # (S, d_s)
+        S = S0.shape[0]
+
+        # ---- sampling, batched over S. Replicate the sequential per-trajectory RNG EXACTLY so the result
+        # is bit-identical to the loop (eta==0 => the only randomness is the init noise): step() chains rng
+        # and per trajectory splits sk, then sample_Traj_karras splits k=split(sk)[1] and draws the init
+        # noise. normal(k,(H,dim)) == normal(k,(1,H,dim)).squeeze(0) (same element order). ----
+        keys = []
+        r = rng
+        for _ in range(S):
+            r, sk = jax.random.split(r)
+            _, k = jax.random.split(sk)
+            keys.append(k)
+        keys = jnp.stack(keys)
+        noise0 = jax.vmap(lambda kk: jax.random.normal(kk, (H, dim), dtype=jnp.float32))(keys)  # (S,H,dim)
+        x = noise0 * self.sigma_grid[0]
+        mask = jnp.zeros((1, H, dim), dtype=jnp.float32).at[:, 0, :d_s].set(1.0)
+        y = jnp.zeros((S, H, dim), dtype=jnp.float32).at[:, 0, :d_s].set(S0)
+        x = mask * y + (1 - mask) * x
+        X = [x]
+        for i in range(self.config.diffusion_steps):
+            t_now = self.t_grid[i]
+            beta_now = self._beta_now[i]
+            dt = self._dt[i]
+            drift = -0.5 * beta_now * x
+            score = self._score(self.new_score_net, x, jnp.broadcast_to(t_now, (S,)))
+            x = x + (drift - beta_now * score) * dt           # eta==0 branch (no noise)
+            x = mask * y + (1 - mask) * x
+            x = clip_actions(x, d_s)
+            X.append(x)
+        X = jnp.stack(X)   # (steps+1, S, H, dim)
+
+        finals = X[-1]                                         # (S, H, dim)
+        rewards = jax.vmap(lambda xf: base._predict_jit(xf, lam))(finals)        # (S,)
+        Cs = jax.vmap(lambda xf: base._get_c_jit(xf))(finals)                    # (S,)
+        reward_std = float(jnp.max(rewards) - jnp.min(rewards))
+        total_avgC = float(jnp.mean(Cs))
+        if reward_std == 0.0:
+            reward_std = 1.0
+
+        # ---- adjoints, batched over S. make_a's recursion is elementwise over the leading dim, so the
+        # SAME math runs with x of shape (S,1,H,dim). We replicate it directly (vmapping make_a would
+        # re-call the reward __call__ per row anyway; here we batch that too). ----
+        alpha = self.alpha_scheduler.get_alpha()
+        Xr = X[:, :, None, :, :]                                # (steps+1, S, 1, H, dim) to match make_a's (1,H,dim)
+        # reward gradient per trajectory via vmap over the SAME __call__ used sequentially.
+        T_final = finals                                        # (S, H, dim)
+        rg = jax.vmap(lambda xf: base._call_jit(xf, lam)[1])(T_final)   # (S, H, dim) gradients
+        a_cur = jax.lax.stop_gradient(-1 * (self.config.reward_scaling_factor / alpha / reward_std) * rg)  # (S,H,dim)
+        a_cur = a_cur[:, None]                                   # (S,1,H,dim); EntGrad==0 for MaxEnt=False
+        t_asc_reversed = jnp.flip(self.t_asc, axis=0)
+        k_reversed = jnp.flip(self.k, axis=0)
+        X_reversed = X[::-1]                                    # (steps+1, S, H, dim)
+        adjoints = [a_cur]
+        for i in range(len(X) - 1):
+            t_now = t_asc_reversed[i]
+            dt = (t_asc_reversed[i] - t_asc_reversed[i + 1])
+            # jvp of frozen old_score_net w.r.t. batched input; t broadcast to (S,) so the DiT noise dim
+            # matches the batch exactly (no (1,)-vs-(S,) broadcast ambiguity). Same math as make_a.
+            _, jov = jax.jvp(lambda z: self._score(self.old_score_net, z, jnp.broadcast_to(t_now, (S,))),
+                             (X_reversed[i],), (jnp.squeeze(a_cur, 1),))
+            jov = jov[:, None]
+            a_cur = jax.lax.stop_gradient(a_cur + dt * (k_reversed[i] * a_cur + 2 * k_reversed[i] * jov))
+            adjoints.append(a_cur)
+        adjoints = adjoints[::-1]                                # list of (S,1,H,dim), len steps+1
+
+        # ---- loss over params, batched. Inlines adjoint_matching_loss / vector_field with explicit (S,)
+        # time so the trainable forward matches the batch exactly. Identical math to the sequential loss. ----
+        def loss_fn(params):
+            bound = functools.partial(self.new_score_net, params=params)
+            Loss = jnp.asarray(0.0)
+            n = len(X)
+            for i in range(n):
+                xi = jax.lax.stop_gradient(X[i])                 # (S,H,dim)
+                ai = jax.lax.stop_gradient(jnp.squeeze(adjoints[i], 1).reshape(S, -1))
+                tt = jax.lax.stop_gradient(self.t_asc[i])
+                k_t = jax.lax.stop_gradient(self.kt(tt))
+                tb = jnp.broadcast_to(tt, (S,))
+                v_new = (k_t * xi + k_t * bound(xi, tb)).reshape(S, -1)
+                v_old = jax.lax.stop_gradient(
+                    (k_t * xi + k_t * self._score(self.old_score_net, xi, tb)).reshape(S, -1))
+                sigma = jax.lax.stop_gradient(self.sigma_t(self.k[i]))
+                per = (((v_new - v_old) * (2 / sigma) + (sigma * ai)) ** 2).mean(axis=1)   # (S,)
+                if i <= self.config.num_Loss_Clip_steps:
+                    per = jnp.minimum(per, jnp.asarray((self.config.reward_scaling_factor ** 2) * 1.6))
+                Loss = Loss + per.mean()
+            Loss = Loss / n
+            return Loss, {'loss': Loss}
+
+        grads, aux = jax.grad(loss_fn, has_aux=True)(self.new_score_net.params)
+        self.new_score_net = self.new_score_net.apply_gradients(grads=grads)
+        self.alpha_scheduler.step_alpha()
+        avg_loss = float(aux['loss'])
+        avg_reward = float(jnp.mean(rewards))
+        return avg_loss, avg_reward, total_avgC
+
+
     def step(self, s0_batch: jnp.ndarray, reward_model: Union[TotalReward, TotalReward_Critic], *, rng=None) -> Tuple[float, float, float]:
         rng = self._next_rng() if rng is None else rng
+        if _USE_VMAP and self.config.eta == 0:
+            return self._step_vmapped(s0_batch, reward_model, rng)
         # 1. Split batch across processes
         base_reward_model = self.accelerator.unwrap_model(reward_model)
         with self.accelerator.split_between_processes(s0_batch) as local_s0:
