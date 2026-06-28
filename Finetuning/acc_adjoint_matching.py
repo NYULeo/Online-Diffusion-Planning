@@ -371,7 +371,7 @@ class Acc_AdjointMatchingFineTuner:
             x = mask * y + (1 - mask) * x
             X.append(x)
         #x = apply_conditioning(x, conditions, d_s)
-        reward = reward_model.predict(jnp.squeeze(X[-1], 0), self.Lam.get_lam())
+        reward = reward_model._predict_jit(jnp.squeeze(X[-1], 0), self.Lam.get_lam())
         return  jnp.stack(X), reward
 
     def sample_Traj_karras(self,
@@ -414,7 +414,7 @@ class Acc_AdjointMatchingFineTuner:
              x = clip_actions(x, self.config.d_s)
              X.append(x)
 
-        reward = reward_model.predict(jnp.squeeze(X[-1], 0), self.Lam.get_lam())
+        reward = reward_model._predict_jit(jnp.squeeze(X[-1], 0), self.Lam.get_lam())
         return jnp.stack(X), reward
 
     def make_a(self, X, reward_model: Union[TotalReward, TotalReward_Critic], reward_std: float):
@@ -425,7 +425,7 @@ class Acc_AdjointMatchingFineTuner:
         a = []
         T = X_reversed[0]
         T_squeezed = jnp.squeeze(T, 0)
-        reward, gradient = reward_model(T_squeezed, self.Lam.get_lam())
+        reward, gradient = reward_model._call_jit(T_squeezed, self.Lam.get_lam())
         #grad_norm = jnp.linalg.norm(gradient).clip(min=1e-8)
         #gradient = gradient * (1.0 / grad_norm)
         #print(f"Reward Gradeint Norm: {gradient.norm().item()}")
@@ -521,7 +521,7 @@ class Acc_AdjointMatchingFineTuner:
 
                    local_trajs.append(traj)
                    final_x = jnp.squeeze(traj[-1], 0)
-                   C_val = base_reward_model.get_c(final_x)
+                   C_val = base_reward_model._get_c_jit(final_x)
                    local_final_Cs.append(C_val)
                    local_rewards.append(reward)
 

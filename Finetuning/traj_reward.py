@@ -213,6 +213,13 @@ class TotalReward:
         self.config.d_a = act_dim
         if(not self.config.explore):
               self.config.gamma = 0.0
+        self._setup_jit()
+
+    def _setup_jit(self):
+        # SPEED (logic-identical): jit the frozen reward/constraint forwards; see TotalReward_Critic note.
+        self._predict_jit = jax.jit(lambda x, lam: self.predict(x, lam))
+        self._get_c_jit = jax.jit(lambda x: self.get_c(x))
+        self._call_jit = jax.jit(lambda x, lam: self.__call__(x, lam))
 
     def get_beta(self):
         return self.config.beta
@@ -419,6 +426,18 @@ class TotalReward_Critic:
         self.config.critic_d_s = critic_obs_dim
         if(not self.config.explore):
               self.config.gamma = 0.0
+        self._setup_jit()
+
+    def _setup_jit(self):
+        # SPEED (logic-identical): predict/get_c/__call__ run a 31-step horizon loop x 10-member kernel
+        # ensemble of pure-JAX ops, all EAGER -> ~900 dispatches per trajectory (the 145s/step). These are
+        # FROZEN forwards (params are fixed on the instance; their outputs are consumed downstream as
+        # constants -- predict feeds a scalar normalizer, __call__'s gradient is stop_gradient'd in make_a),
+        # so jitting fuses each loop into ONE compiled call with no change to the numbers. lam arrives as a
+        # JAX array, so no per-value recompile.
+        self._predict_jit = jax.jit(lambda x, lam: self.predict(x, lam))
+        self._get_c_jit = jax.jit(lambda x: self.get_c(x))
+        self._call_jit = jax.jit(lambda x, lam: self.__call__(x, lam))
 
     def get_beta(self):
         return self.config.beta
