@@ -775,6 +775,26 @@ class OnlineFinetuner():
                  print(f"Total Number of Environment Steps: {total_steps}")
                  print(f"Average Success Rate: {avg_success_rate:.2f}")
                  print(f"Average Normalized Score: {avg_score:.2f}")
+                 # DIAGNOSTIC (read-only, never affects training): the in-loop success metric is
+                 # rewards[-1]==1.0, but cube/OGBench episodes don't terminate at the goal, so a planner
+                 # that DID reach the goal mid-episode still reads 0. Also report (a) "reached goal at any
+                 # step" (max shifted reward hit 1.0 == raw reward hit 0) and (b) torch's distance-to-goal
+                 # (final cube pos obs[-1][19:22] vs the task goal). These reveal real task success.
+                 try:
+                     if self.config.dataset_name == 'cube' and 'single' in self.config.specific_dataset:
+                         _goals = {1: np.array([0.0,-1.0,0.199599]), 2: np.array([0.75,0.0,0.199599]),
+                                   3: np.array([-0.75,0.0,0.199599]), 4: np.array([0.75,2.0,0.199599]),
+                                   5: np.array([0.75,-2.0,0.199599])}
+                         _tid = self.config.train_reward_config.task_id
+                         _g = _goals.get(_tid)
+                         if _g is not None and len(trajs) > 0:
+                             _reached = np.mean([1.0 if (np.max(t['rewards']) >= 1.0 - 1e-6) else 0.0 for t in trajs])
+                             _final_d = np.mean([np.linalg.norm(np.asarray(t['observations'])[-1][19:22] - _g) for t in trajs])
+                             _min_d = np.mean([np.min(np.linalg.norm(np.asarray(t['observations'])[:,19:22] - _g, axis=1)) for t in trajs])
+                             print(f"[cube-diag] reached-goal-any-step: {_reached:.2f} | "
+                                   f"mean final dist-to-goal: {_final_d:.3f} | mean closest dist: {_min_d:.3f}")
+                 except Exception as _e:
+                     print(f"[cube-diag] skipped ({_e})")
             self.accelerator.wait_for_everyone()
 
             if(self.config.offline):
