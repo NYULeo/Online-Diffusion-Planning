@@ -200,10 +200,13 @@ def save_to_finetuning(kernel_net, dataset_name, ensemble_idx, specific_dataset:
     # `kernel_net` is now the flax params pytree for one ensemble member (see §10).
     net_dict = flax.serialization.to_state_dict(kernel_net)
     name = getName(dataset_name, specific_dataset)
+    # RELATIVE './Finetuning' (process-cwd) to MATCH the loader get_kernel, which reads
+    # './Finetuning/Kernels/...'. Previously ABSOLUTE FINETUNE_DIR (symlink-resolved) -> mismatch on a
+    # symlinked/mounted repo dir -> get_kernel FileNotFoundError. (Same fix as the critic saver.)
     if specific_dataset is None:
-         ft_models_dir = FINETUNE_DIR / 'Kernels' / dataset_name / 'Models' / '0'
+         ft_models_dir = Path('Finetuning') / 'Kernels' / dataset_name / 'Models' / '0'
     else:
-         ft_models_dir = FINETUNE_DIR / 'Kernels' / dataset_name / specific_dataset / 'Models' / '0'
+         ft_models_dir = Path('Finetuning') / 'Kernels' / dataset_name / specific_dataset / 'Models' / '0'
     ft_models_dir.mkdir(parents=True, exist_ok=True)
     save_path = ft_models_dir / f'{name}_Kernel_{ensemble_idx}.pkl'
     with open(save_path, 'wb') as f:
@@ -213,9 +216,9 @@ def save_to_finetuning(kernel_net, dataset_name, ensemble_idx, specific_dataset:
 def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str] = None):
     name = getName(dataset_name, specific_dataset)
     if specific_dataset is None:
-        ft_stats_dir = FINETUNE_DIR / "Kernels" / dataset_name / "Stats"
+        ft_stats_dir = Path('Finetuning') / "Kernels" / dataset_name / "Stats"
     else:
-        ft_stats_dir = FINETUNE_DIR / "Kernels" / dataset_name / specific_dataset / "Stats"
+        ft_stats_dir = Path('Finetuning') / "Kernels" / dataset_name / specific_dataset / "Stats"
     ft_stats_dir.mkdir(parents=True, exist_ok=True)
     savepath = ft_stats_dir / f"{name}_Kernel_stats_0.pkl"
     with open(savepath, "wb") as f:

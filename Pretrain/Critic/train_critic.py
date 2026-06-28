@@ -243,7 +243,11 @@ def save_to_finetuning(critic_net, dataset_name, specific_dataset, task_id: Opti
     # `critic_net` is a TrainState (the JAX critic). Serialize its params (flax.serialization).
     net_dict = flax.serialization.to_state_dict(critic_net.params)
     name = get_CriticName(dataset_name, specific_dataset, task_id)
-    ft_models_dir = FINETUNE_DIR / "Critics" / dataset_name / specific_dataset / "Models"
+    # RELATIVE './Finetuning' (resolved against the process cwd) to EXACTLY MATCH the loader get_critic_model,
+    # which reads './Finetuning/Critics/.../Models/...'. Previously this used the ABSOLUTE FINETUNE_DIR
+    # (Path(__file__).resolve(), symlink-resolved), which can differ from the cwd-relative loader path on a
+    # symlinked/mounted repo dir -> FileNotFoundError when planner2 loads the critic.
+    ft_models_dir = Path("Finetuning") / "Critics" / dataset_name / specific_dataset / "Models"
     ft_models_dir.mkdir(parents=True, exist_ok=True)
     save_path = ft_models_dir / f"{name}_Critic_0.pkl"
     # TODO(checkpoint-bridge): torch original did `torch.save(critic_net.state_dict(), save_path)`.
@@ -253,7 +257,8 @@ def save_to_finetuning(critic_net, dataset_name, specific_dataset, task_id: Opti
 
 def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
     name = get_CriticName(dataset_name, specific_dataset, task_id)
-    ft_stats_dir = FINETUNE_DIR / "Critics" / dataset_name / specific_dataset / "Stats"
+    # RELATIVE (see save_to_finetuning) to MATCH the loader get_critic_stats ('./Finetuning/.../Stats/...').
+    ft_stats_dir = Path("Finetuning") / "Critics" / dataset_name / specific_dataset / "Stats"
     ft_stats_dir.mkdir(parents=True, exist_ok=True)
     savepath = ft_stats_dir / f"{name}_Critic_stats_0.pkl"
     with open(savepath, "wb") as f:
