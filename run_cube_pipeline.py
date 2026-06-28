@@ -255,21 +255,11 @@ def stage_critic(args, group):
                                  horizon=HORIZON, tau=0.005, sigma=8.0))
     _banner('critic', 'critic')
     rng = set_seed(args.seed)
-    # Build the offline trajectories the critic regresses on. Torch (train_critic_script2) uses
-    # dataset trajs + the success rollouts (trajs_task4_success_0.pkl from gen_success); merge them
-    # the same way. If the success file isn't present yet, fall back to dataset-only with a warning.
-    import pickle
+    # Critic regresses on the offline cube dataset trajectories. (Torch's train_critic_script2 also adds a
+    # success-rollout file, but for cube-single that file is generated only AFTER finetune reaches the goal,
+    # so on a from-scratch run the dataset is the available source -- same as our reward stage.)
     data = get_dataset(ENV_NAME, SPECIFIC_PLAY, task_id=TASK_ID, traj_length=200)
     trajs = data.get_trajectories()
-    _succ_path = f'./Finetuning/Rollouts/{ENV_NAME}/{SPECIFIC_PLAY}/task_{TASK_ID}/trajs_task{TASK_ID}_success_0.pkl'
-    if os.path.exists(_succ_path):
-        with open(_succ_path, 'rb') as f:
-            _succ = pickle.load(f)
-        trajs = trajs + _succ
-        print(f"[critic] using {len(_succ)} success trajs + dataset (total {len(trajs)})", flush=True)
-    else:
-        print(f"[critic] WARNING: no success trajs at {_succ_path} -> dataset only "
-              f"(run the gen_success stage first to match torch)", flush=True)
 
     train_critic(
         dataset_name=ENV_NAME,
@@ -303,50 +293,6 @@ def stage_critic(args, group):
             trajs=trajs,
             task_id=TASK_ID,
         )
-    finish_run()
-
-
-# --------------------------------------------------------------------------------------------------
-# Stage 4.5: generate success rollouts (trajs_task4_success_0.pkl) by rolling out the pretrained planner
-# and keeping goal-reaching episodes. Torch trains reward+critic on dataset + these success trajs; this
-# stage reproduces that data SELF-CONTAINED (no collaborator checkpoint needed).
-# --------------------------------------------------------------------------------------------------
-def stage_gen_success(args, group):
-    import pickle
-    from Pretrain.utils import set_seed
-    from Finetuning.Rollout import rollout
-
-    n_seeds = SMOKE.get('gen_seeds', 8) if args.smoke else int(os.environ.get('ODP_GEN_SEEDS', 200))
-    eplen = 200 if args.smoke else int(os.environ.get('ODP_GEN_EPLEN', 3000))
-    init_run('gen_success', group,
-                     config=dict(stage='gen_success', env=ENV_NAME, specific=SPECIFIC_PLAY, task_id=TASK_ID,
-                                 n_seeds=n_seeds, episode_length=eplen))
-    _banner('gen_success', 'gen_success')
-    set_seed(args.seed)
-    # Roll out the pretrained planner (checkpoint 0) and collect FULL trajectories, then filter successes.
-    # rollout() returns (sum_reward, steps); we need the traj dict, so we collect via the success helper:
-    # run each seed, keep the episode if it reached the goal (sum of shifted rewards == 1.0).
-    chunk = int(os.environ.get('ODP_GEN_CHUNK', 31))
-    raw_trajs = []
-    for j in range(1, n_seeds + 1):
-        ret, traj = rollout(
-            ENV_NAME, SPECIFIC_PLAY, HORIZON,
-            steps_T=10, num_karras=1, eta=0.0, episode_length=eplen,
-            checkpoint_steps=0, render=False, base_seed=j, task_id=TASK_ID,
-            continual_rollout=True, chunk_size=chunk, device=None, return_traj=True)
-        raw_trajs.append((ret, traj))
-        if j % 20 == 0:
-            print(f"[gen_success] rolled out {j}/{n_seeds} seeds", flush=True)
-    # Cube success = goal reached AT ANY step. rollout() already applied reward_processor (min->0), so a
-    # success episode has exactly one reward==1.0 -> sum(rewards)==1.0 (the eval's criterion). NOT
-    # rewards[-1] (cube episodes don't terminate at the goal, so the last step is ~always 0).
-    succ = [traj for (ret, traj) in raw_trajs if abs(ret - 1.0) < 1e-6]
-    print(f"[gen_success] {len(succ)}/{len(raw_trajs)} episodes reached the goal", flush=True)
-    save_path = f'./Finetuning/Rollouts/{ENV_NAME}/{SPECIFIC_PLAY}/task_{TASK_ID}/trajs_task{TASK_ID}_success_0.pkl'
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    with open(save_path, 'wb') as f:
-        pickle.dump(succ, f)
-    print(f"[gen_success] saved {len(succ)} success trajs -> {save_path}", flush=True)
     finish_run()
 
 
@@ -461,12 +407,11 @@ def stage_finetune(args, group):
 STAGES = {
     'pretrain': stage_pretrain,
     'kernel': stage_kernel,
-    'gen_success': stage_gen_success,
     'reward': stage_reward,
     'critic': stage_critic,
     'finetune': stage_finetune,
 }
-ORDER = ['pretrain', 'kernel', 'gen_success', 'reward', 'critic', 'finetune']
+ORDER = ['pretrain', 'kernel', 'reward', 'critic', 'finetune']
 
 
 def main():
