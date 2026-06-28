@@ -195,13 +195,16 @@ class Acc_AdjointMatchingFineTuner:
          lr = new_lr if new_lr is not None else self.config.finetune_lr
          steps = new_steps if new_steps is not None else self.config.finetune_total_steps
 
-         # Create new optimizer (AdamW, weight_decay=1e-2) with a cosine-annealing LR schedule.
-         # torch used CosineAnnealingLR(optimizer, T_max=steps) which decays lr -> 0 over `steps`;
-         # optax.cosine_decay_schedule(lr, steps) matches (alpha=0 final value).
+         # Optimizer: faithfully match torch `torch.optim.Adam(lr, weight_decay=1e-2)`. Torch's Adam uses
+         # COUPLED L2 (adds wd*param to the gradient BEFORE the Adam moments) — NOT decoupled AdamW. So
+         # compose add_decayed_weights BEFORE scale_by_adam (optax.adamw decouples it, which is a different
+         # optimizer). Clip-by-norm(1.0) first mirrors accelerator.clip_grad_norm_ in step(); cosine LR.
          self.scheduler = optax.cosine_decay_schedule(lr, decay_steps=steps)
          tx = optax.chain(
-             optax.clip_by_global_norm(1.0),  # accelerator.clip_grad_norm_(max_norm=1.0) in step()
-             optax.adamw(learning_rate=self.scheduler, weight_decay=1e-2),
+             optax.clip_by_global_norm(1.0),         # accelerator.clip_grad_norm_(max_norm=1.0)
+             optax.add_decayed_weights(1e-2),        # COUPLED L2 (torch Adam weight_decay), before adam
+             optax.scale_by_adam(),                  # b1=0.9,b2=0.999,eps=1e-8 == torch Adam defaults
+             optax.scale_by_learning_rate(self.scheduler),
          )
          # Rebuild the trainable TrainState with the new optimizer (was: new torch.optim.Adam over
          # new_score_net.parameters()). Params are preserved across optimizer resets.
