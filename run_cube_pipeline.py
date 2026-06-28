@@ -58,7 +58,15 @@ os.chdir(PROJECT_ROOT)
 # so every entry point (smoke/train/sweep all go through this file) benefits. Override with your own
 # XLA_FLAGS, or set ODP_AUTOTUNE=1 to keep XLA's autotuner on.
 if 'XLA_FLAGS' not in os.environ and os.environ.get('ODP_AUTOTUNE', '0') != '1':
-    os.environ['XLA_FLAGS'] = '--xla_gpu_autotune_level=0'
+    # The `dot_search_space` warning storm is XLA's Triton-GEMM tiling search, which autotune_level=0 does
+    # NOT disable on jax 0.6.x. Turning Triton-GEMM off routes dots to cuBLAS (numerics-safe), removes the
+    # search entirely, and sidesteps the cuFuncGetName/Triton driver-mismatch path. Big compile-time win.
+    os.environ['XLA_FLAGS'] = (
+        '--xla_gpu_autotune_level=0'
+        ' --xla_gpu_enable_triton_gemm=false'
+        ' --xla_gpu_exhaustive_tiling_search=false'
+        ' --xla_gpu_cublas_fallback=true'
+    )
 
 import jax
 import wandb

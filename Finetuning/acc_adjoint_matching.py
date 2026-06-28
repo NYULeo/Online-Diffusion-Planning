@@ -121,6 +121,16 @@ class Acc_AdjointMatchingFineTuner:
         self.k = self.kt(self.t_asc)
         self.t_grid, self.beta_1, self.sigma_grid = karras_beta_schedule(self.config.diffusion_steps, self.config.sigma_min, self.config.sigma_max, self.device)
         self.beta_2 = cosine_beta(self.t_grid, s = self.config.s)
+        # SPEED (logic-identical): the per-diffusion-step scalars dt[i] and beta_now[i] depend only on i
+        # (identical for every trajectory), so materialize them ONCE as Python floats here. Otherwise
+        # sample_Traj_karras calls .item() on them — a blocking device->host sync — 2x per step x
+        # diffusion_steps x 256 trajectories (~5k stalls/AM-step) that serialize the async dispatch queue.
+        self._dt = []
+        self._beta_now = []
+        for i in range(self.config.diffusion_steps):
+            t_next = self.t_grid[i + 1] if i < self.config.diffusion_steps - 1 else 0.0
+            self._dt.append(float(t_next - self.t_grid[i]))
+            self._beta_now.append(float(self.beta_1[i] if i < self.config.num_karras else self.beta_2[i]))
 
         self.set_old_score_net(planner_checkpoint)
         self.set_new_score_net()
@@ -386,12 +396,8 @@ class Acc_AdjointMatchingFineTuner:
         X.append(x)
         for i in range(self.config.diffusion_steps):
              t_now = self.t_grid[i]
-             t_next = self.t_grid[i + 1] if i < self.config.diffusion_steps - 1 else 0.0
-             dt = (t_next - t_now).item()
-             if( i < self.config.num_karras ):
-                  beta_now = self.beta_1[i].item()
-             else:
-                  beta_now = self.beta_2[i].item()
+             dt = self._dt[i]            # precomputed Python float (was (t_next - t_now).item())
+             beta_now = self._beta_now[i]  # precomputed Python float (was self.beta_{1,2}[i].item())
              # Drift
              drift = -0.5 * beta_now * x
              # Score

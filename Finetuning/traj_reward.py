@@ -123,6 +123,13 @@ def _torch_softplus(x, beta):
     return jax.nn.softplus(beta * x) / beta
 
 
+def _jax_norm_consts(stat):
+    '''On-device (mean, 1/max(std, std_floor)) for an SAStats, so normalization is pure-JAX
+    (s - mean) * inv_std == SAStats.norm_obs((s-mean)/max(std,std_floor)) but without a host round-trip.'''
+    std = np.maximum(stat.obs_std, stat.std_floor)
+    return (jnp.asarray(stat.obs_mean, dtype=jnp.float32), jnp.asarray(1.0 / std, dtype=jnp.float32))
+
+
 # API-CHANGE: torch `nn.Module` base dropped. These classes were never trained as flax modules — they
 # are orchestration objects holding frozen pretrained subnets and hand-rolling the input-gradient of the
 # reward (CONVERSION_GUIDE §7). Public class names, constructor signatures and method signatures are
@@ -196,6 +203,11 @@ class TotalReward:
 
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
 
+        # SPEED (logic-identical): cache on-device (mean, 1/max(std,floor)) so the *_processor methods do
+        # pure-JAX (s-mean)*inv_std instead of np.asarray()->norm_obs->jnp.asarray (a device<->host round
+        # trip on EVERY per-step call: ~H x trajs x methods host syncs/AM-step). Same affine as SAStats.norm_obs.
+        self._reward_norm = _jax_norm_consts(self.reward_stat)
+        self._kernel_norm = _jax_norm_consts(self.kernel_stat)
 
         self.config.d_s = obs_dim
         self.config.d_a = act_dim
@@ -222,16 +234,12 @@ class TotalReward:
 
 
     def reward_processor(self, s):
-        s_n = np.asarray(s)
-        s_n = self.reward_stat.norm_obs(s_n)
-        s = jnp.asarray(s_n, dtype=jnp.float32)
-        return s
+        mean, inv_std = self._reward_norm   # pure-JAX (s-mean)/max(std,floor); no host round-trip
+        return ((jnp.asarray(s, dtype=jnp.float32) - mean) * inv_std)
 
     def kernel_processor(self, s):
-        s_n = np.asarray(s)
-        s_n = self.kernel_stat.norm_obs(s_n)
-        s = jnp.asarray(s_n, dtype=jnp.float32)
-        return s
+        mean, inv_std = self._kernel_norm
+        return ((jnp.asarray(s, dtype=jnp.float32) - mean) * inv_std)
 
     def makeGrad(self, H, s_grad, a_grad, i, s_next_grad: Optional[jnp.ndarray] = None):
         S = jnp.zeros((H, (self.config.d_s + self.config.d_a)))
@@ -400,6 +408,10 @@ class TotalReward_Critic:
         self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint, task_id)
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
         self.critic_stat = get_critic_stats(dataset_name, specific_dataset, task_id, 0)
+        # SPEED (logic-identical): on-device norm constants -> pure-JAX processors (see TotalReward note).
+        self._reward_norm = _jax_norm_consts(self.reward_stat)
+        self._kernel_norm = _jax_norm_consts(self.kernel_stat)
+        self._critic_norm = _jax_norm_consts(self.critic_stat)
 
 
         self.config.d_s = obs_dim
@@ -427,22 +439,16 @@ class TotalReward_Critic:
 
 
     def reward_processor(self, s):
-        s_n = np.asarray(s)
-        s_n = self.reward_stat.norm_obs(s_n)
-        s = jnp.asarray(s_n, dtype=jnp.float32)
-        return s
+        mean, inv_std = self._reward_norm   # pure-JAX (s-mean)/max(std,floor); no host round-trip
+        return ((jnp.asarray(s, dtype=jnp.float32) - mean) * inv_std)
 
     def kernel_processor(self, s):
-        s_n = np.asarray(s)
-        s_n = self.kernel_stat.norm_obs(s_n)
-        s = jnp.asarray(s_n, dtype=jnp.float32)
-        return s
+        mean, inv_std = self._kernel_norm
+        return ((jnp.asarray(s, dtype=jnp.float32) - mean) * inv_std)
 
     def critic_processor(self, s):
-        s_n = np.asarray(s)
-        s_n = self.critic_stat.norm_obs(s_n)
-        s = jnp.asarray(s_n, dtype=jnp.float32)
-        return s
+        mean, inv_std = self._critic_norm
+        return ((jnp.asarray(s, dtype=jnp.float32) - mean) * inv_std)
 
     def makeGrad(self, H, s_grad, a_grad, i, s_next_grad: Optional[jnp.ndarray] = None):
         S = jnp.zeros((H, (self.config.d_s + self.config.d_a)))
