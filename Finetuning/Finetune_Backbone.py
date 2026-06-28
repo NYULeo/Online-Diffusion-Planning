@@ -781,7 +781,7 @@ class OnlineFinetuner():
                  # step" (max shifted reward hit 1.0 == raw reward hit 0) and (b) torch's distance-to-goal
                  # (final cube pos obs[-1][19:22] vs the task goal). These reveal real task success.
                  try:
-                     if self.config.dataset_name == 'cube' and 'single' in self.config.specific_dataset:
+                     if os.environ.get('ODP_CUBE_DIAG', '0') == '1' and self.config.dataset_name == 'cube' and 'single' in self.config.specific_dataset:
                          _goals = {1: np.array([0.0,-1.0,0.199599]), 2: np.array([0.75,0.0,0.199599]),
                                    3: np.array([-0.75,0.0,0.199599]), 4: np.array([0.75,2.0,0.199599]),
                                    5: np.array([0.75,-2.0,0.199599])}

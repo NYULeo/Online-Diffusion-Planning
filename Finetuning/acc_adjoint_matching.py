@@ -789,7 +789,7 @@ class Acc_AdjointMatchingFineTuner:
              conds = next(dataloader)
              _t0 = time.time()
              loss, avg_reward, avg_C = self.step(conds, reward_model)
-             if self.accelerator.is_main_process:
+             if self.accelerator.is_main_process and os.environ.get('ODP_AM_TIMING', '0') == '1':
                  print(f"[AM] round {round} step {step}/{self.config.per_round_steps} "
                        f"took {time.time() - _t0:.1f}s (loss={float(loss):.4g})", flush=True)
 
