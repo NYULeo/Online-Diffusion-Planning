@@ -4,6 +4,15 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
+# Disable XLA Triton-GEMM autotuning BEFORE importing jax (running `python Rollout.py` directly does not
+# go through run_cube_pipeline.py, so without this the dot_search_space autotuning storm makes eval crawl).
+if 'XLA_FLAGS' not in os.environ and os.environ.get('ODP_AUTOTUNE', '0') != '1':
+    os.environ['XLA_FLAGS'] = (
+        '--xla_gpu_autotune_level=0'
+        ' --xla_gpu_enable_triton_gemm=false'
+        ' --xla_gpu_exhaustive_tiling_search=false'
+        ' --xla_gpu_cublas_fallback=true'
+    )
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -412,9 +421,9 @@ def load_success_trajs(env_name, specific_env, task_id, step):
         trajs = pickle.load(f)
     return trajs
 
-def rollout(env_name, 
-            specific_env, 
-            horizon, 
+def rollout(env_name,
+            specific_env,
+            horizon,
             steps_T, 
             num_karras, eta, 
             episode_length, 
@@ -883,33 +892,37 @@ if __name__ == "__main__":
     #for seed in [10001, 20002, 30003, 40004, 50005, 60006, 70007, 80008, 90009, 100010, 110011, 120012]:
     set_seed(1)
 
+    # Eval-speed knobs (env vars): ODP_EVAL_EPLEN shortens episodes (default 3000), ODP_EVAL_MAXCHUNKS caps
+    # the per-seed chunk_size retries (default = all). A FAILING planner exhausts every chunk_size x a full
+    # episode per seed, so these bound the wall-clock for a quick read.
+    _eplen = int(os.environ.get('ODP_EVAL_EPLEN', 3000))
+    _max_chunks = int(os.environ.get('ODP_EVAL_MAXCHUNKS', len(chunk_size)))
     while(checkpoint < _ckpt_to):
          print(f"Running checkpoing: {checkpoint}")
          total_return = 0.0
          for j in range(1, _n_seeds + 1):
            return_value = 0.0
            chunk_size_index = 0
-           while((return_value != 1.0) and (chunk_size_index < len(chunk_size))):
+           while((return_value != 1.0) and (chunk_size_index < min(_max_chunks, len(chunk_size)))):
               return_value, _ = rollout(
-                  env_name, 
-                  specific_train_dataset, 
-                  horizon, 
-                  steps_T = 10, 
-                  num_karras = 1, 
-                  eta = 0.0, 
-                  episode_length = 3000, 
-                  checkpoint_steps = checkpoint, 
-                  render = False,  
-                  base_seed = j, 
-                  #goal_cell = np.array([6, 1], dtype = int), 
+                  env_name,
+                  specific_train_dataset,
+                  horizon,
+                  steps_T = 10,
+                  num_karras = 1,
+                  eta = 0.0,
+                  episode_length = _eplen,
+                  checkpoint_steps = checkpoint,
+                  render = False,
+                  base_seed = j,
+                  #goal_cell = np.array([6, 1], dtype = int),
                   task_id = task_id,
                   continual_rollout = True,
                   chunk_size = chunk_size[chunk_size_index],
                   #chunk_size = 1,
                   device = device)
               chunk_size_index += 1
-           print(return_value)
-           #print(f"Chunk Size: {chunk_size[chunk_size_index]}")
+           print(f"  seed {j}: {return_value} (tried {chunk_size_index} chunk sizes)")
            total_return += return_value
          print(f"Checkpoint: {checkpoint} Success Rate: {total_return / _n_seeds :.4f}")
          checkpoint += _ckpt_by
