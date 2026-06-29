@@ -3173,7 +3173,11 @@ def train_critic_with_planner2(
                 total = total + lp
             avg_lp = total / len(kernels)
         else:  # 'mog'
-            avg_lp = compute_log_density_mog(kernels, s_t, a_t, s_tp1)
+            # SPEED (logic-identical): the eager 10-member compute_log_density_mog dispatches ~thousands of
+            # ops per plan (the py-spy bottleneck: apply_primitive -> rsqrt -> LayerNorm, per op). Use the
+            # jitted version built in setup (closes over the frozen kernels) -> one fused compiled call with
+            # IDENTICAL numbers. is_plan_feasible reads `_mog_logdensity_jit` from the enclosing scope.
+            avg_lp = _mog_logdensity_jit(s_t, a_t, s_tp1)
 
         return bool((avg_lp > kernel_config.min_log_prob).all())
 
@@ -3321,6 +3325,18 @@ def train_critic_with_planner2(
         dataset_name, specific_dataset, kernel_config,
         obs_dim, act_dim, device, rng=kern_rng,
     )
+
+    # SPEED (logic-identical): jit the MoG feasibility log-density ONCE, closing over the frozen kernel
+    # ensemble. _generate_feasible_plans -> is_plan_feasible runs PER PLAN (sequential, exactly like the torch
+    # original); the eager 10-member apply dispatches thousands of GPU ops per plan (py-spy bottleneck). Jit
+    # fuses it into a single compiled call -> identical numbers, ~order-of-magnitude faster. is_plan_feasible
+    # reads this via closure (late-bound; set before the generation loop runs).
+    if kernel_config.type_kernel == 'mog':
+        _mog_logdensity_jit = jax.jit(
+            lambda s_t, a_t, s_tp1: compute_log_density_mog(kernels, s_t, a_t, s_tp1)
+        )
+    else:
+        _mog_logdensity_jit = None
 
     # ----------------------------------- critic stats: load once, never save
     critic_stat = get_critic_stats(
