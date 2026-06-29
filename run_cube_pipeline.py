@@ -70,6 +70,11 @@ if 'XLA_FLAGS' not in os.environ and os.environ.get('ODP_AUTOTUNE', '0') != '1':
         ' --xla_gpu_enable_triton_gemm=false'
         ' --xla_gpu_exhaustive_tiling_search=false'
         ' --xla_gpu_cublas_fallback=true'
+        # Disable CUDA command buffers (graphs): the AM step compiles many distinct graphs and CUDA-graph
+        # INSTANTIATION can OOM ("instantiate command buffer ... N alive graphs") even when tensors fit.
+        # Empty value = disable all command buffers (XLA's own suggested fix). Falls back to normal kernel
+        # launches -- a small speed cost, no numerics change.
+        ' --xla_gpu_enable_command_buffer='
     )
 
 # GPU memory: the single-device AM step runs the FULL finetune batch on ONE GPU (torch splits it across 8),
