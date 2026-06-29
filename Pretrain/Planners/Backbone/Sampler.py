@@ -19,6 +19,21 @@ from .Dit import DiT1d
 from .utils import cosine_alpha_sigma, cosine_beta
 
 
+# SPEED (logic-identical): cache a jitted frozen forward per planner. The per-step `score_model(x, t)` inside
+# sample_euler_karras was running EAGERLY (op-by-op GPU dispatch), which is the dominant cost in the sequential
+# plan loops of rollout + train_critic_with_planner2. Jitting `model_def.apply` (compile once per planner,
+# then one fused call/step) gives identical numbers — mirrors the proven acc_adjoint_matching pattern
+# (`_score_apply = jax.jit(model_def.apply)`).
+_SCORE_APPLY_JIT = {}
+def _jitted_score_apply(model_def):
+    k = id(model_def)
+    fn = _SCORE_APPLY_JIT.get(k)
+    if fn is None:
+        fn = jax.jit(model_def.apply)
+        _SCORE_APPLY_JIT[k] = fn
+    return fn
+
+
 def clip_actions(x: jnp.ndarray, d_s: int) -> jnp.ndarray:
     actions = jnp.clip(x[..., d_s:], -1.0, 1.0)
     x = x.at[..., d_s:].set(actions)
@@ -140,8 +155,13 @@ def sample_euler_karras(
         # Drift
         drift = -0.5 * beta_now * x
 
-        # Score
-        score = score_model(x, t_now[None])
+        # Score — jitted frozen forward (compile-once, fused) instead of eager per-op dispatch. Identical
+        # numbers to `score_model(x, t_now[None])` (== model_def.apply({'params': params}, x, t)). Guarded so
+        # any non-TrainState score_model still works.
+        if hasattr(score_model, 'model_def') and hasattr(score_model, 'params'):
+            score = _jitted_score_apply(score_model.model_def)({'params': score_model.params}, x, t_now[None])
+        else:
+            score = score_model(x, t_now[None])
 
         # Euler step
         if eta > 0:
