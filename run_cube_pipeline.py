@@ -50,6 +50,10 @@ import time
 # relative ./Finetuning/... checkpoint paths used throughout the codebase resolve correctly.
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT_ROOT)
+# Some package modules use BARE imports (e.g. `from Dataset import ...` in Pretrain/Planners/Backbone),
+# which require <repo>/Pretrain on sys.path. Add it here at the entry point so it's available before any
+# stage import, regardless of import order.
+sys.path.insert(0, os.path.join(PROJECT_ROOT, 'Pretrain'))
 os.chdir(PROJECT_ROOT)
 
 # XLA GPU autotuning is slow/unstable on some driver+jaxlib combos (symptom: repeated

@@ -9,8 +9,15 @@ import os
 # os.chdir below moved the whole process cwd into Pretrain/. Because this module is imported transitively,
 # EVERY later relative './Finetuning/...' load/save then resolved under <repo>/Pretrain/Finetuning instead
 # of <repo>/Finetuning -> the cascade of "FileNotFoundError: ./Finetuning/Critics/.../Critic_0.pkl" errors.
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))  # <repo>
+# Two separate needs, previously conflated into one (buggy) path:
+#  - sys.path must contain BOTH <repo> (for `from flax_utils import ...`, `Pretrain.X`, `Finetuning.X`) AND
+#    <repo>/Pretrain (for the BARE `from Dataset import ...` here and in Trainer.py — Dataset.py lives in
+#    Pretrain/). The old code appended only <repo>/Pretrain and leaned on run_cube_pipeline for <repo>.
+#  - os.chdir must go to <repo> ONLY, so relative './Finetuning/...' load/save paths resolve to
+#    <repo>/Finetuning. The old code chdir'd into <repo>/Pretrain (3 dirnames) -> the FileNotFoundError cascade.
 sys.path.append(project_root)
+sys.path.append(os.path.join(project_root, "Pretrain"))
 os.chdir(project_root)
 
 import jax
