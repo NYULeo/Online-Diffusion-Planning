@@ -440,11 +440,18 @@ def stage_finetune(args, group):
         # task_id is threaded into finetune via train_reward_config.task_id (used for PlannerDataset,
         # get_planner/get_reward/get_kernel/get_critic, and AMConfig.task_id). hidden_layers/hidden_dim MUST
         # match the saved reward net (4/512): the per-round critic retrain (train_critic_with_planner2)
-        # rebuilds the reward net from these dims to load it. sigma/target_reward mirror stage_reward.
+        # rebuilds the reward net from these dims to load it. batch_size/lr mirror the teammate's reward train.
         train_reward_config=Train_Reward_Config(task_id=TASK_ID, num_steps=ft_reward_steps,
-                                                 hidden_layers=4, hidden_dim=512,
-                                                 sigma=4.0, target_reward=500.0),
-        train_kernel_config=Train_Kernel_Config(num_steps=ft_kernel_steps),
+                                                 hidden_layers=4, hidden_dim=512, batch_size=256,
+                                                 lr=5e-3, sigma=4.0, target_reward=500.0),
+        # train_kernel_config MUST match the saved MoG kernel (teammate: mog/4/514/10 modes/512 batch/1e-4 lr):
+        # self.kernel_config (built from this in Finetune_Backbone.__init__) is what the per-round critic
+        # retrain's feasibility filter loads. The dataclass defaults (robust/2/256) would mismatch the saved
+        # 4/514 MoG kernel and crash the round-end retrain.
+        train_kernel_config=Train_Kernel_Config(num_steps=ft_kernel_steps, type_kernel='mog',
+                                                 num_hidden_layers=4, hidden_dim=514, ensemble_size=10,
+                                                 kernel_num_modes=10, kernel_noise_floor=5e-4,
+                                                 batch_size=512, lr=1e-4),
         # teammate cube/single-play TrainCriticConfig (EXACT): per-round online retrain runs batch_size=256,
         # num_steps=20, lr=1e-5 (the offline path uses AMConfig.horizon=32, not this horizon field). Do NOT
         # shrink batch_size for speed -- it changes the critic's per-round training sample. If the JAX
@@ -463,6 +470,7 @@ def stage_finetune(args, group):
         finetune_batch_per_sample=ft_batch_per_sample,
         diffusion_steps=ft_diffusion_steps,
         karras_percent=0.1,                  # teammate: num_karras = ceil(10*0.1) = 1
+        Loss_Clip_percent=0.0,               # teammate: Loss clip steps = ceil(10*0.0) = 0 (was defaulting to 0.75 -> 8)
         finetune_lr=2e-5,                    # teammate
         initial_lam=0.05,                    # teammate
         eta_lam=0.5,                         # teammate
