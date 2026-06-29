@@ -274,7 +274,11 @@ def stage_critic(args, group):
     #       are independent of target_reward/sigma);
     #   (2) train_critic_with_planner2(old=0, new=0) to overwrite checkpoint 0 on the normalized scale.
     # The finetune loop then retrains it every round (update_critic=True) on the *improving* planner.
-    init_steps = SMOKE['critic'] if args.smoke else 2000
+    # init_steps is intentionally SMALL: train_critic here only needs to materialize the critic obs-norm stats
+    # + a near-fresh (small-output) checkpoint 0. planner2 then bootstraps v from this checkpoint, so a heavily
+    # trained (target_reward=500) init would give a LARGE v that propagates -> inflated predict() terminal term
+    # (we saw reward~10 vs teammate ~3.5). A near-fresh init keeps v ~ O(1), matching the teammate.
+    init_steps = SMOKE['critic'] if args.smoke else 50
     # planner2 generates feasible plans ONE AT A TIME (this faithfully mirrors the torch
     # _generate_feasible_plans, which is ALSO a sequential while-loop). These values match the teammate's
     # train_critic_script.py init call (batch_size=128, num_steps=10, oversample=4) -- do NOT shrink them for
