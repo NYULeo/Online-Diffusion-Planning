@@ -72,6 +72,11 @@ if 'XLA_FLAGS' not in os.environ and os.environ.get('ODP_AUTOTUNE', '0') != '1':
         ' --xla_gpu_cublas_fallback=true'
     )
 
+# GPU memory: the single-device AM step runs the FULL finetune batch on ONE GPU (torch splits it across 8),
+# so JAX's default 75% pre-allocation can OOM. Grab more of the card by default (override by exporting your
+# own XLA_PYTHON_CLIENT_MEM_FRACTION). Does NOT change any numerics.
+os.environ.setdefault('XLA_PYTHON_CLIENT_MEM_FRACTION', '0.95')
+
 import jax
 import wandb
 
@@ -371,7 +376,13 @@ def stage_finetune(args, group):
         finetune_rounds = args.rounds
         num_steps = 3 * finetune_rounds                  # per_round_steps stays 3 (teammate)
         rollout_length, rollout_num_envs = 4000, 8       # keep rollout REAL so success rate is representative
-        ft_diffusion_steps, ft_batch_size, ft_batch_per_sample = 10, 32, 8
+        # teammate: ft_batch_size=32, ft_batch_per_sample=8 (=> 256 trajs/AM-step, split across 8 GPUs by
+        # accelerate ~ 32 trajs/GPU). The single-device JAX runs ALL of them on one GPU -> OOM. --bs/--bps let
+        # you shrink the per-step batch to one GPU's footprint (e.g. --bs 4 => 4x8=32 trajs/step, matching a
+        # torch per-GPU step). This is a single-GPU MEMORY workaround, not a method change; for full fidelity
+        # the gradient should be micro-batched to the teammate's 256-traj total.
+        ft_diffusion_steps = 10
+        ft_batch_size, ft_batch_per_sample = args.bs, args.bps
         ft_reward_steps, ft_kernel_steps = 30000, 5000   # only used if offline=False; offline skips them
     init_run('finetune', group,
                      config=dict(stage='finetune', env=ENV_NAME, specific=SPECIFIC_PLAY, task_id=TASK_ID,
@@ -483,6 +494,11 @@ def main():
                    help='finetune rounds (default 30 = full teammate run). Use a small N (e.g. 5) for a smoke '
                         'that runs the REAL config for N rounds; per_round_steps stays 3, so the first N rounds '
                         'match a full run exactly.')
+    p.add_argument('--bs', type=int, default=32,
+                   help='finetune_batch_size (teammate 32). The single-device AM step runs bs*bps trajs on ONE '
+                        'GPU; reduce (e.g. --bs 4) if you OOM (torch splits 32 across 8 GPUs ~ 4/GPU).')
+    p.add_argument('--bps', type=int, default=8,
+                   help='finetune_batch_per_sample (teammate 8). trajs/AM-step = bs*bps; reduce to fit one GPU.')
     p.add_argument('--smoke', action='store_true', help='tiny step counts to verify wiring end-to-end.')
     p.add_argument('--mid-finetune', dest='mid_finetune', action='store_true',
                    help='lighter finetune (6 steps/3 rounds, tiny traj batch) so the full loop completes '
