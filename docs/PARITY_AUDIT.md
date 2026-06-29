@@ -58,3 +58,17 @@ Function-by-function diff of the active **cube / single-play / task4** path (off
 
 ## Benign idioms (everywhere, not divergences)
 Single-device accelerator shim (vs 8-GPU `accelerate`), `jnp`↔`torch`, `optax.chain`↔explicit optimizer+scheduler+clip, `@jax.jit`/`vmap`, threaded `rng=` vs implicit RNG, `TrainState`/`target_update` vs `nn.Module`/manual EMA, host-side `sample()` vs `DataLoader`, `SyncVectorEnv` vs `AsyncVectorEnv`, pickle vs torch.save.
+
+---
+
+## Single-device performance adaptations (NOT result-changing — for the perf discussion)
+
+The torch original splits work across 8 GPUs (rollout 1 env/GPU; AM 32 trajs/GPU all-reduced to 256; critic plan-gen pipelined eagerly). The single-GPU JAX port serialized all of it → ~30 min/round vs torch's 5–10. Three changes restore throughput **without changing what the model learns**:
+
+| # | Change | File | Fidelity |
+|---|---|---|---|
+| A | **Batched diffusion sampling** `sample_euler_karras_batch` used in critic plan-gen (`_generate_feasible_plans`) + rollout (`rollout_parallel2`). ~5k–10k sequential batch-1 diffusions/round → tens of batched calls. | `Sampler.py`, `utils.py` | **Distribution-identical** sampling (same karras schedule / frozen DiT forward — per-sample, no batch mixing / Euler / clip; only the init-noise RNG is drawn once as `(B,..)` → i.i.d. plans from the *same* distribution, not bit-identical RNG). The critic is a value estimator over a plan *distribution*, so its learned value function is unchanged. |
+| A′ | Critic **feasibility** batched by flattening `n·(H-1)` transitions into one `compute_log_density_mog`. | `utils.py` | **Bit-identical** — transitions are independent in the MoG density, so flatten == per-plan `is_plan_feasible`. |
+| B | **AM gradient micro-batching** (`ODP_AM_MICRO`, default 32): accumulate `jax.grad` over chunks of m trajs, weighted by `chunk_size/N`. Restores the faithful **256-traj** gradient on one GPU (which OOMs in a single backward — the reason the smoke ran `--bs 4` = 1/8 gradient, leaving success=0). | `acc_adjoint_matching.py` | **Bit-identical** to torch's 8-GPU all-reduce mean over the full batch (mean-of-size-weighted-chunk-means == overall mean); trajs/adjoints already materialized → no re-sampling. |
+
+Run config: smoke (speed) `--bs 4` (32 trajs, micro inactive); faithful run `--bs 32 --bps 8 --rounds 30` (256 trajs, auto micro-batched). Do **not** set `ODP_VMAP=1` at 256 trajs (the whole-batch vmapped path OOMs; micro-batching is the memory-safe route).
