@@ -4,7 +4,12 @@ import math
 import numpy as np
 import sys
 import os
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# This file is 4 levels deep (Pretrain/Planners/Backbone/utils.py), so reaching the repo root needs FOUR
+# os.path.dirname calls. It previously used three -> project_root resolved to '<repo>/Pretrain', and the
+# os.chdir below moved the whole process cwd into Pretrain/. Because this module is imported transitively,
+# EVERY later relative './Finetuning/...' load/save then resolved under <repo>/Pretrain/Finetuning instead
+# of <repo>/Finetuning -> the cascade of "FileNotFoundError: ./Finetuning/Critics/.../Critic_0.pkl" errors.
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.append(project_root)
 os.chdir(project_root)
 
