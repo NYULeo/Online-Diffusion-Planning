@@ -720,7 +720,14 @@ class OnlineFinetuner():
 
 
             #self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
-            self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
+            # FAITHFUL to torch Finetune_Backbone2:633 — pass old_planner_checkpoint = step*per_round_steps so
+            # reset_old_score_net reloads the adjoint REFERENCE net (old_score_net) to the PREVIOUS round's
+            # planner each round (incremental refinement). Omitting it left old_score_net frozen at the
+            # pretrained planner for all rounds -> wrong AM gradient in rounds 2+.
+            self.AMFineTuner.finetune_planner(
+                dataloader, self.reward_model, step+1,
+                old_planner_checkpoint=step * self.config.AMConfig.per_round_steps,
+            )
             self.accelerator.wait_for_everyone()
 
 
@@ -760,7 +767,13 @@ class OnlineFinetuner():
             if self.accelerator.is_main_process:
                   print(f"Rollout Completed")
 
-            update_reward = self.gather_and_sync_trajs_and_buffer(trajs)
+            # FAITHFUL to torch Finetune_Backbone2:671-672 (`if not offline`): in OFFLINE mode the planner-
+            # conditioning dataset must stay the frozen offline expert set. Running this every round grows
+            # Finetune_Buffer/Train_Buffer and REBUILDS PlannerDataset from online rollouts -> shifts the AM
+            # conditioning s0 distribution across rounds (a real divergence).
+            update_reward = False
+            if not self.config.offline:
+                update_reward = self.gather_and_sync_trajs_and_buffer(trajs)
             self.accelerator.wait_for_everyone()
 
             if self.config.critic and not self.config.offline:

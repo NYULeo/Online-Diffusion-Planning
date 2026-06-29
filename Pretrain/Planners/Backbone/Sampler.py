@@ -217,9 +217,15 @@ def karras_beta_schedule(
     alpha = 1.0 / jnp.sqrt(1.0 + sigma_k ** 2)
     sigma = sigma_k * alpha
 
-    # analytic β(t) = 2ρ σ_k/(1+σ_k²)
-    beta = 2.0 * rho * sigma_k / (1.0 + sigma_k ** 2)
-    beta = jnp.clip(beta, 1e-6, None)
+    # β(t) from VP-SDE marginals via numerical diff (dσ²/dt = β(t)·(1−σ²)). This MATCHES torch
+    # Pretrain/Planners/Backbone/Sampler.py and the faithful Finetuning/utils.py copy. The previous
+    # closed-form `2ρ·σ_k/(1+σ_k²)` DIVERGED from torch -> changed the diffusion sampler (drift/score/noise)
+    # in the first num_karras steps of sample_euler_karras, affecting rollout + planner2 plan generation.
+    sigma_sq = sigma ** 2
+    d_sigma_sq = jnp.diff(sigma_sq, axis=0)
+    dt = jnp.diff(t, axis=0)
+    beta = d_sigma_sq / (1 - sigma_sq[:-1]) / dt
+    beta = jnp.concatenate([beta, beta[-1][None]])  # pad last
 
     return t, beta, sigma
 

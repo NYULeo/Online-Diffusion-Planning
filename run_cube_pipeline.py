@@ -366,7 +366,11 @@ def stage_finetune(args, group):
         # EXACT teammate cube-single finetune config (finetune_script2): critic=True, offline=True
         # (offline -> loop `continue`s after rollout, so NO per-round kernel/reward retrain -> the good
         # pretrained MoG kernel stays fixed, which avoids the divergence we saw with update_kernel).
-        num_steps, finetune_rounds, rollout_length, rollout_num_envs = 90, 30, 4000, 8
+        # --rounds N caps to N rounds for a SMOKE while keeping per_round_steps = num_steps//rounds = 3 (the
+        # teammate value), so the first N rounds are IDENTICAL to a full run. Default 30 = full.
+        finetune_rounds = args.rounds
+        num_steps = 3 * finetune_rounds                  # per_round_steps stays 3 (teammate)
+        rollout_length, rollout_num_envs = 4000, 8       # keep rollout REAL so success rate is representative
         ft_diffusion_steps, ft_batch_size, ft_batch_per_sample = 10, 32, 8
         ft_reward_steps, ft_kernel_steps = 30000, 5000   # only used if offline=False; offline skips them
     init_run('finetune', group,
@@ -475,6 +479,10 @@ def main():
     p.add_argument('--suffix', default='play', choices=['play', 'noisy'],
                    help="cube dataset suffix for the planner/critic/finetune naming (default: play).")
     p.add_argument('--task', type=int, default=4, help='cube singletask task id (default: 4; valid 1-5).')
+    p.add_argument('--rounds', type=int, default=30,
+                   help='finetune rounds (default 30 = full teammate run). Use a small N (e.g. 5) for a smoke '
+                        'that runs the REAL config for N rounds; per_round_steps stays 3, so the first N rounds '
+                        'match a full run exactly.')
     p.add_argument('--smoke', action='store_true', help='tiny step counts to verify wiring end-to-end.')
     p.add_argument('--mid-finetune', dest='mid_finetune', action='store_true',
                    help='lighter finetune (6 steps/3 rounds, tiny traj batch) so the full loop completes '
