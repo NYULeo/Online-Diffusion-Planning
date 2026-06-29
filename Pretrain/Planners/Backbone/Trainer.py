@@ -271,8 +271,12 @@ class SDETrainer:
         }
         if epoch == self.num_steps:
             file_name = f"{self.model_name}_0.pt"
+            # RELATIVE './Finetuning' to MATCH get_planner ('./Finetuning/Planners/...'), which reads against
+            # the process cwd. REPO_ROOT is an absolute path; if it doesn't equal cwd (as on the failing box)
+            # the relative loader 404s -- same bug class as the critic/kernel savers. Relative both sides ==
+            # always consistent in-process.
             save_dir = os.path.join(
-                REPO_ROOT, "Finetuning", "Planners",
+                "Finetuning", "Planners",
                 self.dataset_name, self.specific_dataset,
             )
         else:
