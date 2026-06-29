@@ -731,7 +731,35 @@ class Acc_AdjointMatchingFineTuner:
         # 5. Backward and (maybe) optimizer step. In JAX gradients are functional: differentiate the
         # per-batch loss_fn w.r.t. new_score_net params and apply (grad clip is in the optax chain).
         with self.accelerator.accumulate(self.new_score_net):
-            grads, _ = jax.grad(loss_fn, has_aux=True)(self.new_score_net.params)
+            # MICRO-BATCH the gradient (single-GPU faithful 256-traj gradient): backpropping the whole local
+            # batch (all s0 * batch_per_sample trajs) through adjoint_matching_loss at once OOMs on one GPU
+            # (this is why the smoke had to drop to --bs 4 = 1/8 the teammate's gradient -> success stayed 0).
+            # With ODP_AM_MICRO=m>0 we accumulate jax.grad over chunks of m trajs, weighting each chunk by
+            # (chunk_size/N) so the summed gradient is EXACTLY the full-batch mean gradient
+            # (mean-of-(size-weighted chunk-means) == overall mean) -> bit-identical to torch's 8-GPU
+            # all-reduce mean over the full batch, only computed sequentially to fit memory. traj_lists /
+            # adjoint_lists are already materialized above, so NO re-sampling. Default 32 is purely protective:
+            # at <=32 trajs (the small smoke batch) _N>_micro is false -> original single jax.grad (unchanged);
+            # at 256 (the faithful full-batch run) it auto-chunks to avoid OOM. Lower it further only if a
+            # single 32-traj chunk still OOMs; raise/disable (0) only if you can fit the whole batch at once.
+            _micro = int(os.environ.get('ODP_AM_MICRO', '32'))
+            _N = len(traj_lists)
+            if _micro > 0 and _N > _micro:
+                grads = None
+                for _c0 in range(0, _N, _micro):
+                    _ct = traj_lists[_c0:_c0 + _micro]
+                    _ca = adjoint_lists[_c0:_c0 + _micro]
+                    _w  = len(_ct) / _N
+                    def _chunk_loss(params, _ct=_ct, _ca=_ca):
+                        _bound = functools.partial(self.new_score_net, params=params)
+                        _losses = [self.adjoint_matching_loss(t, a, new_score_net=_bound)
+                                   for t, a in zip(_ct, _ca)]
+                        return jnp.stack(_losses).mean(), {}
+                    _g, _ = jax.grad(_chunk_loss, has_aux=True)(self.new_score_net.params)
+                    _g = jax.tree_util.tree_map(lambda z: z * _w, _g)
+                    grads = _g if grads is None else jax.tree_util.tree_map(jnp.add, grads, _g)
+            else:
+                grads, _ = jax.grad(loss_fn, has_aux=True)(self.new_score_net.params)
             if self.accelerator.sync_gradients:
                 self.new_score_net = self.new_score_net.apply_gradients(grads=grads)
                 # scheduler is folded into the optax learning_rate (reads opt_state.count); no .step().
