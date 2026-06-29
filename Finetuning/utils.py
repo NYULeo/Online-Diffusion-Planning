@@ -32,7 +32,7 @@ from Pretrain.Transition_Kernel.Kernel_Net import MoGTransitionKernel, RobustTra
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_total_mahalanobis_score, compute_log_density_mog, compute_log_density, compute_total_mahalanobis_score_mog
 from Pretrain.Dataset import KitchenDataset, PointMazeDataset, get_env, get_dataset, Planner_Processor
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv
-from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
+from Pretrain.Planners.Backbone.Sampler import sample_euler_karras, sample_euler_karras_batch
 from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Critic.nets import Critic
 from Pretrain.Dataset import get_dataset
@@ -2210,28 +2210,39 @@ def rollout_parallel2(
         for i in range(episode_length):
             actions = np.zeros((num_envs, d_a))
          
-            # Generate actions for each environment
-            for env_idx in range(num_envs):
-               if done_envs[env_idx]:
-                   continue
-               if(continual_rollout):
-                   if(len(Temp_acts[env_idx]) == 0):
-                      current_state = current_states[env_idx]
-                      current_state_norm = planner_processor.preprocess(current_state)
-                      rng, sub = jax.random.split(rng)
-                      x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device, rng=sub)
-                      for k in range(chunk_size):
-                          Temp_acts[env_idx].append(x[k, d_s:(d_s+d_a)].copy())
-
-                   actions[env_idx] = Temp_acts[env_idx][0].copy()
-                   Temp_acts[env_idx] = Temp_acts[env_idx][1:].copy()
-               else:
-                   current_state = current_states[env_idx]
-                   current_state_norm = planner_processor.preprocess(current_state)
-                   rng, sub = jax.random.split(rng)
-                   x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device, rng=sub)
-                   action = x[0, d_s:(d_s+d_a)].copy()
-                   actions[env_idx] = action
+            # Generate actions for each environment. SPEED (distribution-identical): batch the diffusion
+            # planning across all envs that replan THIS step into ONE sample_euler_karras_batch call instead
+            # of a per-env sequential sample_euler_karras (the 8 envs were serialized -> 8x the diffusions per
+            # round). Each env still gets an independent plan from its own state + its own batch row; only the
+            # per-env RNG split ordering differs (the rollout success metric is an expectation -> unchanged).
+            if continual_rollout:
+                replan = [e for e in range(num_envs)
+                          if (not done_envs[e]) and (len(Temp_acts[e]) == 0)]
+                if len(replan) > 0:
+                    states_norm = np.stack(
+                        [planner_processor.preprocess(current_states[e]) for e in replan], axis=0)
+                    rng, sub = jax.random.split(rng)
+                    Xb = sample_euler_karras_batch(
+                        states_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device, rng=sub)
+                    for bi, e in enumerate(replan):
+                        xe = Xb[bi]
+                        for k in range(chunk_size):
+                            Temp_acts[e].append(xe[k, d_s:(d_s + d_a)].copy())
+                for env_idx in range(num_envs):
+                    if done_envs[env_idx]:
+                        continue
+                    actions[env_idx] = Temp_acts[env_idx][0].copy()
+                    Temp_acts[env_idx] = Temp_acts[env_idx][1:].copy()
+            else:
+                active = [e for e in range(num_envs) if not done_envs[e]]
+                if len(active) > 0:
+                    states_norm = np.stack(
+                        [planner_processor.preprocess(current_states[e]) for e in active], axis=0)
+                    rng, sub = jax.random.split(rng)
+                    Xb = sample_euler_karras_batch(
+                        states_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device, rng=sub)
+                    for bi, e in enumerate(active):
+                        actions[e] = Xb[bi][0, d_s:(d_s + d_a)].copy()
          
             # Step all environments at once
             obs_vec, rewards_vec, terminated_vec, truncated_vec, info_vec = vec_env.step(actions)
@@ -3205,36 +3216,63 @@ def train_critic_with_planner2(
         accepted_s0    = []
         max_attempts   = kernel_config.oversample * batch_size
         attempts       = 0
+        # SPEED (distribution-identical sampling, bit-identical feasibility): the original drew ONE plan per
+        # iteration (sequential sample_euler_karras) and checked it -> up to oversample*batch_size sequential
+        # diffusions per critic step, the dominant single-GPU cost (5k-10k tiny diffusions/round). Here each
+        # round draws a CHUNK of candidate plans in ONE vectorized sample_euler_karras_batch call, then checks
+        # feasibility for the whole chunk in ONE flattened compute_log_density_mog (transitions are independent
+        # -> flatten n*(H-1) == per-plan). Diffusion schedule/score/eta identical; only the init-noise RNG
+        # differs (i.i.d. plans from the same distribution). Chunk env-overridable (lower if OOM).
+        gen_chunk = int(os.environ.get('ODP_GEN_CHUNK', str(batch_size)))
+        gen_chunk = max(1, min(gen_chunk, max_attempts))
 
         while len(accepted_plans) < batch_size and attempts < max_attempts:
-            idx    = np.random.randint(0, len(s0_pool))
-            s0_raw = s0_pool[idx]
-            s0_p   = planner_proc.preprocess(s0_raw)
-            # planner is a frozen TrainState; sample_euler_karras calls it without params= (== torch no_grad).
+            n       = min(gen_chunk, max_attempts - attempts)
+            idxs    = np.random.randint(0, len(s0_pool), size=n)
+            s0_raws = s0_pool[idxs]                                       # (n, d_s)
+            s0_ps   = np.stack([planner_proc.preprocess(s) for s in s0_raws], axis=0)
+            # planner is a frozen TrainState; sample_euler_karras_batch calls it without params= (== no_grad).
             rng, sub = jax.random.split(rng)
-            x      = sample_euler_karras(
-                s0_p, planner, obs_dim, act_dim, horizon,
+            Xb = jnp.asarray(sample_euler_karras_batch(
+                s0_ps, planner, obs_dim, act_dim, horizon,
                 num_steps=steps_T, num_karras=num_karras,
                 eta=eta, device=device, rng=sub,
-            )
+            ), dtype=jnp.float32)                                         # (n, H, dim)
 
-            x_t       = jnp.asarray(x, dtype=jnp.float32)
-            s_planner = x_t[..., :obs_dim]
-            a_raw     = x_t[..., obs_dim:]
-            s_raw_pl  = s_planner * planner_std + planner_mean
+            # ---- feasibility for the whole chunk (identical math to is_plan_feasible, batched) ----
+            if kernel_config.type_kernel == 'mog':
+                s_pl_b  = Xb[..., :obs_dim]
+                a_raw_b = Xb[..., obs_dim:]
+                s_raw_b = s_pl_b * planner_std + planner_mean
+                s_k_b   = (s_raw_b - k_mean) / k_std
+                s_t_b   = s_k_b[:, :-1]
+                a_t_b   = a_raw_b[:, :-1]
+                s_tp1_b = s_k_b[:, 1:]
+                nn, hm  = s_t_b.shape[0], s_t_b.shape[1]
+                flat_lp = _mog_logdensity_jit(
+                    s_t_b.reshape(nn * hm, -1), a_t_b.reshape(nn * hm, -1), s_tp1_b.reshape(nn * hm, -1),
+                ).reshape(nn, hm)
+                feasible = np.asarray((flat_lp > kernel_config.min_log_prob).all(axis=1))   # (n,)
+            else:
+                feasible = np.asarray([
+                    is_plan_feasible(
+                        s_raw_plan    = Xb[j, :, :obs_dim] * planner_std + planner_mean,
+                        a_raw_plan    = Xb[j, :, obs_dim:],
+                        kernels       = kernels,
+                        k_mean        = k_mean,
+                        k_std         = k_std,
+                        kernel_config = kernel_config,
+                        device        = device,
+                    ) for j in range(n)
+                ])
 
-            if is_plan_feasible(
-                s_raw_plan    = s_raw_pl,
-                a_raw_plan    = a_raw,
-                kernels       = kernels,
-                k_mean        = k_mean,
-                k_std         = k_std,
-                kernel_config = kernel_config,
-                device        = device,
-            ):
-                accepted_plans.append(x_t)
-                accepted_s0.append(s0_raw)
-            attempts += 1
+            for j in range(n):
+                if len(accepted_plans) >= batch_size:
+                    break
+                if feasible[j]:
+                    accepted_plans.append(Xb[j])
+                    accepted_s0.append(s0_raws[j])
+            attempts += n
 
         if len(accepted_plans) == 0:
             raise RuntimeError(

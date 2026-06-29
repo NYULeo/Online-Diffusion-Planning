@@ -179,6 +179,79 @@ def sample_euler_karras(
     return np.asarray(x.squeeze(0))
 
 
+def sample_euler_karras_batch(
+    s0_batch: np.ndarray,
+    score_model,
+    d_s: int,
+    d_a: int,
+    horizon: int,
+    num_steps: int = 50,
+    num_karras: int = 5,
+    eta: float = 1.0,
+    device: Optional[str] = None,
+    *,
+    rng=None,
+) -> np.ndarray:
+    '''Batched `sample_euler_karras`: s0_batch (B, d_s) -> (B, horizon, dim).
+
+    DISTRIBUTION-IDENTICAL to looping `sample_euler_karras` over the B rows (NOT bit-identical RNG):
+    every step uses the SAME karras β schedule, the SAME frozen score forward (DiT is per-sample — adaLN
+    and within-sequence attention never mix the batch, so apply on (B,H,dim) == apply per-row), the SAME
+    Euler update / conditioning / clip. The only difference is the init noise is drawn once as (B,H,dim)
+    instead of B draws of (1,H,dim), so each row is still an i.i.d. plan from the identical sampling
+    distribution. Used to collapse the sequential per-plan loops in `_generate_feasible_plans`
+    (critic retrain) and `rollout_parallel2` into ONE vectorized diffusion call on a single GPU — what the
+    torch original gets for free by splitting plans across 8 GPUs + eager-pipelining.'''
+    s0_t = jnp.asarray(s0_batch, dtype=jnp.float32)
+    if s0_t.ndim != 2 or s0_t.shape[1] != d_s:
+        raise ValueError(f"s0_batch should have shape (B, {d_s}), but got {s0_t.shape}")
+    B = s0_t.shape[0]
+    dim = d_s + d_a
+
+    t_grid, beta_1, sigma_grid = karras_beta_schedule(num_steps, device=device)
+    beta_2 = cosine_beta(t_grid, s=0.008)
+
+    rng, k = jax.random.split(rng)
+    x = jax.random.normal(k, (B, horizon, dim)) * sigma_grid[0]
+
+    mask = jnp.zeros((1, horizon, dim))
+    mask = mask.at[:, 0, :d_s].set(1.0)
+    y = jnp.zeros((B, horizon, dim))
+    y = y.at[:, 0, :d_s].set(s0_t)
+    x = mask * y + (1 - mask) * x
+
+    use_jit = hasattr(score_model, 'model_def') and hasattr(score_model, 'params')
+    if use_jit:
+        apply_fn = _jitted_score_apply(score_model.model_def)
+
+    for i in range(num_steps):
+        t_now = t_grid[i]
+        t_next = t_grid[i + 1] if i < num_steps - 1 else 0.0
+        dt = float(t_next - t_now)
+        beta_now = float(beta_1[i]) if i < num_karras else float(beta_2[i])
+
+        drift = -0.5 * beta_now * x
+        # time broadcast to the batch (B,), matching the per-row t_now[None] in sample_euler_karras.
+        t_b = jnp.broadcast_to(t_now, (B,))
+        if use_jit:
+            score = apply_fn({'params': score_model.params}, x, t_b)
+        else:
+            score = score_model(x, t_b)
+
+        if eta > 0:
+            rng, kk = jax.random.split(rng)
+            noise = jax.random.normal(kk, x.shape, dtype=x.dtype)
+            noise_scale = eta * math.sqrt(beta_now * (-dt))
+            x = x + ((drift - beta_now * score) * dt + noise_scale * noise)
+        else:
+            x = x + (drift - beta_now * score) * dt
+
+        x = mask * y + (1 - mask) * x
+        x = clip_actions(x, d_s)
+
+    return np.asarray(x)   # (B, horizon, dim)
+
+
 # ------------------------------------------------------------------ #
 # 1. Hybrid schedule (Karras speed + cosine smoothness)
 # ------------------------------------------------------------------ #
