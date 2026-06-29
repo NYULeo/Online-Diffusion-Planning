@@ -265,7 +265,12 @@ def stage_critic(args, group):
     #   (2) train_critic_with_planner2(old=0, new=0) to overwrite checkpoint 0 on the normalized scale.
     # The finetune loop then retrains it every round (update_critic=True) on the *improving* planner.
     init_steps = SMOKE['critic'] if args.smoke else 2000
-    planner_steps = SMOKE['critic'] if args.smoke else 200
+    # planner2 generates feasible plans ONE AT A TIME (sequential diffusion sample + 10-member MoG feasibility
+    # check), so total cost ~ batch_size * planner_steps * (#feasibility attempts). The teammate's torch run
+    # tolerates 128/256-wide batches; the JAX port's sequential loop does not, so we use a small batch + few
+    # steps here. The critic's value scale comes from the DATA (clamped reward net on far-from-goal planner
+    # plans -> small targets -> v~O(1)), NOT from the plan count, so a small batch still fixes reward~50.
+    planner_steps = SMOKE['critic'] if args.smoke else 30
     init_run('critic', group,
                      config=dict(stage='critic', env=ENV_NAME, specific=SPECIFIC_PLAY, task_id=TASK_ID,
                                  init_steps=init_steps, planner_steps=planner_steps, hidden_dim=512,
@@ -297,7 +302,7 @@ def stage_critic(args, group):
     # (2) normalized planner-rollout critic -> overwrites checkpoint 0 (same path get_critic_model loads).
     rng2 = set_seed(args.seed + 1)
     kcfg = KernelConfig(checkpoint=0, type_kernel='mog', num_hidden_layers=4, hidden_dim=514,
-                        num_modes=10, noise_floor=5e-4, min_log_prob=-110.0, oversample=5)
+                        num_modes=10, noise_floor=5e-4, min_log_prob=-110.0, oversample=3)
     train_critic_with_planner2(
         trajs=trajs,
         dataset_name=ENV_NAME,
@@ -310,7 +315,7 @@ def stage_critic(args, group):
         kernel_config=kcfg,
         reward_hidden_layers=4,
         reward_hidden_dim=512,
-        batch_size=128,
+        batch_size=32,
         num_steps=planner_steps,
         horizon=HORIZON,
         gamma=0.99,
@@ -418,8 +423,9 @@ def stage_finetune(args, group):
         train_kernel_config=Train_Kernel_Config(num_steps=ft_kernel_steps),
         # teammate cube/single-play TrainCriticConfig: the per-round online retrain runs num_steps=20 at
         # lr=1e-5 (the offline path uses AMConfig.horizon=32, not this horizon field). hidden 4/512 must
-        # match the saved critic. momentum/data_conservation per teammate.
-        train_critic_config=Train_Critic_Config(hidden_layers=4, hidden_dim=512, batch_size=256,
+        # match the saved critic. batch_size cut 256->32: planner2's per-plan sequential sampling makes a
+        # 256-wide batch x 20 steps x 30 rounds far too slow in the JAX port (see stage_critic note).
+        train_critic_config=Train_Critic_Config(hidden_layers=4, hidden_dim=512, batch_size=32,
                                                  num_steps=20, lr=1e-5, min_lr=1e-6, tau=0.005,
                                                  gamma=0.99, horizon=HORIZON,
                                                  data_conservation=True, momentum=0.1),
