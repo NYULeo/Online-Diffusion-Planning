@@ -148,6 +148,10 @@ class Acc_AdjointMatchingFineTuner:
         self._score_apply = jax.jit(self.old_score_net.model_def.apply)
         self.set_ema_model()
         self.set_optimizer_and_scheduler()
+        # Live LR carried across rounds: torch reads optimizer.param_groups[0]['lr'] (the value the previous
+        # round's CosineAnnealingLR decayed to) as the next round's peak. We replicate exactly by updating
+        # self._am_live_lr = scheduler(per_round_steps) at each round's end.
+        self._am_live_lr = self.config.finetune_lr
         self.set_alpha_scheduler()
         self.set_lambda()
         self.set_reward_tracker()
@@ -761,15 +765,12 @@ class Acc_AdjointMatchingFineTuner:
         if(round > 1):
             self.set_lambda(reward_model.get_beta())
             self.set_ema_model()
-            # FAITHFUL fix: torch continued the cosine from the LIVE decayed lr (param_groups[0]['lr']) each
-            # round, so the lr decays across the whole run. optax has no param_groups, so we continue the
-            # GLOBAL cosine: evaluate it at the steps already consumed, then decay over the remaining steps.
-            # The previous code restarted at config.finetune_lr every round -> the lr stayed ~peak and never
-            # decayed across rounds (a real divergence in late rounds).
-            steps_done = (round - 1) * self.config.per_round_steps
-            total = max(self.config.finetune_total_steps, 1)
-            decayed_lr = self.config.finetune_lr * 0.5 * (1.0 + math.cos(math.pi * min(steps_done / total, 1.0)))
-            self.set_optimizer_and_scheduler(new_lr = decayed_lr, new_steps = self.config.finetune_total_steps - ((round-1)*self.config.per_round_steps))
+            # EXACT match to torch: continue from the LIVE decayed lr of the previous round (torch read
+            # optimizer.param_groups[0]['lr']), then build the cosine over the remaining steps. self._am_live_lr
+            # is refreshed at each round's end to scheduler(per_round_steps) == torch's CosineAnnealingLR value
+            # after per_round_steps steps, so the cosine compounds across rounds identically (not a restart, and
+            # not the global-cosine approximation that drifted ~6% by round 3).
+            self.set_optimizer_and_scheduler(new_lr = self._am_live_lr, new_steps = self.config.finetune_total_steps - ((round-1)*self.config.per_round_steps))
 
 
         if self.accelerator.is_main_process:
@@ -865,6 +866,11 @@ class Acc_AdjointMatchingFineTuner:
 
              step = step+1
              self.accelerator.wait_for_everyone()
+
+        # Refresh the live LR to this round's end value: scheduler() is the current round's cosine (the config
+        # schedule over finetune_total_steps for round 1, or the remaining-steps cosine for round>1), so
+        # scheduler(per_round_steps) == torch's param_groups[0]['lr'] after this round. Round r+1 continues from it.
+        self._am_live_lr = float(self.scheduler(self.config.per_round_steps))
 
         if self.accelerator.is_main_process:
              save_planner(self.ema_model, self.config.dataset_name, self.config.specific_dataset, (round*self.config.per_round_steps), task_id = self.config.task_id)
