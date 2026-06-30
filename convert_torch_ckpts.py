@@ -272,12 +272,21 @@ def main():
     from Pretrain.Critic.nets import Critic
     from Pretrain.Transition_Kernel.Kernel_Net import MoGTransitionKernel
     from Pretrain.Planners.Backbone.Dit import DiT1d
-    from Finetuning.utils import get_env
     import torch
 
-    _, OBS, ACT = get_env('cube', 'single')
-    DIMS = {'obs': int(OBS), 'act': int(ACT)}
-    print(f"[dims] obs={OBS} act={ACT}")
+    # Derive obs/act dims straight from the checkpoint shapes -> no get_env / OGBench dataset load and no
+    # dependency on the dataset's specific-name (which 'single' is not). critic net.0.weight = (hidden, obs);
+    # reward net.0.weight = (hidden, obs+act). torch.load reads a state_dict without needing model classes.
+    def _find1(fname):
+        hits = sorted(glob.glob(os.path.join(args.src, '**', fname), recursive=True))
+        if not hits:
+            raise FileNotFoundError(f"'{fname}' not found under --src '{args.src}'.")
+        return hits[0]
+    OBS = int(torch.load(_find1('Cube_SinglePlay_task4_Critic_0.pkl'), map_location='cpu')['net.0.weight'].shape[1])
+    _rin = int(torch.load(_find1('Cube_Single_Task4_Reward_0.pkl'), map_location='cpu')['net.0.weight'].shape[1])
+    ACT = _rin - OBS
+    DIMS = {'obs': OBS, 'act': ACT}
+    print(f"[dims] obs={OBS} act={ACT} (derived from critic/reward checkpoint shapes)")
 
     rng = np.random.default_rng(0)
     INS = {
