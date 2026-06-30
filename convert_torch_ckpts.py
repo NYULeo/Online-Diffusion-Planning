@@ -106,14 +106,20 @@ np.savez(sys.argv[2], **out)
 
 
 def torch_refs(torch_repo, nets, ins, dims):
-    """Run the torch nets in a subprocess (cwd=torch_repo) -> dict name->output array."""
+    """Run the torch nets in a subprocess -> dict name->output array. The torch repo is put on PYTHONPATH
+    (NOT just cwd: `python script.py` adds the SCRIPT's dir to sys.path, not cwd) so its Pretrain.* imports
+    + their relative imports resolve to the torch repo."""
+    torch_repo = os.path.abspath(torch_repo)
+    if not os.path.isdir(torch_repo):
+        raise FileNotFoundError(f"--torch-repo '{torch_repo}' is not a directory.")
     with tempfile.TemporaryDirectory() as td:
         srcf = os.path.join(td, '_torch_ref.py')
         specf = os.path.join(td, 'spec.pkl')
         outf = os.path.join(td, 'out.npz')
         open(srcf, 'w').write(_TORCH_REF_SRC)
         pickle.dump({'nets': nets, 'ins': ins, 'dims': dims}, open(specf, 'wb'))
-        r = subprocess.run([sys.executable, srcf, specf, outf], cwd=torch_repo,
+        env = {**os.environ, 'PYTHONPATH': torch_repo + os.pathsep + os.environ.get('PYTHONPATH', '')}
+        r = subprocess.run([sys.executable, srcf, specf, outf], cwd=torch_repo, env=env,
                            capture_output=True, text=True)
         if r.returncode != 0:
             raise RuntimeError(f"torch ref subprocess failed:\nSTDOUT{r.stdout}\nSTDERR{r.stderr}")
