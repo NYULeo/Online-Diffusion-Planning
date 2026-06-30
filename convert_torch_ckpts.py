@@ -21,6 +21,7 @@ Reads  (torch.save):  <src>/{Rewards,Critics,Kernels,Planners}/cube/<spec>/Model
 Writes (flax pickle): <dst>/{Rewards,Critics,Kernels,Planners}/cube/<spec>/Models|Stats/...
 """
 import argparse
+import glob
 import os
 import pickle
 import subprocess
@@ -277,35 +278,42 @@ def main():
     }
 
     S = args.src
-    # (name, kind, torch_path, dst_model_path, dst_stats_src, dst_stats_dst, info)
+    # Source files are located by NAME anywhere under --src (recursive) so the staging layout doesn't matter
+    # (whatever folder you copied under ODP-jax). Destinations are the pipeline's EXISTING checkpoint dirs.
+    def find_src(fname):
+        hits = sorted(glob.glob(os.path.join(S, '**', fname), recursive=True))
+        if len(hits) == 0:
+            raise FileNotFoundError(
+                f"'{fname}' not found under --src '{S}'. Point --src at the folder that holds the torch checkpoints.")
+        if len(hits) > 1:
+            raise RuntimeError(f"'{fname}' is ambiguous under '{S}' ({hits}). Use a clean staging dir.")
+        return hits[0]
+
+    # (name, kind, model_filename, dst_model_path, stats_filename, dst_stats_path, info)
     jobs = []
     def J(name, kind, mp, dp, sp, sdp, **info):
         jobs.append((name, kind, mp, dp, sp, sdp, info))
-    J('reward', 'reward',
-      f'{S}/Rewards/cube/single/Models/Cube_Single_Task4_Reward_0.pkl',
+    J('reward', 'reward', 'Cube_Single_Task4_Reward_0.pkl',
       f'{args.dst}/Rewards/cube/single/Models/Cube_Single_Task4_Reward_0.pkl',
-      f'{S}/Rewards/cube/single/Stats/Cube_Single_Task4_Reward_stats_0.pkl',
+      'Cube_Single_Task4_Reward_stats_0.pkl',
       f'{args.dst}/Rewards/cube/single/Stats/Cube_Single_Task4_Reward_stats_0.pkl',
       hid=REWARD_HID, layers=REWARD_LAYERS)
-    J('critic', 'critic',
-      f'{S}/Critics/cube/single-play/Models/Cube_SinglePlay_task4_Critic_0.pkl',
+    J('critic', 'critic', 'Cube_SinglePlay_task4_Critic_0.pkl',
       f'{args.dst}/Critics/cube/single-play/Models/Cube_SinglePlay_task4_Critic_0.pkl',
-      f'{S}/Critics/cube/single-play/Stats/Cube_SinglePlay_task4_Critic_stats_0.pkl',
+      'Cube_SinglePlay_task4_Critic_stats_0.pkl',
       f'{args.dst}/Critics/cube/single-play/Stats/Cube_SinglePlay_task4_Critic_stats_0.pkl',
       hid=CRITIC_HID, layers=CRITIC_LAYERS)
     for i in range(10):
-        J(f'kernel{i}', 'kernel',
-          f'{S}/Kernels/cube/single/Models/0/Cube_Single_Kernel_{i}.pkl',
+        J(f'kernel{i}', 'kernel', f'Cube_Single_Kernel_{i}.pkl',
           f'{args.dst}/Kernels/cube/single/Models/0/Cube_Single_Kernel_{i}.pkl',
           None, None,
           modes=KERNEL_MODES, layers=KERNEL_LAYERS, hid=KERNEL_HID, noise=KERNEL_NOISE)
     J('kernel_stats', 'copystats', None, None,
-      f'{S}/Kernels/cube/single/Stats/Cube_Single_Kernel_stats_0.pkl',
+      'Cube_Single_Kernel_stats_0.pkl',
       f'{args.dst}/Kernels/cube/single/Stats/Cube_Single_Kernel_stats_0.pkl')
-    J('planner', 'planner',
-      f'{S}/Planners/cube/single-play/Models/Cube_SinglePlay_task4_Planner_0.pt',
+    J('planner', 'planner', 'Cube_SinglePlay_task4_Planner_0.pt',
       f'{args.dst}/Planners/cube/single-play/Cube_SinglePlay_task4_Planner_0.pt',
-      f'{S}/Planners/cube/single-play/Stats/Cube_SinglePlay_task4_Planner_stats.pkl',
+      'Cube_SinglePlay_task4_Planner_stats.pkl',
       # planner STATS are read by Planner_Processor from PRETRAIN_DIR/Planners/.../Stats (NOT Finetuning),
       # so they MUST land under Pretrain/ to override the JAX-pretrain normalization for the converted planner.
       'Pretrain/Planners/cube/single-play/Stats/Cube_SinglePlay_task4_Planner_stats.pkl',
@@ -315,7 +323,7 @@ def main():
     ref_nets = {}
     for name, kind, mp, dp, sp, sdp, info in jobs:
         if kind in ('reward', 'critic', 'kernel', 'planner'):
-            ref_nets[name] = {'kind': kind, 'path': os.path.abspath(mp), **info}
+            ref_nets[name] = {'kind': kind, 'path': find_src(mp), **info}
     print(f"[torch] computing reference forwards for {len(ref_nets)} nets via subprocess ...")
     refs = torch_refs(args.torch_repo, ref_nets, INS, DIMS)
 
@@ -355,8 +363,8 @@ def main():
     n_ok = 0
     for name, kind, mp, dp, sp, sdp, info in jobs:
         if kind == 'copystats':
-            copy_stats(sp, sdp); print(f"  [{name}] stats copied"); continue
-        sd = torch.load(mp, map_location='cpu')
+            copy_stats(find_src(sp), sdp); print(f"  [{name}] stats copied"); continue
+        sd = torch.load(find_src(mp), map_location='cpu')
         if kind == 'planner':
             sd = sd['ema']
         sd = {k: np.asarray(v.detach().cpu().numpy() if hasattr(v, 'detach') else v) for k, v in sd.items()}
@@ -400,7 +408,7 @@ def main():
         else:
             save_pickle(dp, flax.serialization.to_state_dict(params))
         if sp and sdp:
-            copy_stats(sp, sdp)
+            copy_stats(find_src(sp), sdp)
         n_ok += 1
         print(f"  [{name}] -> {dp}")
 
