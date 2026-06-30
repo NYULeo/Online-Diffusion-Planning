@@ -30,6 +30,12 @@ import tempfile
 
 import numpy as np
 
+# The converter only does tiny tensor reshapes + small parity forwards, so force JAX onto CPU: it then never
+# initializes cuDNN/the GPU driver (avoids CUDNN_STATUS_NOT_INITIALIZED on a driver/cuDNN-version mismatch).
+# Must be set BEFORE any jax import (the Pretrain.* imports trigger jax at module load). Does NOT affect the
+# finetune, which runs as a separate process and keeps using the GPU. Override with JAX_PLATFORMS=... if needed.
+os.environ.setdefault('JAX_PLATFORMS', 'cpu')
+
 TOL = 2e-3   # float32 forward: a correct mapping is ~1e-5-1e-4; a real bug is O(0.1+)
 
 # cube/task4 dims (from run_cube_pipeline.py): reward/kernel use specific='single', critic/planner='single-play'.
