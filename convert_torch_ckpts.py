@@ -44,14 +44,33 @@ PLAN_EMB_TYPE = 'fourier'
 _TORCH_REF_SRC = r'''
 import sys, os, pickle
 import numpy as np
-import torch
-# cwd is the torch repo, so these resolve to the TORCH classes.
-from Pretrain.Rewards.nets import SimpleReward as TReward
-from Pretrain.Critic.nets import Critic as TCritic
+import torch, torch.nn as nn
+# The torch repo defines SimpleReward/Critic MULTIPLE times in one file; `import` would grab the LAST
+# (a wrong fixed-arch Critic). So reward/critic are rebuilt GENERICALLY here to match the checkpoint keys
+# net.0..15 ([Linear,LN,SiLU]x(1+layers) + final Linear). MoG and DiT1d are single-def -> import them.
 from Pretrain.Transition_Kernel.Kernel_Net import MoGTransitionKernel as TKernel
 from Pretrain.Planners.Backbone.Dit import DiT1d as TDiT
 
-spec = pickle.load(open(sys.argv[1], 'rb'))   # {'job':..., 'ins':{...}, 'ckpts':{...}, 'dims':{...}}
+def _mlp(in_dim, hidden, n_blocks):
+    layers = [nn.Linear(in_dim, hidden), nn.LayerNorm(hidden), nn.SiLU()]
+    for _ in range(n_blocks - 1):
+        layers += [nn.Linear(hidden, hidden), nn.LayerNorm(hidden), nn.SiLU()]
+    layers += [nn.Linear(hidden, 1)]
+    return nn.Sequential(*layers)
+
+class RewardNet(nn.Module):
+    def __init__(self, obs, act, hidden, layers):
+        super().__init__(); self.net = _mlp(obs + act, hidden, 1 + layers)
+    def forward(self, o, a):
+        return self.net(torch.cat([o, a], -1)).squeeze(-1)
+
+class CriticNet(nn.Module):
+    def __init__(self, obs, hidden, layers):
+        super().__init__(); self.net = _mlp(obs, hidden, 1 + layers)
+    def forward(self, o):
+        return self.net(o).squeeze(-1)
+
+spec = pickle.load(open(sys.argv[1], 'rb'))
 out = {}
 d = spec['dims']
 torch.manual_seed(0)
@@ -61,11 +80,11 @@ with torch.no_grad():
         if kind == 'planner':
             sd = sd['ema']
         if kind == 'reward':
-            net = TReward(d['obs'], d['act'], info['hid'], info['layers'])
+            net = RewardNet(d['obs'], d['act'], info['hid'], info['layers'])
             net.load_state_dict(sd); net.eval()
             o = net(torch.tensor(spec['ins']['obs']), torch.tensor(spec['ins']['act']))
         elif kind == 'critic':
-            net = TCritic(d['obs'], info['hid'], info['layers'])
+            net = CriticNet(d['obs'], info['hid'], info['layers'])
             net.load_state_dict(sd); net.eval()
             o = net(torch.tensor(spec['ins']['obs']))
         elif kind == 'kernel':
