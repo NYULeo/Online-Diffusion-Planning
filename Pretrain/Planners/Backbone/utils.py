@@ -220,12 +220,20 @@ class FourierEmbedding(nn.Module):
 
     @nn.compact
     def __call__(self, x, *, rng=None):
-        # `freqs` is a frozen (requires_grad=False) buffer initialized from randn * scale. To survive a
-        # params-only TrainState (the planner/sampler call `apply` with only {'params'}), it is computed
-        # as a deterministic constant from a fixed key instead of a 'consts'-collection variable — i.e.
-        # drawn once-equivalent: identical on every call, never trained. init: fql-style (not torch-identical).
-        key = rng if rng is not None else jax.random.PRNGKey(0)
-        freqs = jax.random.normal(key, (self.dim // 8,)) * self.scale
+        # `freqs` is torch's frozen (requires_grad=False) Fourier buffer. It is declared as a NON-TRAINABLE
+        # param so it (a) travels with the checkpoint — a converted torch planner stores its real freqs and
+        # from_state_dict restores them — and (b) stays frozen via stop_gradient (zero grad; any adamw
+        # weight-decay drift over a finetune is ~lr*wd*steps, negligible). The init_fn reproduces the previous
+        # inline value EXACTLY (PRNGKey(0) draw), so a planner trained FROM SCRATCH is numerically unchanged;
+        # a torch-converted checkpoint simply overwrites this leaf with torch's map_noise.freqs.
+        # NOTE: checkpoints saved BEFORE this change lack the 'freqs' leaf and won't load via from_state_dict;
+        # use convert_torch_ckpts.py (which writes the leaf) or re-save. init: fql-style (not torch-identical).
+        freqs = self.param(
+            'freqs',
+            lambda _k, shape: jax.random.normal(jax.random.PRNGKey(0), shape) * self.scale,
+            (self.dim // 8,),
+        )
+        freqs = jax.lax.stop_gradient(freqs)
         emb = jnp.einsum('...i,j->...ij', x, (2 * np.pi * freqs).astype(x.dtype))
         # emb = x.ger((2 * np.pi * self.freqs).to(x.dtype))
         emb = jnp.concatenate([jnp.cos(emb), jnp.sin(emb)], -1)

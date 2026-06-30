@@ -57,3 +57,6 @@ exp/
 wandb/
 plots/
 logs/
+
+# teammate torch checkpoints (staged for conversion; transfer via scp, not git)
+checkpoints/
