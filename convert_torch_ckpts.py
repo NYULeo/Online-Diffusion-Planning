@@ -306,7 +306,9 @@ def main():
       f'{S}/Planners/cube/single-play/Models/Cube_SinglePlay_task4_Planner_0.pt',
       f'{args.dst}/Planners/cube/single-play/Cube_SinglePlay_task4_Planner_0.pt',
       f'{S}/Planners/cube/single-play/Stats/Cube_SinglePlay_task4_Planner_stats.pkl',
-      f'{args.dst}/Planners/cube/single-play/Stats/Cube_SinglePlay_task4_Planner_stats.pkl',
+      # planner STATS are read by Planner_Processor from PRETRAIN_DIR/Planners/.../Stats (NOT Finetuning),
+      # so they MUST land under Pretrain/ to override the JAX-pretrain normalization for the converted planner.
+      'Pretrain/Planners/cube/single-play/Stats/Cube_SinglePlay_task4_Planner_stats.pkl',
       emb=PLAN_EMB, dmodel=PLAN_DMODEL, heads=PLAN_HEADS, depth=PLAN_DEPTH, emb_type=PLAN_EMB_TYPE)
 
     # 1) torch ground-truth (subprocess, cwd=torch_repo)
