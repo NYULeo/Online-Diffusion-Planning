@@ -73,7 +73,7 @@ def check_cube_double_goal_reach(trajs, task_id):
     average_dist = total_dist/len(trajs)
     print(f"Task {task_id} average distance: {average_dist}")
 
-data = get_dataset('cube','single-play', task_id = 4)
+data = get_dataset('cube','single-play', task_id = 4, mode = 'reward')
 trajs = data.get_trajectories()
 print(len(trajs))
 exit()

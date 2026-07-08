@@ -796,6 +796,7 @@ class CubeDataset_Singletask:
         
         self.name = name
         self.traj_length = traj_length
+        self.mode = mode
         name_to_id = {
             "single-play": f"cube-single-play-singletask-task{task_id}-v0",
             "single-noisy": f"cube-single-noisy-singletask-task{task_id}-v0",
