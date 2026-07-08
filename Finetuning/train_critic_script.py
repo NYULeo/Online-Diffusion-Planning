@@ -36,10 +36,9 @@ from Pretrain.utils import set_seed
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'cube'
-       specific_env = 'double-play'
-       traj_length = None
+       specific_env = 'single-play'
+       traj_length = 200
        horizon = 32
-       #horizon = 300
        task_id = 4
        step = 0
       
@@ -48,7 +47,26 @@ if __name__ == '__main__':  # pragma: no cover
        #trajs = load_success_trajs(env_name, specific_env, task_id, step)
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
-       
+       train_critic_with_reward(trajs,
+                      dataset_name  = env_name,
+                      specific_dataset = specific_env,
+                      reward_hidden_layers = 4,
+                      reward_hidden_dim  = 512,
+                      reward_checkpoint  = 0,
+                      critic_hidden_layers = 4,
+                      critic_hidden_dim  = 512,
+                      batch_size = 256,
+                      num_steps  = 20000,
+                      gamma = 0.99,
+                      lam = 0.95,
+                      horizon = horizon,
+                      lr = 1e-04, 
+                      min_lr = 1e-05, 
+                      tau = 0.005, 
+                      old_step = None,    # from scratch
+                      new_step = step,
+                      momentum = 0.005,   # unused when old_step is None
+                      task_id = task_id)
        """
        train_critic(trajs, 
              dataset_name = env_name, 
@@ -72,28 +90,9 @@ if __name__ == '__main__':  # pragma: no cover
              target_reward = 300.0,
              task_id = task_id)  
        """
-       """
-       train_critic_with_reward(trajs,
-                      dataset_name  = env_name,
-                      specific_dataset = specific_env,
-                      reward_hidden_layers = 4,
-                      reward_hidden_dim  = 512,
-                      reward_checkpoint  = 0,
-                      critic_hidden_layers = 4,
-                      critic_hidden_dim  = 512,
-                      batch_size = 256,
-                      num_steps  = 20000,
-                      gamma = 0.99,
-                      lam = 0.95,
-                      horizon = horizon,
-                      lr = 1e-04, 
-                      min_lr = 1e-05, 
-                      tau = 0.005, 
-                      old_step = None,    # from scratch
-                      new_step = step,
-                      momentum = 0.005,   # unused when old_step is None
-                      task_id = task_id)
-       """
+       
+      
+       
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
@@ -103,7 +102,7 @@ if __name__ == '__main__':  # pragma: no cover
             gamma = 0.99, 
             horizon = horizon,  
             sigma = 4.0, 
-            target_reward = 300.0, 
+            target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
        

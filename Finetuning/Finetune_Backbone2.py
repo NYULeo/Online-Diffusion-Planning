@@ -286,7 +286,7 @@ class OnlineFinetuner():
              self.Base_Critic_Buffer = None
 
         if(self.config.train_reward_config.task_id is not None):
-            dataset_reward = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = self.config.train_buffer_cutoff_length)
+            dataset_reward = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = self.config.train_buffer_cutoff_length, mode = 'reward')
             trajs_reward = dataset_reward.get_trajectories()
             dataset_kernel = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id)
             trajs_kernel = dataset_kernel.get_trajectories()

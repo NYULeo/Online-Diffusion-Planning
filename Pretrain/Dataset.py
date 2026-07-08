@@ -103,7 +103,13 @@ def reward_processor(rewards, name: str):
     else:
          return spare_reward_processor(rewards)
     
-def get_dataset(name: str, specific_name: str, task_id: Optional[int] = None, goal: Optional[np.array] = None, traj_length: Optional[int] = None, mode: Optional[str] = None):
+def get_dataset(name: str, 
+                specific_name: str, 
+                task_id: Optional[int] = None, 
+                goal: Optional[np.array] = None, 
+                traj_length: Optional[int] = None, 
+                mode: Optional[str] = None):
+
        if(name == 'kitchen'):
             return KitchenDataset(specific_name)
        elif(name == 'pointmaze'):
@@ -119,7 +125,7 @@ def get_dataset(name: str, specific_name: str, task_id: Optional[int] = None, go
             if(task_id is None):
                 return CubeDataset(specific_name)
             else:
-                return CubeDataset_Singletask(specific_name, task_id, traj_length)
+                return CubeDataset_Singletask(specific_name, task_id, traj_length, mode)
        
        else:
             raise ValueError(f"Invalid Dataset name: {name}")     
@@ -786,7 +792,7 @@ class OGPointmazeDataset_Singletask:
         return env
 
 class CubeDataset_Singletask:
-    def __init__(self, name: str, task_id, traj_length: Optional[int] = None):
+    def __init__(self, name: str, task_id, traj_length: Optional[int] = None, mode: Optional[str] = None):
         
         self.name = name
         self.traj_length = traj_length
@@ -838,10 +844,11 @@ class CubeDataset_Singletask:
                           last_start = i + 1
                           continue
                      
-                     if(sum(rews) == 0):
-                          last_start = i + 1
-                          continue 
-                    
+                     if(self.mode == 'reward'):
+                        if(sum(rews) == 0):
+                            last_start = i + 1
+                            continue 
+                     
                          
                      trajectory = {
                            "observations": obs_slice[index:],

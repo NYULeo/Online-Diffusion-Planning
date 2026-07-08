@@ -73,8 +73,10 @@ def check_cube_double_goal_reach(trajs, task_id):
     average_dist = total_dist/len(trajs)
     print(f"Task {task_id} average distance: {average_dist}")
 
-
-
+data = get_dataset('cube','single-play', task_id = 4)
+trajs = data.get_trajectories()
+print(len(trajs))
+exit()
 env, dataset, eval_dataset = ogbench.make_env_and_datasets(
                  "cube-double-play-singletask-task4-v0", render_mode="rgb_array"
                   )
