@@ -649,6 +649,7 @@ class OnlineFinetuner():
                 seed_base = rank * num_envs_per_process
                 trajs, score, success_rate, total_steps = rollout_parallel2(self.config.dataset_name, 
                                              self.config.specific_dataset, 
+                                             backbone_layers = self.config.AMConfig.backbone_layers,
                                              horizon = self.config.AMConfig.horizon, 
                                              steps_T = self.config.diffusion_steps, 
                                              num_karras = self.config.AMConfig.num_karras, 
@@ -706,6 +707,7 @@ class OnlineFinetuner():
                                planner_checkpoint     = ((step+1) * self.config.AMConfig.per_round_steps),
                                reward_checkpoint      = self.config.reward_model_checkpoint,
                                old_critic_checkpoint  = self.config.critic_model_checkpoint,
+                               backbone_layers        = self.config.AMConfig.backbone_layers,
                                hidden_layers          = self.config.train_critic_config.hidden_layers,
                                hidden_dim             = self.config.train_critic_config.hidden_dim,
                                kernel_config          = self.kernel_config,
@@ -822,6 +824,7 @@ class OnlineFinetuner():
                                planner_checkpoint     = ((step+1) * self.config.AMConfig.per_round_steps),
                                reward_checkpoint      = ((step+1) * self.config.AMConfig.per_round_steps),
                                old_critic_checkpoint  = self.config.critic_model_checkpoint,
+                               backbone_layers        = self.config.AMConfig.backbone_layers,
                                hidden_layers          = self.config.train_critic_config.hidden_layers,
                                hidden_dim             = self.config.train_critic_config.hidden_dim,
                                kernel_config          = self.kernel_config,

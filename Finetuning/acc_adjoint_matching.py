@@ -43,6 +43,7 @@ class Acc_AdjointMatchingConfig:
     specific_dataset: Optional[str] = None
     task_id: Optional[int] = None
     backbone_name: str = 'transformer'
+    backbone_layers: int = 2
     eta: float = 0.8
     diffusion_steps: int = 30
     num_karras: int = 2
@@ -179,13 +180,13 @@ class Acc_AdjointMatchingFineTuner:
         state_dict = get_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint, self.config.task_id)
         #state_dict = get_pretrained_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
         if( self.config.dataset_name == 'kitchen'):
-              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
+              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth = self.config.backbone_layers, timestep_emb_type="fourier")
         elif (self.config.dataset_name == 'pointmaze'):
-              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
+              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth = self.config.backbone_layers, timestep_emb_type="fourier")
         elif (self.config.dataset_name == 'cube'):
-              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
+              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth = self.config.backbone_layers, timestep_emb_type="fourier")
         elif (self.config.dataset_name == 'ogpointmaze'):
-              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
+              self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth = self.config.backbone_layers, timestep_emb_type="fourier")
         else:
               raise ValueError(f"Invalid Environment: {self.config.dataset_name}")
         self.old_score_net.load_state_dict(state_dict)
@@ -216,7 +217,7 @@ class Acc_AdjointMatchingFineTuner:
          if(self.config.backbone_name == 'transformer'):
               self.new_score_net = DiT1d(
                    in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128,
-                   d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier")
+                   d_model = 256, n_heads = 256//64, depth = self.config.backbone_layers, timestep_emb_type="fourier")
               self.new_score_net.load_state_dict(self.old_score_net.state_dict())
               self.new_score_net.train()
          elif(self.config.backbone_name == 'unet'):

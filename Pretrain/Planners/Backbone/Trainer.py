@@ -27,6 +27,7 @@ class SDETrainer:
         task_id,
         horizon,
         backbone_name,
+        backbone_layers = 2,
         num_steps = 1000000,
         batch_size = 128,
         lr=2e-4,
@@ -54,7 +55,7 @@ class SDETrainer:
             self.Dimension = self.state_dim + self.action_dim
             self.stride = 1
         self.backbone_name = backbone_name
-        self.backbone_selection()
+        self.backbone_selection(backbone_layers)
         self.model_name = get_PlannerName(self.dataset_name, self.specific_dataset, self.task_id)
         self.ema_model = copy.deepcopy(self.model).to(self.device)
         self.reset_parameters()
@@ -187,11 +188,11 @@ class SDETrainer:
     
         print(f"Pretraining hyperparameters saved to {filepath}", flush=True)
 
-    def backbone_selection(self):
+    def backbone_selection(self, backbone_layers):
          if(self.backbone_name == 'transformer'):
               self.model = DiT1d(
                    in_dim = self.Dimension, emb_dim = 128,
-                   d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(self.device)
+                   d_model = 256, n_heads = 256//64, depth = backbone_layers, timestep_emb_type="fourier").to(self.device)
          elif(self.backbone_name == 'unet'):
               self.model = TemporalUnet(self.horizon, self.Dimension).to(self.device)
               

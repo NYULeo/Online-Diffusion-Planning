@@ -2062,6 +2062,7 @@ def rollout_parallel(
 def rollout_parallel2(
      env_name, 
      specific_env, 
+     backbone_layers = 2,
      horizon = 32, 
      steps_T = 50, 
      num_karras = 10, 
@@ -2103,15 +2104,15 @@ def rollout_parallel2(
      # Get Planner
      state_dict = get_planner(env_name, specific_env, checkpoint_step, task_id)
      if env_name == 'kitchen':
-         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=backbone_layers, timestep_emb_type="fourier").to(device)
      elif env_name == 'pointmaze':
-         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=backbone_layers, timestep_emb_type="fourier").to(device)
      elif(env_name == 'antmaze'):
-         model = DiT1d(in_dim = d_s, emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+         model = DiT1d(in_dim = d_s, emb_dim = 128, d_model = 256, n_heads = 256//64, depth=backbone_layers, timestep_emb_type="fourier").to(device)
      elif env_name == 'cube':
-         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=backbone_layers, timestep_emb_type="fourier").to(device)
      elif env_name == 'ogpointmaze':
-         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=2, timestep_emb_type="fourier").to(device)
+         model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=backbone_layers, timestep_emb_type="fourier").to(device)
      else:
          raise ValueError(f"Invalid Environment: {env_name}")
      model.load_state_dict(state_dict)
@@ -2969,7 +2970,9 @@ class Critic_Buffer_Reward():
 
                  # === ADD NORMALIZATION HERE ===
                  value_targets = values[:, 0] + advantages[:, 0]         # raw targets
-            
+                
+
+                 """
                  # Normalize advantages and targets (running stats or batch stats)
                  adv_mean = advantages.mean()
                  adv_std  = advantages.std() + 1e-8
@@ -2978,6 +2981,7 @@ class Critic_Buffer_Reward():
                  tgt_mean = value_targets.mean()
                  tgt_std  = value_targets.std() + 1e-8
                  value_targets = (value_targets - tgt_mean) / tgt_std
+                 """
                  # =================================
             
 
@@ -3083,6 +3087,7 @@ def train_critic_with_planner2(
     planner_checkpoint: int,
     reward_checkpoint: int,
     old_critic_checkpoint: int,
+    backbone_layers: int,
     hidden_layers: int,
     hidden_dim: int,
     kernel_config: KernelConfig,
@@ -3268,7 +3273,7 @@ def train_critic_with_planner2(
     # ----------------------------------------------------------------- planner
     planner = DiT1d(
         in_dim=(obs_dim + act_dim), emb_dim=128, d_model=256,
-        n_heads=256 // 64, depth=2, timestep_emb_type="fourier",
+        n_heads=256 // 64, depth=backbone_layers, timestep_emb_type="fourier",
     ).to(device)
     planner.load_state_dict(
         get_planner(dataset_name, specific_dataset, planner_checkpoint, task_id)
@@ -3397,7 +3402,7 @@ def train_critic_with_planner2(
             v_bootstrap  = target_critic(s_n_critic)                          # (B',)
             target_value = disc_return + gamma_n * v_bootstrap                # (B',)
 
-
+           
             # === NEW: Running normalization ===
             batch_mean = target_value.mean()
             batch_std  = target_value.std(unbiased=False) + 1e-8
