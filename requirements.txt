@@ -1,0 +1,31 @@
+# Dependencies for Pretrain/ and Finetuning/
+# Python 3.10 recommended
+
+# --- Core ML ---
+numpy<2.0
+torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
+torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+accelerate
+einops
+
+# --- Environments & datasets ---
+gymnasium<1.0.0
+gymnasium-robotics>=1.4.0
+minari
+ogbench
+h5py>=3.0.0
+jax-jumpy==1.0.0 ; python_version >= "3.8" and python_version < "3.11"
+
+# --- Scientific & visualization ---
+matplotlib
+mediapy
+scipy
+scikit-learn
+sympy
+seaborn
+imageio
+tqdm
+
+# --- Utilities ---
+loguru
