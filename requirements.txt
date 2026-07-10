@@ -10,7 +10,7 @@ accelerate
 einops
 
 # --- Environments & datasets ---
-gymnasium<1.0.0
+gymnasium>=1.2.0
 gymnasium-robotics>=1.4.0
 minari
 ogbench
