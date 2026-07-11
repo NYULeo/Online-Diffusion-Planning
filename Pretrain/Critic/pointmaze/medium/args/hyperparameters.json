@@ -9,9 +9,10 @@
         "obs_dim": 4
     },
     "training_hyperparameters": {
-        "num_steps": 5000,
+        "num_steps": 30000,
         "batch_size": 256,
         "lr": 1e-05,
+        "min_lr": 1e-06,
         "optimizer": {
             "type": "Adam",
             "lr": 1e-05,
@@ -19,18 +20,20 @@
         }
     },
     "critic_config": {
-        "gamma": 0.95,
+        "gamma": 0.99,
         "horizon": 32,
         "tau": 0.005
     },
     "reward_processing": {
-        "sigma": 7.0,
-        "target_reward": 1.0,
+        "sigma": 4.0,
+        "alpha": null,
+        "target_reward": 20.0,
         "goal": [
             [
                 -2.5,
                 -2.5
             ]
-        ]
+        ],
+        "task_id": null
     }
 }

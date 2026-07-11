@@ -157,7 +157,7 @@
     },
     "device_info": {
         "device": "cuda",
-        "num_gpus": 6,
+        "num_gpus": 4,
         "gpu_name": "Quadro RTX 6000"
     }
 }
