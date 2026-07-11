@@ -844,12 +844,13 @@ class CubeDataset_Singletask:
                      if len(act_slice) < 10:
                           last_start = i + 1
                           continue
-                     
+                        
+                     """
                      if(self.mode == 'reward'):
                         if(sum(rews) == 0):
                             last_start = i + 1
                             continue 
-                     
+                     """
                          
                      trajectory = {
                            "observations": obs_slice[index:],
