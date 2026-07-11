@@ -73,23 +73,11 @@ def check_cube_double_goal_reach(trajs, task_id):
     average_dist = total_dist/len(trajs)
     print(f"Task {task_id} average distance: {average_dist}")
 
-import ogbench
-env, _, _ = ogbench.make_env_and_datasets('pointmaze-medium-navigate-v0')  # or your variant
-print(env.spec.max_episode_steps)  # Should be 1000
-exit()
-for i in range(1, len(dataset['rewards'])):
-    if(dataset['rewards'][i] == 0  or dataset['terminals'][i] == 1):
-          if(not check_increase(dataset['rewards'][last_start: i+1])):
-             print('False')
-             exit()
-          rews_slice = reward_processor(dataset['rewards'][last_start:i+1].copy(), 'cube')
-          if len(rews_slice) < 10:
-                    last_start = i + 1
-                    continue
-          print()
-          last_start = i + 1
 
-exit()
+
+
+
+
 
 
 """
