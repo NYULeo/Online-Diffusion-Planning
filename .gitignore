@@ -25,3 +25,17 @@ venv/
 .vscode/
 !.vscode/settings.json
 
+
+
+
+## Training outputs / checkpoints (keep out of git)
+*.pt
+*.pth
+*.ckpt
+*.pkl
+*.npz
+*.npy
+*.mp4
+*.png
+*.jpg
+*.jpeg
