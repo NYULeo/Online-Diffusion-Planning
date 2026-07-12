@@ -81,7 +81,7 @@ if __name__ == '__main__':
     dataset_name = 'cube'
     specific_dataset = 'single'
     task_id = 4
-    traj_length = 200
+    traj_length = None
     
     """
     path = f'./Finetuning/Rollouts/{dataset_name}/{specific_dataset}-play/task_{task_id}/trajs_task{task_id}_success_0.pkl'
@@ -123,8 +123,8 @@ if __name__ == '__main__':
                  batch_size = 256, 
                  num_steps = 30000, 
                  save_freq = 30000, 
-                 lr = 1e-03, 
-                 min_lr = 1e-04, 
+                 lr = 5e-03, 
+                 min_lr = 5e-04, 
                  sigma  = 4.0,
                  alpha = None, 
                  target_reward = 500.0,
