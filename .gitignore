@@ -39,3 +39,13 @@ venv/
 *.png
 *.jpg
 *.jpeg
+
+
+Finetuning/**/Models/
+Finetuning/**/Stats/
+Finetuning/**/logs/
+Finetuning/Rollouts/
+
+Pretrain/**/Models/
+Pretrain/**/Stats/
+Pretrain/**/logs/
