@@ -1153,7 +1153,13 @@ def _get_planner_base(env_name, specific_env):
             return 'OG2DMaze_Giant'
         else:
             raise ValueError(f"Invalid ogpointmaze dataset name: {specific_env}")
-
+    elif env_name == 'scene':
+        if specific_env == 'play':
+            return 'Scene_Play'
+        elif specific_env == 'noisy':
+            return 'Scene_Noisy'
+        else:
+            raise ValueError(f"Invalid scene dataset name: {specific_env}")
     else:
         raise ValueError(f"Invalid environment name: {env_name}")
 

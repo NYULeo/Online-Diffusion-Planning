@@ -10,7 +10,16 @@ import torch
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
-from Pretrain.Dataset import CubeDataset_Singletask, KitchenDataset, OGPointmazeDataset, OGPointmazeDataset_Singletask, PointMazeDataset, CubeDataset
+from Pretrain.Dataset import (
+    CubeDataset_Singletask, 
+    KitchenDataset, 
+    OGPointmazeDataset, 
+    OGPointmazeDataset_Singletask, 
+    PointMazeDataset, 
+    CubeDataset, 
+    SceneDataset, 
+    SceneDataset_Singletask
+)
 from .Kernel_Net import  RobustTransitionKernel, MoGTransitionKernel
 from sympy import factorint
 import pickle
@@ -28,7 +37,7 @@ import json
 def check_specific_dataset(dataset_name):
     if(dataset_name == 'kitchen'):
          return False
-    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze']:
+    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze', 'scene', 'puzzle', 'antmaze', 'humanoidmaze']:
         return True
 
 def getName(env_name, specific_env):
@@ -77,7 +86,10 @@ def getName(env_name, specific_env):
                return 'Cube_Quadruple'
           else:
                raise ValueError(f"Invalid cube dataset name: {specific_env}")
-
+     
+     elif(env_name == 'scene'):
+         return 'Scene'
+             
      elif(env_name == 'ogpointmaze'):
           if specific_env == 'medium':
                return 'OG2DMaze_Medium'
@@ -373,6 +385,21 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
              name = 'Cube_Kernel_quadruple'
         else: 
             raise ValueError(f"Invalid dataset name: {specific_dataset}")
+        if(task_id is not None):
+            trajs = data_1.get_trajectories() + data_2.get_trajectories() + data_3.get_trajectories() + data_4.get_trajectories()
+        else:
+            trajs = data_1.get_trajectories() + data_2.get_trajectories()
+        obs_dim = data_1.get_state_dim()
+        act_dim = data_1.get_action_dim()
+        return trajs, name, obs_dim, act_dim
+    
+    elif(dataset_name == 'scene'):
+        data_1 = SceneDataset('play')
+        data_2 = SceneDataset('noisy')
+        if(task_id is not None):
+            data_3 = SceneDataset_Singletask('play', task_id)
+            data_4 = SceneDataset_Singletask('noisy', task_id)
+        name = 'Scene_Kernel'
         if(task_id is not None):
             trajs = data_1.get_trajectories() + data_2.get_trajectories() + data_3.get_trajectories() + data_4.get_trajectories()
         else:

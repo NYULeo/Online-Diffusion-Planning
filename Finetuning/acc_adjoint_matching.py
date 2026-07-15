@@ -11,7 +11,7 @@ from Pretrain.Planners.Backbone.Dit import DiT1d
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, karras_beta_schedule, clip_actions, save_planner, get_planner, getName, AlphaScheduler, AlphaSchedulerConfig
+from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, karras_beta_schedule, clip_actions, save_planner, get_planner, getName, AlphaScheduler, AlphaSchedulerConfig, load_dit
 from Pretrain.Planners.Backbone.utils import cosine_alpha_sigma, cosine_beta, compute_dot_alpha_beta, get_pretrained_planner
 import numpy as np
 from Pretrain.Dataset import get_PlannerName
@@ -179,6 +179,7 @@ class Acc_AdjointMatchingFineTuner:
     def set_old_score_net(self, planner_checkpoint: int):
         state_dict = get_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint, self.config.task_id)
         #state_dict = get_pretrained_planner(self.config.dataset_name, self.config.specific_dataset, planner_checkpoint)
+        """
         if( self.config.dataset_name == 'kitchen'):
               self.old_score_net = DiT1d(in_dim = (self.config.d_s + self.config.d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth = self.config.backbone_layers, timestep_emb_type="fourier")
         elif (self.config.dataset_name == 'pointmaze'):
@@ -190,6 +191,8 @@ class Acc_AdjointMatchingFineTuner:
         else:
               raise ValueError(f"Invalid Environment: {self.config.dataset_name}")
         self.old_score_net.load_state_dict(state_dict)
+        """
+        self.old_score_net = load_dit(self.config.d_s, self.config.d_a, state_dict, self.config.backbone_layers, self.device, self.config.dataset_name, eval_mode = True)
         for p in self.old_score_net.parameters():
               p.requires_grad_(False)
         self.old_score_net.eval()

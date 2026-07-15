@@ -610,6 +610,14 @@ def getName(env_name, specific_env):
             return 'Cube_QuadrupleNoisy'
          else:
             raise ValueError(f"Invalid cube dataset name: {specific_env}")
+            
+     elif(env_name == 'scene'):
+         if specific_env == 'play':
+             return 'Scene_Play'
+         elif specific_env == 'noisy':
+             return 'Scene_Noisy'
+         else:
+              raise ValueError(f"Invalid scene dataset name: {specific_env}")
 
      elif(env_name == 'ogpointmaze'):
          if specific_env == 'medium':

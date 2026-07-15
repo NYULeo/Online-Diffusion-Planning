@@ -4,7 +4,15 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(project_root)
 from typing import Optional
-from Dataset import CubeDataset_Singletask, KitchenDataset, PointMazeDataset, get_dataset, get_env, CubeDataset, OGPointmazeDataset_Singletask
+from Dataset import (
+    CubeDataset,
+    CubeDataset_Singletask,
+    get_dataset,
+    get_env,
+    OGPointmazeDataset_Singletask,
+    SceneDataset,
+    SceneDataset_Singletask,
+)
 import random
 from torch.utils.data import Dataset, DataLoader
 import torch
@@ -81,7 +89,7 @@ def drop_trajs(trajs, percentage):
 def check_specific_dataset(dataset_name):
     if(dataset_name == 'kitchen'):
          return False
-    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze']:
+    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze', 'scene', 'puzzle', 'antmaze', 'humanoidmaze']:
         return True
 
 def get_trajs(env_name, specific_env, step, task_id: Optional[int] = None):
@@ -141,6 +149,10 @@ def getName(env_name, specific_env, task_id: Optional[int] = None):
               return f'Cube_Quadruple_Task{task_id}'
          else:
               raise ValueError(f"Invalid cube dataset name: {specific_env}")
+
+     elif(env_name == 'scene'):
+        return f'Scene_Task{task_id}'
+        
      elif(env_name == 'ogpointmaze'):
          if(task_id is None):
             raise ValueError('Task ID is required for ogpointmaze dataset')
@@ -501,7 +513,16 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
          trajs = data_1.get_trajectories() + data_2.get_trajectories()
          #trajs = make_reward_increase(trajs)
          return trajs, name, obs_dim, act_dim
-
+    
+    elif(dataset_name == 'scene'):
+         data_1 = SceneDataset_Singletask('play', task_id, mode = 'reward')
+         data_2 = SceneDataset_Singletask('noisy', task_id, mode = 'reward')
+         obs_dim = data_1.get_state_dim()
+         act_dim = data_1.get_action_dim()
+         name = f'Scene_Reward_task{task_id}'
+         trajs = data_1.get_trajectories() + data_2.get_trajectories()
+         #trajs = make_reward_increase(trajs)
+         return trajs, name, obs_dim, act_dim
     else:
          raise ValueError(f"Invalid dataset name: {dataset_name}")
          

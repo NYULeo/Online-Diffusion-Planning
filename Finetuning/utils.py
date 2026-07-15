@@ -13,7 +13,7 @@ import pickle
 from torch.utils.data import Dataset
 from Pretrain.utils import SAStats
 from scipy.ndimage import gaussian_filter1d
-from typing import TypedDict, List
+from typing import TypedDict, List, Union
 from typing import Optional
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
@@ -39,10 +39,54 @@ import random
 
 
 
+
 class TrajectoryDict(TypedDict):
     observations: np.ndarray
     actions: np.ndarray  
     rewards: np.ndarray
+
+
+
+def build_dit(
+    d_s: int,
+    d_a: int,
+    depth: int = 2,
+    device: Optional[Union[str, torch.device]] = None,
+    env_name: Optional[str] = None,
+) -> DiT1d:
+    """Standard planner DiT used everywhere in this repo.
+    Fixed: emb_dim=128, d_model=256, n_heads=4, timestep_emb_type='fourier'.
+    Only depth (and dims / device) vary by call site.
+    Antmaze uses in_dim=d_s; all others use d_s + d_a.
+    """
+    in_dim = d_s if env_name == 'antmaze' else (d_s + d_a)
+    model = DiT1d(
+        in_dim=in_dim,
+        emb_dim=128,
+        d_model=256,
+        n_heads=256 // 64,
+        depth=depth,
+        timestep_emb_type='fourier',
+    )
+    if device is not None:
+        model = model.to(device)
+    return model
+
+def load_dit(
+    d_s: int,
+    d_a: int,
+    state_dict: dict,
+    depth: int = 2,
+    device: Optional[Union[str, torch.device]] = None,
+    env_name: Optional[str] = None,
+    eval_mode: bool = True,
+) -> DiT1d:
+    """Build the standard DiT and load a checkpoint."""
+    model = build_dit(d_s, d_a, depth=depth, device=device, env_name=env_name)
+    model.load_state_dict(state_dict)
+    if eval_mode:
+        model.eval()
+    return model
 
 def divide_trajs(trajs):
     success_trajs = []
@@ -68,7 +112,7 @@ def _bootstrap_per_member(s, a, r, ensemble_size, device):
 def check_specific_dataset(dataset_name):
     if(dataset_name == 'kitchen'):
          return False
-    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze']:
+    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze', 'scene', 'puzzle', 'antmaze', 'humanoidmaze']:
         return True
 
 def reward_name_converter(specific_dataset):
@@ -423,6 +467,14 @@ def getName(env_name, specific_env):
                 return 'Cube_QuadrupleNoisy'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
+     
+     elif(env_name == 'scene'):
+          if specific_env == 'play':
+                return 'Scene_Play'
+          elif specific_env == 'noisy':
+                return 'Scene_Noisy'
+          else:
+                raise ValueError(f"Invalid Dataset name: {specific_env}")
 
      elif(env_name == 'ogpointmaze'):
           if specific_env == 'medium':
@@ -471,6 +523,9 @@ def getName2(env_name, specific_env):
                 return 'Cube_Quadruple'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
+
+     elif(env_name == 'scene'):
+          return 'Scene'
 
      elif(env_name == 'ogpointmaze'):
           if specific_env == 'medium':
@@ -523,7 +578,15 @@ def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
              return f'Cube_QuadrupleNoisy_task{task_id}'
          else:
              raise ValueError(f"Invalid cube dataset name: {specific_env}")
-
+     
+     elif(env_name == 'scene'):
+         if specific_env == 'play':
+             return f'Scene_Play_task{task_id}'
+         elif specific_env == 'noisy':
+             return f'Scene_Noisy_task{task_id}'
+         else:
+             raise ValueError(f"Invalid scene dataset name: {specific_env}")
+            
      elif(env_name == 'ogpointmaze'):
          if(task_id is None):
               raise ValueError('Task ID is required for cube dataset')
@@ -589,7 +652,10 @@ def get_RewardName(env_name, specific_env, task_id: Optional[int] = None):
               return f'Cube_Quadruple_Task{task_id}'
          else:
               raise ValueError(f"Invalid cube dataset name: {specific_env}")
-     
+
+     elif(env_name == 'scene'):
+          return f"Scene_Task{task_id}"
+
      elif(env_name == 'ogpointmaze'):
          if(task_id is None):
             raise ValueError('Task ID is required for cube dataset')
@@ -2103,6 +2169,7 @@ def rollout_parallel2(
     
      # Get Planner
      state_dict = get_planner(env_name, specific_env, checkpoint_step, task_id)
+     """
      if env_name == 'kitchen':
          model = DiT1d(in_dim=(d_s + d_a), emb_dim=128, d_model=256, n_heads=256//64, depth=backbone_layers, timestep_emb_type="fourier").to(device)
      elif env_name == 'pointmaze':
@@ -2117,7 +2184,16 @@ def rollout_parallel2(
          raise ValueError(f"Invalid Environment: {env_name}")
      model.load_state_dict(state_dict)
      model.eval()
+     """
+     model = load_dit(d_s, d_a, state_dict, backbone_layers, device, env_name, eval_mode = True)
      
+     
+
+
+
+
+
+
      # Get Processor
      planner_processor = Planner_Processor(env_name, specific_env, task_id)
      
