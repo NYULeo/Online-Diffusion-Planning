@@ -25,7 +25,7 @@ from Finetuning.Rollout import load_success_trajs
 from Finetuning.utils import (
     train_critic_with_reward,
     train_critic_with_planner,
-    train_critic_with_planner2,
+    train_critic_with_planner3,
     train_critic,
     test_critic,
     KernelConfig,
@@ -43,7 +43,7 @@ if __name__ == '__main__':  # pragma: no cover
        step = 0
       
        
-        
+       """
        #trajs = load_success_trajs(env_name, specific_env, task_id, step)
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
@@ -67,30 +67,7 @@ if __name__ == '__main__':  # pragma: no cover
                       new_step = step,
                       momentum = 0.005,   # unused when old_step is None
                       task_id = task_id)
-       """
-       train_critic(trajs, 
-             dataset_name = env_name, 
-             specific_dataset = specific_env, 
-             hidden_layers = 5, 
-             hidden_dim = 512, 
-             sigma = 4.0,
-             batch_size = 256, 
-             num_steps = 20000, 
-             gamma = 0.99, 
-             lam = 0.95, 
-             horizon = horizon, 
-             #lr = 1e-04, 
-             #min_lr = 1e-05, 
-             lr = 1e-03, 
-             min_lr = 5e-04, 
-             tau = 0.005, 
-             old_step = None, 
-             new_step = step, 
-             momentum = 0.005, 
-             target_reward = 300.0,
-             task_id = task_id)  
-       """
-       
+     
       
        
        trajs = data.get_trajectories()
@@ -105,9 +82,10 @@ if __name__ == '__main__':  # pragma: no cover
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
-       
        """
        
+       data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
+       trajs = data.get_trajectories()
        kernel_config = KernelConfig(
              checkpoint        = 0,           # which kernel checkpoint to load
              type_kernel       = 'mog',    # 'robust' or 'mog'
@@ -120,7 +98,7 @@ if __name__ == '__main__':  # pragma: no cover
        )
 
 
-       train_critic_with_planner2(
+       train_critic_with_planner3(
             trajs                  = trajs,
             dataset_name           = env_name,
             specific_dataset       = specific_env,
@@ -142,7 +120,7 @@ if __name__ == '__main__':  # pragma: no cover
             steps_T                = 10,
             num_karras             = 1,
             eta                    = 0.0,
-            new_step               = 1,
+            new_step               = 0,
             task_id                = task_id,
             log_every              = 1,
          )
@@ -155,11 +133,11 @@ if __name__ == '__main__':  # pragma: no cover
             finetune = True,
             hidden_layers = 4, 
             hidden_dim = 512, 
-            checkpoint_step = 1, 
+            checkpoint_step = 0, 
             gamma = 0.99, 
             horizon = horizon,  
             sigma = 4.0, 
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
-      """
+      
