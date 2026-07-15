@@ -127,7 +127,10 @@ def get_dataset(name: str,
             else:
                 return CubeDataset_Singletask(specific_name, task_id, traj_length, mode)
        elif name == "scene":
-            return SceneDataset_Singletask(specific_name, task_id, traj_length, mode)
+            if task_id is None:
+                return SceneDataset(specific_name)
+            else:
+                return SceneDataset_Singletask(specific_name, task_id, traj_length, mode)
        else:
             raise ValueError(f"Invalid Dataset name: {name}")     
 
@@ -861,6 +864,55 @@ class CubeDataset_Singletask:
                          
                      trajectories.append(trajectory)
                      last_start = i + 1
+
+        return trajectories
+
+    def get_state_dim(self) -> int:
+        return int(self.dataset["observations"].shape[-1])
+
+    def get_action_dim(self) -> int:
+        return int(self.dataset["actions"].shape[-1])
+
+    def get_env(self, render_mode: str = "rgb_array"):
+        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
+        return env
+
+class SceneDataset:
+    def __init__(self, name: str):
+        self.name = name
+        name_to_id = {
+            "play": "scene-play-v0",
+            "noisy": "scene-noisy-v0",
+        }
+
+        if name not in name_to_id:
+            raise ValueError(f"Invalid dataset name: {name}")
+
+        self.dataset_id = name_to_id[name]
+
+        self.env, self.dataset, self.eval_dataset = ogbench.make_env_and_datasets(
+            self.dataset_id, render_mode="rgb_array"
+        )
+
+    def get_trajectories(self) -> List[Dict[str, np.ndarray]]:
+        trajectories = []
+        last_start = 0
+        N = len(self.dataset["observations"])
+
+        for i in range(N):
+            if self.dataset["terminals"][i] == 1 or i == N - 1:
+                obs_slice = self.dataset["observations"][last_start : i + 1]
+                act_slice = self.dataset["actions"][last_start : i + 1]
+
+                if len(act_slice) < 10:
+                    last_start = i + 1
+                    continue
+
+                trajectories.append({
+                    "observations": obs_slice,
+                    "actions": act_slice,
+                })
+                last_start = i + 1
 
         return trajectories
 
