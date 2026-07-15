@@ -1,3 +1,4 @@
+from pkgutil import get_data
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -9,6 +10,7 @@ import numpy as np
 import seaborn as sns
 import minari
 import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -75,11 +77,11 @@ def check_cube_double_goal_reach(trajs, task_id):
 
 
 
+env, train_dataset, val_dataset = ogbench.make_env_and_datasets('humanoidmaze-giant-navigate-v0')
 
-
-
-
-
+# Check horizon
+print(env.spec.max_episode_steps)
+exit()
 """
 env_steps = [0, 1592, 1590, 1600, 1411, 1416, 1600, 1555, 1422, 1600, 1599, 1554]
 total_steps = [0]
