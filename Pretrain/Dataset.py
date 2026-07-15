@@ -126,7 +126,8 @@ def get_dataset(name: str,
                 return CubeDataset(specific_name)
             else:
                 return CubeDataset_Singletask(specific_name, task_id, traj_length, mode)
-       
+       elif name == "scene":
+            return SceneDataset_Singletask(specific_name, task_id, traj_length, mode)
        else:
             raise ValueError(f"Invalid Dataset name: {name}")     
 
@@ -844,7 +845,7 @@ class CubeDataset_Singletask:
                      if len(act_slice) < 10:
                           last_start = i + 1
                           continue
-                        
+
                      """
                      if(self.mode == 'reward'):
                         if(sum(rews) == 0):
@@ -873,6 +874,70 @@ class CubeDataset_Singletask:
         env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
         return env
 
+class SceneDataset_Singletask:
+    def __init__(self, name: str, task_id, traj_length: Optional[int] = None, mode: Optional[str] = None):
+        self.name = name
+        self.traj_length = traj_length
+        self.mode = mode
+        name_to_id = {
+            "play": f"scene-play-singletask-task{task_id}-v0",
+            'noisy': f"scene-noisy-singletask-task{task_id}-v0"
+        }
+
+        if name not in name_to_id:
+            raise ValueError(f"Invalid dataset name: {name}")
+
+        self.dataset_id = name_to_id[name]
+
+        self.env, self.dataset, self.eval_dataset = ogbench.make_env_and_datasets(
+            self.dataset_id, render_mode="rgb_array"
+        )
+
+    def get_trajectories(self) -> List[Dict[str, np.ndarray]]:
+        trajectories = []
+        last_start = 0
+        N = len(self.dataset["observations"])
+        rewards = reward_processor(self.dataset["rewards"].copy(), "scene")
+        for i in range(N):
+            # End of a natural episode (terminal or success)
+            if self.dataset["terminals"][i] == 1 or self.dataset["rewards"][i] == 0:
+                obs_slice = self.dataset["observations"][last_start:i].copy()
+                act_slice = self.dataset["actions"][last_start:i].copy()
+                rews = rewards[last_start + 1 : i + 1].copy()
+
+                L = len(obs_slice)
+                if self.traj_length is not None:
+                    index = L - self.traj_length
+                    if index < 0:
+                        index = 0
+                else:
+                    index = 0
+                
+            
+                if len(act_slice) < 10:
+                    last_start = i + 1
+                    continue
+                
+
+                trajectory = {
+                    "observations": obs_slice[index:],
+                    "actions": act_slice[index:],
+                    "rewards": rews[index:],
+                }
+                trajectories.append(trajectory)
+                last_start = i + 1
+
+        return trajectories
+
+    def get_state_dim(self) -> int:
+        return int(self.dataset["observations"].shape[-1])
+
+    def get_action_dim(self) -> int:
+        return int(self.dataset["actions"].shape[-1])
+
+    def get_env(self, render_mode: str = "rgb_array"):
+        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
+        return env
 
 
 #-------------------------------------------------------------------------------------#

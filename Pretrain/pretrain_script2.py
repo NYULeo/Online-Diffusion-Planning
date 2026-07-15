@@ -8,9 +8,9 @@ import torch
 
 if __name__ == '__main__':  # pragma: no cover
      set_seed(1)
-     dataset_name = 'cube'
-     specific_dataset = 'single-play'
-     task_id = 2
+     dataset_name = 'scene'
+     specific_dataset = 'play'
+     task_id = 4
      horizon = 32
      device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
      trainer = SDETrainer(
@@ -19,7 +19,7 @@ if __name__ == '__main__':  # pragma: no cover
          task_id,
          horizon,
          backbone_name = 'transformer',
-         backbone_layers = 2,
+         backbone_layers = 4,
          num_steps = 1000000, 
          batch_size = 128,
          lr = 2e-4,
