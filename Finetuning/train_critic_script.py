@@ -106,6 +106,7 @@ if __name__ == '__main__':  # pragma: no cover
             planner_checkpoint     = 0,
             reward_checkpoint      = 0,
             old_critic_checkpoint  = 0,
+            backbone_layers        = 2,
             hidden_layers          = 4,
             hidden_dim             = 512,
             kernel_config          = kernel_config,
