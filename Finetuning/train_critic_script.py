@@ -43,7 +43,7 @@ if __name__ == '__main__':  # pragma: no cover
        step = 0
       
        
-       """
+       
        #trajs = load_success_trajs(env_name, specific_env, task_id, step)
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
@@ -82,9 +82,9 @@ if __name__ == '__main__':  # pragma: no cover
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
+       
+       
        """
-       
-       
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
        kernel_config = KernelConfig(
@@ -142,4 +142,4 @@ if __name__ == '__main__':  # pragma: no cover
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
-       
+       """
