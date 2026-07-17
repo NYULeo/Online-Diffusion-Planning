@@ -127,7 +127,7 @@ if __name__ == '__main__':  # pragma: no cover
             log_every              = 1,
          )
 
-       """
+       
        #trajs = load_success_trajs(env_name, specific_env, task_id, step)
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
@@ -142,4 +142,4 @@ if __name__ == '__main__':  # pragma: no cover
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
-       """
+       
