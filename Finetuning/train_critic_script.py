@@ -132,7 +132,6 @@ if __name__ == '__main__':  # pragma: no cover
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
-            finetune = True,
             hidden_layers = 4, 
             hidden_dim = 512, 
             checkpoint_step = 0, 
