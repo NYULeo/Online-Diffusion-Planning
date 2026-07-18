@@ -858,8 +858,25 @@ if __name__ == "__main__":
     #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
     chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17, 21, 22, 23, 24, 26, 27, 28, 29, 30]
     #for seed in [10001, 20002, 30003, 40004, 50005, 60006, 70007, 80008, 90009, 100010, 110011, 120012]:
-    set_seed(2)
-    
+    set_seed(1)
+    return_value, _ = rollout(
+                  env_name, 
+                  specific_train_dataset, 
+                  horizon, 
+                  steps_T = 10, 
+                  num_karras = 1, 
+                  eta = 0.0, 
+                  episode_length = 3000, 
+                  checkpoint_steps = checkpoint, 
+                  render = True,  
+                  base_seed = 8, 
+                  #goal_cell = np.array([6, 1], dtype = int), 
+                  task_id = task_id,
+                  continual_rollout = True,
+                  chunk_size = 9,
+                  #chunk_size = 1,
+                  device = device)
+    exit()
     
     while(checkpoint < 30):
          print(f"Running checkpoing: {checkpoint}")

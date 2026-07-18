@@ -3697,10 +3697,11 @@ def train_critic_with_planner3(
 
     # ------------------------------------------------------------------ critic
     critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
-    critic_state, _ = get_critic_model(
-        dataset_name, specific_dataset, task_id=task_id, step=old_critic_checkpoint,
-    )
-    critic.load_state_dict(critic_state)
+    if(old_critic_checkpoint is not None):
+        critic_state, _ = get_critic_model(
+            dataset_name, specific_dataset, task_id=task_id, step=old_critic_checkpoint,
+         )
+        critic.load_state_dict(critic_state)
 
     target_critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
     target_critic.load_state_dict(critic.state_dict())

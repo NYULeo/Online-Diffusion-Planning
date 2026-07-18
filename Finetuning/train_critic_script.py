@@ -105,7 +105,7 @@ if __name__ == '__main__':  # pragma: no cover
             specific_dataset       = specific_env,
             planner_checkpoint     = 0,
             reward_checkpoint      = 0,
-            old_critic_checkpoint  = 0,
+            old_critic_checkpoint  = None,
             backbone_layers        = 2,
             hidden_layers          = 4,
             hidden_dim             = 512,
