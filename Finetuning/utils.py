@@ -3543,7 +3543,7 @@ def train_critic_with_planner3(
     eta: float = 0.0,
     new_step: int = 0,
     task_id: Optional[int] = None,
-    log_every: int = 1,
+    log_every: int = 0,
 ):
 
     # ---------------------------------------------------------------- helpers
@@ -3878,7 +3878,7 @@ def train_critic_with_planner3(
 
         running += loss.item()
         
-        if k % log_every == 0:
+        if log_every > 0 and k % log_every == 0:
             print(f"  step {k:>6}/{num_steps}   loss = {running / log_every:.4f}")
             running = 0.0
     
@@ -3886,7 +3886,7 @@ def train_critic_with_planner3(
     target_critic.eval()
     save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
     print("critic saved.")
-
+    
 
 
 
