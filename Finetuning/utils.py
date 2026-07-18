@@ -3877,11 +3877,11 @@ def train_critic_with_planner3(
                 tp.data.mul_(1 - tau).add_(tau * p.data)
 
         running += loss.item()
-        """
+        
         if k % log_every == 0:
             print(f"  step {k:>6}/{num_steps}   loss = {running / log_every:.4f}")
             running = 0.0
-        """
+    
 
     target_critic.eval()
     save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
