@@ -1662,6 +1662,8 @@ def test_critic(dataset_name: str,
                 hidden_layers: int,
                 hidden_dim: int,
                 checkpoint_step: int,
+                mean: float = 0.0,
+                std: float = 1.0,
                 gamma: float = 0.99,
                 horizon: int = 32,
                 sigma: Optional[float] = None,
@@ -1694,21 +1696,27 @@ def test_critic(dataset_name: str,
             rews_chunk = rews_chunk.to(device)
 
             pred = model(s).squeeze(-1)                # (B,)  ← normalized V(s)
-
+            pred = pred * std + mean
+            
             # Compute raw n-step return
             gamma_pow = torch.tensor([gamma ** i for i in range(horizon)], device=device, dtype=torch.float32)
             raw_target = (gamma_pow.unsqueeze(0) * rews_chunk).sum(dim=1)
-
+            
+            """
             # === Normalize target (CRITICAL) ===
             tgt_mean = raw_target.mean()
             tgt_std = raw_target.std(unbiased=False) + 1e-8
             target = (raw_target - tgt_mean) / tgt_std
+            """
 
-            loss = F.smooth_l1_loss(pred, target, beta=1.0)
+            #loss = F.smooth_l1_loss(pred, target, beta=1.0)
+            loss = F.smooth_l1_loss(pred, raw_target, beta=1.0)
             total_loss += loss.item() * s.size(0)
 
             all_preds.extend(pred.cpu().numpy())
-            all_targets.extend(target.cpu().numpy())
+            #all_targets.extend(target.cpu().numpy())
+            all_targets.extend(raw_target.cpu().numpy())
+
 
     avg_loss = total_loss / len(dataset)
     mae = np.mean(np.abs(np.array(all_preds) - np.array(all_targets)))
@@ -3886,6 +3894,8 @@ def train_critic_with_planner3(
     target_critic.eval()
     save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
     print("critic saved.")
+    return running_tgt_mean.item(), running_tgt_std.item()
+            
     
 
 

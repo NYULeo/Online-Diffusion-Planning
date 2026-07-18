@@ -99,7 +99,7 @@ if __name__ == '__main__':  # pragma: no cover
        )
 
 
-       train_critic_with_planner3(
+       mean, std = train_critic_with_planner3(
             trajs                  = trajs,
             dataset_name           = env_name,
             specific_dataset       = specific_env,
@@ -135,6 +135,8 @@ if __name__ == '__main__':  # pragma: no cover
             hidden_layers = 4, 
             hidden_dim = 512, 
             checkpoint_step = 0, 
+            mean = mean,
+            std = std,
             gamma = 0.99, 
             horizon = horizon,  
             sigma = 4.0, 
