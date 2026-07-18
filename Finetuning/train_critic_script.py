@@ -113,7 +113,7 @@ if __name__ == '__main__':  # pragma: no cover
             reward_hidden_layers   = 4,
             reward_hidden_dim      = 512,
             batch_size             = 128,
-            num_steps              = 20000,
+            num_steps              = 500,
             horizon                = 32,
             gamma                  = 0.99,
             lr                     = 5e-5,
@@ -124,7 +124,7 @@ if __name__ == '__main__':  # pragma: no cover
             eta                    = 0.0,
             new_step               = 0,
             task_id                = task_id,
-            log_every              = 1000,
+            log_every              = 50,
          )
 
        
