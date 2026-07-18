@@ -1687,7 +1687,8 @@ def test_critic(dataset_name: str,
     total_loss = 0.0
     all_preds = []
     all_targets = []
-
+    mean_pred = torch.tensor(mean, device = device, dtype = torch.float32)
+    std_pred = torch.tensor(std, device = device, dtype = torch.float32)
     print(f"Testing critic at checkpoint {checkpoint_step}...")
 
     with torch.no_grad():
@@ -1696,7 +1697,7 @@ def test_critic(dataset_name: str,
             rews_chunk = rews_chunk.to(device)
 
             pred = model(s).squeeze(-1)                # (B,)  ← normalized V(s)
-            pred = pred * std + mean
+            pred = (pred * std_pred) + mean_pred
             
             # Compute raw n-step return
             gamma_pow = torch.tensor([gamma ** i for i in range(horizon)], device=device, dtype=torch.float32)
@@ -3841,11 +3842,11 @@ def train_critic_with_planner3(
                 actions[:, :n].reshape(B * n, -1),
             ).reshape(B, n)  
             
-            
+            """
             # NEW: Strong scaling
             r_hat = torch.clamp(r_hat, -10.0, 10.0)
             r_hat = r_hat / 5.0          
-                                                 # (B', n)
+            """             # (B', n)
 
             # 4) discounted return + bootstrapped target value
             disc_return  = (gamma_pow_t.unsqueeze(0) * r_hat).sum(dim=1)      # (B',)
