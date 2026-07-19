@@ -415,6 +415,7 @@ def load_success_trajs(env_name, specific_env, task_id, step):
 def rollout(env_name, 
             specific_env, 
             horizon, 
+            num_layers,
             steps_T, 
             num_karras, eta, 
             episode_length, 
@@ -447,15 +448,15 @@ def rollout(env_name,
      state_dict = get_planner(env_name, specific_env, checkpoint_steps, task_id)
      #state_dict = get_planner(env_name, specific_env, checkpoint_steps)
      if( env_name == 'kitchen'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
      elif (env_name == 'pointmaze'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
      elif(env_name == 'antmaze'):
-           model = DiT1d(in_dim = (d_s), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
      elif(env_name == 'cube'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
      elif(env_name == 'ogpointmaze'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
      else:
           raise ValueError(f"Invalid Environment: {env_name}")
      model.load_state_dict(state_dict)
@@ -833,9 +834,9 @@ if __name__ == "__main__":
 
     horizon = 32 
     env_name = 'cube'
-    specific_train_dataset = 'single-play'
+    specific_train_dataset = 'double-play'
     task_id = 4
-    checkpoint = 27
+    checkpoint = 0
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -863,21 +864,21 @@ if __name__ == "__main__":
                   env_name, 
                   specific_train_dataset, 
                   horizon, 
+                  num_layers = 4,
                   steps_T = 10, 
                   num_karras = 1, 
                   eta = 0.0, 
                   episode_length = 3000, 
                   checkpoint_steps = checkpoint, 
                   render = True,  
-                  base_seed = 8, 
+                  base_seed = 1, 
                   #goal_cell = np.array([6, 1], dtype = int), 
                   task_id = task_id,
                   continual_rollout = True,
-                  chunk_size = 9,
+                  chunk_size = 10,
                   #chunk_size = 1,
                   device = device)
     exit()
-    
     while(checkpoint < 30):
          print(f"Running checkpoing: {checkpoint}")
          total_return = 0.0

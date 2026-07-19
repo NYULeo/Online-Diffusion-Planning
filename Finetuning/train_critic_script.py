@@ -37,13 +37,13 @@ if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'cube'
        specific_env = 'single-play'
-       traj_length = None
+       traj_length = 200
        horizon = 128
        task_id = 4
        step = 0
       
        
-       """
+       
        #trajs = load_success_trajs(env_name, specific_env, task_id, step)
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
@@ -82,9 +82,9 @@ if __name__ == '__main__':  # pragma: no cover
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
+       
+       
        """
-       
-       
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
        kernel_config = KernelConfig(
@@ -112,8 +112,8 @@ if __name__ == '__main__':  # pragma: no cover
             kernel_config          = kernel_config,
             reward_hidden_layers   = 4,
             reward_hidden_dim      = 512,
-            batch_size             = 256,
-            num_steps              = 1000,
+            batch_size             = 128,
+            num_steps              = 500,
             horizon                = 32,
             gamma                  = 0.99,
             lr                     = 5e-5,
@@ -124,7 +124,7 @@ if __name__ == '__main__':  # pragma: no cover
             eta                    = 0.0,
             new_step               = 0,
             task_id                = task_id,
-            log_every              = 50,
+            log_every              = 100,
          )
 
        
@@ -143,4 +143,4 @@ if __name__ == '__main__':  # pragma: no cover
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
-       
+       """
