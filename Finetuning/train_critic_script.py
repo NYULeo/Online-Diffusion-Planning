@@ -144,7 +144,7 @@ if __name__ == '__main__':  # pragma: no cover
                 reward_hidden_layers=4,
                 reward_hidden_dim=512,
                 batch_size=64,
-                num_steps=1000,
+                num_steps=500,
                 horizon=32,
                 gamma=0.99,
                 lr=5e-5,
