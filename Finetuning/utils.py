@@ -45,6 +45,21 @@ class TrajectoryDict(TypedDict):
     actions: np.ndarray  
     rewards: np.ndarray
 
+class Q_Stats:
+    Q_mean: float
+    Q_std:  float
+    def get_Q_stats(self):
+        return self.Q_mean, self.Q_std
+
+def save_Q_stats(Q_stats: Q_Stats, dataset_name: str, specific_dataset: str, task_id: Optional[int] = None, step: int = 0):
+        critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
+        stats_name =  str(critic_name) + f'_Q_stats_{str(step)}.pkl'
+        stats_dir = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/'
+        os.makedirs(stats_dir, exist_ok=True)
+        savepath = os.path.join(stats_dir, stats_name)
+        with open(savepath, 'wb') as f:
+              pickle.dump(Q_stats, f)
+        print(f"saved stats to {savepath}")
 
 
 def build_dit(
@@ -1703,20 +1718,20 @@ def test_critic(dataset_name: str,
             gamma_pow = torch.tensor([gamma ** i for i in range(horizon)], device=device, dtype=torch.float32)
             raw_target = (gamma_pow.unsqueeze(0) * rews_chunk).sum(dim=1)
             
-            """
+            
             # === Normalize target (CRITICAL) ===
             tgt_mean = raw_target.mean()
             tgt_std = raw_target.std(unbiased=False) + 1e-8
             target = (raw_target - tgt_mean) / tgt_std
-            """
+        
 
-            #loss = F.smooth_l1_loss(pred, target, beta=1.0)
-            loss = F.smooth_l1_loss(pred, raw_target, beta=1.0)
+            loss = F.smooth_l1_loss(pred, target, beta=1.0)
+            #loss = F.smooth_l1_loss(pred, raw_target, beta=1.0)
             total_loss += loss.item() * s.size(0)
 
             all_preds.extend(pred.cpu().numpy())
-            #all_targets.extend(target.cpu().numpy())
-            all_targets.extend(raw_target.cpu().numpy())
+            all_targets.extend(target.cpu().numpy())
+            #all_targets.extend(raw_target.cpu().numpy())
 
 
     avg_loss = total_loss / len(dataset)
@@ -3861,7 +3876,7 @@ def train_critic_with_planner3(
             target_value = disc_return + gamma_n * v_bootstrap                # (B',)
 
             
-            """
+            
             # === NEW: Running normalization ===
             batch_mean = target_value.mean()
             batch_std  = target_value.std(unbiased=False) + 1e-8
@@ -3871,15 +3886,15 @@ def train_critic_with_planner3(
 
             normalized_target = (target_value - running_tgt_mean) / running_tgt_std
             # =================================
-            """
+        
 
             # 5) input for V_β(s_0)
             s0_critic = (s_raw[:, 0] - c_mean) / c_std                        # (B', d_s)
 
         # 6) gradient step on V_β
         v_pred = critic(s0_critic)                                            # (B',)
-        #loss   = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
-        loss   = F.smooth_l1_loss(v_pred, target_value, beta=1.0)
+        loss   = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
+        #loss   = F.smooth_l1_loss(v_pred, target_value, beta=1.0)
 
         optimizer.zero_grad()
         loss.backward()
@@ -3901,6 +3916,10 @@ def train_critic_with_planner3(
 
     target_critic.eval()
     save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
+    Q_Stats = Q_Stats()
+    Q_Stats.Q_mean = running_tgt_mean.item()
+    Q_Stats.Q_std = running_tgt_std.item()
+    save_Q_stats(Q_Stats, dataset_name, specific_dataset, task_id, new_step)
     print("critic saved.")
     return running_tgt_mean.item(), running_tgt_std.item()
             

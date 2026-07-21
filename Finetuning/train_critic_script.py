@@ -42,7 +42,7 @@ if __name__ == '__main__':  # pragma: no cover
        task_id = 4
        step = 0
       
-       1
+       
        """
        #trajs = load_success_trajs(env_name, specific_env, task_id, step)
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
@@ -113,7 +113,7 @@ if __name__ == '__main__':  # pragma: no cover
             reward_hidden_layers   = 4,
             reward_hidden_dim      = 512,
             batch_size             = 128,
-            num_steps              = 500,
+            num_steps              = 1000,
             horizon                = 32,
             gamma                  = 0.99,
             lr                     = 5e-5,
