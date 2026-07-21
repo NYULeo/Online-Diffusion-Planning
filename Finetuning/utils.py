@@ -52,6 +52,15 @@ class Q_Stats:
     def get_Q_stats(self):
         return self.Q_mean, self.Q_std
 
+def get_Q_stats(dataset_name: str, specific_dataset: str, task_id: Optional[int] = None, step: int = 0) -> Q_Stats:
+        critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
+        stats_name =  str(critic_name) + f'_Q_stats_{str(step)}.pkl'
+        stats_dir = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/'
+        savepath = os.path.join(stats_dir, stats_name)
+        with open(savepath, 'rb') as f:
+             Q_stats = pickle.load(f)
+        return Q_stats
+
 def save_Q_stats(Q_stats: Q_Stats, dataset_name: str, specific_dataset: str, task_id: Optional[int] = None, step: int = 0):
         critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
         stats_name =  str(critic_name) + f'_Q_stats_{str(step)}.pkl'
