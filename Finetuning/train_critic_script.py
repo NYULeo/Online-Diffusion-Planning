@@ -87,7 +87,7 @@ if __name__ == '__main__':  # pragma: no cover
        """
        
        
-       data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = None)
+       data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
        kernel_config = KernelConfig(
              checkpoint        = 0,           # which kernel checkpoint to load
@@ -144,7 +144,7 @@ if __name__ == '__main__':  # pragma: no cover
                 reward_hidden_layers=4,
                 reward_hidden_dim=512,
                 batch_size=64,
-                num_steps=500,
+                num_steps=200,
                 horizon=32,
                 gamma=0.99,
                 lr=5e-6,
@@ -155,7 +155,7 @@ if __name__ == '__main__':  # pragma: no cover
                 eta=0.0,
                 new_step=0,
                 task_id=task_id,
-                log_every=100,
+                log_every=20,
                 accelerator=accelerator,
         )
 
