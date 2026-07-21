@@ -4147,7 +4147,8 @@ def train_critic_with_planner4(
             all_accepted_lists = [local_accepted]
 
         all_plans = [p for sublist in all_accepted_lists for p in sublist]
-
+        
+        """
         if len(all_plans) == 0:
             raise RuntimeError(
                 f"No feasible plans found across {accelerator.num_processes} GPUs. "
@@ -4157,6 +4158,7 @@ def train_critic_with_planner4(
         if accelerator.is_main_process:
             print(f"[Critic-Online] collected {len(all_plans)} feasible plans "
                   f"(from {batch_size} s0 × {oversample} attempts)")
+        """
 
         plans = torch.stack(all_plans).to(device)
         return plans, None
@@ -4384,7 +4386,7 @@ def train_critic_with_planner4(
                 tp.data.mul_(1 - tau).add_(tau * p.data)
 
         running += loss.item()
-
+    
         if log_every > 0 and k % log_every == 0 and is_main:
             print(
                 f" step {k:>6}/{num_steps} "
