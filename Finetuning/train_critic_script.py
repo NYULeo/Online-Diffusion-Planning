@@ -27,6 +27,7 @@ from Finetuning.utils import (
     train_critic_with_planner,
     train_critic_with_planner3,
     train_critic_with_planner4,
+    train_critic_with_planner5,
     train_critic,
     test_critic,
     KernelConfig,
@@ -130,7 +131,7 @@ if __name__ == '__main__':  # pragma: no cover
             log_every              = 100,
          )
        """
-       train_critic_with_planner4(
+       train_critic_with_planner5(
                 trajs=trajs,
                 dataset_name=env_name,
                 specific_dataset=specific_env,
@@ -156,12 +157,12 @@ if __name__ == '__main__':  # pragma: no cover
                 new_step=0,
                 task_id=task_id,
                 log_every=20,
+                use_multi_horizon = False,
                 accelerator=accelerator,
         )
 
        accelerator.wait_for_everyone()
        #trajs = load_success_trajs(env_name, specific_env, task_id, step)
-       data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
        if accelerator.is_main_process:
            test_critic(dataset_name = env_name, 
