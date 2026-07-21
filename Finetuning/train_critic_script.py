@@ -157,7 +157,7 @@ if __name__ == '__main__':  # pragma: no cover
                 new_step=0,
                 task_id=task_id,
                 log_every=20,
-                use_multi_horizon = False,
+                use_multi_horizon = True,
                 accelerator=accelerator,
         )
 
