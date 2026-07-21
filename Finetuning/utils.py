@@ -4147,7 +4147,7 @@ def train_critic_with_planner4(
             all_accepted_lists = [local_accepted]
 
         all_plans = [p for sublist in all_accepted_lists for p in sublist]
-        """
+
         if len(all_plans) == 0:
             raise RuntimeError(
                 f"No feasible plans found across {accelerator.num_processes} GPUs. "
@@ -4157,7 +4157,7 @@ def train_critic_with_planner4(
         if accelerator.is_main_process:
             print(f"[Critic-Online] collected {len(all_plans)} feasible plans "
                   f"(from {batch_size} s0 × {oversample} attempts)")
-        """
+
         plans = torch.stack(all_plans).to(device)
         return plans, None
 
@@ -4306,18 +4306,39 @@ def train_critic_with_planner4(
             s_raw = s_planner * planner_std + planner_mean
 
             N, H, _ = s_raw.shape
+            n = H - 1
 
-            # per-plan targets
+            # rewards for t = 0 .. n-1
             s_for_r = (s_raw[:, :n] - r_mean) / r_std
             r_hat = reward_net(
                 s_for_r.reshape(N * n, -1),
                 actions[:, :n].reshape(N * n, -1),
-            ).reshape(N, n)
+            ).reshape(N, n)  # (N, n)
 
-            disc_return = (gamma_pow_t.unsqueeze(0) * r_hat).sum(dim=1)
-            s_n_critic = (s_raw[:, n] - c_mean) / c_std
-            v_bootstrap = target_critic(s_n_critic)
-            plan_targets = disc_return + gamma_n * v_bootstrap
+            # ---------------------------------------------------------------
+            # New multi-horizon average target for every plan:
+            # y_plan = 1/(n-1) * sum_{H=2}^{n} (
+            #     sum_{t=1}^{H-1} gamma^t * r_t  +  gamma^H * V(s_H)
+            # )
+            # In 0-based indexing this becomes:
+            # for L = 1 .. n-1:
+            #     sum_{t=0}^{L-1} gamma^{t+1} * r[t]  +  gamma^{L+1} * V(s[L])
+            # ---------------------------------------------------------------
+            plan_targets = torch.zeros(N, device=device)
+
+            for L in range(1, n):  # L = 1 .. n-1  → H = 2 .. n
+                # sum_{t=0}^{L-1} gamma^{t+1} * r[t]
+                discounts = gamma_pow_t[:L] * gamma          # gamma^1 ... gamma^L
+                disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
+
+                # bootstrap at step L
+                s_L = (s_raw[:, L] - c_mean) / c_std
+                v_boot = target_critic(s_L)
+                partial = disc_return + (gamma ** (L + 1)) * v_boot
+
+                plan_targets += partial
+
+            plan_targets = plan_targets / (n - 1)            # average over H=2..n
 
             # ----- average targets per unique s0 -----
             s0_raw = s_raw[:, 0]
@@ -4342,7 +4363,7 @@ def train_critic_with_planner4(
             running_tgt_std = alpha * running_tgt_std + (1 - alpha) * batch_std
             normalized_target = (averaged_targets - running_tgt_mean) / running_tgt_std
 
-            # critic input (unique s0)
+            # critic input
             s0_critic = (unique_s0 - c_mean) / c_std
 
         # gradient step
@@ -4390,6 +4411,3 @@ def train_critic_with_planner4(
 
     return running_tgt_mean.item(), running_tgt_std.item()
 
-
-
-    
