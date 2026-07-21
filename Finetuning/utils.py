@@ -36,6 +36,7 @@ from Pretrain.Dataset import get_dataset
 import json
 import torch.nn as nn
 import random
+import torch.distributed as dist
 
 
 
@@ -4126,7 +4127,11 @@ def train_critic_with_planner4(
 
         # -------------------- 3. COLLECT --------------------
         # every rank receives the complete list of accepted plans from all GPUs
-        all_accepted_lists = accelerator.gather_object(local_accepted)
+        if accelerator.num_processes > 1:
+             all_accepted_lists = [None for _ in range(accelerator.num_processes)]
+             dist.all_gather_object(all_accepted_lists, local_accepted)
+        else:
+             all_accepted_lists = [local_accepted]
         all_plans = [p for sublist in all_accepted_lists for p in sublist]
 
         if len(all_plans) == 0:

@@ -100,6 +100,7 @@ if __name__ == '__main__':  # pragma: no cover
              oversample        = 4,           # try up to oversample * batch_size candidates
        )
        accelerator = Accelerator()
+       accelerator.wait_for_everyone()
        """
        mean, std = train_critic_with_planner3(
             trajs                  = trajs,
