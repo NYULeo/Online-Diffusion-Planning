@@ -26,11 +26,13 @@ from Finetuning.utils import (
     train_critic_with_reward,
     train_critic_with_planner,
     train_critic_with_planner3,
+    train_critic_with_planner4,
     train_critic,
     test_critic,
     KernelConfig,
 )
 from Pretrain.utils import set_seed
+from accelerate import Accelerator
 
 
 if __name__ == '__main__':  # pragma: no cover
@@ -97,8 +99,8 @@ if __name__ == '__main__':  # pragma: no cover
              min_log_prob      = -110.0,       # feasibility threshold (tune per kernel type)
              oversample        = 4,           # try up to oversample * batch_size candidates
        )
-
-
+       accelerator = Accelerator()
+       """
        mean, std = train_critic_with_planner3(
             trajs                  = trajs,
             dataset_name           = env_name,
@@ -126,17 +128,45 @@ if __name__ == '__main__':  # pragma: no cover
             task_id                = task_id,
             log_every              = 100,
          )
+       """
+       train_critic_with_planner4(
+            trajs=trajs,
+            dataset_name=env_name,
+            specific_dataset=specific_env,
+            planner_checkpoint=0,
+            reward_checkpoint=0,
+            old_critic_checkpoint=None,
+            backbone_layers=2,
+            hidden_layers=4,
+            hidden_dim=512,
+            kernel_config=kernel_config,
+            reward_hidden_layers=4,
+            reward_hidden_dim=512,
+            batch_size=128,
+            num_steps=1000,
+            horizon=32,
+            gamma=0.99,
+            lr=5e-5,
+            min_lr=1e-8,
+            tau=0.005,
+            steps_T=10,
+            num_karras=1,
+            eta=0.0,
+            new_step=0,
+            task_id=task_id,
+            log_every=100,
+            accelerator=accelerator,
+        )
 
-       
+       accelerator.wait_for_everyone()
        #trajs = load_success_trajs(env_name, specific_env, task_id, step)
        trajs = data.get_trajectories()
-       test_critic(dataset_name = env_name, 
+       if accelerator.is_main_process:
+           test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
             hidden_layers = 4, 
             hidden_dim = 512, 
             checkpoint_step = 0, 
-            mean = mean,
-            std = std,
             gamma = 0.99, 
             horizon = horizon,  
             sigma = 4.0, 
