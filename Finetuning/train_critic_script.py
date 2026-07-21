@@ -42,7 +42,7 @@ if __name__ == '__main__':  # pragma: no cover
        task_id = 4
        step = 0
       
-       
+       1
        """
        #trajs = load_success_trajs(env_name, specific_env, task_id, step)
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
@@ -85,7 +85,7 @@ if __name__ == '__main__':  # pragma: no cover
        """
        
        
-       data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
+       data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = None)
        trajs = data.get_trajectories()
        kernel_config = KernelConfig(
              checkpoint        = 0,           # which kernel checkpoint to load
