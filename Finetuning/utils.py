@@ -3854,7 +3854,8 @@ def train_critic_with_planner3(
             v_bootstrap  = target_critic(s_n_critic)                          # (B',)
             target_value = disc_return + gamma_n * v_bootstrap                # (B',)
 
-        
+            
+            """
             # === NEW: Running normalization ===
             batch_mean = target_value.mean()
             batch_std  = target_value.std(unbiased=False) + 1e-8
@@ -3864,15 +3865,15 @@ def train_critic_with_planner3(
 
             normalized_target = (target_value - running_tgt_mean) / running_tgt_std
             # =================================
-            
+            """
 
             # 5) input for V_β(s_0)
             s0_critic = (s_raw[:, 0] - c_mean) / c_std                        # (B', d_s)
 
         # 6) gradient step on V_β
         v_pred = critic(s0_critic)                                            # (B',)
-        loss   = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
-        #loss   = F.smooth_l1_loss(v_pred, target_value, beta=1.0)
+        #loss   = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
+        loss   = F.smooth_l1_loss(v_pred, target_value, beta=1.0)
 
         optimizer.zero_grad()
         loss.backward()
