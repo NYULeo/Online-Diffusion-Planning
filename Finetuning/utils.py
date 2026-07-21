@@ -3916,10 +3916,10 @@ def train_critic_with_planner3(
 
     target_critic.eval()
     save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
-    Q_Stats = Q_Stats()
-    Q_Stats.Q_mean = running_tgt_mean.item()
-    Q_Stats.Q_std = running_tgt_std.item()
-    save_Q_stats(Q_Stats, dataset_name, specific_dataset, task_id, new_step)
+    q_stats = Q_Stats()
+    q_stats.Q_mean = running_tgt_mean.item()
+    q_stats.Q_std = running_tgt_std.item()
+    save_Q_stats(q_stats, dataset_name, specific_dataset, task_id, new_step)
     print("critic saved.")
     return running_tgt_mean.item(), running_tgt_std.item()
             
