@@ -3533,7 +3533,7 @@ def train_critic_with_planner3(
     specific_dataset: str,
     planner_checkpoint: int,
     reward_checkpoint: int,
-    old_critic_checkpoint: int,
+    old_critic_checkpoint: Optional[int],
     backbone_layers: int,
     hidden_layers: int,
     hidden_dim: int,
@@ -3711,6 +3711,7 @@ def train_critic_with_planner3(
             dataset_name, specific_dataset, task_id=task_id, step=old_critic_checkpoint,
          )
         critic.load_state_dict(critic_state)
+    
 
     target_critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
     target_critic.load_state_dict(critic.state_dict())
@@ -3765,12 +3766,17 @@ def train_critic_with_planner3(
         dataset_name, specific_dataset, kernel_config,
         obs_dim, act_dim, device,
     )
-
+    
+    
     # ----------------------------------- critic stats: load once, never save
-    critic_stat = get_critic_stats(
-        dataset_name, specific_dataset,
-        task_id=task_id, step=0,
-    )
+    if(old_critic_checkpoint is not None):
+         critic_stat = get_critic_stats(
+             dataset_name, specific_dataset,
+             task_id=task_id, step=0,
+         )
+    else:
+         critic_stat = obtain_and_save_critic_stats(trajs, dataset_name, specific_dataset, task_id, step = 0)
+    
     c_mean = torch.as_tensor(
         critic_stat.obs_mean, device=device, dtype=torch.float32,
     )
@@ -3899,7 +3905,25 @@ def train_critic_with_planner3(
     return running_tgt_mean.item(), running_tgt_std.item()
             
     
-
+def obtain_and_save_critic_stats(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, task_id: Optional[int] = None, step: int = 0):
+        obs_all = []
+        for traj in trajs:
+            obs_all.append(traj['observations'])
+        obs_all = np.concatenate(obs_all, axis = 0)
+        
+        #get stats
+        stats = SAStats()
+        stats.obs_mean = obs_all.mean(axis=0)
+        stats.obs_std = obs_all.std(axis=0)+ 1e-8
+        critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
+        stats_name =  str(critic_name) + f'_Critic_stats_{str(step)}.pkl'
+        stats_dir = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/'
+        os.makedirs(stats_dir, exist_ok=True)
+        savepath = os.path.join(stats_dir, stats_name)
+        with open(savepath, 'wb') as f:
+              pickle.dump(stats, f)
+        print(f"saved stats to {savepath}")
+        return stats
 
 
 
