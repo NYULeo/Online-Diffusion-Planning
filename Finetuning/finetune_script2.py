@@ -496,7 +496,7 @@ if __name__ == "__main__":
     TrainCriticConfig = Train_Critic_Config(
                             hidden_layers = 4,
                             hidden_dim = 512,
-                            batch_size = 256,
+                            batch_size = 64,
                             num_steps = 20,
                             lr = 5e-06,
                             min_lr = 1e-09,
