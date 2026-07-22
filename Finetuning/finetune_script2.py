@@ -480,7 +480,7 @@ if __name__ == "__main__":
                             kernel_num_modes = 10,
                             kernel_noise_floor = 5e-4,
                             λ_reg = 1e-3)
-    
+    """
     TrainCriticConfig = Train_Critic_Config(
                             hidden_layers = 4,
                             hidden_dim = 512,
@@ -492,7 +492,19 @@ if __name__ == "__main__":
                             gamma = 0.99,
                             data_conservation = True,
                             momentum = 0.1)
-    
+    """
+    TrainCriticConfig = Train_Critic_Config(
+                            hidden_layers = 4,
+                            hidden_dim = 512,
+                            batch_size = 256,
+                            num_steps = 20,
+                            lr = 5e-06,
+                            min_lr = 1e-09,
+                            tau = 0.005,
+                            gamma = 0.99,
+                            data_conservation = True,
+                            momentum = 0.1)
+
     FTConfig = FinetuningConfig(
         AMConfig = AMConfig, 
         RewardConfig = RWConfig, 
