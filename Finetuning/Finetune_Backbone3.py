@@ -819,7 +819,7 @@ class OnlineFinetuner():
                       #save_trajs(critic_buffer, self.config.dataset_name, self.config.specific_dataset, ((step+1) * self.config.AMConfig.per_round_steps))
                       if self.config.kernel and self.config.update_kernel:
                            self.kernel_config.checkpoint = self.config.kernel_model_checkpoint
-                      train_critic_with_planner3(
+                      train_critic_with_planner4(
                                trajs                  = critic_buffer,
                                dataset_name           = self.config.dataset_name,
                                specific_dataset       = self.config.specific_dataset,
@@ -843,7 +843,9 @@ class OnlineFinetuner():
                                num_karras             = self.config.AMConfig.num_karras,
                                eta                    = self.config.AMConfig.eta,
                                new_step               = ((step+1) * self.config.AMConfig.per_round_steps),
-                               task_id                = self.config.train_reward_config.task_id)                       
+                               task_id                = self.config.train_reward_config.task_id,
+                               log_every              = 0,
+                               accelerator            = self.accelerator)                       
             self.accelerator.wait_for_everyone()
             #plans = self.get_generated_plans(number_of_generated_plans = self.config.RewardConfig.number_of_generated_plans)
             if self.config.kernel and self.config.update_kernel:

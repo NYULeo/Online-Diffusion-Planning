@@ -46,7 +46,7 @@ if __name__ == '__main__':  # pragma: no cover
        step = 0
       
        
-       """
+       
        #trajs = load_success_trajs(env_name, specific_env, task_id, step)
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
@@ -85,7 +85,7 @@ if __name__ == '__main__':  # pragma: no cover
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
-       """
+       exit()
        
        
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
@@ -102,6 +102,8 @@ if __name__ == '__main__':  # pragma: no cover
        )
        accelerator = Accelerator()
        accelerator.wait_for_everyone()
+
+
        """
        mean, std = train_critic_with_planner3(
             trajs                  = trajs,
@@ -130,6 +132,10 @@ if __name__ == '__main__':  # pragma: no cover
             task_id                = task_id,
             log_every              = 100,
          )
+       """
+
+
+
        """
        train_critic_with_planner5(
                 trajs=trajs,
@@ -176,4 +182,4 @@ if __name__ == '__main__':  # pragma: no cover
                        target_reward = 500.0, 
                        trajs = trajs,
                        task_id = task_id)
-     
+     """

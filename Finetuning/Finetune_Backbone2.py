@@ -817,7 +817,7 @@ class OnlineFinetuner():
                       #save_trajs(critic_buffer, self.config.dataset_name, self.config.specific_dataset, ((step+1) * self.config.AMConfig.per_round_steps))
                       if self.config.kernel and self.config.update_kernel:
                            self.kernel_config.checkpoint = self.config.kernel_model_checkpoint
-                      train_critic_with_planner3(
+                      train_critic_with_planner2(
                                trajs                  = critic_buffer,
                                dataset_name           = self.config.dataset_name,
                                specific_dataset       = self.config.specific_dataset,

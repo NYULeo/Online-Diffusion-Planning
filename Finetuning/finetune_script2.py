@@ -8,7 +8,7 @@ os.chdir(project_root)
 
 from utils import AlphaSchedulerConfig
 #from Finetune_Backbone import OnlineFinetuner, FinetuningConfig, Train_Critic_Config, Train_Kernel_Config, Train_Reward_Config
-from Finetune_Backbone3 import OnlineFinetuner, FinetuningConfig, Train_Critic_Config, Train_Kernel_Config, Train_Reward_Config
+from Finetune_Backbone2 import OnlineFinetuner, FinetuningConfig, Train_Critic_Config, Train_Kernel_Config, Train_Reward_Config
 from adjoint_matching import AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig
 #from AM import Acc_AdjointMatchingConfig
