@@ -46,7 +46,7 @@ if __name__ == '__main__':  # pragma: no cover
        step = 0
       
        
-       
+       """
        #trajs = load_success_trajs(env_name, specific_env, task_id, step)
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
@@ -85,8 +85,8 @@ if __name__ == '__main__':  # pragma: no cover
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
-       exit()
        
+       """
        
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
@@ -104,40 +104,14 @@ if __name__ == '__main__':  # pragma: no cover
        accelerator.wait_for_everyone()
 
 
-       """
-       mean, std = train_critic_with_planner3(
-            trajs                  = trajs,
-            dataset_name           = env_name,
-            specific_dataset       = specific_env,
-            planner_checkpoint     = 0,
-            reward_checkpoint      = 0,
-            old_critic_checkpoint  = None,
-            backbone_layers        = 2,
-            hidden_layers          = 4,
-            hidden_dim             = 512,
-            kernel_config          = kernel_config,
-            reward_hidden_layers   = 4,
-            reward_hidden_dim      = 512,
-            batch_size             = 128,
-            num_steps              = 1000,
-            horizon                = 32,
-            gamma                  = 0.99,
-            lr                     = 5e-5,
-            min_lr                 = 1e-8,
-            tau                    = 0.005,
-            steps_T                = 10,
-            num_karras             = 1,
-            eta                    = 0.0,
-            new_step               = 0,
-            task_id                = task_id,
-            log_every              = 100,
-         )
-       """
+    
+      
+       
 
 
 
-       """
-       train_critic_with_planner5(
+       
+       train_critic_with_planner4(
                 trajs=trajs,
                 dataset_name=env_name,
                 specific_dataset=specific_env,
@@ -163,7 +137,6 @@ if __name__ == '__main__':  # pragma: no cover
                 new_step=0,
                 task_id=task_id,
                 log_every=20,
-                use_multi_horizon = True,
                 accelerator=accelerator,
         )
 
@@ -182,4 +155,4 @@ if __name__ == '__main__':  # pragma: no cover
                        target_reward = 500.0, 
                        trajs = trajs,
                        task_id = task_id)
-     """
+    
