@@ -599,7 +599,7 @@ class OnlineFinetuner():
         
         #warm up critic
         print(f"Warming Up Critic: ---------------------------------------------------------------- ")
-        train_critic_with_planner5(
+        train_critic_with_planner4(
                                trajs                  = self.Base_Critic_Buffer,
                                dataset_name           = self.config.dataset_name,
                                specific_dataset       = self.config.specific_dataset,
@@ -626,7 +626,6 @@ class OnlineFinetuner():
                                new_step               = 0,
                                task_id                = self.config.train_reward_config.task_id,
                                log_every              = self.config.train_critic_config.warm_up_log_every,
-                               use_multi_horizon      = False,
                                accelerator            = self.accelerator) 
         self.accelerator.wait_for_everyone()
         for step in range(self.config.finetune_rounds):

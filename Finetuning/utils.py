@@ -4468,7 +4468,6 @@ def train_critic_with_planner4(
 
     return running_tgt_mean.item(), running_tgt_std.item()
 
-
 def train_critic_with_planner5(
     trajs: List[TrajectoryDict],
     dataset_name: str,
