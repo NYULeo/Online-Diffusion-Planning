@@ -4395,7 +4395,7 @@ def train_critic_with_planner4(
                   weight_sum += w
                   w *= lam
 
-            plan_targets = plan_targets / weight_sum.clamp(min=1e-8)
+            plan_targets = plan_targets / max(weight_sum, 1e-8)
 
             # ----- average targets per unique s0 -----
             s0_raw = s_raw[:, 0]
