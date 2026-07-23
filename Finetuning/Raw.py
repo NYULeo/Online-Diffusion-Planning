@@ -75,6 +75,10 @@ def check_cube_double_goal_reach(trajs, task_id):
     average_dist = total_dist/len(trajs)
     print(f"Task {task_id} average distance: {average_dist}")
 
+a = torch.ones(1)
+print(a)
+exit()
+
 
 
 """
