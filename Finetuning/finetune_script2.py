@@ -500,7 +500,7 @@ if __name__ == "__main__":
                             batch_size = 64,
                             num_steps = 20,
                             warm_up_steps = 500,
-                            warm_up_log_every = 100,
+                            warm_up_log_every = 50,
                             lr = 5e-06,
                             min_lr = 1e-10,
                             tau = 0.005,
