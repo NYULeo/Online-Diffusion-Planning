@@ -63,6 +63,7 @@ class Train_Kernel_Config:
     kernel_num_modes: Optional[int] = 8
     kernel_noise_floor: Optional[float] = 1e-4
     λ_reg: float = 1e-3
+    oversample: int = 5
 
 @dataclass
 class Train_Critic_Config:
@@ -70,10 +71,13 @@ class Train_Critic_Config:
     hidden_dim: int = 128
     batch_size: int = 256
     num_steps: int = 3000
+    warm_up_steps: int = 1000
+    warm_up_log_every: int = 100
     lr: float = 5e-05
     min_lr: float = 1e-05
     tau: float = 0.005
     gamma: float = 1.0
+    lam: float = 0.95
     data_conservation: bool = False
     momentum: float = 0.005
 
@@ -260,7 +264,7 @@ class OnlineFinetuner():
                 num_modes = self.config.train_kernel_config.kernel_num_modes,
                 noise_floor = self.config.train_kernel_config.kernel_noise_floor,
                 min_log_prob = self.config.RewardConfig.min_log_prob,
-                oversample = 5,
+                oversample = self.config.train_kernel_config.oversample,
         )
         #self.accelerator = Accelerator(mixed_precision = 'bf16')
         self.accelerator = Accelerator(
@@ -609,9 +613,10 @@ class OnlineFinetuner():
                                reward_hidden_layers   = self.config.train_reward_config.hidden_layers,
                                reward_hidden_dim      = self.config.train_reward_config.hidden_dim,
                                batch_size             = self.config.train_critic_config.batch_size,
-                               num_steps              = 100,
+                               num_steps              = self.config.train_critic_config.warm_up_steps,
                                horizon                = self.config.AMConfig.horizon,
                                gamma                  = self.config.train_critic_config.gamma,
+                               lam                    = self.config.train_critic_config.lam,
                                lr                     = self.config.train_critic_config.lr,
                                min_lr                 = self.config.train_critic_config.min_lr,
                                tau                    = self.config.train_critic_config.tau,
@@ -620,7 +625,7 @@ class OnlineFinetuner():
                                eta                    = self.config.AMConfig.eta,
                                new_step               = 0,
                                task_id                = self.config.train_reward_config.task_id,
-                               log_every              = 10,
+                               log_every              = self.config.train_critic_config.warm_up_log_every,
                                accelerator            = self.accelerator) 
         self.accelerator.wait_for_everyone()
         for step in range(self.config.finetune_rounds):
@@ -749,6 +754,7 @@ class OnlineFinetuner():
                                num_steps              = self.config.train_critic_config.num_steps,
                                horizon                = self.config.AMConfig.horizon,
                                gamma                  = self.config.train_critic_config.gamma,
+                               lam                    = self.config.train_critic_config.lam,
                                lr                     = self.config.train_critic_config.lr,
                                min_lr                 = self.config.train_critic_config.min_lr,
                                tau                    = self.config.train_critic_config.tau,
@@ -868,6 +874,7 @@ class OnlineFinetuner():
                                num_steps              = self.config.train_critic_config.num_steps,
                                horizon                = self.config.AMConfig.horizon,
                                gamma                  = self.config.train_critic_config.gamma,
+                               lam                    = self.config.train_critic_config.lam,
                                lr                     = self.config.train_critic_config.lr,
                                min_lr                 = self.config.train_critic_config.min_lr,
                                tau                    = self.config.train_critic_config.tau,

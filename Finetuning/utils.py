@@ -3516,9 +3516,9 @@ def train_critic_with_planner2(
             
             """
             # NEW: Strong scaling
-            r_hat = torch.clamp(r_hat, -10.0, 10.0)
+            r_hat = torch.clamp(r_hat, -20.0, 20.0)
             r_hat = r_hat / 5.0 
-            """                                                # (B', n)
+            """                                # (B', n)
 
             # 4) discounted return + bootstrapped target value
             disc_return  = (gamma_pow_t.unsqueeze(0) * r_hat).sum(dim=1)      # (B',)
@@ -3984,6 +3984,7 @@ def train_critic_with_planner4(
     num_steps: int = 20000,
     horizon: int = 32,
     gamma: float = 0.99,
+    lam: float = 0.95,
     lr: float = 5e-5,
     min_lr: float = 1e-6,
     tau: float = 0.005,
@@ -4359,21 +4360,42 @@ def train_critic_with_planner4(
             # for L = 1 .. n-1:
             #     sum_{t=0}^{L-1} gamma^{t+1} * r[t]  +  gamma^{L+1} * V(s[L])
             # ---------------------------------------------------------------
+            """
             plan_targets = torch.zeros(N, device=device)
 
             for L in range(1, n):  # L = 1 .. n-1  → H = 2 .. n
                 # sum_{t=0}^{L-1} gamma^{t+1} * r[t]
-                discounts = gamma_pow_t[:L] * gamma          # gamma^1 ... gamma^L
+                #discounts = gamma_pow_t[:L] * gamma          # gamma^1 ... gamma^L
+                discounts = gamma_pow_t[:L]         
                 disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
 
                 # bootstrap at step L
                 s_L = (s_raw[:, L] - c_mean) / c_std
                 v_boot = target_critic(s_L)
-                partial = disc_return + (gamma ** (L + 1)) * v_boot
+                #partial = disc_return + (gamma ** (L + 1)) * v_boot
+                partial = disc_return + (gamma ** L) * v_boot
 
                 plan_targets += partial
 
             plan_targets = plan_targets / (n - 1)            # average over H=2..n
+            """
+            plan_targets = torch.zeros(N, device=device)
+            w = 1.0 - lam       # first weight = (1-λ)
+            weight_sum = 0.0
+
+            for L in range(1, n):                               # L = 1 .. n-1
+                  discounts = gamma_pow_t[:L]                     # γ⁰ … γ^{L-1}
+                  disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
+
+                  s_L = (s_raw[:, L] - c_mean) / c_std
+                  v_boot = target_critic(s_L)
+                  partial = disc_return + (gamma ** L) * v_boot   # R^{(L)}
+
+                  plan_targets += w * partial
+                  weight_sum += w
+                  w *= lam
+
+            plan_targets = plan_targets / weight_sum.clamp(min=1e-8)
 
             # ----- average targets per unique s0 -----
             s0_raw = s_raw[:, 0]

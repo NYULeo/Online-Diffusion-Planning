@@ -479,7 +479,8 @@ if __name__ == "__main__":
                             type_kernel = 'mog',
                             kernel_num_modes = 10,
                             kernel_noise_floor = 5e-4,
-                            λ_reg = 1e-3)
+                            λ_reg = 1e-3,
+                            oversample = 5)
     """
     TrainCriticConfig = Train_Critic_Config(
                             hidden_layers = 4,
@@ -498,10 +499,13 @@ if __name__ == "__main__":
                             hidden_dim = 512,
                             batch_size = 64,
                             num_steps = 20,
+                            warm_up_steps = 1000,
+                            warm_up_log_every = 100,
                             lr = 5e-06,
                             min_lr = 1e-09,
                             tau = 0.005,
                             gamma = 0.99,
+                            lam = 0.95,
                             data_conservation = True,
                             momentum = 0.1)
 
