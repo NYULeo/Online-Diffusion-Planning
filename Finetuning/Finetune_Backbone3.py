@@ -594,8 +594,7 @@ class OnlineFinetuner():
         last_reward_update_step = 0
         
         #warm up critic
-        if self.accelerator.is_main_process:
-             print(f"Warming Up Critic: ---------------------------------------------------------------- ")
+        print(f"Warming Up Critic: ---------------------------------------------------------------- ")
         train_critic_with_planner4(
                                trajs                  = self.Base_Critic_Buffer,
                                dataset_name           = self.config.dataset_name,

@@ -3514,9 +3514,11 @@ def train_critic_with_planner2(
                 actions[:, :n].reshape(B * n, -1),
             ).reshape(B, n)  
             
+            """
             # NEW: Strong scaling
             r_hat = torch.clamp(r_hat, -10.0, 10.0)
-            r_hat = r_hat / 5.0                                                 # (B', n)
+            r_hat = r_hat / 5.0 
+            """                                                # (B', n)
 
             # 4) discounted return + bootstrapped target value
             disc_return  = (gamma_pow_t.unsqueeze(0) * r_hat).sum(dim=1)      # (B',)
@@ -3993,6 +3995,7 @@ def train_critic_with_planner4(
     log_every: int = 0,
     accelerator=None,
 ):
+
     from accelerate import Accelerator
     import math
     import torch.distributed as dist
@@ -4342,6 +4345,10 @@ def train_critic_with_planner4(
                 s_for_r.reshape(N * n, -1),
                 actions[:, :n].reshape(N * n, -1),
             ).reshape(N, n)  # (N, n)
+             
+            # reward clipping -----------------------------------------------------
+            r_hat = torch.clamp(r_hat, -20.0, 20.0)
+            r_hat = r_hat / 5.0
 
             # ---------------------------------------------------------------
             # New multi-horizon average target for every plan:
@@ -4812,6 +4819,10 @@ def train_critic_with_planner5(
                 s_for_r.reshape(N * n, -1),
                 actions[:, :n].reshape(N * n, -1),
             ).reshape(N, n)  # (N, n)
+
+            # reward clipping -----------------------------------------------------
+            r_hat = torch.clamp(r_hat, -20.0, 20.0)
+            r_hat = r_hat / 5.0
 
             # ---------------------------------------------------------------
             # Compute per-plan targets
