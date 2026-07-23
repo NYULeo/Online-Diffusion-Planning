@@ -945,7 +945,7 @@ class OnlineFinetuner():
                   self.config.kernel_model_checkpoint = 0
             
             if(self.config.critic and self.config.update_critic):
-                self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
+                 self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             else:
                  self.config.critic_model_checkpoint = 0
               
