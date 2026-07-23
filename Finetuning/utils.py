@@ -1729,20 +1729,20 @@ def test_critic(dataset_name: str,
             gamma_pow = torch.tensor([gamma ** i for i in range(horizon)], device=device, dtype=torch.float32)
             raw_target = (gamma_pow.unsqueeze(0) * rews_chunk).sum(dim=1)
             
-            """
+            
             # === Normalize target (CRITICAL) ===
             tgt_mean = raw_target.mean()
             tgt_std = raw_target.std(unbiased=False) + 1e-8
             target = (raw_target - tgt_mean) / tgt_std
-            """
+        
 
-            #loss = F.smooth_l1_loss(pred, target, beta=1.0)
-            loss = F.smooth_l1_loss(pred, raw_target, beta=1.0)
+            loss = F.smooth_l1_loss(pred, target, beta=1.0)
+            #loss = F.smooth_l1_loss(pred, raw_target, beta=1.0)
             total_loss += loss.item() * s.size(0)
 
             all_preds.extend(pred.cpu().numpy())
-            #all_targets.extend(target.cpu().numpy())
-            all_targets.extend(raw_target.cpu().numpy())
+            all_targets.extend(target.cpu().numpy())
+            #all_targets.extend(raw_target.cpu().numpy())
 
 
     avg_loss = total_loss / len(dataset)
@@ -3082,7 +3082,7 @@ class Critic_Buffer_Reward():
                  # === ADD NORMALIZATION HERE ===
                  value_targets = values[:, 0] + advantages[:, 0]         # raw targets
                 
-                 """
+                 
                  # Normalize advantages and targets (running stats or batch stats)
                  adv_mean = advantages.mean()
                  adv_std  = advantages.std() + 1e-8
@@ -3095,10 +3095,10 @@ class Critic_Buffer_Reward():
                  tgt_std_new = alpha * tgt_std + ((1 - alpha) * tgt_std_new)
                  value_targets = (value_targets - tgt_mean_new) / tgt_std_new
                  # =================================
-                 """
+                 
 
-        #return obs_chunks[:, 0], value_targets, tgt_mean_new, tgt_std_new
-        return obs_chunks[:, 0], value_targets
+        return obs_chunks[:, 0], value_targets, tgt_mean_new, tgt_std_new
+        #return obs_chunks[:, 0], value_targets
 
 def train_critic_with_reward(trajs: List[TrajectoryDict], 
                  dataset_name: str, 
@@ -3155,8 +3155,8 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
     tgt_mean = torch.zeros(1, device=device)
     tgt_std = torch.ones(1, device=device)
     for k in range(1, num_steps + 1):  # number of passes over dataset
-           #s, target_value, tgt_mean, tgt_std = buffer.obtain_training_data(target_critic, batch_size, tgt_mean, tgt_std, device)
-           s, target_value = buffer.obtain_training_data(target_critic, batch_size, tgt_mean, tgt_std, device)
+           s, target_value, tgt_mean, tgt_std = buffer.obtain_training_data(target_critic, batch_size, tgt_mean, tgt_std, device)
+           #s, target_value = buffer.obtain_training_data(target_critic, batch_size, tgt_mean, tgt_std, device)
            s = s.to(device)
            target_value = target_value.to(device)
 
@@ -3188,6 +3188,7 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
     save_Q_stats(q_stats, dataset_name, specific_dataset, task_id, new_step)
     print(f"critic model saved")
     print(f"mean: {tgt_mean.item()}, std: {tgt_std.item()}")
+    return tgt_mean.item(), tgt_std.item()
 
 @dataclass
 class KernelConfig:

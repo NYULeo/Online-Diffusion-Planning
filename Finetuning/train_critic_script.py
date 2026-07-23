@@ -50,7 +50,7 @@ if __name__ == '__main__':  # pragma: no cover
        #trajs = load_success_trajs(env_name, specific_env, task_id, step)
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
-       train_critic_with_reward(trajs,
+       mean, std = train_critic_with_reward(trajs,
                       dataset_name  = env_name,
                       specific_dataset = specific_env,
                       reward_hidden_layers = 4,
@@ -79,6 +79,8 @@ if __name__ == '__main__':  # pragma: no cover
             hidden_layers = 4, 
             hidden_dim = 512, 
             checkpoint_step = 0, 
+            mean = mean,
+            std = std,
             gamma = 0.99, 
             horizon = horizon,  
             sigma = 4.0, 
