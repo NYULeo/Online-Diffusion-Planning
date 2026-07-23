@@ -592,6 +592,38 @@ class OnlineFinetuner():
         world_size = self.accelerator.num_processes
         num_envs_per_process = self.config.rollout_num_envs  # Total envs = base * world_size
         last_reward_update_step = 0
+        
+        #warm up critic
+        if self.accelerator.is_main_process:
+             print(f"Warming Up Critic: ---------------------------------------------------------------- ")
+        train_critic_with_planner4(
+                               trajs                  = self.Base_Critic_Buffer,
+                               dataset_name           = self.config.dataset_name,
+                               specific_dataset       = self.config.specific_dataset,
+                               planner_checkpoint     = 0,
+                               reward_checkpoint      = 0,
+                               old_critic_checkpoint  = 0,
+                               backbone_layers        = self.config.AMConfig.backbone_layers,
+                               hidden_layers          = self.config.train_critic_config.hidden_layers,
+                               hidden_dim             = self.config.train_critic_config.hidden_dim,
+                               kernel_config          = self.kernel_config,
+                               reward_hidden_layers   = self.config.train_reward_config.hidden_layers,
+                               reward_hidden_dim      = self.config.train_reward_config.hidden_dim,
+                               batch_size             = self.config.train_critic_config.batch_size,
+                               num_steps              = 100,
+                               horizon                = self.config.AMConfig.horizon,
+                               gamma                  = self.config.train_critic_config.gamma,
+                               lr                     = self.config.train_critic_config.lr,
+                               min_lr                 = self.config.train_critic_config.min_lr,
+                               tau                    = self.config.train_critic_config.tau,
+                               steps_T                = self.config.diffusion_steps,
+                               num_karras             = self.config.AMConfig.num_karras,
+                               eta                    = self.config.AMConfig.eta,
+                               new_step               = 0,
+                               task_id                = self.config.train_reward_config.task_id,
+                               log_every              = 10,
+                               accelerator            = self.accelerator) 
+        self.accelerator.wait_for_everyone()
         for step in range(self.config.finetune_rounds):
             if (torch.cuda.device_count() > 1):
                 world_size = self.accelerator.num_processes
