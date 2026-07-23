@@ -4486,6 +4486,7 @@ def train_critic_with_planner5(
     num_steps: int = 20000,
     horizon: int = 32,
     gamma: float = 0.99,
+    lam: float = 0.95,
     lr: float = 5e-5,
     min_lr: float = 1e-6,
     tau: float = 0.005,
@@ -4850,24 +4851,25 @@ def train_critic_with_planner5(
             # Compute per-plan targets
             # ---------------------------------------------------------------
             if use_multi_horizon:
-                # Multi-horizon average:
-                # y_plan = 1/(n-1) * sum_{H=2}^{n} (
-                #     sum_{t=1}^{H-1} gamma^t * r_t  +  gamma^H * V(s_H)
-                # )
+                # λ-weighted multi-step returns (finite-horizon GAE-style)
+                # y = (1/Z) * Σ_{L=1}^{n-1} (1-λ) λ^{L-1} * R^{(L)}
+                # where R^{(L)} = Σ_{t=0}^{L-1} γ^t r_t + γ^L V(s_L)
                 plan_targets = torch.zeros(N, device=device)
+                w = 1.0 - lam
+                weight_sum = 0.0
 
-                for L in range(1, n):  # L = 1 .. n-1  → H = 2 .. n
-                    # sum_{t=0}^{L-1} gamma^{t+1} * r[t]
-                    discounts = gamma_pow_t[:L] * gamma          # gamma^1 ... gamma^L
+                for L in range(1, n):
+                    discounts = gamma_pow_t[:L]                              # γ⁰ … γ^{L-1}
                     disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
-
                     s_L = (s_raw[:, L] - c_mean) / c_std
                     v_boot = target_critic(s_L)
-                    partial = disc_return + (gamma ** (L + 1)) * v_boot
+                    partial = disc_return + (gamma ** L) * v_boot           # R^{(L)}
 
-                    plan_targets += partial
+                    plan_targets += w * partial
+                    weight_sum += w
+                    w *= lam
 
-                plan_targets = plan_targets / (n - 1)
+                plan_targets = plan_targets / max(weight_sum, 1e-8)
 
             else:
                 # Standard n-step return:

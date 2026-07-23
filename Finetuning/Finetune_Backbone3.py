@@ -5,7 +5,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 from dataclasses import dataclass
 from gymnasium.vector import AsyncVectorEnv
-from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs, check_Critic, get_kernel, get_new_critic_stats, load_success_trajs, KernelConfig, train_critic_with_planner2, train_critic_with_planner4
+from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs, check_Critic, get_kernel, get_new_critic_stats, load_success_trajs, KernelConfig, train_critic_with_planner2, train_critic_with_planner4, train_critic_with_planner5
 #from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
 #from Finetuning.traj_reward3 import RewardConfig, TotalReward, TotalReward_Critic
 from Finetuning.traj_reward4 import RewardConfig, TotalReward, TotalReward_Critic
@@ -599,7 +599,7 @@ class OnlineFinetuner():
         
         #warm up critic
         print(f"Warming Up Critic: ---------------------------------------------------------------- ")
-        train_critic_with_planner4(
+        train_critic_with_planner5(
                                trajs                  = self.Base_Critic_Buffer,
                                dataset_name           = self.config.dataset_name,
                                specific_dataset       = self.config.specific_dataset,
@@ -626,6 +626,7 @@ class OnlineFinetuner():
                                new_step               = 0,
                                task_id                = self.config.train_reward_config.task_id,
                                log_every              = self.config.train_critic_config.warm_up_log_every,
+                               use_multi_horizon      = False,
                                accelerator            = self.accelerator) 
         self.accelerator.wait_for_everyone()
         for step in range(self.config.finetune_rounds):
