@@ -4779,9 +4779,14 @@ def train_critic_with_planner5(
         [t['observations'] for t in trajs], axis=0,
     ).astype(np.float32)
 
-    # running target stats
-    running_tgt_mean = torch.zeros(1, device=device)
-    running_tgt_std = torch.ones(1, device=device)
+     # running target stats
+    if(old_critic_checkpoint is None):
+        running_tgt_mean = torch.zeros(1, device=device)
+        running_tgt_std = torch.ones(1, device=device)
+    else:
+        q_stats = get_Q_stats(dataset_name, specific_dataset, task_id, old_critic_checkpoint)
+        running_tgt_mean = q_stats.Q_mean
+        running_tgt_std = q_stats.Q_std
     alpha = 0.99
 
     # optim
