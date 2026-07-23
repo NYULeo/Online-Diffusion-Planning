@@ -3184,6 +3184,7 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
     q_stats.Q_std = tgt_std.item()
     save_Q_stats(q_stats, dataset_name, specific_dataset, task_id, new_step)
     print(f"critic model saved")
+    print(f"mean: {tgt_mean.item()}, std: {tgt_std.item()}")
 
 @dataclass
 class KernelConfig:
