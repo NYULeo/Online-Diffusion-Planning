@@ -77,7 +77,7 @@ if __name__ == '__main__':  # pragma: no cover
                              task_id = task_id)
       """
        
-       accelerator.wait_for_everyone()
+       #accelerator.wait_for_everyone()
        kernel_config = KernelConfig(
                 checkpoint = 0,
                 type_kernel = 'mog',
