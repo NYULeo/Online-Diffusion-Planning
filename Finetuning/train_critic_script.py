@@ -40,7 +40,7 @@ from accelerate import Accelerator
 
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
-       #accelerator = Accelerator(mixed_precision='bf16')
+       accelerator = Accelerator(mixed_precision='bf16')
        
        env_name = 'cube'
        specific_env = 'single-play'
@@ -54,6 +54,7 @@ if __name__ == '__main__':  # pragma: no cover
        
        #accelerator.wait_for_everyone()
        #if accelerator.is_main_process:
+       """
        mean, std = train_critic_with_reward(trajs,
                              dataset_name  = env_name,
                              specific_dataset = specific_env,
@@ -74,7 +75,8 @@ if __name__ == '__main__':  # pragma: no cover
                              new_step = step,
                              momentum = 0.005,   # unused when old_step is None
                              task_id = task_id)
-       """
+      """
+       
        accelerator.wait_for_everyone()
        kernel_config = KernelConfig(
                 checkpoint = 0,
@@ -117,7 +119,7 @@ if __name__ == '__main__':  # pragma: no cover
                                accelerator            = accelerator) 
       
        accelerator.wait_for_everyone()
-       """
+    
        #if accelerator.is_main_process:
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
