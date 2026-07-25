@@ -10,6 +10,8 @@ import seaborn as sns
 import minari
 import sys
 
+from torch._C import NoneType
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -42,7 +44,7 @@ if __name__ == '__main__':  # pragma: no cover
        
        env_name = 'cube'
        specific_env = 'single-play'
-       traj_length = 200
+       traj_length = None
        horizon = 128
        task_id = 4
        step = 0
