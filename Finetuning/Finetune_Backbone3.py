@@ -597,6 +597,7 @@ class OnlineFinetuner():
         num_envs_per_process = self.config.rollout_num_envs  # Total envs = base * world_size
         last_reward_update_step = 0
         
+        """
         #warm up critic
         print(f"Warming Up Critic: ---------------------------------------------------------------- ")
         train_critic_with_planner4(
@@ -628,6 +629,8 @@ class OnlineFinetuner():
                                log_every              = self.config.train_critic_config.warm_up_log_every,
                                accelerator            = self.accelerator) 
         self.accelerator.wait_for_everyone()
+        """
+        
         for step in range(self.config.finetune_rounds):
             if (torch.cuda.device_count() > 1):
                 world_size = self.accelerator.num_processes

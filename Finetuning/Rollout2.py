@@ -1,3 +1,4 @@
+import chunk
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -585,31 +586,20 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 36
+    checkpoint = 39
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
-    RConfig = RewardConfig(
-               beta = 1.0, 
-               #max_mahalanobis_score = 3.5,
-               min_log_prob = 5.0,
-               #constraint_adapt = False,
-               critic_gamma = 1.0,
-               type_kernel = 'mog',
-               kernel_num_modes = 10,
-               kernel_noise_floor = 5e-4,
-               num_hidden_layers_kernel = 2,
-               hidden_dim_kernel = 256,
-               num_hidden_layers_reward = 1,
-               hidden_dim_reward = 32,
-               num_hidden_layers_critic = 3,
-               hidden_dim_critic = 256,
-               explore = False)
     #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
     #chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17]
     chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17, 21, 22, 23, 24, 26, 27, 28, 29, 30]
-    set_seed(1)
-    return_value, _ = rollout(
+    chunk_size2 = [4,5,6,7,8]
+    
+    for i in range(1, 51):
+       set_seed(i)
+       chunk_size_index = 0
+       while(chunk_size_index < len(chunk_size2)):
+           return_value, _ = rollout(
                   env_name, 
                   specific_train_dataset, 
                   horizon, 
@@ -619,13 +609,19 @@ if __name__ == "__main__":
                   eta = 0.0, 
                   episode_length = 3000, 
                   checkpoint_steps = checkpoint, 
-                  render = True,  
-                  base_seed = 38, 
+                  render = False,  
+                  base_seed = 3, 
                   #goal_cell = np.array([6, 1], dtype = int), 
                   task_id = task_id,
                   continual_rollout = True,
-                  chunk_size = 7,
+                  chunk_size = chunk_size2[chunk_size_index],
                   device = device)
+           chunk_size_index += 1
+           if(return_value == 1.0):
+                print(f"chunk_size: {chunk_size2[chunk_size_index-1]}")
+                break
+       print(return_value)
+    
     exit()
     while(checkpoint < 33):
        print(f"Running checkpoing: {checkpoint}")
