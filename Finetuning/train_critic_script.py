@@ -44,7 +44,7 @@ if __name__ == '__main__':  # pragma: no cover
        
        env_name = 'cube'
        specific_env = 'single-play'
-       traj_length = None
+       traj_length = 200
        horizon = 128
        task_id = 4
        step = 0
@@ -68,7 +68,7 @@ if __name__ == '__main__':  # pragma: no cover
                              lam = 0.95,
                              horizon = horizon,
                              lr = 1e-04, 
-                             min_lr = 1e-06, 
+                             min_lr = 1e-05, 
                              tau = 0.005, 
                              old_step = None,    # from scratch
                              new_step = step,

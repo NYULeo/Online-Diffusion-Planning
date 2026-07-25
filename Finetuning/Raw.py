@@ -75,11 +75,26 @@ def check_cube_double_goal_reach(trajs, task_id):
     average_dist = total_dist/len(trajs)
     print(f"Task {task_id} average distance: {average_dist}")
 
-a = torch.ones(1)
-print(a)
+data = get_dataset('cube', 'triple-play', task_id = 4, traj_length = None)
+trajs = data.get_trajectories()
+
+Max = float('-inf')
+sum = 0
+count_1 = 0
+count_2 = 0
+for traj in trajs:
+    Max = max(Max, traj['rewards'][0])
+    if(traj['rewards'][0] == 1.0):
+        count_1 += 1
+    elif(traj['rewards'][0] == 2.0):
+        count_2 += 1
+    sum += traj['rewards'][0]
+
+print(Max)
+print(sum)
+print(count_1)
+print(count_2)
 exit()
-
-
 
 """
 env_steps = [0, 1592, 1590, 1600, 1411, 1416, 1600, 1555, 1422, 1600, 1599, 1554]
