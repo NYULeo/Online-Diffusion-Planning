@@ -102,7 +102,7 @@ if __name__ == '__main__':  # pragma: no cover
                                kernel_config          = kernel_config,
                                reward_hidden_layers   = 4,
                                reward_hidden_dim      = 512,
-                               batch_size             = 63,
+                               batch_size             = 64,
                                num_steps              = 1000,
                                horizon                = 32,
                                gamma                  = 0.99,
