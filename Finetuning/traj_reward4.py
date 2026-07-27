@@ -271,7 +271,7 @@ class TotalReward(nn.Module):
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward, gradient
 
-"""
+
 class TotalReward_Critic(nn.Module):
     def __init__(self, device, config: RewardConfig, dataset_name: str, specific_dataset: str, reward_checkpoint: int, kernel_checkpoint: int, critic_checkpoint: int, task_id: Optional[int] = None):
         super().__init__()
@@ -508,12 +508,12 @@ class TotalReward_Critic(nn.Module):
         total_reward +=   ((self.config.critic_gamma**(H-1)) * (  (self.q_stats.Q_std * v.squeeze(0)) + self.q_stats.Q_mean  )  )
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward, gradient
+
+
+
+
+
 """
-
-
-
-
-
 class TotalReward_Critic(nn.Module):
     def __init__(
         self,
@@ -685,21 +685,7 @@ class TotalReward_Critic(nn.Module):
     def _compute_gae_style_return(
         self, x: torch.Tensor, lam: float,  with_grad: bool = False
     ):
-        """
-        Scalar objective:
-
-            R = 1/Z * Σ_{H=2}^n  w_H * ( Σ_{t=1}^{H-1} γ^{t-1} r_t + γ^{H-1} V(s_H) )
-                - lam * Σ c_t + lam * δ
-
-        where
-            w_H = (1 - gae_lam) * gae_lam^{H-1},
-            Z   = Σ w_H.
-
-        Parameters
-        ----------
-        lam      : Lagrange multiplier for the constraint (original meaning)
-        gae_lam  : GAE trace-decay parameter that defines the multi-step weights
-        """
+        
         H, D = x.shape
         device = self.config.device
         gamma = self.config.critic_gamma
@@ -881,26 +867,16 @@ class TotalReward_Critic(nn.Module):
 
     # ---------------------------------------------------------------------- public API
     def predict(self, x: torch.Tensor, lam: float):
-        """
-        Parameters
-        ----------
-        lam     : Lagrange multiplier for the feasibility constraint
-        gae_lam : GAE λ used to form the multi-step return weights
-        """
+        
         total_reward, _ = self._compute_gae_style_return(
             x, lam,  with_grad=False
         )
         return total_reward
 
     def forward(self, x: torch.Tensor, lam: float):
-        """
-        Returns
-        -------
-        total_reward : scalar
-        gradient     : (H, d_s + d_a)  analytic gradient of the objective
-        """
+        
         total_reward, gradient = self._compute_gae_style_return(
             x, lam, with_grad=True
         )
         return total_reward, gradient
-
+"""
