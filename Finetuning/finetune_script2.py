@@ -454,6 +454,7 @@ if __name__ == "__main__":
                quantile = 0.999,
                number_of_generated_plans = 50,
                #max_mahalanobis_score = 100.0,
+               gae_lam = 0.95,
                critic_gamma = 0.99,
                explore = False) 
   
