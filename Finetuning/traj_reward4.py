@@ -758,7 +758,7 @@ class TotalReward_Critic(nn.Module):
                     device=device,
                     dtype=torch.float32,
                 )
-                v_s = grads[0].squeeze(0) * inv_std
+                v_s = grads[0].squeeze(0) * inv_std * self.q_stats.Q_std
                 v_grads.append(v_s)
             else:
                 v_grads.append(None)
@@ -769,7 +769,8 @@ class TotalReward_Critic(nn.Module):
         coeff_v = [torch.tensor(0.0, device=device) for _ in range(n)]
 
         # w_H = (1 - gae_lam) * gae_lam^{H-1}
-        w = (1.0 - self.config.gae_lam) * self.config.gae_lam          # value for H = 2
+        #w = (1.0 - self.config.gae_lam) * self.config.gae_lam          # value for H = 2
+        w = 1.0 - self.config.gae_lam
         weight_sum = 0.0
 
         for h in range(2, n + 1):              # H = 2 … n
@@ -835,7 +836,9 @@ class TotalReward_Critic(nn.Module):
             else:
                 c_grads.append(None)
 
-        total_reward = plan_return - lam * total_c + lam * self.config.delta
+        #total_reward = plan_return - lam * total_c + lam * self.config.delta
+        mean_c = total_c / (n - 1)
+        total_reward = plan_return - lam * (mean_c - self.config.delta)
 
         if not with_grad:
             return total_reward, None
@@ -861,7 +864,8 @@ class TotalReward_Critic(nn.Module):
         for i in range(n - 1):
             c_s, c_a, c_s_next = c_grads[i]
             g_s, g_a, g_s_next = self.makeGrad(H, c_s, c_a, i, c_s_next)
-            gradient = gradient - lam * (g_s + g_a + g_s_next)
+            #gradient = gradient - lam * (g_s + g_a + g_s_next)
+            gradient = gradient - (lam / (n - 1)) * (g_s + g_a + g_s_next)
 
         return total_reward, gradient
 
