@@ -270,7 +270,7 @@ class TotalReward(nn.Module):
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward, gradient
 
-
+"""
 class TotalReward_Critic(nn.Module):
     def __init__(self, device, config: RewardConfig, dataset_name: str, specific_dataset: str, reward_checkpoint: int, kernel_checkpoint: int, critic_checkpoint: int, task_id: Optional[int] = None):
         super().__init__()
@@ -507,10 +507,10 @@ class TotalReward_Critic(nn.Module):
         total_reward +=   ((self.config.critic_gamma**(H-1)) * (  (self.q_stats.Q_std * v.squeeze(0)) + self.q_stats.Q_mean  )  )
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward, gradient
-
-
-
 """
+
+
+
 class TotalReward_Critic(nn.Module):
     def __init__(self, device, config: RewardConfig, dataset_name: str, specific_dataset: str,
                  reward_checkpoint: int, kernel_checkpoint: int, critic_checkpoint: int,
@@ -722,8 +722,8 @@ class TotalReward_Critic(nn.Module):
             for t in range(h - 1):
                 partial = partial + (gamma ** t) * rs[t]
                 coeff_r[t] = coeff_r[t] + w * (gamma ** t)
-            partial = partial + (gamma ** h) * vs[h - 1]
-            coeff_v[h - 1] = coeff_v[h - 1] + w * (gamma ** h)
+            partial = partial + (gamma ** (h - 1)) * vs[h - 1]
+            coeff_v[h - 1] = coeff_v[h - 1] + w * (gamma ** (h - 1))
 
             plan_return = plan_return + w * partial
             weight_sum += w
@@ -798,6 +798,11 @@ class TotalReward_Critic(nn.Module):
             gradient = gradient - lam * (g_s + g_a + g_s_next)
 
         return total_reward, gradient
+   
+
+
+
+
 
     def predict(self, x: torch.Tensor, lam: float):
         total_reward, _ = self._compute_gae_style_return(x, lam, with_grad=False)
@@ -806,6 +811,8 @@ class TotalReward_Critic(nn.Module):
     def forward(self, x: torch.Tensor, lam: float):
         total_reward, gradient = self._compute_gae_style_return(x, lam, with_grad=True)
         return total_reward, gradient
-"""
+
+
+
 
 
