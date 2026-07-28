@@ -100,7 +100,7 @@ if __name__ == '__main__':
                  num_steps = 50000, 
                  save_freq = 50000, 
                  lr = 5e-04, 
-                 min_lr = 5e-05, 
+                 min_lr = 5e-06, 
                  sigma  = 4.0,
                  alpha = None, 
                  target_reward = 500.0,
