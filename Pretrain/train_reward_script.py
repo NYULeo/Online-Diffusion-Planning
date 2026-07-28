@@ -97,8 +97,8 @@ if __name__ == '__main__':
                  hidden_layers = 4, 
                  hidden_dim = 512, 
                  batch_size = 256, 
-                 num_steps = 80000, 
-                 save_freq = 80000, 
+                 num_steps = 30000, 
+                 save_freq = 30000, 
                  lr = 5e-04, 
                  min_lr = 5e-08, 
                  sigma  = 4.0,
@@ -121,8 +121,8 @@ if __name__ == '__main__':
                target_reward = 500.0, 
                task_id = task_id,
                traj_length = traj_length, 
-               save_freq = 80000, 
-               num_steps = 80000)
+               save_freq = 30000, 
+               num_steps = 30000)
     
 
 
