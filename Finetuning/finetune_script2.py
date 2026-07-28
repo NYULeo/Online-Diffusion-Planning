@@ -238,6 +238,17 @@ def set_seed(seed: int):
     torch.backends.cudnn.benchmark = False
 
 
+
+
+
+ 
+
+
+
+
+
+
+
 #finetune_lr = 1e-05,
 
 if __name__ == "__main__":
@@ -254,55 +265,61 @@ if __name__ == "__main__":
     """
     
 
-    """
-    env_name = 'pointmaze'
-    specific_env = 'medium'
-    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = True)
-    AMConfig = Acc_AdjointMatchingConfig(horizon = 32)
 
-    #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
+
+    env_name = 'cube'
+    specific_env = 'double-play'
+    task_id = 1
+    finetune_buffer_cutoff_length = 200
+    train_buffer_cutoff_length = 500
+    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = True)
+    AMConfig = Acc_AdjointMatchingConfig(horizon = 32, eta = 0.0)
+
     RWConfig = RewardConfig(
                beta = 1.0, 
-               #max_mahalanobis_score = 3.5,
-               type_kernel = 'robust',
-               min_log_prob = 5.0,
-               critic_gamma = 1.0,
+               min_log_prob = -110.0,
+               quantile = 0.999,
+               number_of_generated_plans = 50,
+               #max_mahalanobis_score = 100.0,
+               critic_gamma = 0.99,
                explore = False) 
-
-    
+  
     TrainRewardConfig = Train_Reward_Config(
-                          hidden_layers = 1,
-                          hidden_dim = 32,
+                          hidden_layers = 3,
+                          hidden_dim = 256,
                           batch_size = 256, 
-                          num_steps = 400, 
-                          lr = 1e-4, 
-                          min_lr = 1e-4,
-                          sigma = 7.0, 
-                          target_reward = 20.0, 
-                          train_goal = np.array([[-2.5, -2.5]], dtype = np.float32),
-                          rollout_goal = np.array([[6, 1]]),
-                          rollout_start_cells = np.array([[6,6], [5,4], [2,4], [2,1]]))
+                          num_steps = 30000, 
+                          lr = 3e-04,
+                          min_lr = 3e-05,
+                          sigma = 4.0, 
+                          target_reward = 500.0, 
+                          train_goal = None,
+                          task_id = task_id)
       
     TrainKernelConfig = Train_Kernel_Config(
-                            batch_size = 256, 
-                            num_steps = 1000,
-                            lr = 3e-4,
+                            batch_size = 512, 
+                            num_steps = 5000,
+                            lr = 1e-4,
                             ensemble_size = 10,
-                            num_hidden_layers = 2,
-                            hidden_dim = 256,
-                            type_kernel = 'robust',
-                            λ_reg = 1e-3)
+                            num_hidden_layers = 3,
+                            hidden_dim = 512,
+                            type_kernel = 'mog',
+                            kernel_num_modes = 8,
+                            kernel_noise_floor = 5e-4,
+                            λ_reg = 2e-3)
     
     TrainCriticConfig = Train_Critic_Config(
-                            hidden_layers = 1,
-                            hidden_dim = 128,
+                            hidden_layers = 4,
+                            hidden_dim = 512,
                             batch_size = 256,
-                            num_steps = 5000,
+                            num_steps = 10000,
                             lr = 1e-05,
+                            min_lr = 5e-07,
+                            horizon = 300,
                             tau = 0.005,
-                            gamma = 0.95,
-                            lam = 0.95,
-                            data_conservation = True)
+                            gamma = 0.99,
+                            data_conservation = True,
+                            momentum = 0.1)
     
     FTConfig = FinetuningConfig(
         AMConfig = AMConfig, 
@@ -314,20 +331,20 @@ if __name__ == "__main__":
         reward_model_checkpoint = 0,
         kernel_model_checkpoint = 0,
         critic_model_checkpoint = 0,
-        offline = True,
-        critic = False,
-        update_critic = False,
+        offline = False,
+        critic = True,
+        update_critic = True,
         kernel = True,
         update_kernel = False,
-        buffer_size = 5500,
-        finetune_buffer_cutoff_length = None,
-        train_buffer_cutoff_length = None,
-        finetune_steps = 300,
+        buffer_size = 200000,
+        finetune_buffer_cutoff_length = finetune_buffer_cutoff_length,
+        train_buffer_cutoff_length = train_buffer_cutoff_length,
+        finetune_steps = 90,
         finetune_rounds = 30,
-        diffusion_steps = 50,
-        karras_percent = 0.05,
-        Loss_Clip_percent = 0.75,
-        finetune_batch_size = 12,
+        diffusion_steps = 10,
+        karras_percent = 0.1,
+        Loss_Clip_percent = 0.0,
+        finetune_batch_size = 16,
         finetune_batch_per_sample = 6,
         finetune_lr = 2e-05,
         initial_lam = 0.05,
@@ -338,104 +355,30 @@ if __name__ == "__main__":
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value
-        rollout_num_envs = 1, 
+        rollout_num_envs = 8, 
         continual_rollout = True,
         chunk_size = 31,
-        num_rollout_processes = 4,
+        num_rollout_processes = 8,
         train_reward_config = TrainRewardConfig,
         train_kernel_config = TrainKernelConfig,
         train_critic_config = TrainCriticConfig) 
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-    """
-
-    
+    exit()
 
 
-    """
-    env_name = 'pointmaze'
-    specific_env = 'large'
-    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = False)
-    AMConfig = Acc_AdjointMatchingConfig(horizon = 70)
 
-    #RWConfig = RewardConfig(beta = 1.0, min_log_prob = 15.0, explore = False) 
-    RWConfig = RewardConfig(
-               beta = 1.0, 
-               min_log_prob = 17.5, 
-               critic_gamma = 1.0,
-               explore = False) 
 
-    TrainRewardConfig = Train_Reward_Config(
-                          hidden_layers = 2,
-                          hidden_dim = 128,
-                          batch_size = 512, 
-                          num_steps = 2000, 
-                          lr = 1e-04, 
-                          sigma = 50.0, 
-                          target_reward = 100.0, 
-                          train_goal = np.array([[4.0, -3.0]], dtype = np.float32),
-                          rollout_goal = np.array([[7, 10]]),
-                          rollout_start_cells =  np.array([[3, 6], [1, 10], [3, 10], [7, 6], [3, 4], [7, 1]]))
-      
-    TrainKernelConfig = Train_Kernel_Config(
-                            batch_size = 256, 
-                            num_steps = 1000,
-                            lr = 3e-4,
-                            ensemble_size = 10,
-                            num_hidden_layers = 2,
-                            hidden_dim = 256,
-                            λ_reg = 1e-3)
-    
-    TrainCriticConfig = Train_Critic_Config(
-                            hidden_layers = 2,
-                            hidden_dim = 512,
-                            batch_size = 512,
-                            num_steps = 10000,
-                            lr = 3e-05,
-                            tau = 0.005,
-                            gamma = 0.99,
-                            data_conservation = True)
-    
-    FTConfig = FinetuningConfig(
-        AMConfig = AMConfig, 
-        RewardConfig = RWConfig, 
-        AlphaConfig = AlphaConfig,
-        dataset_name = env_name,
-        specific_dataset = specific_env,
-        planner_checkpoint = 0,
-        reward_model_checkpoint = 0,
-        kernel_model_checkpoint = 0,
-        critic_model_checkpoint = 0,
-        critic = True,
-        kernel = False,
-        buffer_size = 5500,
-        finetune_steps = 300,
-        finetune_rounds = 30,
-        diffusion_steps = 50,
-        karras_percent = 0.05,
-        Loss_Clip_percent = 0.75,
-        finetune_batch_size = 32,
-        finetune_batch_per_sample = 3,
-        finetune_lr = 2e-05,
-        initial_lam = 0.05,
-        eta_lam = 0.5,
-        gradient_accumulate_every = 5,
-        update_lambda_every = 1,
-        reward_scaling_factor = 10,
-        MaxEnt = False,
-        Entropy_Scaling_Factor = 0.5,
-        rollout_length = 8000,  # or your desired value
-        rollout_num_envs = 1, 
-        continual_rollout = True,
-        num_rollout_processes = 4,
-        train_reward_config = TrainRewardConfig,
-        train_kernel_config = TrainKernelConfig,
-        train_critic_config = TrainCriticConfig) 
-    set_seed(1)
-    OnlineFinetuner = OnlineFinetuner(FTConfig)
-    OnlineFinetuner.finetune_planner()
-   """
+
+
+
+
+
+
+
+
+
 
     
     
@@ -558,7 +501,7 @@ if __name__ == "__main__":
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-
+    
 
     """
     env_name = 'ogpointmaze'
@@ -656,105 +599,8 @@ if __name__ == "__main__":
     OnlineFinetuner.finetune_planner()
     """
 
-    """
-    env_name = 'cube'
-    specific_env = 'double-play'
-    task_id = 1
-    finetune_buffer_cutoff_length = 200
-    train_buffer_cutoff_length = 500
-    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = True)
-    AMConfig = Acc_AdjointMatchingConfig(horizon = 32, eta = 0.0)
 
-    RWConfig = RewardConfig(
-               beta = 1.0, 
-               min_log_prob = -110.0,
-               quantile = 0.999,
-               number_of_generated_plans = 50,
-               #max_mahalanobis_score = 100.0,
-               critic_gamma = 0.99,
-               explore = False) 
-  
-    TrainRewardConfig = Train_Reward_Config(
-                          hidden_layers = 3,
-                          hidden_dim = 256,
-                          batch_size = 256, 
-                          num_steps = 30000, 
-                          lr = 3e-04,
-                          min_lr = 3e-05,
-                          sigma = 4.0, 
-                          target_reward = 500.0, 
-                          train_goal = None,
-                          task_id = task_id)
-      
-    TrainKernelConfig = Train_Kernel_Config(
-                            batch_size = 512, 
-                            num_steps = 5000,
-                            lr = 1e-4,
-                            ensemble_size = 10,
-                            num_hidden_layers = 3,
-                            hidden_dim = 512,
-                            type_kernel = 'mog',
-                            kernel_num_modes = 8,
-                            kernel_noise_floor = 5e-4,
-                            λ_reg = 2e-3)
-    
-    TrainCriticConfig = Train_Critic_Config(
-                            hidden_layers = 4,
-                            hidden_dim = 512,
-                            batch_size = 256,
-                            num_steps = 10000,
-                            lr = 1e-05,
-                            min_lr = 5e-07,
-                            horizon = 300,
-                            tau = 0.005,
-                            gamma = 0.99,
-                            data_conservation = True,
-                            momentum = 0.1)
-    
-    FTConfig = FinetuningConfig(
-        AMConfig = AMConfig, 
-        RewardConfig = RWConfig, 
-        AlphaConfig = AlphaConfig,
-        dataset_name = env_name,
-        specific_dataset = specific_env,
-        planner_checkpoint = 0,
-        reward_model_checkpoint = 0,
-        kernel_model_checkpoint = 0,
-        critic_model_checkpoint = 0,
-        offline = False,
-        critic = True,
-        update_critic = True,
-        kernel = True,
-        update_kernel = False,
-        buffer_size = 200000,
-        finetune_buffer_cutoff_length = finetune_buffer_cutoff_length,
-        train_buffer_cutoff_length = train_buffer_cutoff_length,
-        finetune_steps = 90,
-        finetune_rounds = 30,
-        diffusion_steps = 10,
-        karras_percent = 0.1,
-        Loss_Clip_percent = 0.0,
-        finetune_batch_size = 16,
-        finetune_batch_per_sample = 6,
-        finetune_lr = 2e-05,
-        initial_lam = 0.05,
-        eta_lam = 0.5,
-        gradient_accumulate_every = 1,
-        update_lambda_every = 1,
-        reward_scaling_factor = 50,
-        MaxEnt = False,
-        Entropy_Scaling_Factor = 0.5,
-        rollout_length = 4000,  # or your desired value
-        rollout_num_envs = 8, 
-        continual_rollout = True,
-        chunk_size = 31,
-        num_rollout_processes = 8,
-        train_reward_config = TrainRewardConfig,
-        train_kernel_config = TrainKernelConfig,
-        train_critic_config = TrainCriticConfig) 
-    set_seed(1)
-    OnlineFinetuner = OnlineFinetuner(FTConfig)
-    OnlineFinetuner.finetune_planner()
-    """
 
+
+    
 

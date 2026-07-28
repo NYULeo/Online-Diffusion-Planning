@@ -143,7 +143,7 @@ if __name__ == '__main__':  # pragma: no cover
 
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
-       #accelerator = Accelerator(mixed_precision='bf16')
+       
        
        env_name = 'cube'
        specific_env = 'double-play'
@@ -151,12 +151,10 @@ if __name__ == '__main__':  # pragma: no cover
        horizon = 300
        task_id = 4
        step = 0
-       #trajs = load_success_trajs(env_name, specific_env, task_id, step)
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
        
-       #accelerator.wait_for_everyone()
-       #if accelerator.is_main_process:
+       
        
        mean, std = train_critic_with_reward(trajs,
                              dataset_name  = env_name,
@@ -167,7 +165,7 @@ if __name__ == '__main__':  # pragma: no cover
                              critic_hidden_layers = 4,
                              critic_hidden_dim  = 512,
                              batch_size = 256,
-                             num_steps  = 30000,
+                             num_steps  = 20000,
                              gamma = 0.99,
                              lam = 0.95,
                              horizon = horizon,
@@ -180,6 +178,7 @@ if __name__ == '__main__':  # pragma: no cover
                              task_id = task_id)
       
        """
+       accelerator = Accelerator(mixed_precision='bf16')
        #accelerator.wait_for_everyone()
        kernel_config = KernelConfig(
                 checkpoint = 0,
@@ -224,7 +223,6 @@ if __name__ == '__main__':  # pragma: no cover
       
        accelerator.wait_for_everyone()
        """
-       #if accelerator.is_main_process:
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
