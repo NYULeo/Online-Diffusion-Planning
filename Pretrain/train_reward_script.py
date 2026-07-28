@@ -79,7 +79,7 @@ if __name__ == '__main__':
     set_seed(1)
     
     dataset_name = 'cube'
-    specific_dataset = 'single'
+    specific_dataset = 'double'
     task_id = 4
     traj_length = None
     
