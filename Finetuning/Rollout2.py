@@ -499,7 +499,7 @@ def rollout(env_name,
      #return traj
      
      #return rewards[-1], len(observations)
-     return sum(rewards), len(observations)
+     return float(info['success']), len(observations)
      #print(get_normalized_score([traj]))
  
 def load_kernel(env_name, specific_env, checkpoint_steps, kernel_config: Kernel_Config, device: str):
@@ -611,10 +611,27 @@ if __name__ == "__main__":
     #chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17]
     chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17, 21, 22, 23, 24, 26, 27, 28, 29, 30]
     chunk_size2 = [4,5,6,7,8]
-    #chunk_size2 = [8]
     total_return = 0.0
-    #set_seed(1)
-    
+    set_seed(1)
+    return_value, _ = rollout(
+                  env_name, 
+                  specific_train_dataset, 
+                  horizon, 
+                  num_layers = 2,
+                  steps_T = 10, 
+                  num_karras = 1, 
+                  eta = 0.0, 
+                  episode_length = 3000, 
+                  checkpoint_steps = checkpoint, 
+                  render = True,  
+                  base_seed = 1, 
+                  #goal_cell = np.array([6, 1], dtype = int), 
+                  task_id = task_id,
+                  continual_rollout = True,
+                  chunk_size = 5,
+                  device = device)
+    print(return_value)
+    exit()
     for i in range(1, 101):
        set_seed(i)
        chunk_size_index = 0

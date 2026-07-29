@@ -2237,6 +2237,7 @@ def rollout_parallel2(
      
     
      total_steps = 0
+     successes = []
      if (start_cells is not None):
       for start_cell in start_cells:
          # Reset all environments
@@ -2305,6 +2306,7 @@ def rollout_parallel2(
              
                if terminated_vec[env_idx] or truncated_vec[env_idx]:
                    done_envs[env_idx] = True
+                   successes.append(int(info_vec[env_idx]['success']))
                    #print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
          
         
@@ -2312,6 +2314,10 @@ def rollout_parallel2(
             if all(done_envs):
                 #print("All environments completed!")
                 break
+        
+        for env_idx in range(num_envs):
+            if not done_envs[env_idx]:
+                successes.append(0)
         
         for env_idx in range(num_envs):
                    total_steps += (len(observations[env_idx]) - 1)
@@ -2364,7 +2370,7 @@ def rollout_parallel2(
                    x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                    action = x[0, d_s:(d_s+d_a)].copy()
                    actions[env_idx] = action
-         
+            
             # Step all environments at once
             obs_vec, rewards_vec, terminated_vec, truncated_vec, info_vec = vec_env.step(actions)
             obs_batch = obs_vec['observation'] if isinstance(obs_vec, dict) else obs_vec
@@ -2378,11 +2384,11 @@ def rollout_parallel2(
                acts[env_idx].append(actions[env_idx].copy())
                rewards[env_idx].append(rewards_vec[env_idx])
                all_rewards[env_idx] += rewards_vec[env_idx]
-             
                current_states[env_idx] = obs_batch[env_idx].copy()
              
                if terminated_vec[env_idx] or truncated_vec[env_idx]:
                    done_envs[env_idx] = True
+                   successes.append(int(info_vec[env_idx]['success']))
                    #print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
          
         
@@ -2392,6 +2398,12 @@ def rollout_parallel2(
                     break
      
             # Find the trajectory with the maximum reward
+        
+        
+        for env_idx in range(num_envs):
+            if not done_envs[env_idx]:
+                 successes.append(0)
+                 
         for env_idx in range(num_envs):
                    total_steps += (len(observations[env_idx]) - 1)
                    trajs.append({
@@ -2399,8 +2411,11 @@ def rollout_parallel2(
                       'actions': np.asarray(acts[env_idx].copy()),
                       'rewards': np.asarray(reward_processor(rewards[env_idx].copy(), env_name))
         })     
+     
+
+     
      vec_env.close()
-     success_rate = check_success_rate(trajs)
+     success_rate = np.mean(successes) if len(successes) > 0 else 0.0
      print(f"success rate: {success_rate:.2f}")
      if(goal_cell is None):
             expert_score = get_expert_score(env_name)
