@@ -285,14 +285,14 @@ if __name__ == "__main__":
                explore = False) 
   
     TrainRewardConfig = Train_Reward_Config(
-                          hidden_layers = 3,
-                          hidden_dim = 256,
+                          hidden_layers = 4,
+                          hidden_dim = 512,
                           batch_size = 256, 
-                          num_steps = 30000, 
+                          num_steps = 100000, 
                           lr = 3e-04,
                           min_lr = 3e-05,
                           sigma = 4.0, 
-                          target_reward = 500.0, 
+                          target_reward = 300.0, 
                           train_goal = None,
                           task_id = task_id)
       
@@ -301,12 +301,12 @@ if __name__ == "__main__":
                             num_steps = 5000,
                             lr = 1e-4,
                             ensemble_size = 10,
-                            num_hidden_layers = 3,
-                            hidden_dim = 512,
+                            num_hidden_layers = 4,
+                            hidden_dim = 514,
                             type_kernel = 'mog',
-                            kernel_num_modes = 8,
+                            kernel_num_modes = 10,
                             kernel_noise_floor = 5e-4,
-                            λ_reg = 2e-3)
+                            λ_reg = 1e-3)
     
     TrainCriticConfig = Train_Critic_Config(
                             hidden_layers = 4,
