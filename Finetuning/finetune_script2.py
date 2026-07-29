@@ -269,7 +269,7 @@ if __name__ == "__main__":
 
     env_name = 'cube'
     specific_env = 'double-play'
-    task_id = 1
+    task_id = 4
     finetune_buffer_cutoff_length = 200
     train_buffer_cutoff_length = 500
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = True)
@@ -311,16 +311,21 @@ if __name__ == "__main__":
     TrainCriticConfig = Train_Critic_Config(
                             hidden_layers = 4,
                             hidden_dim = 512,
-                            batch_size = 256,
-                            num_steps = 10000,
-                            lr = 1e-05,
-                            min_lr = 5e-07,
-                            horizon = 300,
+                            batch_size = 64,
+                            #batch_size = 63,
+                            num_steps = 20,
+                            warm_up_steps = 1000,
+                            warm_up_log_every = 100,
+                            lr = 1e-06,
+                            min_lr = 1e-09,
                             tau = 0.005,
                             gamma = 0.99,
+                            lam = 0.95,
                             data_conservation = True,
                             momentum = 0.1)
     
+
+
     FTConfig = FinetuningConfig(
         AMConfig = AMConfig, 
         RewardConfig = RWConfig, 
@@ -344,14 +349,14 @@ if __name__ == "__main__":
         diffusion_steps = 10,
         karras_percent = 0.1,
         Loss_Clip_percent = 0.0,
-        finetune_batch_size = 16,
-        finetune_batch_per_sample = 6,
+        finetune_batch_size = 32,
+        finetune_batch_per_sample = 8,
         finetune_lr = 2e-05,
         initial_lam = 0.05,
         eta_lam = 0.5,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
-        reward_scaling_factor = 50,
+        reward_scaling_factor = 150,
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value
