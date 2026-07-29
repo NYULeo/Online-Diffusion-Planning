@@ -2306,7 +2306,7 @@ def rollout_parallel2(
              
                if terminated_vec[env_idx] or truncated_vec[env_idx]:
                    done_envs[env_idx] = True
-                   successes.append(int(info_vec[env_idx]['success']))
+                   successes.append(int(info_vec['success'][env_idx]))
                    #print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
          
         
@@ -2388,7 +2388,7 @@ def rollout_parallel2(
              
                if terminated_vec[env_idx] or truncated_vec[env_idx]:
                    done_envs[env_idx] = True
-                   successes.append(int(info_vec[env_idx]['success']))
+                   successes.append(int(info_vec['success'][env_idx]))
                    #print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
          
         
@@ -2403,7 +2403,7 @@ def rollout_parallel2(
         for env_idx in range(num_envs):
             if not done_envs[env_idx]:
                  successes.append(0)
-                 
+
         for env_idx in range(num_envs):
                    total_steps += (len(observations[env_idx]) - 1)
                    trajs.append({
