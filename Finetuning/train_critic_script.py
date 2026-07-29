@@ -155,7 +155,7 @@ if __name__ == '__main__':  # pragma: no cover
        trajs = data.get_trajectories()
        
        
-       
+       """
        mean, std = train_critic_with_reward(trajs,
                              dataset_name  = env_name,
                              specific_dataset = specific_env,
@@ -176,8 +176,8 @@ if __name__ == '__main__':  # pragma: no cover
                              new_step = step,
                              momentum = 0.005,   # unused when old_step is None
                              task_id = task_id)
-      
-       """
+      """
+       
        accelerator = Accelerator(mixed_precision='bf16')
        #accelerator.wait_for_everyone()
        kernel_config = KernelConfig(
@@ -187,7 +187,7 @@ if __name__ == '__main__':  # pragma: no cover
                 hidden_dim = 514,
                 num_modes = 10,
                 noise_floor = 5e-4,
-                min_log_prob = -110.0,
+                min_log_prob = -120.0,
                 oversample = 5,
         )
        
@@ -199,7 +199,7 @@ if __name__ == '__main__':  # pragma: no cover
                                planner_checkpoint     = 0,
                                reward_checkpoint      = 0,
                                old_critic_checkpoint  = 0,
-                               backbone_layers        = 2,
+                               backbone_layers        = 4,
                                hidden_layers          = 4,
                                hidden_dim             = 512,
                                kernel_config          = kernel_config,
@@ -222,7 +222,7 @@ if __name__ == '__main__':  # pragma: no cover
                                accelerator            = accelerator) 
       
        accelerator.wait_for_everyone()
-       """
+    
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
