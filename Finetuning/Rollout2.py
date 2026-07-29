@@ -27,7 +27,7 @@ from typing import Optional, List
 from dataclasses import dataclass
 import time
 from typing import List
-from Finetuning.traj_reward2 import TotalReward_Critic, RewardConfig, TotalReward
+from Finetuning.traj_reward4 import TotalReward_Critic, RewardConfig, TotalReward
 class Selector():
     def __init__(self, env_name, specific_env, RConfig: RewardConfig, reward_checkpoint: int, kernel_checkpoint: Optional[int] = None, critic_checkpoint: Optional[int] = None):
          self.env_name = env_name
@@ -37,7 +37,7 @@ class Selector():
          self.kernel_checkpoint = kernel_checkpoint
          self.critic_checkpoint = critic_checkpoint
          self.device = check_device()
-         self.lam = 0.05
+         self.lam = 0.0
          if(critic_checkpoint is not None):
             self.model = TotalReward_Critic(self.device, RConfig, env_name, specific_env, self.reward_checkpoint, self.kernel_checkpoint, self.critic_checkpoint)
          else:
