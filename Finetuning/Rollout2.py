@@ -610,7 +610,8 @@ if __name__ == "__main__":
     #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
     #chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17]
     chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17, 21, 22, 23, 24, 26, 27, 28, 29, 30]
-    chunk_size2 = [4,5,6,7,8]
+    #chunk_size2 = [4,5,6,7,8]
+    chunk_size2 = [7]
     total_return = 0.0
     #set_seed(1)
     

@@ -187,7 +187,7 @@ if __name__ == '__main__':  # pragma: no cover
                 hidden_dim = 514,
                 num_modes = 10,
                 noise_floor = 5e-4,
-                min_log_prob = -140.0,
+                min_log_prob = -145.0,
                 oversample = 5,
         )
        
