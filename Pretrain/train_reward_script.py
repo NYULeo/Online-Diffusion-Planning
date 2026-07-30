@@ -49,7 +49,7 @@ if __name__ == '__main__':
     traj_length = None
     
    
-    
+    """
     train_reward(dataset_name = dataset_name, 
                  hidden_layers = 4, 
                  hidden_dim = 512, 
@@ -65,7 +65,24 @@ if __name__ == '__main__':
                  specific_dataset = specific_dataset, 
                  task_id = task_id, 
                  traj_length = traj_length)
-    
+    """
+
+
+    train_reward(dataset_name = dataset_name, 
+                 hidden_layers = 4, 
+                 hidden_dim = 512, 
+                 batch_size = 256, 
+                 num_steps = 30000, 
+                 save_freq = 30000, 
+                 lr = 5e-06, 
+                 min_lr = 5e-08, 
+                 #sigma  = 4.0,
+                 sigma = None,
+                 alpha = None, 
+                 target_reward = 500.0,
+                 specific_dataset = specific_dataset, 
+                 task_id = task_id, 
+                 traj_length = traj_length)
        
 
   
