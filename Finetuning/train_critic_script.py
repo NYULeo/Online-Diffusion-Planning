@@ -37,7 +37,7 @@ from Finetuning.utils import (
 from Pretrain.utils import set_seed
 from accelerate import Accelerator
 
-
+"""
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
       
@@ -74,7 +74,7 @@ if __name__ == '__main__':  # pragma: no cover
                              momentum = 0.005,   # unused when old_step is None
                              task_id = task_id)
       
-       """
+       
        accelerator = Accelerator(mixed_precision='bf16')
        #accelerator.wait_for_everyone()
        kernel_config = KernelConfig(
@@ -118,7 +118,7 @@ if __name__ == '__main__':  # pragma: no cover
                                accelerator            = accelerator) 
       
        accelerator.wait_for_everyone()
-       """
+       
        #if accelerator.is_main_process:
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
@@ -135,12 +135,12 @@ if __name__ == '__main__':  # pragma: no cover
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
-    
+"""
 
     
        
 
-"""
+
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        
@@ -177,7 +177,7 @@ if __name__ == '__main__':  # pragma: no cover
                              momentum = 0.005,   # unused when old_step is None
                              task_id = task_id)
       
-       
+       """
        accelerator = Accelerator(mixed_precision='bf16')
        #accelerator.wait_for_everyone()
        kernel_config = KernelConfig(
@@ -222,7 +222,7 @@ if __name__ == '__main__':  # pragma: no cover
                                accelerator            = accelerator) 
       
        accelerator.wait_for_everyone()
-    
+       """
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
@@ -234,11 +234,11 @@ if __name__ == '__main__':  # pragma: no cover
             gamma = 0.99, 
             horizon = horizon,  
             sigma = 4.0, 
-            target_reward = 300.0, 
+            target_reward = 600.0, 
             trajs = trajs,
             task_id = task_id)
 
-""" 
+
     
 
 

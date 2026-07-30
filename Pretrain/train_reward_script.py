@@ -39,7 +39,7 @@ def check_cube_single_goal_reach(trajs, task_id):
 
 
 
-
+"""
 if __name__ == '__main__':
     set_seed(1)
     
@@ -81,12 +81,12 @@ if __name__ == '__main__':
                traj_length = traj_length, 
                save_freq = 30000, 
                num_steps = 30000)
-    
-
-
-
-
 """
+
+
+
+
+
 if __name__ == '__main__':
     set_seed(1)
     
@@ -128,7 +128,7 @@ if __name__ == '__main__':
                save_freq = 100000, 
                num_steps = 100000)
     
-"""
+
 
 
 

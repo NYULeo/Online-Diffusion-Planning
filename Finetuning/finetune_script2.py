@@ -266,7 +266,7 @@ if __name__ == "__main__":
     
 
 
-    """
+    
     env_name = 'cube'
     specific_env = 'double-play'
     task_id = 4
@@ -312,7 +312,6 @@ if __name__ == "__main__":
                             hidden_layers = 4,
                             hidden_dim = 512,
                             batch_size = 64,
-                            #batch_size = 63,
                             num_steps = 20,
                             warm_up_steps = 1000,
                             warm_up_log_every = 100,
@@ -371,7 +370,7 @@ if __name__ == "__main__":
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
     exit()
-   """
+   
 
 
 

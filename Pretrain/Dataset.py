@@ -97,12 +97,26 @@ def reward_processor(rewards, name: str):
          dist = 0 - Min
          rews = rewards + dist
          return rews
-    
+
+    def mode_reward_processor(rewards):
+        new_rews = [0]*len(rewards)
+        for i in range(1, len(rewards)):
+             if(rewards[i] == rewards[i-1]+1):
+                new_rews[i] = 1
+        return np.array(new_rews, dtype = np.float64)
+
+
     if(name in ('cube', 'ogpointmaze', 'antmaze', 'humanoidmaze', 'puzzle', 'scene')):
-         return ogbench_reward_processor(rewards)
+         rewards = ogbench_reward_processor(rewards)
+         rewards = mode_reward_processor(rewards)
+         #return ogbench_reward_processor(rewards)
+         return rewards
     else:
          return spare_reward_processor(rewards)
     
+
+
+
 def get_dataset(name: str, 
                 specific_name: str, 
                 task_id: Optional[int] = None, 
