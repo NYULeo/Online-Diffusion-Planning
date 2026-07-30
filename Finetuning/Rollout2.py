@@ -495,7 +495,7 @@ def rollout(env_name,
      with open('Generated_trajectory.pkl', 'wb') as f:
                 pickle.dump(traj_info, f)
      """
-     #print(sum(traj['rewards']))
+     print(traj['rewards'])
      #return traj
      
      #return rewards[-1], len(observations)

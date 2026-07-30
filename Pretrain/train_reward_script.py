@@ -39,7 +39,7 @@ def check_cube_single_goal_reach(trajs, task_id):
 
 
 
-"""
+
 if __name__ == '__main__':
     set_seed(1)
     
@@ -58,7 +58,8 @@ if __name__ == '__main__':
                  save_freq = 30000, 
                  lr = 5e-03, 
                  min_lr = 5e-04, 
-                 sigma  = 4.0,
+                 #sigma  = 4.0,
+                 sigma = None,
                  alpha = None, 
                  target_reward = 500.0,
                  specific_dataset = specific_dataset, 
@@ -73,7 +74,8 @@ if __name__ == '__main__':
                hidden_dim = 512, 
                specific_dataset = specific_dataset, 
                trajs = None, 
-               sigma = 4.0, 
+               #sigma = 4.0, 
+               sigma = None,
                alpha = None, 
                target_reward = 500.0, 
                task_id = task_id,
@@ -81,8 +83,11 @@ if __name__ == '__main__':
                save_freq = 30000, 
                num_steps = 30000)
     
-"""
 
+
+
+
+"""
 if __name__ == '__main__':
     set_seed(1)
     
@@ -103,7 +108,7 @@ if __name__ == '__main__':
                  min_lr = 5e-08, 
                  sigma  = 4.0,
                  alpha = None, 
-                 target_reward = 300.0,
+                 target_reward = 600.0,
                  specific_dataset = specific_dataset, 
                  task_id = task_id, 
                  traj_length = traj_length)
@@ -118,60 +123,14 @@ if __name__ == '__main__':
                trajs = None, 
                sigma = 4.0, 
                alpha = None, 
-               target_reward = 300.0, 
+               target_reward = 600.0, 
                task_id = task_id,
                traj_length = traj_length, 
                save_freq = 100000, 
                num_steps = 100000)
     
-
-
-
-
-
-
 """
 
-if __name__ == '__main__':
-    set_seed(1)
-    
-    dataset_name = 'ogpointmaze'
-    specific_dataset = 'medium'
-    task_id = 1
-    
-    
-    
-    
-    train_reward(
-        dataset_name = dataset_name,
-        hidden_layers = 1,
-        hidden_dim = 32, 
-        batch_size = 256,
-        num_steps = 12000,
-        save_freq = 2000,
-        lr = 1e-04,
-        min_lr = 1e-04,
-        sigma = 7.0,
-        #alpha = 0.99,
-        target_reward = 50.0,
-        specific_dataset = specific_dataset,
-        task_id = task_id,
-        traj_length = None,
-        trajs = None
-    )
-    
-    test_Model(dataset_name = dataset_name, 
-               hidden_layers = 1, 
-               hidden_dim = 32, 
-               specific_dataset  = specific_dataset, 
-               trajs = None, 
-               sigma = 7.0, 
-               alpha = None, 
-               target_reward = 50.0,
-               goal= None, 
-               task_id = task_id, 
-               traj_length = None, 
-               save_freq = 2000, 
-               num_steps = 12000)
 
-"""
+
+

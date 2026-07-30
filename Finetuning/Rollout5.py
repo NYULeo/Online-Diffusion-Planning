@@ -462,7 +462,7 @@ def rollout(env_name, specific_env, horizon, num_layers, steps_T, num_karras, et
      """
      #print(f"total steps: {len(observations)}")
      #print(f"number of plans: {number_of_plans}")
-    
+     
      rewards = reward_processor(rewards, env_name)
      traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(rewards)}
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
@@ -470,13 +470,11 @@ def rollout(env_name, specific_env, horizon, num_layers, steps_T, num_karras, et
      
      #expert_score = get_expert_score(env_name)
      #print(get_normalized_score([traj], expert_score))
+     print(rewards)
      if(render):
           media.write_video("demo.mp4", frames, fps=50) #save the video
-     """
-     with open('Generated_trajectory.pkl', 'wb') as f:
-                pickle.dump(traj_info, f)
-     """
-     #print(sum(traj['rewards']))
+     
+     
      #return traj
      
      #return rewards[-1], len(observations)
@@ -584,7 +582,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'double-play'
     task_id = 4
-    checkpoint = 42
+    checkpoint = 90
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -623,9 +621,9 @@ if __name__ == "__main__":
                   #goal_cell = np.array([6, 1], dtype = int), 
                   task_id = task_id,
                   continual_rollout = True,
-                  chunk_size = 4,
+                  chunk_size = 31,
                   device = device)
-    #print(return_value)
+    print(return_value)
     exit()
     while(checkpoint < 42):
        print(f"Running checkpoing: {checkpoint}")

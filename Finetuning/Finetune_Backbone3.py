@@ -670,8 +670,8 @@ class OnlineFinetuner():
                  print(f"Finetuning round {step+1} started")
                 
             
-            #self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
-            self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1, old_planner_checkpoint = (step * self.config.AMConfig.per_round_steps))
+            self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
+            #self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1, old_planner_checkpoint = (step * self.config.AMConfig.per_round_steps))
             self.accelerator.wait_for_everyone()
             
             

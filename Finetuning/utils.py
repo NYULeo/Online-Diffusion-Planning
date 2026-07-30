@@ -1729,20 +1729,21 @@ def test_critic(dataset_name: str,
             gamma_pow = torch.tensor([gamma ** i for i in range(horizon)], device=device, dtype=torch.float32)
             raw_target = (gamma_pow.unsqueeze(0) * rews_chunk).sum(dim=1)
             
+            """
             
             # === Normalize target (CRITICAL) ===
             tgt_mean = raw_target.mean()
             tgt_std = raw_target.std(unbiased=False) + 1e-8
             target = (raw_target - tgt_mean) / tgt_std
         
-
-            loss = F.smooth_l1_loss(pred, target, beta=1.0)
-            #loss = F.smooth_l1_loss(pred, raw_target, beta=1.0)
+            """
+            #loss = F.smooth_l1_loss(pred, target, beta=1.0)
+            loss = F.smooth_l1_loss(pred, raw_target, beta=1.0)
             total_loss += loss.item() * s.size(0)
 
             all_preds.extend(pred.cpu().numpy())
-            all_targets.extend(target.cpu().numpy())
-            #all_targets.extend(raw_target.cpu().numpy())
+            #all_targets.extend(target.cpu().numpy())
+            all_targets.extend(raw_target.cpu().numpy())
 
 
     avg_loss = total_loss / len(dataset)

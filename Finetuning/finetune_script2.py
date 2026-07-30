@@ -266,7 +266,7 @@ if __name__ == "__main__":
     
 
 
-
+    """
     env_name = 'cube'
     specific_env = 'double-play'
     task_id = 4
@@ -292,7 +292,7 @@ if __name__ == "__main__":
                           lr = 3e-04,
                           min_lr = 3e-05,
                           sigma = 4.0, 
-                          target_reward = 300.0, 
+                          target_reward = 600.0, 
                           train_goal = None,
                           task_id = task_id)
       
@@ -371,7 +371,7 @@ if __name__ == "__main__":
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
     exit()
-
+   """
 
 
 
@@ -413,7 +413,8 @@ if __name__ == "__main__":
                           num_steps = 30000, 
                           lr = 5e-03,
                           min_lr = 5e-04,
-                          sigma = 4.0, 
+                          #sigma = 4.0, 
+                          sigma = None,
                           target_reward = 500.0, 
                           train_goal = None,
                           task_id = task_id)
