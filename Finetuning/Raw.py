@@ -75,9 +75,13 @@ def check_cube_double_goal_reach(trajs, task_id):
     average_dist = total_dist/len(trajs)
     print(f"Task {task_id} average distance: {average_dist}")
 
-
-
-
+data = get_dataset('cube', 'double-play', task_id = 4, traj_length = 500)
+trajs = data.get_trajectories()
+print(gaussian_filter1d(trajs[16]['rewards']*50, sigma = 2.0, mode="nearest"))
+exit()
+rews = [-50, -50, -50, -50, -50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+rews = gaussian_filter1d(rews, sigma = 2.0, mode="nearest")
+print (rews)
 """
 env_steps = [0, 1592, 1590, 1600, 1411, 1416, 1600, 1555, 1422, 1600, 1599, 1554]
 total_steps = [0]
