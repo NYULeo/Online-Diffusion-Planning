@@ -78,8 +78,6 @@ def check_cube_double_goal_reach(trajs, task_id):
 
 
 
-
-
 """
 env_steps = [0, 1592, 1590, 1600, 1411, 1416, 1600, 1555, 1422, 1600, 1599, 1554]
 total_steps = [0]
@@ -151,66 +149,6 @@ reward  =  rollout(
 
 print(reward)
 """
-
-
-from Finetuning.Rollout import load_success_trajs
-from Finetuning.utils import TrajectoryDict, reward_processor, train_critic, test_critic
-from Pretrain.utils import set_seed
-
-env_name = 'cube'
-specific_env = 'single-play'
-task_id = 4
-step = 0
-traj_length = 200
-
-set_seed(1)
-"""
-trajs = load_success_trajs(env_name, specific_env, task_id, step)
-test_critic(dataset_name = env_name, 
-            specific_dataset = specific_env, 
-            hidden_layers = 4, 
-            hidden_dim = 512, 
-            checkpoint_step = 0, 
-            gamma = 0.99, 
-            horizon = 32,  
-            sigma = 3.0, 
-            target_reward = 80.0, 
-            trajs = trajs,
-            task_id = task_id)
-"""
-trajs = load_success_trajs(env_name, specific_env, task_id, step)
-train_critic(trajs, 
-             dataset_name = env_name, 
-             specific_dataset = specific_env, 
-             hidden_layers = 4, 
-             hidden_dim = 512, 
-             sigma = 3.0,
-             batch_size = 256, 
-             num_steps = 20000, 
-             gamma = 0.99, 
-             lam = 0.95, 
-             horizon = 32, 
-             lr = 5e-05, 
-             min_lr = 1e-06, 
-             tau = 0.005, 
-             old_step = None, 
-             new_step = 0, 
-             momentum = 0.005, 
-             target_reward = 80.0,
-             task_id = task_id)
-
-trajs = load_success_trajs(env_name, specific_env, task_id, step)
-test_critic(dataset_name = env_name, 
-            specific_dataset = specific_env, 
-            hidden_layers = 4, 
-            hidden_dim = 512, 
-            checkpoint_step = 0, 
-            gamma = 0.99, 
-            horizon = 32,  
-            sigma = 3.0, 
-            target_reward = 80.0, 
-            trajs = trajs,
-            task_id = task_id)
 
 
 

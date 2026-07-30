@@ -102,13 +102,13 @@ def reward_processor(rewards, name: str):
         new_rews = [0]*len(rewards)
         for i in range(1, len(rewards)):
              if(rewards[i] == rewards[i-1]+1):
-                new_rews[i] = 1
+                new_rews[i] = 1.0
         return np.array(new_rews, dtype = np.float64)
 
 
     if(name in ('cube', 'ogpointmaze', 'antmaze', 'humanoidmaze', 'puzzle', 'scene')):
-         rewards = ogbench_reward_processor(rewards)
-         rewards = mode_reward_processor(rewards)
+         #rewards = ogbench_reward_processor(rewards)
+         #rewards = mode_reward_processor(rewards)
          return rewards
     else:
          return spare_reward_processor(rewards)
