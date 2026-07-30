@@ -593,16 +593,16 @@ class OnlineFinetuner():
         for step in range(self.config.finetune_rounds):
             if (torch.cuda.device_count() > 1):
                 world_size = self.accelerator.num_processes
-                num_workers = min(8, max(1, os.cpu_count() // (2 * world_size)))  # 
+                num_workers = min(8, max(1, len(os.sched_getaffinity(0)) // (2 * world_size)))  #
                 sampler = DistributedSampler(self.PlannerDataset, shuffle=True, drop_last=True)
                 sampler.set_epoch(step)
                 
                 dataloader = DataLoader(
-                    self.PlannerDataset, 
-                    self.config.finetune_batch_size, 
-                    pin_memory = True, 
-                    num_workers = (os.cpu_count() // 2),  
-                    sampler = sampler,  
+                    self.PlannerDataset,
+                    self.config.finetune_batch_size,
+                    pin_memory = True,
+                    num_workers = num_workers,
+                    sampler = sampler,
                     drop_last = True)
                 """
                 dataloader = DataLoader(
@@ -616,13 +616,14 @@ class OnlineFinetuner():
                     prefetch_factor = 4)
                 """
             else:
+                num_workers = min(8, max(1, len(os.sched_getaffinity(0)) // 2))
                 dataloader = DataLoader(
-                    self.PlannerDataset, 
-                    self.config.finetune_batch_size, 
-                    pin_memory = True, 
-                    num_workers = (os.cpu_count() // 2), 
+                    self.PlannerDataset,
+                    self.config.finetune_batch_size,
+                    pin_memory = True,
+                    num_workers = num_workers,
                     #num_workers = 0,
-                    shuffle = True, 
+                    shuffle = True,
                     drop_last = True)
             
             if self.accelerator.is_main_process:

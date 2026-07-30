@@ -1,0 +1,38 @@
+# ODP dependencies for NCSA DeltaAI (GH200 / aarch64 / Python 3.10)
+# One-shot install:   pip install -r requirements_deltaai.txt
+#
+# WHY THIS FILE EXISTS: the default requirements.txt pins torch from the cu124
+# index, which only has x86_64 wheels -> it fails on the Grace (ARM64) CPU.
+# The line below adds PyTorch's aarch64 CUDA-12.6 wheel index to pip's search
+# path (PyPI is still used for everything else), so torch/vision/audio install
+# as native GH200 (Hopper sm_90) CUDA builds.
+--extra-index-url https://download.pytorch.org/whl/cu126
+
+# --- Core ML (aarch64 CUDA build pulled from the index above) ---
+numpy<2.0
+torch==2.6.0
+torchvision==0.21.0
+torchaudio==2.6.0
+accelerate>=0.21
+einops
+
+# --- Environments & datasets ---
+gymnasium>=1.2.0
+gymnasium-robotics>=1.4.0
+minari
+ogbench
+h5py>=3.0.0
+jax-jumpy==1.0.0 ; python_version >= "3.8" and python_version < "3.11"
+
+# --- Scientific & visualization ---
+matplotlib
+mediapy
+scipy
+scikit-learn
+sympy
+seaborn
+imageio
+tqdm
+
+# --- Utilities ---
+loguru
