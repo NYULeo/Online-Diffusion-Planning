@@ -288,7 +288,7 @@ if __name__ == "__main__":
                           hidden_layers = 4,
                           hidden_dim = 512,
                           batch_size = 256, 
-                          num_steps = 100000, 
+                          num_steps = 30000, 
                           lr = 3e-04,
                           min_lr = 3e-05,
                           #sigma = 4.0, 
@@ -356,7 +356,8 @@ if __name__ == "__main__":
         eta_lam = 0.5,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
-        reward_scaling_factor = 150,
+        #reward_scaling_factor = 150,
+        reward_scaling_factor = 300,
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value
