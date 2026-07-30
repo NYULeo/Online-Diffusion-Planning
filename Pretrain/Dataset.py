@@ -845,7 +845,6 @@ class CubeDataset_Singletask:
             if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
                      obs_slice = self.dataset["observations"][last_start : i].copy()
                      act_slice = self.dataset["actions"][last_start : i].copy()
-                     #rews = sparse_reward_processor(self.dataset['rewards'][last_start+1: i+1].copy())
                      rews = rewards[last_start+1: i+1].copy()
                      
             

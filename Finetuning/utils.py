@@ -1741,9 +1741,9 @@ def test_critic(dataset_name: str,
             #loss = F.smooth_l1_loss(pred, raw_target, beta=1.0)
             total_loss += loss.item() * s.size(0)
 
-            #all_preds.extend(pred.cpu().numpy())
+            all_preds.extend(pred.cpu().numpy())
             all_targets.extend(target.cpu().numpy())
-            all_targets.extend(raw_target.cpu().numpy())
+            #all_targets.extend(raw_target.cpu().numpy())
 
 
     avg_loss = total_loss / len(dataset)
