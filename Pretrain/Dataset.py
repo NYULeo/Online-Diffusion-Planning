@@ -109,7 +109,6 @@ def reward_processor(rewards, name: str):
     if(name in ('cube', 'ogpointmaze', 'antmaze', 'humanoidmaze', 'puzzle', 'scene')):
          rewards = ogbench_reward_processor(rewards)
          rewards = mode_reward_processor(rewards)
-         #return ogbench_reward_processor(rewards)
          return rewards
     else:
          return spare_reward_processor(rewards)
