@@ -156,8 +156,8 @@ if __name__ == '__main__':  # pragma: no cover
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
        
-       trajs = filter_trajs(trajs)
-       """
+       
+       
        mean, std = train_critic_with_reward(trajs,
                              dataset_name  = env_name,
                              specific_dataset = specific_env,
@@ -179,8 +179,8 @@ if __name__ == '__main__':  # pragma: no cover
                              momentum = 0.005,   # unused when old_step is None
                              task_id = task_id)
     
-       """
        
+       """
        accelerator = Accelerator(mixed_precision='bf16')
        #accelerator.wait_for_everyone()
        kernel_config = KernelConfig(
@@ -225,7 +225,7 @@ if __name__ == '__main__':  # pragma: no cover
                                accelerator            = accelerator) 
       
        accelerator.wait_for_everyone()
-    
+       """
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
