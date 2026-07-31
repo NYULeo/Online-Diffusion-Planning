@@ -293,7 +293,7 @@ if __name__ == "__main__":
                           min_lr = 3e-05,
                           #sigma = 4.0, 
                           sigma = None,
-                          target_reward = 1.0, 
+                          target_reward = 20.0, 
                           train_goal = None,
                           task_id = task_id)
       
@@ -357,7 +357,7 @@ if __name__ == "__main__":
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
         #reward_scaling_factor = 150,
-        reward_scaling_factor = 0.5,
+        reward_scaling_factor = 30,
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value
