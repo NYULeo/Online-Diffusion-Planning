@@ -6,7 +6,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PRETRAIN_DIR = PROJECT_ROOT / "Pretrain"
 import numpy as np
 import minari
-from sympy.core import I
 #import mediapy as media
 import warnings
 import gymnasium as gym
