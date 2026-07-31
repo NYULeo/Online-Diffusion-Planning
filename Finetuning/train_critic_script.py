@@ -148,7 +148,7 @@ if __name__ == '__main__':  # pragma: no cover
        env_name = 'cube'
        specific_env = 'double-play'
        traj_length = 500
-       horizon = 300
+       horizon = 450
        task_id = 4
        step = 0
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
@@ -223,7 +223,7 @@ if __name__ == '__main__':  # pragma: no cover
                                accelerator            = accelerator) 
       
        accelerator.wait_for_everyone()
-       """
+        """
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
