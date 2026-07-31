@@ -317,7 +317,7 @@ if __name__ == "__main__":
                             warm_up_steps = 1000,
                             warm_up_log_every = 100,
                             lr = 1e-07,
-                            min_lr = 1e-09,
+                            min_lr = 1e-10,
                             tau = 0.005,
                             gamma = 0.99,
                             lam = 0.95,

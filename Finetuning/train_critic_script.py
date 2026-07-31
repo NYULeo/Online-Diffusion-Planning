@@ -211,7 +211,7 @@ if __name__ == '__main__':  # pragma: no cover
                                gamma                  = 0.99,
                                lam                    = 0.95,
                                lr                     = 1e-07,
-                               min_lr                 = 1e-09,
+                               min_lr                 = 1e-10,
                                tau                    = 0.005,
                                steps_T                = 10,
                                num_karras             = 1,
