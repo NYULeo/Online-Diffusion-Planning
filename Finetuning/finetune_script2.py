@@ -316,7 +316,7 @@ if __name__ == "__main__":
                             num_steps = 20,
                             warm_up_steps = 1000,
                             warm_up_log_every = 100,
-                            lr = 1e-06,
+                            lr = 1e-07,
                             min_lr = 1e-09,
                             tau = 0.005,
                             gamma = 0.99,
@@ -357,7 +357,7 @@ if __name__ == "__main__":
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
         #reward_scaling_factor = 150,
-        reward_scaling_factor = 10,
+        reward_scaling_factor = 30,
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value
