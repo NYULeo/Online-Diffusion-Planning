@@ -270,7 +270,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_env = 'double-play'
     task_id = 4
-    finetune_buffer_cutoff_length = 200
+    finetune_buffer_cutoff_length = 300
     train_buffer_cutoff_length = 500
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = True)
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32, backbone_layers = 4, eta = 0.0)
@@ -291,9 +291,9 @@ if __name__ == "__main__":
                           num_steps = 30000, 
                           lr = 3e-04,
                           min_lr = 3e-05,
-                          #sigma = 4.0, 
-                          sigma = None,
-                          target_reward = 20.0, 
+                          sigma = 6.0, 
+                          #sigma = None,
+                          target_reward = 800.0, 
                           train_goal = None,
                           task_id = task_id)
       
@@ -356,8 +356,8 @@ if __name__ == "__main__":
         eta_lam = 0.5,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
-        #reward_scaling_factor = 150,
-        reward_scaling_factor = 30,
+        reward_scaling_factor = 150,
+        #reward_scaling_factor = 30,
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value

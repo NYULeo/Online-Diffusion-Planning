@@ -77,13 +77,7 @@ def check_cube_double_goal_reach(trajs, task_id):
 
 data = get_dataset('cube', 'triple-play', task_id = 1, traj_length = 500)
 trajs = data.get_trajectories()
-count = 0
-print(len(trajs))
-for traj in trajs:
-    if(traj['rewards'][-1] >= 0.0):
-        count += 1
-print(count)
-print(count/len(trajs))
+
 """
 env_steps = [0, 1592, 1590, 1600, 1411, 1416, 1600, 1555, 1422, 1600, 1599, 1554]
 total_steps = [0]

@@ -112,8 +112,11 @@ def reward_processor(rewards, name: str):
     else:
          return spare_reward_processor(rewards)
     
-
-
+def reward_processor_2(rewards):
+     new_rewards = [0]*len(rewards)
+     if(rewards[-1] == 0.0):
+         new_rewards[-1] = 1.0
+     return np.array(new_rewards, dtype = np.float64)
 
 def get_dataset(name: str, 
                 specific_name: str, 
@@ -839,6 +842,7 @@ class CubeDataset_Singletask:
         last_start = 0
         N = len(self.dataset["observations"])
         rewards = reward_processor(self.dataset['rewards'].copy(), 'cube')
+        #rewards =  reward_processor_2(self.dataset['rewards'].copy())
         for i in range(N):
             # End of a natural episode (terminal or dataset end)
             if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
@@ -870,7 +874,7 @@ class CubeDataset_Singletask:
                      trajectory = {
                            "observations": obs_slice[index:],
                            "actions": act_slice[index:],
-                           "rewards": rews[index:]
+                           "rewards":  reward_processor_2(rews[index:].copy())
                      }
                          
                      trajectories.append(trajectory)
