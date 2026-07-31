@@ -168,8 +168,8 @@ if __name__ == '__main__':  # pragma: no cover
                              gamma = 0.99,
                              lam = 0.95,
                              horizon = horizon,
-                             lr = 1e-02, 
-                             min_lr = 1e-03, 
+                             lr = 1e-07, 
+                             min_lr = 1e-08, 
                              tau = 0.005, 
                              old_step = None,    # from scratch
                              new_step = step,
