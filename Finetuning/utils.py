@@ -2589,7 +2589,7 @@ def rollout_parallel3(
         score = get_normalized_score(trajs, expert_score)
     else:
         score = get_normalized_score(trajs)
-
+    
     return trajs, score, success_rate, total_steps
 
 import math

@@ -101,9 +101,6 @@ def check_cube_double_goal_reach(trajs, task_id):
     average_dist = total_dist/len(trajs)
     print(f"Task {task_id} average distance: {average_dist}")
 
-def get_normalized_score(score, min_score,  max_score):
-    return (100 * ((score - min_score) / (max_score - min_score)))
-
 @dataclass
 class Kernel_Config:
     ensemble_size: int = 10
@@ -330,18 +327,27 @@ def load_success_trajs(env_name, specific_env, task_id, step):
         trajs = pickle.load(f)
     return trajs
 
-def rollout(env_name, specific_env, horizon, num_layers, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None, task_id: Optional[int] = None, base_seed: int = 0, continual_rollout = False, chunk_size = 5, device = None, selector: Optional[Selector] = None):
-     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     #print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}, episode_length: {episode_length}")
-     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     #device = check_device()
-     #device = "cuda" if torch.cuda.is_available() else "cpu"
-     #print(f"Using device {device}")
-     import minari
-     #env.reset(seed=1)  # Important: pass seed to env.reset
+def rollout(env_name, 
+            specific_env, 
+            horizon, 
+            num_layers, 
+            steps_T, 
+            num_karras, 
+            eta, 
+            episode_length, 
+            checkpoint_steps, 
+            render = False, 
+            goal_cell: Optional[np.ndarray] = None, 
+            start_cell: Optional[np.ndarray] = None, 
+            task_id: Optional[int] = None, 
+            base_seed: int = 0, 
+            continual_rollout = False, 
+            chunk_size = 5, 
+            device = None, selector: Optional[Selector] = None):
+     
+     
      env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', task_id = task_id, episode_length = None)
-     #env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', episode_length = episode_length)
-     #np.random.seed(base_seed)
+     
     
     # 2. Reset environment with both seed and task_id
      #env.reset(seed=base_seed)   # Important first reset
@@ -468,9 +474,9 @@ def rollout(env_name, specific_env, horizon, num_layers, steps_T, num_karras, et
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      #print(test_rollout_fit_for_model(traj, env_name, specific_env, checkpoint_steps, checkpoint_steps, checkpoint_steps, device=None))
      
-     #expert_score = get_expert_score(env_name)
-     #print(get_normalized_score([traj], expert_score))
-     print(rewards)
+     
+    
+     #print(rewards)
      if(render):
           media.write_video("demo.mp4", frames, fps=50) #save the video
      
@@ -621,7 +627,7 @@ if __name__ == "__main__":
                   #goal_cell = np.array([6, 1], dtype = int), 
                   task_id = task_id,
                   continual_rollout = True,
-                  chunk_size = 31,
+                  chunk_size = 5,
                   device = device)
     print(return_value)
     exit()
