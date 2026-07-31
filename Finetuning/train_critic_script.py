@@ -150,7 +150,7 @@ if __name__ == '__main__':  # pragma: no cover
        env_name = 'cube'
        specific_env = 'double-play'
        traj_length = 500
-       horizon = 450
+       horizon = 480
        task_id = 4
        step = 0
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
