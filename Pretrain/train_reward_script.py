@@ -38,41 +38,6 @@ def check_cube_single_goal_reach(trajs, task_id):
 
 
 
-"""
-
-if __name__ == '__main__':
-    set_seed(1)
-    train_reward(
-    dataset_name = 'pointmaze',
-    hidden_layers = 1,
-    hidden_dim = 32,
-    batch_size = 256, 
-    num_steps = 400, 
-    save_freq = 200,  
-    lr = 1e-4,
-    sigma = 7.0,
-    target_reward = 20.0,
-    specific_dataset = 'medium',
-    goal = np.array([[-2.5, -2.5]], dtype = np.float32))
-
-"""
-"""
-if __name__ == '__main__':
-    set_seed(1)
-    train_reward(
-    dataset_name = 'pointmaze',
-    hidden_layers = 2,
-    hidden_dim = 128,
-    batch_size = 512, 
-    num_steps = 1000, 
-    save_freq = 500,  
-    lr = 1e-04,
-    sigma = 2.0,
-    target_reward = 20.0,
-    specific_dataset = 'large',
-    goal = np.array([[4.0, -3.0]], dtype = np.float32))
-
-"""
 
 
 if __name__ == '__main__':
@@ -83,40 +48,8 @@ if __name__ == '__main__':
     task_id = 4
     traj_length = None
     
-    """
-    path = f'./Finetuning/Rollouts/{dataset_name}/{specific_dataset}-play/task_{task_id}/trajs_task{task_id}_success_0.pkl'
-    with open(path, 'rb') as f:
-          trajs = pickle.load(f)
-    """
-    
-    """
-    train_reward_ensemble(
-        dataset_name = dataset_name,
-        hidden_layers = 3,
-        hidden_dim = 256, 
-        batch_size = 256,
-        num_steps = 30000,
-        save_freq = 5000,
-        lr = 3e-04,
-        min_lr = 3e-05,
-        ensemble_size = 5,
-        bootstrap = True,
-        save_percentage = 0.02,
-        #lr = 1e-04,
-        #min_lr = 5e-06,
-        sigma = 4.0,
-        #sigma = None,
-        #alpha = None,
-        #alpha = 0.99,
-        target_reward = 500.0,
-        specific_dataset = specific_dataset,
-        task_id = task_id,
-        traj_length = traj_length,
-        trajs = None,
-        log_every = 2000
-    )
-    """
-    
+   
+
     train_reward(dataset_name = dataset_name, 
                  hidden_layers = 4, 
                  hidden_dim = 512, 
@@ -126,115 +59,79 @@ if __name__ == '__main__':
                  lr = 5e-03, 
                  min_lr = 5e-04, 
                  sigma  = 4.0,
+                 #sigma = None,
                  alpha = None, 
                  target_reward = 500.0,
                  specific_dataset = specific_dataset, 
                  task_id = task_id, 
                  traj_length = traj_length)
     
-       
 
-    """
-    train_reward_pos_weight(
-          dataset_name = dataset_name,
-          hidden_layers = 4,
-          hidden_dim = 512,
-          batch_size = 256,
-          num_steps = 100000,
-          save_freq = 100000,
-          lr = 1e-04,                    # lowered
-          min_lr = 5e-06,
-          sigma = 4.0,
-          alpha = None,
-          target_reward = 300.0,   # lowered
-          specific_dataset = specific_dataset,
-          task_id = task_id,
-          traj_length = traj_length,
-          pos_weight = 25.0)
-    """
-    
-    """
-    path = f'./Finetuning/Rollouts/{dataset_name}/{specific_dataset}-play/task_{task_id}/trajs_task{task_id}_success_0.pkl'
-    with open(path, 'rb') as f:
-          trajs = pickle.load(f)
-    """
-    """
-    test_Model_ensemble(
-        dataset_name = dataset_name, 
-        hidden_layers = 3, 
-        hidden_dim = 256,
-        ensemble_size = 5,
-        specific_dataset = specific_dataset, 
-        trajs = None,
-        sigma = 4.0,
-        #sigma = None,
-        #alpha = None,
-        #alpha = 0.99, 
-        target_reward = 500.0,
-        task_id = task_id,
-        traj_length = traj_length,
-        save_freq = 30000, 
-        num_steps = 30000)
-    """
+  
     test_Model(dataset_name, 
                hidden_layers = 4, 
                hidden_dim = 512, 
                specific_dataset = specific_dataset, 
                trajs = None, 
                sigma = 4.0, 
+               #sigma = None,
                alpha = None, 
                target_reward = 500.0, 
                task_id = task_id,
                traj_length = traj_length, 
                save_freq = 30000, 
                num_steps = 30000)
-    
+
 
 
 
 
 """
-
 if __name__ == '__main__':
     set_seed(1)
     
-    dataset_name = 'ogpointmaze'
-    specific_dataset = 'medium'
-    task_id = 1
+    dataset_name = 'cube'
+    specific_dataset = 'double'
+    task_id = 4
+    traj_length = None
     
+   
     
+    train_reward(dataset_name = dataset_name, 
+                 hidden_layers = 4, 
+                 hidden_dim = 512, 
+                 batch_size = 256, 
+                 num_steps = 2000, 
+                 save_freq = 2000, 
+                 lr = 5e-07, 
+                 min_lr = 5e-08, 
+                 sigma  = 6.0,
+                 #sigma = None,
+                 alpha = None, 
+                 target_reward = 800.0,
+                 specific_dataset = specific_dataset, 
+                 task_id = task_id, 
+                 traj_length = traj_length)
     
-    
-    train_reward(
-        dataset_name = dataset_name,
-        hidden_layers = 1,
-        hidden_dim = 32, 
-        batch_size = 256,
-        num_steps = 12000,
-        save_freq = 2000,
-        lr = 1e-04,
-        min_lr = 1e-04,
-        sigma = 7.0,
-        #alpha = 0.99,
-        target_reward = 50.0,
-        specific_dataset = specific_dataset,
-        task_id = task_id,
-        traj_length = None,
-        trajs = None
-    )
-    
-    test_Model(dataset_name = dataset_name, 
-               hidden_layers = 1, 
-               hidden_dim = 32, 
-               specific_dataset  = specific_dataset, 
-               trajs = None, 
-               sigma = 7.0, 
-               alpha = None, 
-               target_reward = 50.0,
-               goal= None, 
-               task_id = task_id, 
-               traj_length = None, 
-               save_freq = 2000, 
-               num_steps = 12000)
+       
 
+  
+    test_Model(dataset_name, 
+               hidden_layers = 4, 
+               hidden_dim = 512, 
+               specific_dataset = specific_dataset, 
+               trajs = None, 
+               sigma = 6.0, 
+               #sigma = None,
+               alpha = None, 
+               target_reward = 800.0, 
+               task_id = task_id,
+               traj_length = traj_length, 
+               save_freq = 2000, 
+               num_steps = 2000)
 """
+
+
+
+
+

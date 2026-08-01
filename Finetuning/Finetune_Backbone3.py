@@ -5,10 +5,10 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 from dataclasses import dataclass
 from gymnasium.vector import AsyncVectorEnv
-from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs, check_Critic, get_kernel, get_new_critic_stats, load_success_trajs, KernelConfig, train_critic_with_planner2, train_critic_with_planner3
+from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs, check_Critic, get_kernel, get_new_critic_stats, load_success_trajs, KernelConfig, train_critic_with_planner2, train_critic_with_planner4, train_critic_with_planner5
 #from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
-#from Finetuning.traj_reward2 import RewardConfig, TotalReward, TotalReward_Critic
-from Finetuning.traj_reward3 import RewardConfig, TotalReward, TotalReward_Critic
+#from Finetuning.traj_reward3 import RewardConfig, TotalReward, TotalReward_Critic
+from Finetuning.traj_reward4 import RewardConfig, TotalReward, TotalReward_Critic
 from adjoint_matching import AdjointMatchingFineTuner, AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
 #from AM import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
@@ -63,6 +63,7 @@ class Train_Kernel_Config:
     kernel_num_modes: Optional[int] = 8
     kernel_noise_floor: Optional[float] = 1e-4
     λ_reg: float = 1e-3
+    oversample: int = 5
 
 @dataclass
 class Train_Critic_Config:
@@ -70,10 +71,13 @@ class Train_Critic_Config:
     hidden_dim: int = 128
     batch_size: int = 256
     num_steps: int = 3000
+    warm_up_steps: int = 1000
+    warm_up_log_every: int = 100
     lr: float = 5e-05
     min_lr: float = 1e-05
     tau: float = 0.005
     gamma: float = 1.0
+    lam: float = 0.95
     data_conservation: bool = False
     momentum: float = 0.005
 
@@ -260,7 +264,7 @@ class OnlineFinetuner():
                 num_modes = self.config.train_kernel_config.kernel_num_modes,
                 noise_floor = self.config.train_kernel_config.kernel_noise_floor,
                 min_log_prob = self.config.RewardConfig.min_log_prob,
-                oversample = 5,
+                oversample = self.config.train_kernel_config.oversample,
         )
         #self.accelerator = Accelerator(mixed_precision = 'bf16')
         self.accelerator = Accelerator(
@@ -286,7 +290,7 @@ class OnlineFinetuner():
              self.Base_Critic_Buffer = None
 
         if(self.config.train_reward_config.task_id is not None):
-            dataset_reward = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = self.config.train_buffer_cutoff_length, mode = 'reward')
+            dataset_reward = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = None)
             trajs_reward = dataset_reward.get_trajectories()
             dataset_kernel = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id)
             trajs_kernel = dataset_kernel.get_trajectories()
@@ -294,9 +298,11 @@ class OnlineFinetuner():
             self.Train_Buffer.extend(trajs_reward)
             self.Train_Kernel_Buffer.extend(trajs_kernel)
             if(self.Base_Critic_Buffer is not None):
+                dataset_critic = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = self.config.train_buffer_cutoff_length)
+                trajs_critic = dataset_critic.get_trajectories()
                 #success_trajs = load_success_trajs(self.config.dataset_name, self.config.specific_dataset, self.config.train_reward_config.task_id, step = 0)
                 #self.Base_Critic_Buffer.extend(success_trajs)
-                self.Base_Critic_Buffer.extend(trajs_reward)
+                self.Base_Critic_Buffer.extend(trajs_critic)
 
         elif(self.config.train_reward_config.train_goal is not None):
             dataset_reward = get_dataset(self.config.dataset_name, self.config.specific_dataset, goal = self.config.train_reward_config.train_goal, mode = 'reward')
@@ -590,10 +596,45 @@ class OnlineFinetuner():
         world_size = self.accelerator.num_processes
         num_envs_per_process = self.config.rollout_num_envs  # Total envs = base * world_size
         last_reward_update_step = 0
+        
+        """
+        #warm up critic
+        print(f"Warming Up Critic: ---------------------------------------------------------------- ")
+        train_critic_with_planner4(
+                               trajs                  = self.Base_Critic_Buffer,
+                               dataset_name           = self.config.dataset_name,
+                               specific_dataset       = self.config.specific_dataset,
+                               planner_checkpoint     = 0,
+                               reward_checkpoint      = 0,
+                               old_critic_checkpoint  = 0,
+                               backbone_layers        = self.config.AMConfig.backbone_layers,
+                               hidden_layers          = self.config.train_critic_config.hidden_layers,
+                               hidden_dim             = self.config.train_critic_config.hidden_dim,
+                               kernel_config          = self.kernel_config,
+                               reward_hidden_layers   = self.config.train_reward_config.hidden_layers,
+                               reward_hidden_dim      = self.config.train_reward_config.hidden_dim,
+                               batch_size             = self.config.train_critic_config.batch_size,
+                               num_steps              = self.config.train_critic_config.warm_up_steps,
+                               horizon                = self.config.AMConfig.horizon,
+                               gamma                  = self.config.train_critic_config.gamma,
+                               lam                    = self.config.train_critic_config.lam,
+                               lr                     = self.config.train_critic_config.lr,
+                               min_lr                 = self.config.train_critic_config.min_lr,
+                               tau                    = self.config.train_critic_config.tau,
+                               steps_T                = self.config.diffusion_steps,
+                               num_karras             = self.config.AMConfig.num_karras,
+                               eta                    = self.config.AMConfig.eta,
+                               new_step               = 0,
+                               task_id                = self.config.train_reward_config.task_id,
+                               log_every              = self.config.train_critic_config.warm_up_log_every,
+                               accelerator            = self.accelerator) 
+        self.accelerator.wait_for_everyone()
+        """
+        
         for step in range(self.config.finetune_rounds):
             if (torch.cuda.device_count() > 1):
                 world_size = self.accelerator.num_processes
-                num_workers = min(8, max(1, len(os.sched_getaffinity(0)) // (2 * world_size)))  # 
+                num_workers = min(8, max(1, os.cpu_count() // (2 * world_size)))  # 
                 sampler = DistributedSampler(self.PlannerDataset, shuffle=True, drop_last=True)
                 sampler.set_epoch(step)
                 
@@ -601,7 +642,7 @@ class OnlineFinetuner():
                     self.PlannerDataset, 
                     self.config.finetune_batch_size, 
                     pin_memory = True, 
-                    num_workers = num_workers,
+                    num_workers = (os.cpu_count() // 2),  
                     sampler = sampler,  
                     drop_last = True)
                 """
@@ -620,7 +661,7 @@ class OnlineFinetuner():
                     self.PlannerDataset, 
                     self.config.finetune_batch_size, 
                     pin_memory = True, 
-                    num_workers = min(8, max(1, len(os.sched_getaffinity(0)) // 2)),
+                    num_workers = (os.cpu_count() // 2), 
                     #num_workers = 0,
                     shuffle = True, 
                     drop_last = True)
@@ -629,8 +670,8 @@ class OnlineFinetuner():
                  print(f"Finetuning round {step+1} started")
                 
             
-            #self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
-            self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1, old_planner_checkpoint = (step * self.config.AMConfig.per_round_steps))
+            self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
+            #self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1, old_planner_checkpoint = (step * self.config.AMConfig.per_round_steps))
             self.accelerator.wait_for_everyone()
             
             
@@ -697,10 +738,9 @@ class OnlineFinetuner():
             self.accelerator.wait_for_everyone()  
             
             if(self.config.offline):
-                if(self.accelerator.is_main_process):
-                     if self.config.critic and self.config.update_critic:
-                         print(f"Starting Critic Training with Planner")
-                         train_critic_with_planner2(
+                if self.config.critic and self.config.update_critic:
+                      print(f"Starting Critic Training with Planner")
+                      train_critic_with_planner4(
                                trajs                  = self.Base_Critic_Buffer,
                                dataset_name           = self.config.dataset_name,
                                specific_dataset       = self.config.specific_dataset,
@@ -717,6 +757,7 @@ class OnlineFinetuner():
                                num_steps              = self.config.train_critic_config.num_steps,
                                horizon                = self.config.AMConfig.horizon,
                                gamma                  = self.config.train_critic_config.gamma,
+                               lam                    = self.config.train_critic_config.lam,
                                lr                     = self.config.train_critic_config.lr,
                                min_lr                 = self.config.train_critic_config.min_lr,
                                tau                    = self.config.train_critic_config.tau,
@@ -724,9 +765,11 @@ class OnlineFinetuner():
                                num_karras             = self.config.AMConfig.num_karras,
                                eta                    = self.config.AMConfig.eta,
                                new_step               = ((step+1) * self.config.AMConfig.per_round_steps),
-                               task_id                = self.config.train_reward_config.task_id)
-                     print(f"Finetuning round {step+1} completed")
-                     print()
+                               task_id                = self.config.train_reward_config.task_id,
+                               log_every              = 0,
+                               accelerator            = self.accelerator)
+                print(f"Finetuning round {step+1} completed")
+                print()
                 self.accelerator.wait_for_everyone()
                 if self.config.critic and self.config.update_critic:
                       self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
@@ -812,12 +855,12 @@ class OnlineFinetuner():
                                       x_generated_plans = x_generated_plans)
                   """
 
-                  if self.config.critic and self.config.update_critic:
-                      print(f"Starting Critic Training with Planner")
-                      #save_trajs(critic_buffer, self.config.dataset_name, self.config.specific_dataset, ((step+1) * self.config.AMConfig.per_round_steps))
-                      if self.config.kernel and self.config.update_kernel:
-                           self.kernel_config.checkpoint = self.config.kernel_model_checkpoint
-                      train_critic_with_planner2(
+            if self.config.critic and self.config.update_critic:
+                print(f"Starting Critic Training with Planner")
+                #save_trajs(critic_buffer, self.config.dataset_name, self.config.specific_dataset, ((step+1) * self.config.AMConfig.per_round_steps))
+                if self.config.kernel and self.config.update_kernel:
+                        self.kernel_config.checkpoint = self.config.kernel_model_checkpoint
+                train_critic_with_planner4(
                                trajs                  = critic_buffer,
                                dataset_name           = self.config.dataset_name,
                                specific_dataset       = self.config.specific_dataset,
@@ -834,6 +877,7 @@ class OnlineFinetuner():
                                num_steps              = self.config.train_critic_config.num_steps,
                                horizon                = self.config.AMConfig.horizon,
                                gamma                  = self.config.train_critic_config.gamma,
+                               lam                    = self.config.train_critic_config.lam,
                                lr                     = self.config.train_critic_config.lr,
                                min_lr                 = self.config.train_critic_config.min_lr,
                                tau                    = self.config.train_critic_config.tau,
@@ -841,7 +885,9 @@ class OnlineFinetuner():
                                num_karras             = self.config.AMConfig.num_karras,
                                eta                    = self.config.AMConfig.eta,
                                new_step               = ((step+1) * self.config.AMConfig.per_round_steps),
-                               task_id                = self.config.train_reward_config.task_id)                       
+                               task_id                = self.config.train_reward_config.task_id,
+                               log_every              = 0,
+                               accelerator            = self.accelerator)                       
             self.accelerator.wait_for_everyone()
             #plans = self.get_generated_plans(number_of_generated_plans = self.config.RewardConfig.number_of_generated_plans)
             if self.config.kernel and self.config.update_kernel:
@@ -902,7 +948,7 @@ class OnlineFinetuner():
                   self.config.kernel_model_checkpoint = 0
             
             if(self.config.critic and self.config.update_critic):
-                self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
+                 self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             else:
                  self.config.critic_model_checkpoint = 0
               

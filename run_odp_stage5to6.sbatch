@@ -6,7 +6,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=64
 #SBATCH --mem=200G
-#SBATCH --time=07:00:00                # finetune(4-GPU)+rollout measured ~7h
+#SBATCH --time=09:00:00                # critic-warmup + finetune(4-GPU) + rollout
 #SBATCH --job-name=odp_ft
 #SBATCH --output=/projects/bhpx/khu5/ODP/logs/%x-%j.log   # absolute -> always under ODP/logs regardless of submit dir (Slurm does NOT expand $VARS here)
                                        # NOTE: this dir MUST exist at submit time -- launch with:  mkdir -p /projects/bhpx/khu5/ODP/logs && sbatch run_odp.sbatch
@@ -118,6 +118,12 @@ done
 ls "$REPO"/Finetuning/Kernels/cube/single/Models/0/*Kernel*.pkl >/dev/null 2>&1 \
   || { echo "FATAL: no kernel checkpoints -- run run_odp_stage1to4.sbatch first"; exit 1; }
 echo "upstream checkpoints OK"
+
+# Stage 4.5 -- CRITIC WARMUP (4-GPU, new step added by teammate). accelerate launch.
+run_stage "4.5 CRITIC WARMUP (4-GPU)" \
+  env CUDA_VISIBLE_DEVICES=0,1,2,3 accelerate launch \
+      --multi_gpu --num_processes 4 --num_machines 1 --mixed_precision bf16 \
+      Finetuning/train_critic_script2.py
 
 # Stage 5 -- Finetune / adjoint matching (THE ONLY 4-GPU stage). accelerate launch, NOT plain python (that = 1 GPU).
 #            Do NOT also wrap in srun --ntasks=4 (double-spawn). num_workers now bounded in-code (sched_getaffinity, cap 8).

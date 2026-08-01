@@ -6,7 +6,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PRETRAIN_DIR = PROJECT_ROOT / "Pretrain"
 import numpy as np
 import minari
-from sympy.core import I
 #import mediapy as media
 import warnings
 import gymnasium as gym
@@ -97,12 +96,28 @@ def reward_processor(rewards, name: str):
          dist = 0 - Min
          rews = rewards + dist
          return rews
-    
+
+    def mode_reward_processor(rewards):
+        new_rews = [0]*len(rewards)
+        for i in range(1, len(rewards)):
+             if(rewards[i] == rewards[i-1]+1):
+                new_rews[i] = 1.0
+        return np.array(new_rews, dtype = np.float64)
+
+
     if(name in ('cube', 'ogpointmaze', 'antmaze', 'humanoidmaze', 'puzzle', 'scene')):
-         return ogbench_reward_processor(rewards)
+         #rewards = ogbench_reward_processor(rewards)
+         #rewards = mode_reward_processor(rewards)
+         return rewards
     else:
          return spare_reward_processor(rewards)
     
+def reward_processor_2(rewards):
+     new_rewards = [0]*len(rewards)
+     if(rewards[-1] == 0.0):
+         new_rewards[-1] = 1.0
+     return np.array(new_rewards, dtype = np.float64)
+
 def get_dataset(name: str, 
                 specific_name: str, 
                 task_id: Optional[int] = None, 
@@ -827,12 +842,12 @@ class CubeDataset_Singletask:
         last_start = 0
         N = len(self.dataset["observations"])
         rewards = reward_processor(self.dataset['rewards'].copy(), 'cube')
+        #rewards =  reward_processor_2(self.dataset['rewards'].copy())
         for i in range(N):
             # End of a natural episode (terminal or dataset end)
             if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
                      obs_slice = self.dataset["observations"][last_start : i].copy()
                      act_slice = self.dataset["actions"][last_start : i].copy()
-                     #rews = sparse_reward_processor(self.dataset['rewards'][last_start+1: i+1].copy())
                      rews = rewards[last_start+1: i+1].copy()
                      
             
@@ -859,7 +874,7 @@ class CubeDataset_Singletask:
                      trajectory = {
                            "observations": obs_slice[index:],
                            "actions": act_slice[index:],
-                           "rewards": rews[index:]
+                           "rewards":  reward_processor_2(rews[index:].copy())
                      }
                          
                      trajectories.append(trajectory)

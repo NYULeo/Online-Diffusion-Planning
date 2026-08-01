@@ -101,9 +101,6 @@ def check_cube_double_goal_reach(trajs, task_id):
     average_dist = total_dist/len(trajs)
     print(f"Task {task_id} average distance: {average_dist}")
 
-def get_normalized_score(score, min_score,  max_score):
-    return (100 * ((score - min_score) / (max_score - min_score)))
-
 @dataclass
 class Kernel_Config:
     ensemble_size: int = 10
@@ -330,18 +327,27 @@ def load_success_trajs(env_name, specific_env, task_id, step):
         trajs = pickle.load(f)
     return trajs
 
-def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_length, checkpoint_steps, render = False, goal_cell: Optional[np.ndarray] = None, start_cell: Optional[np.ndarray] = None, task_id: Optional[int] = None, base_seed: int = 0, continual_rollout = False, chunk_size = 5, device = None, selector: Optional[Selector] = None):
-     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     #print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}, episode_length: {episode_length}")
-     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     #device = check_device()
-     #device = "cuda" if torch.cuda.is_available() else "cpu"
-     #print(f"Using device {device}")
-     import minari
-     #env.reset(seed=1)  # Important: pass seed to env.reset
+def rollout(env_name, 
+            specific_env, 
+            horizon, 
+            num_layers, 
+            steps_T, 
+            num_karras, 
+            eta, 
+            episode_length, 
+            checkpoint_steps, 
+            render = False, 
+            goal_cell: Optional[np.ndarray] = None, 
+            start_cell: Optional[np.ndarray] = None, 
+            task_id: Optional[int] = None, 
+            base_seed: int = 0, 
+            continual_rollout = False, 
+            chunk_size = 5, 
+            device = None, selector: Optional[Selector] = None):
+     
+     
      env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', task_id = task_id, episode_length = None)
-     #env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', episode_length = episode_length)
-     #np.random.seed(base_seed)
+     
     
     # 2. Reset environment with both seed and task_id
      #env.reset(seed=base_seed)   # Important first reset
@@ -349,15 +355,15 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
     # Create environment factory function
      state_dict = get_planner(env_name, specific_env, checkpoint_steps, task_id)
      if( env_name == 'kitchen'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
      elif (env_name == 'pointmaze'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
      elif(env_name == 'antmaze'):
-           model = DiT1d(in_dim = (d_s), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
      elif(env_name == 'cube'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
      elif(env_name == 'ogpointmaze'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
      else:
           raise ValueError(f"Invalid Environment: {env_name}")
      model.load_state_dict(state_dict)
@@ -462,25 +468,23 @@ def rollout(env_name, specific_env, horizon, steps_T, num_karras, eta, episode_l
      """
      #print(f"total steps: {len(observations)}")
      #print(f"number of plans: {number_of_plans}")
-    
+     
      rewards = reward_processor(rewards, env_name)
      traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(rewards)}
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      #print(test_rollout_fit_for_model(traj, env_name, specific_env, checkpoint_steps, checkpoint_steps, checkpoint_steps, device=None))
      
-     #expert_score = get_expert_score(env_name)
-     #print(get_normalized_score([traj], expert_score))
+     
+    
+     #print(rewards)
      if(render):
           media.write_video("demo.mp4", frames, fps=50) #save the video
-     """
-     with open('Generated_trajectory.pkl', 'wb') as f:
-                pickle.dump(traj_info, f)
-     """
-     #print(sum(traj['rewards']))
+     
+     
      #return traj
      
      #return rewards[-1], len(observations)
-     return sum(rewards), len(observations)
+     return float(info['success']), len(observations)
      #print(get_normalized_score([traj]))
  
 def load_kernel(env_name, specific_env, checkpoint_steps, kernel_config: Kernel_Config, device: str):
@@ -582,9 +586,9 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
 if __name__ == "__main__":
     horizon = 32
     env_name = 'cube'
-    specific_train_dataset = 'single-play'
+    specific_train_dataset = 'double-play'
     task_id = 4
-    checkpoint = 39
+    checkpoint = 15
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -607,7 +611,28 @@ if __name__ == "__main__":
     #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
     #chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17]
     chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17, 21, 22, 23, 24, 26, 27, 28, 29, 30]
-    set_seed(10)
+    set_seed(1)
+    #for i in range(4, 32):
+        #set_seed(4)
+    return_value, _ = rollout(
+                  env_name, 
+                  specific_train_dataset, 
+                  horizon, 
+                  num_layers = 4,
+                  steps_T = 10, 
+                  num_karras = 10, 
+                  eta = 0.0, 
+                  episode_length = 3000, 
+                  checkpoint_steps = checkpoint, 
+                  render = True,  
+                  base_seed = 1, 
+                  #goal_cell = np.array([6, 1], dtype = int), 
+                  task_id = task_id,
+                  continual_rollout = True,
+                  chunk_size = 5,
+                  device = device)
+    print(return_value)
+    exit()
     while(checkpoint < 42):
        print(f"Running checkpoing: {checkpoint}")
        total_return = 0.0
