@@ -6,7 +6,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=100G
-#SBATCH --time=03:00:00                # stages 2-4 only (reward 30k + kernel 5k + critic); pretrain SKIPPED
+#SBATCH --time=06:00:00                # reward 30k + kernel 5k + critic(planner4, 1000 steps x oversample 5 -- slower than the old planner3 path)
 #SBATCH --job-name=odp_rkc
 #SBATCH --output=/projects/bhpx/khu5/ODP/logs/%x-%j.log   # absolute -> always under ODP/logs regardless of submit dir (Slurm does NOT expand $VARS here)
                                        # NOTE: this dir MUST exist at submit time -- launch with:  mkdir -p /projects/bhpx/khu5/ODP/logs && sbatch run_odp.sbatch

@@ -125,6 +125,16 @@ run_stage "4.5 CRITIC WARMUP (4-GPU)" \
       --multi_gpu --num_processes 4 --num_machines 1 --mixed_precision bf16 \
       Finetuning/train_critic_script2.py
 
+# ---- Teammate's distributed env, applied to FINETUNE ONLY (he exports these after the
+#      warmup step, so the warmup above intentionally runs without them). Verbatim copy.
+export TORCH_DISTRIBUTED_BACKEND=gloo
+export NCCL_IB_DISABLE=1
+export NCCL_P2P_DISABLE=1
+export NCCL_ALGO=Ring
+export NCCL_TIMEOUT=1000000
+export NCCL_BLOCKING_WAIT=1
+export NCCL_ASYNC_ERROR_HANDLING=1
+
 # Stage 5 -- Finetune / adjoint matching (THE ONLY 4-GPU stage). accelerate launch, NOT plain python (that = 1 GPU).
 #            Do NOT also wrap in srun --ntasks=4 (double-spawn). num_workers now bounded in-code (sched_getaffinity, cap 8).
 run_stage "5 FINETUNE (4-GPU)" \
