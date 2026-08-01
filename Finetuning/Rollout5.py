@@ -588,7 +588,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'double-play'
     task_id = 4
-    checkpoint = 57
+    checkpoint = 6
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -611,7 +611,7 @@ if __name__ == "__main__":
     #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
     #chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17]
     chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17, 21, 22, 23, 24, 26, 27, 28, 29, 30]
-    set_seed(3)
+    set_seed(1)
     #for i in range(4, 32):
         #set_seed(4)
     return_value, _ = rollout(
@@ -629,7 +629,7 @@ if __name__ == "__main__":
                   #goal_cell = np.array([6, 1], dtype = int), 
                   task_id = task_id,
                   continual_rollout = True,
-                  chunk_size = 30,
+                  chunk_size = 15,
                   device = device)
     print(return_value)
     exit()

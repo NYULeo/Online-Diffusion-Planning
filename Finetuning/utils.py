@@ -4165,6 +4165,7 @@ def train_critic_with_planner4(
 
                 s_planner = x_t[..., :obs_dim]
                 a_raw = x_t[..., obs_dim:]
+                a_raw = torch.clamp(a_raw, -1.0, 1.0)
                 s_raw_pl = s_planner * planner_std + planner_mean
 
                 if is_plan_feasible(
@@ -4350,7 +4351,8 @@ def train_critic_with_planner4(
                 continue
 
             s_planner = plans[..., :obs_dim]
-            actions = plans[..., obs_dim:]
+            #actions = plans[..., obs_dim:]
+            actions = torch.clamp(plans[..., obs_dim:], -1.0, 1.0)
             s_raw = s_planner * planner_std + planner_mean
 
             N, H, _ = s_raw.shape

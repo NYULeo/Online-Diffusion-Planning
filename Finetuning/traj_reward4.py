@@ -394,7 +394,7 @@ class TotalReward_Critic(nn.Module):
             s = x[i][:self.config.d_s]
             s_norm_reward = self.reward_processor(s).unsqueeze(0).requires_grad_(False).to(self.config.device)
             a = x[i][self.config.d_s:].unsqueeze(0).requires_grad_(False).to(self.config.device)
-            
+            a = torch.clamp(a, -1.0, 1.0)
            
             s_next = x[i+1][:self.config.d_s]
             s_norm_kernel = self.kernel_processor(s).unsqueeze(0).requires_grad_(False).to(self.config.device)
@@ -408,6 +408,7 @@ class TotalReward_Critic(nn.Module):
         s = x[H-1][:self.config.d_s]
         s_norm_reward = self.reward_processor(s).unsqueeze(0).requires_grad_(False)
         a = x[H-1][self.config.d_s:].unsqueeze(0).requires_grad_(False)
+        a = torch.clamp(a, -1.0, 1.0)
         r = self.reward_net(s_norm_reward, a)
         final_s_critic = x[H-1][:self.config.critic_d_s]
         final_s_norm_critic = self.critic_processor(final_s_critic).unsqueeze(0).requires_grad_(False)
@@ -425,7 +426,7 @@ class TotalReward_Critic(nn.Module):
             s = x[i][:self.config.d_s]
             s_norm_reward = self.reward_processor(s).unsqueeze(0).requires_grad_(True).to(self.config.device)
             a = x[i][self.config.d_s:].unsqueeze(0).requires_grad_(True).to(self.config.device)
-            
+            a = torch.clamp(a, -1.0, 1.0)
            
             s_next = x[i+1][:self.config.d_s]
             s_norm_kernel = self.kernel_processor(s).unsqueeze(0).requires_grad_(True).to(self.config.device)
@@ -474,6 +475,7 @@ class TotalReward_Critic(nn.Module):
         s = x[H-1][:self.config.d_s]
         s_norm_reward = self.reward_processor(s).unsqueeze(0).requires_grad_(True)
         a = x[H-1][self.config.d_s:].unsqueeze(0).requires_grad_(True)
+        a = torch.clamp(a, -1.0, 1.0)
         r = self.reward_net(s_norm_reward, a)
         
 
