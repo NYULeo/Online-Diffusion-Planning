@@ -266,7 +266,7 @@ if __name__ == "__main__":
     
 
 
-    """
+    
     env_name = 'cube'
     specific_env = 'double-play'
     task_id = 4
@@ -352,7 +352,8 @@ if __name__ == "__main__":
         finetune_batch_size = 32,
         finetune_batch_per_sample = 8,
         finetune_lr = 2e-05,
-        initial_lam = 0.05,
+        #initial_lam = 0.05,
+        initial_lam = 0.0,
         eta_lam = 0.5,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
@@ -372,7 +373,7 @@ if __name__ == "__main__":
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
     exit()
-   """
+   
 
 
 

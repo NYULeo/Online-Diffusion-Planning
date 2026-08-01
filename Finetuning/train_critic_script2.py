@@ -38,6 +38,7 @@ from Pretrain.utils import set_seed
 from accelerate import Accelerator
 import random 
 
+"""
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
       
@@ -52,7 +53,7 @@ if __name__ == '__main__':  # pragma: no cover
        trajs = data.get_trajectories()
        
       
-       """
+       
        mean, std = train_critic_with_reward(trajs,
                              dataset_name  = env_name,
                              specific_dataset = specific_env,
@@ -74,7 +75,7 @@ if __name__ == '__main__':  # pragma: no cover
                              momentum = 0.005,   # unused when old_step is None
                              task_id = task_id)
       
-       """
+    
        accelerator = Accelerator(mixed_precision='bf16')
        #accelerator.wait_for_everyone()
        kernel_config = KernelConfig(
@@ -137,15 +138,8 @@ if __name__ == '__main__':  # pragma: no cover
             task_id = task_id)
 """
 
-def filter_trajs(trajs):
-    successes = [t for t in trajs if t['rewards'][-1] > 0.0]
-    failures = [t for t in trajs if t['rewards'][-1] <= 0.0]
-    k = min(2 * len(successes), len(failures))
-    return successes + random.sample(failures, k=k)
-"""
 
 
-"""
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        
@@ -160,7 +154,7 @@ if __name__ == '__main__':  # pragma: no cover
        trajs = data.get_trajectories()
        
        
-       
+       """
        mean, std = train_critic_with_reward(trajs,
                              dataset_name  = env_name,
                              specific_dataset = specific_env,
@@ -181,7 +175,7 @@ if __name__ == '__main__':  # pragma: no cover
                              new_step = step,
                              momentum = 0.005,   # unused when old_step is None
                              task_id = task_id)
-    
+       """
        
        
        accelerator = Accelerator(mixed_precision='bf16')
@@ -245,7 +239,7 @@ if __name__ == '__main__':  # pragma: no cover
             trajs = trajs,
             task_id = task_id)
 
-"""
+
     
 
 
