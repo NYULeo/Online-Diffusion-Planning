@@ -588,7 +588,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'double-play'
     task_id = 4
-    checkpoint = 6
+    checkpoint = 15
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -620,7 +620,7 @@ if __name__ == "__main__":
                   horizon, 
                   num_layers = 4,
                   steps_T = 10, 
-                  num_karras = 1, 
+                  num_karras = 10, 
                   eta = 0.0, 
                   episode_length = 3000, 
                   checkpoint_steps = checkpoint, 
@@ -629,7 +629,7 @@ if __name__ == "__main__":
                   #goal_cell = np.array([6, 1], dtype = int), 
                   task_id = task_id,
                   continual_rollout = True,
-                  chunk_size = 15,
+                  chunk_size = 5,
                   device = device)
     print(return_value)
     exit()

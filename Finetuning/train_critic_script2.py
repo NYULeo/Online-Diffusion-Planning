@@ -52,7 +52,7 @@ if __name__ == '__main__':  # pragma: no cover
        trajs = data.get_trajectories()
        
       
-       
+       """
        mean, std = train_critic_with_reward(trajs,
                              dataset_name  = env_name,
                              specific_dataset = specific_env,
@@ -118,7 +118,7 @@ if __name__ == '__main__':  # pragma: no cover
                                accelerator            = accelerator) 
       
        accelerator.wait_for_everyone()
-       """
+       
        #if accelerator.is_main_process:
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
@@ -135,9 +135,14 @@ if __name__ == '__main__':  # pragma: no cover
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
+"""
 
-
-
+def filter_trajs(trajs):
+    successes = [t for t in trajs if t['rewards'][-1] > 0.0]
+    failures = [t for t in trajs if t['rewards'][-1] <= 0.0]
+    k = min(2 * len(successes), len(failures))
+    return successes + random.sample(failures, k=k)
+"""
 
 
 """

@@ -266,7 +266,7 @@ if __name__ == "__main__":
     
 
 
-    
+    """
     env_name = 'cube'
     specific_env = 'double-play'
     task_id = 4
@@ -372,7 +372,7 @@ if __name__ == "__main__":
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
     exit()
-   
+   """
 
 
 
