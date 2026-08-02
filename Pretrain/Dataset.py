@@ -874,7 +874,8 @@ class CubeDataset_Singletask:
                      trajectory = {
                            "observations": obs_slice[index:],
                            "actions": act_slice[index:],
-                           "rewards":  reward_processor_2(rews[index:].copy())
+                           #"rewards":  reward_processor_2(rews[index:].copy())
+                           "rewards":  rews[index:]
                      }
                          
                      trajectories.append(trajectory)

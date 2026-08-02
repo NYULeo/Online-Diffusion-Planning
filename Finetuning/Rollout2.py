@@ -495,7 +495,7 @@ def rollout(env_name,
      with open('Generated_trajectory.pkl', 'wb') as f:
                 pickle.dump(traj_info, f)
      """
-     print(traj['rewards'])
+     #print(traj['rewards'])
      #return traj
      
      #return rewards[-1], len(observations)
@@ -603,7 +603,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 90
+    checkpoint = 24
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -628,9 +628,9 @@ if __name__ == "__main__":
                   #goal_cell = np.array([6, 1], dtype = int), 
                   task_id = task_id,
                   continual_rollout = True,
-                  chunk_size = 5,
+                  chunk_size = 3,
                   device = device)
-    print(return_value)
+    #print(return_value)
     exit()
     for i in range(1, 101):
        set_seed(i)

@@ -2986,6 +2986,7 @@ class CriticDataset_Reward(Dataset):
                 obs_for_r = reward_stat.norm_obs(obs[:T_traj]).astype(np.float32)
                 s_t = torch.as_tensor(obs_for_r, dtype=torch.float32, device=device)
                 a_t = torch.as_tensor(acts[:T_traj], dtype=torch.float32, device=device)
+                a_t = torch.clamp(a_t, -1.0, 1.0)
                 rews = reward_net(s_t, a_t).cpu().numpy().astype(np.float32)   # (T_traj,)  
                 # Scale down predicted rewards from reward model
                 rews = np.clip(rews, -20.0, 20.0)      # adjust bounds if needed
