@@ -131,8 +131,8 @@ if __name__ == '__main__':  # pragma: no cover
             std = None,
             gamma = 0.99, 
             horizon = horizon,  
-            #sigma = 4.0, 
-            sigma = None,
+            sigma = 4.0, 
+            #sigma = None,
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
