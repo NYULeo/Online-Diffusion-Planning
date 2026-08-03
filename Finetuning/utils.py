@@ -3049,7 +3049,7 @@ class Critic_Buffer_Reward():
             momentum             = momentum,
             task_id              = task_id,
         )
-          
+    """
     def obtain_training_data(self, target_critic: nn.Module, batch_size: int, tgt_mean: torch.Tensor, tgt_std: torch.Tensor, device: str):
         loader = cycle(DataLoader(
             self.data, 
@@ -3060,6 +3060,68 @@ class Critic_Buffer_Reward():
             pin_memory=torch.cuda.is_available(),
         ))
         obs_chunks, rews_chunks = next(loader)      # (B, T, dim), (B, T)
+        obs_chunks = obs_chunks.to(device)
+        rews_chunks = rews_chunks.to(device)
+        B, T = obs_chunks.shape[0], obs_chunks.shape[1]
+        
+
+        with torch.no_grad():
+            values = target_critic(obs_chunks)            # (B, T)
+
+            deltas = (
+                  rews_chunks[:, :-1]
+                  + self.gamma * values[:, 1:]
+                   - values[:, :-1]
+              )                                             # (B, T-1)
+
+            advantages = torch.zeros(B, T - 1, device=device)
+            last_adv = torch.zeros(B, device=device)
+            for t in reversed(range(T - 1)):
+                last_adv = deltas[:, t] + self.gamma * self.lam * last_adv
+                advantages[:, t] = last_adv
+
+            #value_targets = values[:, 0] + advantages[:, 0]   # (B,)
+            with torch.no_grad():
+                 values = target_critic(obs_chunks)                      # (B, T)
+                 deltas = (
+                       rews_chunks[:, :-1]
+                       + self.gamma * values[:, 1:]
+                       - values[:, :-1]
+                 )                                                       # (B, T-1)
+
+                  # GAE advantages
+                 advantages = torch.zeros_like(deltas)
+                 last_adv = torch.zeros(B, device=device)
+                 for t in reversed(range(deltas.shape[1])):
+                     last_adv = deltas[:, t] + self.gamma * self.lam * last_adv
+                     advantages[:, t] = last_adv
+
+                 # === ADD NORMALIZATION HERE ===
+                 value_targets = values[:, 0] + advantages[:, 0]         # raw targets
+                
+                 
+                 # Normalize advantages and targets (running stats or batch stats)
+                 adv_mean = advantages.mean()
+                 adv_std  = advantages.std() + 1e-8
+                 advantages = (advantages - adv_mean) / adv_std
+                 
+                 alpha = 0.99
+                 tgt_mean_new = value_targets.mean()
+                 tgt_std_new  = value_targets.std() + 1e-8
+                 tgt_mean_new = alpha * tgt_mean + ((1 - alpha) * tgt_mean_new)
+                 tgt_std_new = alpha * tgt_std + ((1 - alpha) * tgt_std_new)
+                 value_targets = (value_targets - tgt_mean_new) / tgt_std_new
+                 # =================================
+                 
+
+        return obs_chunks[:, 0], value_targets, tgt_mean_new, tgt_std_new
+        #return obs_chunks[:, 0], value_targets
+
+    """
+
+    def obtain_training_data(self, target_critic: nn.Module, batch, tgt_mean: torch.Tensor, tgt_std: torch.Tensor, device: str):
+        
+        obs_chunks, rews_chunks = batch
         obs_chunks = obs_chunks.to(device)
         rews_chunks = rews_chunks.to(device)
         B, T = obs_chunks.shape[0], obs_chunks.shape[1]
@@ -3167,12 +3229,26 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
                        old_step,  
                        new_step, 
                        momentum)
+    g = torch.Generator()
+    g.manual_seed(1)
+    loader = cycle(
+        DataLoader(
+            buffer.data,
+            batch_size=batch_size,
+            shuffle=True,
+            drop_last=True,
+            num_workers=0,
+            pin_memory=torch.cuda.is_available(),
+            generator=g,
+        )
+    )
     print(f"Training critic for {dataset_name}-{specific_dataset}")
     total_loss = 0.0
     tgt_mean = torch.zeros(1, device=device)
     tgt_std = torch.ones(1, device=device)
     for k in range(1, num_steps + 1):  # number of passes over dataset
-           s, target_value, tgt_mean, tgt_std = buffer.obtain_training_data(target_critic, batch_size, tgt_mean, tgt_std, device)
+           batch = next(loader)
+           s, target_value, tgt_mean, tgt_std = buffer.obtain_training_data(target_critic, batch, tgt_mean, tgt_std, device)
            #s, target_value = buffer.obtain_training_data(target_critic, batch_size, tgt_mean, tgt_std, device)
            s = s.to(device)
            target_value = target_value.to(device)
