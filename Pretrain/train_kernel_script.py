@@ -10,7 +10,7 @@ from Finetuning.utils import get_trajs
 import pickle
 
 
-
+"""
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     dataset = 'cube'
@@ -40,10 +40,10 @@ if __name__ == '__main__':  # pragma: no cover
                 num_modes = 10,
                 quantile = 0.99,
                 noise_floor = 5e-4)
-
-
-
 """
+
+
+
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     dataset = 'cube'
@@ -74,4 +74,3 @@ if __name__ == '__main__':  # pragma: no cover
                 quantile = 0.99,
                 noise_floor = 5e-4)
 
-"""

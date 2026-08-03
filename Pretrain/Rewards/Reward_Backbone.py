@@ -590,8 +590,8 @@ class RewardDataset(Dataset):
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
             if(sigma is not None):
-                #rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate = 200/sigma)
-                rews = gaussian_filter1d(rews, sigma, mode="nearest")
+                rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate = 200/sigma)
+                #rews = gaussian_filter1d(rews, sigma, mode="nearest")
             elif(alpha is not None):
                 rews = ema_smooth(rews, alpha)
             for t in range(len(acts)):

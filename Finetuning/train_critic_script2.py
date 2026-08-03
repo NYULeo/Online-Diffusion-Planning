@@ -38,6 +38,7 @@ from Pretrain.utils import set_seed
 from accelerate import Accelerator
 import random 
 
+
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
       
@@ -73,8 +74,8 @@ if __name__ == '__main__':  # pragma: no cover
                              new_step = step,
                              momentum = 0.005,   # unused when old_step is None
                              task_id = task_id)
-      
-       """
+      """
+    
        accelerator = Accelerator(mixed_precision='bf16')
        #accelerator.wait_for_everyone()
        kernel_config = KernelConfig(
@@ -126,23 +127,17 @@ if __name__ == '__main__':  # pragma: no cover
             hidden_layers = 4, 
             hidden_dim = 512, 
             checkpoint_step = 0, 
-            mean = mean,
-            std = std,
+            mean = None,
+            std = None,
             gamma = 0.99, 
             horizon = horizon,  
-            #sigma = 4.0, 
-            sigma = None,
+            sigma = 4.0, 
+            #sigma = None,
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
-"""
 
-def filter_trajs(trajs):
-    successes = [t for t in trajs if t['rewards'][-1] > 0.0]
-    failures = [t for t in trajs if t['rewards'][-1] <= 0.0]
-    k = min(2 * len(successes), len(failures))
-    return successes + random.sample(failures, k=k)
-"""
+
 
 
 """
@@ -181,7 +176,7 @@ if __name__ == '__main__':  # pragma: no cover
                              new_step = step,
                              momentum = 0.005,   # unused when old_step is None
                              task_id = task_id)
-    
+       
        
        
        accelerator = Accelerator(mixed_precision='bf16')

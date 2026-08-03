@@ -495,7 +495,7 @@ def rollout(env_name,
      with open('Generated_trajectory.pkl', 'wb') as f:
                 pickle.dump(traj_info, f)
      """
-     print(traj['rewards'])
+     #print(traj['rewards'])
      #return traj
      
      #return rewards[-1], len(observations)
@@ -603,35 +603,18 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 90
+    checkpoint = 33
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
     #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
     #chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17]
     chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17, 21, 22, 23, 24, 26, 27, 28, 29, 30]
-    chunk_size2 = [4,5,6,7,8]
+    chunk_size2 = [4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
     total_return = 0.0
-    set_seed(1)
-    return_value, _ = rollout(
-                  env_name, 
-                  specific_train_dataset, 
-                  horizon, 
-                  num_layers = 2,
-                  steps_T = 10, 
-                  num_karras = 1, 
-                  eta = 0.0, 
-                  episode_length = 3000, 
-                  checkpoint_steps = checkpoint, 
-                  render = True,  
-                  base_seed = 1, 
-                  #goal_cell = np.array([6, 1], dtype = int), 
-                  task_id = task_id,
-                  continual_rollout = True,
-                  chunk_size = 5,
-                  device = device)
-    print(return_value)
-    exit()
+   
+    #print(return_value)
+    
     for i in range(1, 101):
        set_seed(i)
        chunk_size_index = 0

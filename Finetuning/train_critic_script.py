@@ -66,8 +66,10 @@ if __name__ == '__main__':  # pragma: no cover
                              gamma = 0.99,
                              lam = 0.95,
                              horizon = horizon,
-                             lr = 1e-04, 
-                             min_lr = 1e-05, 
+                             #lr = 1e-04, 
+                             lr = 1e-05,
+                             #min_lr = 1e-05, 
+                             min_lr = 1e-06,
                              tau = 0.005, 
                              old_step = None,    # from scratch
                              new_step = step,
@@ -126,16 +128,15 @@ if __name__ == '__main__':  # pragma: no cover
             hidden_layers = 4, 
             hidden_dim = 512, 
             checkpoint_step = 0, 
-            mean = mean,
-            std = std,
+            mean = None,
+            std = None,
             gamma = 0.99, 
             horizon = horizon,  
-            #sigma = 4.0, 
-            sigma = None,
+            sigma = 4.0, 
+            #sigma = None,
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
-
 
 
 
@@ -223,7 +224,7 @@ if __name__ == '__main__':  # pragma: no cover
                                accelerator            = accelerator) 
       
        accelerator.wait_for_everyone()
-       
+    
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
@@ -239,8 +240,8 @@ if __name__ == '__main__':  # pragma: no cover
             target_reward = 800.0, 
             trajs = trajs,
             task_id = task_id)
-
 """
+
     
 
 

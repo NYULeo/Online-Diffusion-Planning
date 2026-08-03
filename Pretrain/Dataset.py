@@ -106,7 +106,7 @@ def reward_processor(rewards, name: str):
 
 
     if(name in ('cube', 'ogpointmaze', 'antmaze', 'humanoidmaze', 'puzzle', 'scene')):
-         #rewards = ogbench_reward_processor(rewards)
+         rewards = ogbench_reward_processor(rewards)
          #rewards = mode_reward_processor(rewards)
          return rewards
     else:
@@ -874,7 +874,8 @@ class CubeDataset_Singletask:
                      trajectory = {
                            "observations": obs_slice[index:],
                            "actions": act_slice[index:],
-                           "rewards":  reward_processor_2(rews[index:].copy())
+                           #"rewards":  reward_processor_2(rews[index:].copy())
+                           "rewards":  rews[index:]
                      }
                          
                      trajectories.append(trajectory)
