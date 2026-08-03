@@ -62,7 +62,7 @@ if __name__ == '__main__':  # pragma: no cover
                              critic_hidden_layers = 4,
                              critic_hidden_dim  = 512,
                              batch_size = 256,
-                             num_steps  = 20000,
+                             num_steps  = 25000,
                              gamma = 0.99,
                              lam = 0.95,
                              horizon = horizon,
