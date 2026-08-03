@@ -3049,6 +3049,7 @@ class Critic_Buffer_Reward():
             momentum             = momentum,
             task_id              = task_id,
         )
+   
     """
     def obtain_training_data(self, target_critic: nn.Module, batch_size: int, tgt_mean: torch.Tensor, tgt_std: torch.Tensor, device: str):
         loader = cycle(DataLoader(
@@ -3116,7 +3117,6 @@ class Critic_Buffer_Reward():
 
         return obs_chunks[:, 0], value_targets, tgt_mean_new, tgt_std_new
         #return obs_chunks[:, 0], value_targets
-
     """
 
     def obtain_training_data(self, target_critic: nn.Module, batch, tgt_mean: torch.Tensor, tgt_std: torch.Tensor, device: str):
