@@ -4474,6 +4474,8 @@ def train_critic_with_planner4(
 
             plan_targets = plan_targets / (n - 1)            # average over H=2..n
             """
+
+            """
             plan_targets = torch.zeros(N, device=device)
             w = 1.0 - lam       # first weight = (1-λ)
             weight_sum = 0.0
@@ -4489,8 +4491,22 @@ def train_critic_with_planner4(
                   plan_targets += w * partial
                   weight_sum += w
                   w *= lam
-
+            
             plan_targets = plan_targets / max(weight_sum, 1e-8)
+            """
+
+            # ----- equal weight on all multi-step estimators -----
+            plan_targets = torch.zeros(N, device=device)
+            N_est = n - 1                                 # L = 1 … n-1
+
+            for L in range(1, n):
+                   discounts = gamma_pow_t[:L]               # γ⁰ … γ^{L-1}
+                   disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
+                   s_L = (s_raw[:, L] - c_mean) / c_std
+                   v_boot = target_critic(s_L)
+                   partial = disc_return + (gamma ** L) * v_boot   # classic sum return
+                   plan_targets += partial / N_est                 # equal weight
+            
 
             # ----- average targets per unique s0 -----
             s0_raw = s_raw[:, 0]
