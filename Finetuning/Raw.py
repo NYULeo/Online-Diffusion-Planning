@@ -78,6 +78,9 @@ def check_cube_double_goal_reach(trajs, task_id):
 data = get_dataset('cube', 'triple-play', task_id = 1, traj_length = 500)
 trajs = data.get_trajectories()
 
+chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17, 21, 22, 23, 24, 26, 27, 28, 29, 30]
+print(len(chunk_size))
+exit()
 """
 env_steps = [0, 1592, 1590, 1600, 1411, 1416, 1600, 1555, 1422, 1600, 1599, 1554]
 total_steps = [0]
