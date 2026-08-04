@@ -77,7 +77,7 @@ class Train_Critic_Config:
     min_lr: float = 1e-05
     tau: float = 0.005
     gamma: float = 1.0
-    lam: float = 0.95
+    lam: Optional[float] = None
     data_conservation: bool = False
     momentum: float = 0.005
 
