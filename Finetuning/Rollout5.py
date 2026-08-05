@@ -21,94 +21,12 @@ import gymnasium as gym
 import gymnasium_robotics
 from Pretrain.Dataset import get_dataset
 from gymnasium.wrappers import TimeLimit
-from typing import Optional
+from typing import Optional, List
 #from utils import get_normalized_score, rollout_parallel3, get_current_state, get_trajs, spare_reward_prcocessor, compute_threshold_log_prob_mog, compute_threshold_mahalanobis_mog
 from dataclasses import dataclass
 import time
 from typing import List
 from Finetuning.traj_reward2 import TotalReward_Critic, RewardConfig, TotalReward
-from Pretrain.Planners.Backbone.Sampler import karras_beta_schedule, cosine_beta, clip_actions
-
-
-def create_initial(current_state: np.ndarray, plan_suffix: np.ndarray, d_s: int, d_a: int, horizon: int, device: str) -> np.ndarray:
-    initial = torch.zeros(1, horizon, d_s + d_a,device = device)
-    initial[:, 0, :d_s] = current_state
-    initial[:, 0, d_s: (d_s + d_a)] = plan_suffix[0, d_s: (d_s + d_a)]
-    for i in range(horizon):
-        if(i < len(plan_suffix)):
-             initial[:, i] = plan_suffix[i]
-        else:
-             initial[:, i] = initial[:, i-1]
-    return initial
-
-@torch.no_grad()
-def sample_euler_karras_replan(
-    s0: np.ndarray,
-    score_model: torch.nn.Module,
-    d_s: int,
-    d_a: int,
-    horizon: int,
-    num_steps: int = 50,
-    num_karras: int = 5,
-    eta: float = 1.0,
-    plan_suffix: np.ndarray = None,
-    device: Optional[str] = None,
-) -> np.ndarray:
-    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    s0_t = torch.tensor(s0, device=device, dtype=torch.float32)
-    if s0_t.shape[0] != d_s:
-        raise ValueError(f"s0 should have shape ({d_s},), but got {s0_t.shape}")
-
-    dim = d_s + d_a
-
-    # Karras β(t) + σ(t)
-    t_grid, beta_1, sigma_grid = karras_beta_schedule(num_steps, device=device)
-    #t_grid, beta_1, _, sigma_grid =  karras_cosine_interpolated_beta(num_steps, device=device)
-
-    beta_2 = cosine_beta(t_grid, s=0.008)
-
-    # Initialize x_T
-    x = create_initial(s0, plan_suffix, d_s, d_a, horizon, device) * sigma_grid[0]
-    #x = torch.randn(1, horizon, dim, device=device) * sigma_grid[0]
-    #x2 = torch.randn(1, horizon, dim, device=device)
-
-    # Conditioning
-    mask = torch.zeros(1, horizon, dim, device=device)
-    mask[:, 0, :d_s] = 1.0
-    y = torch.zeros_like(x)
-    y[:, 0, :d_s] = s0_t.unsqueeze(0)
-    x = mask * y + (1 - mask) * x
-    
-
-    for i in range(num_steps):
-        t_now = t_grid[i]
-        t_next = t_grid[i + 1] if i < num_steps - 1 else 0.0
-        dt = (t_next - t_now).item()
-        if( i < num_karras ):
-            beta_now = beta_1[i].item()
-        else:
-            beta_now = beta_2[i].item()
-
-        # Drift
-        drift = -0.5 * beta_now * x
-
-        # Score
-        score = score_model(x, t_now.unsqueeze(0))
-
-        # Euler step
-        if eta > 0:
-            noise = torch.randn_like(x)
-            noise_scale = eta * math.sqrt(beta_now * (-dt))
-            x = x + ((drift - beta_now * score) * dt + noise_scale * noise)
-        else:
-            x = x + (drift - beta_now * score) * dt
-
-        # Conditioning
-        x = mask * y + (1 - mask) * x
-        x = clip_actions(x, d_s)
-
-    return x.squeeze(0).cpu().numpy()
-
 class Selector():
     def __init__(self, env_name, specific_env, RConfig: RewardConfig, reward_checkpoint: int, kernel_checkpoint: Optional[int] = None, critic_checkpoint: Optional[int] = None):
          self.env_name = env_name
@@ -182,9 +100,6 @@ def check_cube_double_goal_reach(trajs, task_id):
            total_dist += dist_1 + dist_2
     average_dist = total_dist/len(trajs)
     print(f"Task {task_id} average distance: {average_dist}")
-
-def get_normalized_score(score, min_score,  max_score):
-    return (100 * ((score - min_score) / (max_score - min_score)))
 
 @dataclass
 class Kernel_Config:
@@ -415,38 +330,30 @@ def load_success_trajs(env_name, specific_env, task_id, step):
 def rollout(env_name, 
             specific_env, 
             horizon, 
-            num_layers,
+            num_layers, 
             steps_T, 
-            num_karras, eta, 
+            num_karras, 
+            eta, 
             episode_length, 
             checkpoint_steps, 
             render = False, 
             goal_cell: Optional[np.ndarray] = None, 
-            start_cell: Optional[np.ndarray] = None,
-            task_id: Optional[int] = None,
-            base_seed: int = None, 
+            start_cell: Optional[np.ndarray] = None, 
+            task_id: Optional[int] = None, 
+            base_seed: int = 0, 
             continual_rollout = False, 
             chunk_size = 5, 
-            device = None, 
-            selector: Optional[Selector] = None):
-     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     #print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}, episode_length: {episode_length}")
-     #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
-     #device = check_device()
-     #device = "cuda" if torch.cuda.is_available() else "cpu"
-     #print(f"Using device {device}")
-
-     #env.reset(seed=1)  # Important: pass seed to env.reset
+            device = None, selector: Optional[Selector] = None):
+     
+     
      env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', task_id = task_id, episode_length = None)
-     #env, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array', episode_length = episode_length)
-     #np.random.seed(base_seed)
+     
     
     # 2. Reset environment with both seed and task_id
      #env.reset(seed=base_seed)   # Important first reset
     
     # Create environment factory function
      state_dict = get_planner(env_name, specific_env, checkpoint_steps, task_id)
-     #state_dict = get_planner(env_name, specific_env, checkpoint_steps)
      if( env_name == 'kitchen'):
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
      elif (env_name == 'pointmaze'):
@@ -464,7 +371,6 @@ def rollout(env_name,
 
      #get Processor
      planner_processor = Planner_Processor(env_name, specific_env, task_id)
-     #planner_processor = Planner_Processor(env_name, specific_env)
      
      
      #reset
@@ -563,28 +469,22 @@ def rollout(env_name,
      #print(f"total steps: {len(observations)}")
      #print(f"number of plans: {number_of_plans}")
      
-     
-     #print(rewards)
      rewards = reward_processor(rewards, env_name)
-     #print(rewards)
-     #print(rewards)
      traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(rewards)}
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      #print(test_rollout_fit_for_model(traj, env_name, specific_env, checkpoint_steps, checkpoint_steps, checkpoint_steps, device=None))
      
-     #expert_score = get_expert_score(env_name)
-     #print(get_normalized_score([traj], expert_score))
+     
+    
+     #print(rewards)
      if(render):
           media.write_video("demo.mp4", frames, fps=50) #save the video
-     """
-     with open('Generated_trajectory.pkl', 'wb') as f:
-                pickle.dump(traj_info, f)
-     """
-     #print(sum(traj['rewards']))
+     
+     
      #return traj
      
      #return rewards[-1], len(observations)
-     return sum(rewards), len(observations)
+     return float(info['success']), len(observations)
      #print(get_normalized_score([traj]))
  
 def load_kernel(env_name, specific_env, checkpoint_steps, kernel_config: Kernel_Config, device: str):
@@ -629,7 +529,7 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
      _, d_s, d_a = get_env(env_name, specific_env, render_mode = 'rgb_array')
     
     # Create environment factory function
-     state_dict = get_planner(env_name, specific_env, planner_checkpoint)
+     state_dict = get_planner(env_name, specific_env, planner_checkpoint, task_id)
      if( env_name == 'kitchen'):
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= 2, timestep_emb_type="fourier").to(device)
      elif (env_name == 'pointmaze'):
@@ -684,17 +584,14 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
 
 
 
+
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
-
-    
-  
-
-    horizon = 32 
+    horizon = 32
     env_name = 'cube'
-    specific_train_dataset = 'single-play'
+    specific_train_dataset = 'double-play'
     task_id = 4
-    checkpoint = 39
+    checkpoint = 90
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -715,25 +612,41 @@ if __name__ == "__main__":
                hidden_dim_critic = 256,
                explore = False)
     #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
-    chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17, 21, 22, 23, 24, 26, 27, 28, 29, 30]
-    #for seed in [10001, 20002, 30003, 40004, 50005, 60006, 70007, 80008, 90009, 100010, 110011, 120012]:
+    #chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17]
+    #chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17, 21, 22, 23, 24, 26, 27, 28, 29, 30]
     set_seed(1)
-   
-    
-    while(checkpoint < 42):
-         print(f"Running checkpoing: {checkpoint}")
-         total_return = 0.0
-         for j in range(1, 51):
-           return_value = 0.0
-           #chunk_size_index = 0
-           
-           """
-           while((return_value != 1.0) and (chunk_size_index < len(chunk_size))):
-              return_value, _ = rollout(
+    #for i in range(4, 32):
+        #set_seed(4)
+    return_value, _ = rollout(
                   env_name, 
                   specific_train_dataset, 
                   horizon, 
-                  num_layers = 2,
+                  num_layers = 4,
+                  steps_T = 10, 
+                  num_karras = 1, 
+                  eta = 0.0, 
+                  episode_length = 3000, 
+                  checkpoint_steps = checkpoint, 
+                  render = True,  
+                  base_seed = 1, 
+                  #goal_cell = np.array([6, 1], dtype = int), 
+                  task_id = task_id,
+                  continual_rollout = True,
+                  chunk_size = 15,
+                  device = device)
+    print(return_value)
+    exit()
+    while(checkpoint < 42):
+       print(f"Running checkpoing: {checkpoint}")
+       total_return = 0.0
+       for j in range(1, 51):
+          return_value = 0.0
+          chunk_size_index = 0
+          while((return_value != 1.0) and (chunk_size_index < len(chunk_size))):
+                return_value, _ = rollout(
+                  env_name, 
+                  specific_train_dataset, 
+                  horizon, 
                   steps_T = 10, 
                   num_karras = 1, 
                   eta = 0.0, 
@@ -745,38 +658,14 @@ if __name__ == "__main__":
                   task_id = task_id,
                   continual_rollout = True,
                   chunk_size = chunk_size[chunk_size_index],
-                  #chunk_size = 1,
                   device = device)
-              chunk_size_index += 1
-           """
-           return_value, _ = rollout(
-                  env_name, 
-                  specific_train_dataset, 
-                  horizon, 
-                  num_layers = 2,
-                  steps_T = 10, 
-                  num_karras = 1, 
-                  eta = 0.0, 
-                  episode_length = 3000, 
-                  checkpoint_steps = checkpoint, 
-                  render = False,  
-                  base_seed = j, 
-                  #goal_cell = np.array([6, 1], dtype = int), 
-                  task_id = task_id,
-                  continual_rollout = True,
-                  chunk_size = 1,
-                  #chunk_size = 1,
-                  device = device)
-           print(return_value)
-           #print(f"Chunk Size: {chunk_size[chunk_size_index]}")
-           total_return += return_value
-         print(f"Checkpoint: {checkpoint} Success Rate: {total_return / 50 :.4f}")
-         checkpoint += 3
+                chunk_size_index += 1
+          print(return_value)
+          total_return += return_value
+       print(f"Checkpoint: {checkpoint} Success Rate: {total_return / 50 :.4f}")
+       checkpoint += 3
+    exit()
 
-
-    
-
-    
 
 
 

@@ -16,7 +16,7 @@ import numpy as np
 from typing import Optional
 from torch import Tensor
 from utils import Lambda, function
-from traj_reward4 import RewardConfig, TotalReward
+from traj_reward import RewardConfig, TotalReward
 from torch.utils.data import DataLoader
 from Pretrain.Planners.Backbone.UNet import TemporalUnet
 from Pretrain.Dataset import get_env

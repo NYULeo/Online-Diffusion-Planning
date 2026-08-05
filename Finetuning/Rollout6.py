@@ -109,6 +109,154 @@ def sample_euler_karras_replan(
 
     return x.squeeze(0).cpu().numpy()
 
+class AQCSelector():
+    """
+    Adaptive Q-Chunking selector that chooses chunk sizes based on 
+    discount-normalized advantage scores.
+    
+    Adapted for this codebase where we use the existing critic (state-value network)
+    to approximate Q^k(s, a) ≈ V(s_k) where s_k is the terminal state
+    after executing k steps of action chunk a.
+    """
+    def __init__(
+        self, 
+        env_name, 
+        specific_env, 
+        task_id: int,
+        critic_step: int = 0,
+        k_set: List[int] = None,
+        gamma: float = 0.99,
+        device: Optional[str] = None
+    ):
+        from Pretrain.Critic.nets import Critic
+        from Finetuning.utils import get_critic_model, get_critic_stats
+        
+        self.env_name = env_name
+        self.specific_env = specific_env
+        self.task_id = task_id
+        self.critic_step = critic_step
+        self.k_set = k_set or [1, 5, 10, 25]  # Default chunk sizes from paper
+        self.gamma = gamma
+        self.device = device or check_device()
+        
+        # Load the critic (state-value network)
+        self.critic_state_dict, self.critic_obs_dim = get_critic_model(
+            self.env_name, self.specific_env, task_id=self.task_id, step=self.critic_step
+        )
+        # Match the architecture used during critic training
+        self.critic = Critic(self.critic_obs_dim, hidden_dim=512, hidden_layers=4).to(self.device)
+        self.critic.load_state_dict(self.critic_state_dict)
+        self.critic.eval()
+        
+        # Load normalization stats (always from step 0 since stats are dataset-wide)
+        self.stats = get_critic_stats(
+            self.env_name, self.specific_env, task_id=self.task_id, step=0
+        )
+    
+    def compute_advantage_scores(
+        self, 
+        state: np.ndarray, 
+        plans: List[np.ndarray]
+    ) -> dict:
+        """
+        Compute advantage scores for each chunk size and plan.
+        
+        For each chunk size k and plan a:
+          - V^k(s) = V(s) - the current state value
+          - Q^k(s, a) ≈ V(s_k) where s_k is terminal state after k steps
+          - score(k, a) = (V(s_k) - V(s)) / gamma^k
+        
+        Plans are expected to be numpy arrays of shape (horizon, d_s + d_a)
+        where each row is [state, action] concatenated.
+        
+        Returns dict: {k: [scores for each plan]}
+        """
+        scores = {}
+        d_s = self.critic_obs_dim
+        
+        with torch.no_grad():
+            # Normalize and compute V(s) - the baseline value
+            state_norm = self.stats.norm_obs(state)
+            state_tensor = torch.tensor(state_norm, dtype=torch.float32, device=self.device).unsqueeze(0)
+            v_current = self.critic(state_tensor).item()
+            
+            # For each chunk size k
+            for k in self.k_set:
+                k_scores = []
+                
+                for plan in plans:
+                    # plan is shape (horizon, d_s + d_a), extract state at step k
+                    # Step index is k-1 (0-indexed), but clamp to available length
+                    step_idx = min(k - 1, len(plan) - 1)
+                    if step_idx < 0:
+                        step_idx = 0
+                    
+                    # Extract state from plan[step_idx] which is [state, action]
+                    terminal_state = plan[step_idx, :d_s]
+                    
+                    # Normalize terminal state and compute V(s_k)
+                    terminal_norm = self.stats.norm_obs(terminal_state)
+                    terminal_tensor = torch.tensor(terminal_norm, dtype=torch.float32, device=self.device).unsqueeze(0)
+                    v_terminal = self.critic(terminal_tensor).item()
+                    
+                    # Compute advantage score: (V(s_k) - V(s)) / gamma^k
+                    gamma_k = self.gamma ** k
+                    adv_score = (v_terminal - v_current) / gamma_k
+                    k_scores.append(adv_score)
+                
+                scores[k] = k_scores
+        
+        return scores
+    
+    def z_score_normalize(self, scores: dict) -> dict:
+        """
+        Z-score normalize scores within each chunk size.
+        
+        Returns dict: {k: [normalized scores]}
+        """
+        normalized = {}
+        
+        for k, k_scores in scores.items():
+            scores_array = np.array(k_scores)
+            mean = np.mean(scores_array)
+            std = np.std(scores_array)
+            
+            # Normalize with epsilon for numerical stability
+            normalized[k] = (scores_array - mean) / (std + 1e-8)
+        
+        return normalized
+    
+    def select_plan_and_chunk(
+        self, 
+        state: np.ndarray, 
+        plans: List[np.ndarray]
+    ) -> tuple:
+        """
+        Select the best (chunk_size, plan) pair using AQC criterion.
+        
+        Returns: (selected_plan, selected_chunk_size)
+        """
+        # Step 1: Compute raw advantage scores
+        scores = self.compute_advantage_scores(state, plans)
+        
+        # Step 2: Z-score normalize within each scale
+        normalized_scores = self.z_score_normalize(scores)
+        
+        # Step 3: Find the best (k, plan_idx) pair
+        best_score = -np.inf
+        best_k = None
+        best_plan_idx = None
+        
+        for k in self.k_set:
+            for plan_idx, score in enumerate(normalized_scores[k]):
+                if score > best_score:
+                    best_score = score
+                    best_k = k
+                    best_plan_idx = plan_idx
+        
+        return plans[best_plan_idx], best_k
+
+
 class Selector():
     def __init__(self, env_name, specific_env, RConfig: RewardConfig, reward_checkpoint: int, kernel_checkpoint: Optional[int] = None, critic_checkpoint: Optional[int] = None):
          self.env_name = env_name
@@ -124,12 +272,12 @@ class Selector():
          else:
             self.model = TotalReward(self.device, RConfig, env_name, specific_env, self.reward_checkpoint, self.kernel_checkpoint)
          self.model.eval()
-    
+
     def select_plan(self, plans: List[np.ndarray]) -> np.ndarray:
          rewards = []
          with torch.no_grad():
             for plan in plans:
-             plan_tensor = torch.from_numpy(plan).float().to(self.device) 
+             plan_tensor = torch.from_numpy(plan).float().to(self.device)
              reward = self.model.predict(plan_tensor, self.lam)
              rewards.append(reward.item())
          return plans[rewards.index(max(rewards))].copy()
@@ -412,23 +560,24 @@ def load_success_trajs(env_name, specific_env, task_id, step):
         trajs = pickle.load(f)
     return trajs
 
-def rollout(env_name, 
-            specific_env, 
-            horizon, 
+def rollout(env_name,
+            specific_env,
+            horizon,
             num_layers,
-            steps_T, 
-            num_karras, eta, 
-            episode_length, 
-            checkpoint_steps, 
-            render = False, 
-            goal_cell: Optional[np.ndarray] = None, 
+            steps_T,
+            num_karras, eta,
+            episode_length,
+            checkpoint_steps,
+            render = False,
+            goal_cell: Optional[np.ndarray] = None,
             start_cell: Optional[np.ndarray] = None,
             task_id: Optional[int] = None,
-            base_seed: int = None, 
-            continual_rollout = False, 
-            chunk_size = 5, 
-            device = None, 
-            selector: Optional[Selector] = None):
+            base_seed: int = None,
+            continual_rollout = False,
+            chunk_size = 5,
+            device = None,
+            selector: Optional[Selector] = None,
+            aqc_selector: Optional[AQCSelector] = None):
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
      #print(f"Horizon: {horizon}, step_T: {steps_T}, num_karras: {num_karras}, eta: {eta}, Checkpoint_steps; {checkpoint_steps}, episode_length: {episode_length}")
      #env = gym.make('FrankaKitchen-v1',  tasks_to_complete = ['microwave', 'kettle', 'light switch', 'slide cabinet'], render_mode = None)  # Use headless mode for servers
@@ -495,23 +644,41 @@ def rollout(env_name,
      generated_state = None
      violation_scores = []
      number_of_plans = 0
+     chunk_sizes_used = []  # Track which chunk sizes were selected
+     
      for i in range(episode_length):
            if(continual_rollout):
                 if(len(Temp_acts) == 0):
                      current_state_norm = planner_processor.preprocess(current_state)
-                     if(selector is None):
+                     
+                     # AQC adaptive chunking
+                     if(aqc_selector is not None):
+                         # Sample multiple candidate plans
+                         Plans = []
+                         for j in range(30):
+                              Plans.append(sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device))
+                         
+                         # Select best plan and chunk size using AQC
+                         x, selected_k = aqc_selector.select_plan_and_chunk(current_state, Plans)
+                         chunk_sizes_used.append(selected_k)
+                     elif(selector is None):
                          x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                         selected_k = chunk_size  # Use fixed chunk size
+                         chunk_sizes_used.append(selected_k)
                      else:
                          Plans = []
                          for j in range(30):
                               Plans.append(sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device))
                          x = selector.select_plan(Plans)
-                     for k in range(min(chunk_size, len(x))):
+                         selected_k = chunk_size
+                         chunk_sizes_used.append(selected_k)
+                     
+                     for k in range(min(selected_k, len(x))):
                          Temp_acts.append(x[k, d_s:(d_s+d_a)].copy())
-                     for k in range(1, min(chunk_size, len(x))):
+                     for k in range(1, min(selected_k, len(x))):
                          Temp_states.append(x[k, :d_s].copy())
                      number_of_plans += 1
-                
+
                 action = Temp_acts[0]
                 Temp_acts = Temp_acts[1:]
                 if(len(Temp_states)> 0):
@@ -526,13 +693,26 @@ def rollout(env_name,
            else:
                 current_state_norm = planner_processor.preprocess(current_state)
                 #x = sample_reverse_sde(current_state_norm, model, d_s, d_a, horizon, steps_T, eta,  device = device)
-                if(selector is None):
+                
+                # AQC adaptive chunking
+                if(aqc_selector is not None):
+                    Plans = []
+                    for j in range(30):
+                        Plans.append(sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device))
+                    x, selected_k = aqc_selector.select_plan_and_chunk(current_state, Plans)
+                    chunk_sizes_used.append(selected_k)
+                elif(selector is None):
                     x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                    selected_k = chunk_size
+                    chunk_sizes_used.append(selected_k)
                 else:
                     Plans = []
                     for j in range(30):
                         Plans.append(sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device))
                     x = selector.select_plan(Plans)
+                    selected_k = chunk_size
+                    chunk_sizes_used.append(selected_k)
+                
                 action = x[0, d_s:(d_s+d_a)].copy()
                 generated_state = x[1, :d_s].copy()
                 obs, reward, terminated, truncated, info = env.step(action)
@@ -571,7 +751,7 @@ def rollout(env_name,
      traj = {'observations': np.asarray(observations), 'actions': np.asarray(actions), 'rewards': np.asarray(rewards)}
      traj_info = {'sequence': traj, 'env_name': env_name, 'specific_env': specific_env }
      #print(test_rollout_fit_for_model(traj, env_name, specific_env, checkpoint_steps, checkpoint_steps, checkpoint_steps, device=None))
-     
+
      #expert_score = get_expert_score(env_name)
      #print(get_normalized_score([traj], expert_score))
      if(render):
@@ -582,9 +762,22 @@ def rollout(env_name,
      """
      #print(sum(traj['rewards']))
      #return traj
+
+     # Determine if episode was successful
+     # For cube/pointmaze etc., success means achieving reward 1.0 at any point
+     success = bool(np.any(rewards == 1.0)) if len(rewards) > 0 else False
      
+     # Chunk size statistics
+     chunk_size_stats = {}
+     if len(chunk_sizes_used) > 0:
+         chunk_size_stats = {
+             'mean_chunk_size': np.mean(chunk_sizes_used),
+             'chunk_sizes': chunk_sizes_used,
+             'chunk_size_distribution': dict(zip(*np.unique(chunk_sizes_used, return_counts=True)))
+         }
+
      #return rewards[-1], len(observations)
-     return sum(rewards), len(observations)
+     return sum(rewards), len(observations), success, chunk_size_stats
      #print(get_normalized_score([traj]))
  
 def load_kernel(env_name, specific_env, checkpoint_steps, kernel_config: Kernel_Config, device: str):
@@ -686,20 +879,21 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
 
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
+    
 
     
   
 
-    horizon = 32 
+    horizon = 32
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 39
+    checkpoint = 42
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
     RConfig = RewardConfig(
-               beta = 1.0, 
+               beta = 1.0,
                #max_mahalanobis_score = 3.5,
                min_log_prob = 5.0,
                #constraint_adapt = False,
@@ -714,69 +908,56 @@ if __name__ == "__main__":
                num_hidden_layers_critic = 3,
                hidden_dim_critic = 256,
                explore = False)
+    
     #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
     chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17, 21, 22, 23, 24, 26, 27, 28, 29, 30]
     #for seed in [10001, 20002, 30003, 40004, 50005, 60006, 70007, 80008, 90009, 100010, 110011, 120012]:
     set_seed(1)
-   
-    
-    while(checkpoint < 42):
-         print(f"Running checkpoing: {checkpoint}")
-         total_return = 0.0
+
+
+    while(checkpoint < 45):
+         print(f"Running checkpoint: {checkpoint}")
+         
+         aqc_selector = AQCSelector(
+             env_name=env_name,
+             specific_env=specific_train_dataset,
+             task_id=task_id,
+             critic_step=checkpoint,  # Use same checkpoint as planner
+             k_set=[1, 5, 10, 25],
+             gamma=0.99,
+             device=device
+         )
+         
+         total_success = 0.0
          for j in range(1, 51):
-           return_value = 0.0
-           #chunk_size_index = 0
+           success = False
+
+           _, _, success, chunk_stats = rollout(
+               env_name,
+               specific_train_dataset,
+               horizon,
+               num_layers=2,
+               steps_T = 10,
+               num_karras = 1,
+               eta = 0.0,
+               episode_length = 3000,
+               checkpoint_steps = checkpoint,
+               render = False,
+               base_seed = j,
+               #goal_cell = np.array([6, 1], dtype = int),
+               task_id = task_id,
+               continual_rollout = True,
+               chunk_size = 25,  # Default fallback, AQC will override this
+               device = device,
+               aqc_selector = aqc_selector)
            
-           """
-           while((return_value != 1.0) and (chunk_size_index < len(chunk_size))):
-              return_value, _ = rollout(
-                  env_name, 
-                  specific_train_dataset, 
-                  horizon, 
-                  num_layers = 2,
-                  steps_T = 10, 
-                  num_karras = 1, 
-                  eta = 0.0, 
-                  episode_length = 3000, 
-                  checkpoint_steps = checkpoint, 
-                  render = False,  
-                  base_seed = j, 
-                  #goal_cell = np.array([6, 1], dtype = int), 
-                  task_id = task_id,
-                  continual_rollout = True,
-                  chunk_size = chunk_size[chunk_size_index],
-                  #chunk_size = 1,
-                  device = device)
-              chunk_size_index += 1
-           """
-           return_value, _ = rollout(
-                  env_name, 
-                  specific_train_dataset, 
-                  horizon, 
-                  num_layers = 2,
-                  steps_T = 10, 
-                  num_karras = 1, 
-                  eta = 0.0, 
-                  episode_length = 3000, 
-                  checkpoint_steps = checkpoint, 
-                  render = False,  
-                  base_seed = j, 
-                  #goal_cell = np.array([6, 1], dtype = int), 
-                  task_id = task_id,
-                  continual_rollout = True,
-                  chunk_size = 1,
-                  #chunk_size = 1,
-                  device = device)
-           print(return_value)
-           #print(f"Chunk Size: {chunk_size[chunk_size_index]}")
-           total_return += return_value
-         print(f"Checkpoint: {checkpoint} Success Rate: {total_return / 50 :.4f}")
+           print(f"Seed {j}: success={success}, chunk sizes used: {chunk_stats.get('chunk_size_distribution', {})}")
+           total_success += success
+         print(f"Checkpoint: {checkpoint} Success Rate: {total_success / 50 :.4f}")
          checkpoint += 3
 
 
-    
 
-    
 
 
 

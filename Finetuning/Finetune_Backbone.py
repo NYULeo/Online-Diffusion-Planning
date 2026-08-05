@@ -8,7 +8,7 @@ from gymnasium.vector import AsyncVectorEnv
 from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs, check_Critic, get_kernel, get_new_critic_stats, load_success_trajs
 #from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
 #from Finetuning.traj_reward2 import RewardConfig, TotalReward, TotalReward_Critic
-from Finetuning.traj_reward4 import RewardConfig, TotalReward, TotalReward_Critic
+from Finetuning.traj_reward3 import RewardConfig, TotalReward, TotalReward_Critic
 from adjoint_matching import AdjointMatchingFineTuner, AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
 #from AM import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
