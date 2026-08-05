@@ -47,7 +47,7 @@ import torch.nn.functional as F
 from Rewards.Reward_Backbone import get_pretrained_reward, get_pretrained_reward_stats
 from Dataset import get_dataset
 from Rewards.nets import Reward
-from Finetuning.traj_reward import TotalReward
+from Finetuning.traj_reward4 import TotalReward
 from Rewards.Reward_Backbone import Train_Dataset, RewardDataset
 import random
 from Critic.train_critic import get_critic_model, get_critic_stats
