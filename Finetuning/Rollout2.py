@@ -603,36 +603,14 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 90
+    checkpoint = 39
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
-    #selector = Selector(env_name, specific_train_dataset, RConfig, reward_checkpoint = 60, kernel_checkpoint = 60, critic_checkpoint = None)
-    #chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17]
-    chunk_size = [31, 25, 20, 19, 18, 13, 12, 11, 10, 15, 7, 6, 8, 5, 16, 4, 9, 14, 17, 21, 22, 23, 24, 26, 27, 28, 29, 30]
-    chunk_size2 = [4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+    chunk_size2 = [3,4,5,6,7,8]
     total_return = 0.0
-   
-    #print(return_value)
-    return_value, _ = rollout(
-                  env_name, 
-                  specific_train_dataset, 
-                  horizon, 
-                  num_layers = 2,
-                  steps_T = 10, 
-                  num_karras = 1, 
-                  eta = 0.0, 
-                  episode_length = 3000, 
-                  checkpoint_steps = checkpoint, 
-                  render = True,  
-                  base_seed = 1, 
-                  #goal_cell = np.array([6, 1], dtype = int), 
-                  task_id = task_id,
-                  continual_rollout = True,
-                  chunk_size = 30,
-                  device = device)
-    exit()
     
+   
     for i in range(1, 101):
        set_seed(i)
        chunk_size_index = 0
@@ -661,35 +639,6 @@ if __name__ == "__main__":
                 break
        print(return_value)
     print(f"Total return: {total_return / 100 :.4f}")
-    exit()
-    while(checkpoint < 33):
-       print(f"Running checkpoing: {checkpoint}")
-       total_return = 0.0
-       for j in range(1, 51):
-          return_value = 0.0
-          chunk_size_index = 0
-          while((return_value != 1.0) and (chunk_size_index < len(chunk_size))):
-                return_value, _ = rollout(
-                  env_name, 
-                  specific_train_dataset, 
-                  horizon, 
-                  steps_T = 10, 
-                  num_karras = 1, 
-                  eta = 0.0, 
-                  episode_length = 3000, 
-                  checkpoint_steps = checkpoint, 
-                  render = False,  
-                  base_seed = j, 
-                  #goal_cell = np.array([6, 1], dtype = int), 
-                  task_id = task_id,
-                  continual_rollout = True,
-                  chunk_size = chunk_size[chunk_size_index],
-                  device = device)
-                chunk_size_index += 1
-          print(return_value)
-          total_return += return_value
-       print(f"Checkpoint: {checkpoint} Success Rate: {total_return / 50 :.4f}")
-       checkpoint += 3
-    exit()
+    
 
     
