@@ -7,7 +7,7 @@ os.chdir(project_root)
 from Finetune_Backbone import OnlineFinetuner, FinetuningConfig
 from adjoint_matching import AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig
-from traj_reward import RewardConfig
+from traj_reward4 import RewardConfig
 import random
 import numpy as np
 import torch

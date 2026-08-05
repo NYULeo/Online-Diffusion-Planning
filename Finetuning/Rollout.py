@@ -26,7 +26,7 @@ from typing import Optional
 from dataclasses import dataclass
 import time
 from typing import List
-from Finetuning.traj_reward2 import TotalReward_Critic, RewardConfig, TotalReward
+from Finetuning.traj_reward4 import TotalReward_Critic, RewardConfig, TotalReward
 from Pretrain.Planners.Backbone.Sampler import karras_beta_schedule, cosine_beta, clip_actions
 
 
