@@ -626,7 +626,7 @@ if __name__ == "__main__":
                   episode_length = 3000, 
                   checkpoint_steps = checkpoint, 
                   render = False,  
-                  base_seed = 2, 
+                  base_seed = 1, 
                   #goal_cell = np.array([6, 1], dtype = int), 
                   task_id = task_id,
                   continual_rollout = True,
