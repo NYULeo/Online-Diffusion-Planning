@@ -6,7 +6,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=64
 #SBATCH --mem=200G
-#SBATCH --time=09:00:00
+#SBATCH --time=08:00:00
 #SBATCH --job-name=odp_ft
 #SBATCH --output=/projects/bhpx/khu5/ODP/logs/%x-%j.log
 
@@ -51,4 +51,4 @@ accelerate launch --multi_gpu --num_processes=4   finetune_script2.py | tee outp
 
 #rollout / eval -- not in the teammate's list; read-only, runs after training,
 #                  cannot affect any trained weight. Prints "Checkpoint: N Success Rate: X".
-CUDA_VISIBLE_DEVICES=0 python Rollout.py
+CUDA_VISIBLE_DEVICES=0 python Rollout2.py
