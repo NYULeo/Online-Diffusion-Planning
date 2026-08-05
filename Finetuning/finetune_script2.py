@@ -452,7 +452,7 @@ if __name__ == "__main__":
                             hidden_dim = 512,
                             batch_size = 64,
                             #batch_size = 63,
-                            num_steps = 20,
+                            num_steps = 10,
                             warm_up_steps = 1000,
                             warm_up_log_every = 100,
                             lr = 1e-06,
