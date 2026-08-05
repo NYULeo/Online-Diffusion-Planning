@@ -266,7 +266,6 @@ if __name__ == "__main__":
     
 
     """
-    
     env_name = 'cube'
     specific_env = 'double-play'
     task_id = 4
@@ -324,8 +323,6 @@ if __name__ == "__main__":
                             data_conservation = True,
                             momentum = 0.1)
     
-
-
     FTConfig = FinetuningConfig(
         AMConfig = AMConfig, 
         RewardConfig = RWConfig, 
@@ -373,7 +370,6 @@ if __name__ == "__main__":
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
     exit()
-   
    """
 
 
@@ -484,8 +480,8 @@ if __name__ == "__main__":
         finetune_steps = 90,
         finetune_rounds = 30,
         diffusion_steps = 10,
-        karras_percent = 0.1,
-        Loss_Clip_percent = 0.0,
+        karras_percent = 1.0,
+        Loss_Clip_percent = 0.5,
         #finetune_batch_size = 33,
         finetune_batch_size = 32,
         #finetune_batch_size = 16,
