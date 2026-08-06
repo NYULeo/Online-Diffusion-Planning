@@ -7,16 +7,11 @@ import mediapy as media
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-import minari
 import sys
-
-from torch._C import NoneType
-
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 import gymnasium as gym
-import gymnasium_robotics  # registers the envs
 import numpy as np
 import torch
 import pickle
@@ -51,11 +46,8 @@ if __name__ == '__main__':  # pragma: no cover
        step = 0
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
-       
-      
     
        accelerator = Accelerator(mixed_precision='bf16')
-       #accelerator.wait_for_everyone()
        kernel_config = KernelConfig(
                 checkpoint = 0,
                 type_kernel = 'mog',
@@ -99,7 +91,6 @@ if __name__ == '__main__':  # pragma: no cover
       
        accelerator.wait_for_everyone()
        
-       #if accelerator.is_main_process:
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
