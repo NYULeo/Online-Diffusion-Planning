@@ -53,28 +53,6 @@ if __name__ == '__main__':  # pragma: no cover
        trajs = data.get_trajectories()
        
       
-       """
-       mean, std = train_critic_with_reward(trajs,
-                             dataset_name  = env_name,
-                             specific_dataset = specific_env,
-                             reward_hidden_layers = 4,
-                             reward_hidden_dim  = 512,
-                             reward_checkpoint  = 0,
-                             critic_hidden_layers = 4,
-                             critic_hidden_dim  = 512,
-                             batch_size = 256,
-                             num_steps  = 20000,
-                             gamma = 0.99,
-                             lam = 0.95,
-                             horizon = horizon,
-                             lr = 1e-04, 
-                             min_lr = 1e-05, 
-                             tau = 0.005, 
-                             old_step = None,    # from scratch
-                             new_step = step,
-                             momentum = 0.005,   # unused when old_step is None
-                             task_id = task_id)
-      """
     
        accelerator = Accelerator(mixed_precision='bf16')
        #accelerator.wait_for_everyone()
@@ -85,8 +63,8 @@ if __name__ == '__main__':  # pragma: no cover
                 hidden_dim = 514,
                 num_modes = 10,
                 noise_floor = 5e-4,
-                #min_log_prob = -110.0,
-                min_log_prob = -130.0,
+                min_log_prob = -110.0,
+                #min_log_prob = -130.0,
                 oversample = 5,
         )
        
@@ -112,8 +90,7 @@ if __name__ == '__main__':  # pragma: no cover
                                min_lr                 = 1e-05,
                                tau                    = 0.005,
                                steps_T                = 10,
-                               #num_karras             = 1,
-                               num_karras             = 10,
+                               num_karras             = 1,
                                eta                    = 0.0,
                                new_step               = 0,
                                task_id                = task_id,

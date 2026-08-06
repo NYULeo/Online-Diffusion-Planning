@@ -389,16 +389,16 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_env = 'single-play'
     task_id = 4
-    #finetune_buffer_cutoff_length = 100
-    finetune_buffer_cutoff_length = 200
+    finetune_buffer_cutoff_length = 100
+    #finetune_buffer_cutoff_length = 200
     train_buffer_cutoff_length = 200
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = True)
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32, backbone_layers = 2, eta = 0.0)
 
     RWConfig = RewardConfig(
                beta = 1.0, 
-               #min_log_prob = -110.0,
-               min_log_prob = -130.0,
+               min_log_prob = -110.0,
+               #min_log_prob = -130.0,
                quantile = 0.999,
                number_of_generated_plans = 50,
                #max_mahalanobis_score = 100.0,
@@ -449,11 +449,11 @@ if __name__ == "__main__":
                             hidden_dim = 512,
                             batch_size = 64,
                             #batch_size = 63,
-                            num_steps = 10,
+                            num_steps = 20,
                             warm_up_steps = 1000,
                             warm_up_log_every = 100,
-                            #lr = 1e-06,
-                            lr = 1e-08,
+                            lr = 1e-06,
+                            #lr = 1e-08,
                             min_lr = 1e-09,
                             tau = 0.005,
                             gamma = 0.99,
@@ -482,8 +482,8 @@ if __name__ == "__main__":
         finetune_steps = 90,
         finetune_rounds = 30,
         diffusion_steps = 10,
-        #karras_percent = 0.1,
-        karras_percent = 1,
+        karras_percent = 0.1,
+        #karras_percent = 1,
         Loss_Clip_percent = 0.0,
         #finetune_batch_size = 33,
         finetune_batch_size = 32,
