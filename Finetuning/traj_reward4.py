@@ -378,6 +378,7 @@ class TotalReward_Critic(nn.Module):
         for i in range(H-1):
             s = x[i][:self.config.d_s]
             a = x[i][self.config.d_s:].unsqueeze(0)
+            #a = torch.clamp(a, -1.0, 1.0)
             s_next = x[i+1][:self.config.d_s]
             s_norm_kernel = self.kernel_processor(s).unsqueeze(0)
             s_next_norm_kernel = self.kernel_processor(s_next).unsqueeze(0)
