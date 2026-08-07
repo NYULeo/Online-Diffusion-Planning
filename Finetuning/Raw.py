@@ -77,7 +77,5 @@ def check_cube_double_goal_reach(trajs, task_id):
 
 
 
-data= get_dataset('cube', 'single-play', task_id = 4, traj_length = None)
-trajs= data.get_trajectories()
 
 
