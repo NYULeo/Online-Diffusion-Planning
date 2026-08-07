@@ -7,8 +7,8 @@ from utils import AlphaSchedulerConfig
 from Finetune_Backbone3 import OnlineFinetuner, FinetuningConfig, Train_Critic_Config, Train_Kernel_Config, Train_Reward_Config
 from adjoint_matching import AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig
-from traj_reward4 import RewardConfig
-#from traj_reward5 import RewardConfig
+#from traj_reward4 import RewardConfig
+from traj_reward5 import RewardConfig
 import random
 import numpy as np
 import torch
@@ -362,7 +362,8 @@ if __name__ == "__main__":
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
         #reward_scaling_factor = 50,
-        reward_scaling_factor = 150,
+        reward_scaling_factor = 30,
+        #reward_scaling_factor = 150,
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value
