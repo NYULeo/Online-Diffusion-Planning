@@ -6,8 +6,8 @@ os.chdir(project_root)
 from dataclasses import dataclass
 from gymnasium.vector import AsyncVectorEnv
 from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs, check_Critic, get_kernel, get_new_critic_stats, load_success_trajs, KernelConfig, train_critic_with_planner2, train_critic_with_planner4, train_critic_with_planner5
-#from Finetuning.traj_reward4 import RewardConfig, TotalReward, TotalReward_Critic
-from Finetuning.traj_reward5 import RewardConfig, TotalReward, TotalReward_Critic
+from Finetuning.traj_reward4 import RewardConfig, TotalReward, TotalReward_Critic
+#from Finetuning.traj_reward5 import RewardConfig, TotalReward, TotalReward_Critic
 from adjoint_matching import AdjointMatchingFineTuner, AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
 from Finetuning.Rollout import rollout

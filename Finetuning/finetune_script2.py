@@ -7,8 +7,8 @@ from utils import AlphaSchedulerConfig
 from Finetune_Backbone3 import OnlineFinetuner, FinetuningConfig, Train_Critic_Config, Train_Kernel_Config, Train_Reward_Config
 from adjoint_matching import AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig
-#from traj_reward4 import RewardConfig
-from traj_reward5 import RewardConfig
+from traj_reward4 import RewardConfig
+#from traj_reward5 import RewardConfig
 import random
 import numpy as np
 import torch
@@ -257,8 +257,8 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_env = 'single-play'
     task_id = 4
-    #finetune_buffer_cutoff_length = 100
-    finetune_buffer_cutoff_length = 500
+    finetune_buffer_cutoff_length = 100
+    #finetune_buffer_cutoff_length = 500
     train_buffer_cutoff_length = 200
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = True)
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32, backbone_layers = 2, eta = 0.0)
@@ -377,102 +377,7 @@ if __name__ == "__main__":
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
 
-     #Trump
-    """
-    env_name = 'ogpointmaze'
-    specific_env = 'medium'
-    task_id = 1
-    finetune_buffer_cutoff_length = None
-    train_buffer_cutoff_length = None
-    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.01, total_steps = 300, decay = False)
-    AMConfig = Acc_AdjointMatchingConfig(horizon = 80, eta = 0.2)
-
-    RWConfig = RewardConfig(
-               beta = 1.0, 
-               min_log_prob = 5.0,
-               #max_mahalanobis_score = 100.0,
-               critic_gamma = 1.0,
-               explore = False) 
-  
-    TrainRewardConfig = Train_Reward_Config(
-                          hidden_layers = 1,
-                          hidden_dim = 32,
-                          batch_size = 256, 
-                          num_steps = 12000, 
-                          lr = 1e-04,
-                          min_lr = 1e-04,
-                          sigma = 7.0, 
-                          target_reward = 50.0, 
-                          train_goal = None,
-                          task_id = task_id)
-      
-    TrainKernelConfig = Train_Kernel_Config(
-                            batch_size = 256, 
-                            num_steps = 1000,
-                            lr = 3e-4,
-                            ensemble_size = 10,
-                            num_hidden_layers = 2,
-                            hidden_dim = 256,
-                            type_kernel = 'robust',
-                            λ_reg = 1e-3)
     
-    TrainCriticConfig = Train_Critic_Config(
-                            hidden_layers = 4,
-                            hidden_dim = 512,
-                            batch_size = 256,
-                            num_steps = 5000,
-                            lr = 1e-05,
-                            min_lr = 1e-06,
-                            tau = 0.005,
-                            gamma = 0.99,
-                            data_conservation = True,
-                            momentum = 1.0)
-    
-    FTConfig = FinetuningConfig(
-        AMConfig = AMConfig, 
-        RewardConfig = RWConfig, 
-        AlphaConfig = AlphaConfig,
-        dataset_name = env_name,
-        specific_dataset = specific_env,
-        planner_checkpoint = 0,
-        reward_model_checkpoint = 0,
-        kernel_model_checkpoint = 0,
-        critic_model_checkpoint = 0,
-        offline = True,
-        critic = False,
-        update_critic = False,
-        kernel = False,
-        update_kernel = False,
-        buffer_size = 20000,
-        finetune_buffer_cutoff_length = finetune_buffer_cutoff_length,
-        train_buffer_cutoff_length = train_buffer_cutoff_length,
-        finetune_steps = 300,
-        finetune_rounds = 30,
-        diffusion_steps = 20,
-        karras_percent = 0.1,
-        Loss_Clip_percent = 0.75,
-        finetune_batch_size = 12,
-        finetune_batch_per_sample = 3,
-        finetune_lr = 2e-05,
-        initial_lam = 0.05,
-        eta_lam = 0.5,
-        gradient_accumulate_every = 1,
-        update_lambda_every = 1,
-        reward_scaling_factor = 50,
-        MaxEnt = False,
-        Entropy_Scaling_Factor = 0.5,
-        rollout_length = 4000,  # or your desired value
-        rollout_num_envs = 1, 
-        continual_rollout = True,
-        chunk_size = 79,
-        num_rollout_processes = 8,
-        train_reward_config = TrainRewardConfig,
-        train_kernel_config = TrainKernelConfig,
-        train_critic_config = TrainCriticConfig) 
-    set_seed(1)
-    OnlineFinetuner = OnlineFinetuner(FTConfig)
-    OnlineFinetuner.finetune_planner()
-    """
     
 
     """
