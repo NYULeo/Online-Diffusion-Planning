@@ -7,16 +7,11 @@ import mediapy as media
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-import minari
 import sys
-
-from torch._C import NoneType
-
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 import gymnasium as gym
-import gymnasium_robotics  # registers the envs
 import numpy as np
 import torch
 import pickle
@@ -76,52 +71,6 @@ if __name__ == '__main__':  # pragma: no cover
                              momentum = 0.005,   # unused when old_step is None
                              task_id = task_id)
       
-       """
-       accelerator = Accelerator(mixed_precision='bf16')
-       #accelerator.wait_for_everyone()
-       kernel_config = KernelConfig(
-                checkpoint = 0,
-                type_kernel = 'mog',
-                num_hidden_layers = 4,
-                hidden_dim = 514,
-                num_modes = 10,
-                noise_floor = 5e-4,
-                min_log_prob = -110.0,
-                oversample = 5,
-        )
-       
-       mean, std = train_critic_with_planner4(
-                               trajs                  = trajs,
-                               dataset_name           = env_name,
-                               specific_dataset       = specific_env,
-                               planner_checkpoint     = 0,
-                               reward_checkpoint      = 0,
-                               old_critic_checkpoint  = 0,
-                               backbone_layers        = 2,
-                               hidden_layers          = 4,
-                               hidden_dim             = 512,
-                               kernel_config          = kernel_config,
-                               reward_hidden_layers   = 4,
-                               reward_hidden_dim      = 512,
-                               batch_size             = 64,
-                               num_steps              = 1000,
-                               horizon                = 32,
-                               gamma                  = 0.99,
-                               lam                    = 0.95,
-                               lr                     = 1e-06,
-                               min_lr                 = 1e-09,
-                               tau                    = 0.005,
-                               steps_T                = 10,
-                               num_karras             = 1,
-                               eta                    = 0.0,
-                               new_step               = 0,
-                               task_id                = task_id,
-                               log_every              = 100,
-                               accelerator            = accelerator) 
-      
-       accelerator.wait_for_everyone()
-       """
-       #if accelerator.is_main_process:
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 

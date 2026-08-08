@@ -23,9 +23,7 @@ import gymnasium_robotics
 from Pretrain.Dataset import get_dataset
 from gymnasium.wrappers import TimeLimit
 from typing import Optional, List
-#from utils import get_normalized_score, rollout_parallel3, get_current_state, get_trajs, spare_reward_prcocessor, compute_threshold_log_prob_mog, compute_threshold_mahalanobis_mog
 from dataclasses import dataclass
-import time
 from typing import List
 from Finetuning.traj_reward4 import TotalReward_Critic, RewardConfig, TotalReward
 class Selector():
@@ -603,14 +601,13 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 39
+    checkpoint = 81
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
-    chunk_size2 = [3,4,5,6,7,8]
+    chunk_size2 = [3,4,5,6]
     total_return = 0.0
     
-   
     for i in range(1, 101):
        set_seed(i)
        chunk_size_index = 0
