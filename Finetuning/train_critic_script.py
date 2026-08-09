@@ -36,7 +36,7 @@ import random
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
       
-       
+       """
        env_name = 'cube'
        specific_env = 'single-play'
        traj_length = 200
@@ -87,10 +87,10 @@ if __name__ == '__main__':  # pragma: no cover
             trajs = trajs,
             task_id = task_id)
 
-
-
-
 """
+
+
+
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        
@@ -119,8 +119,8 @@ if __name__ == '__main__':  # pragma: no cover
                              gamma = 0.99,
                              lam = 0.95,
                              horizon = horizon,
-                             lr = 1e-07, 
-                             min_lr = 1e-08, 
+                             lr = 1e-04, 
+                             min_lr = 1e-05, 
                              tau = 0.005, 
                              old_step = None,    # from scratch
                              new_step = step,
@@ -129,50 +129,7 @@ if __name__ == '__main__':  # pragma: no cover
     
        
        
-       accelerator = Accelerator(mixed_precision='bf16')
-       #accelerator.wait_for_everyone()
-       kernel_config = KernelConfig(
-                checkpoint = 0,
-                type_kernel = 'mog',
-                num_hidden_layers = 4,
-                hidden_dim = 514,
-                num_modes = 10,
-                noise_floor = 5e-4,
-                min_log_prob = -170.0,
-                oversample = 5,
-        )
        
-       
-       mean, std = train_critic_with_planner4(
-                               trajs                  = trajs,
-                               dataset_name           = env_name,
-                               specific_dataset       = specific_env,
-                               planner_checkpoint     = 0,
-                               reward_checkpoint      = 0,
-                               old_critic_checkpoint  = 0,
-                               backbone_layers        = 4,
-                               hidden_layers          = 4,
-                               hidden_dim             = 512,
-                               kernel_config          = kernel_config,
-                               reward_hidden_layers   = 4,
-                               reward_hidden_dim      = 512,
-                               batch_size             = 64,
-                               num_steps              = 1000,
-                               horizon                = 32,
-                               gamma                  = 0.99,
-                               lam                    = 0.95,
-                               lr                     = 1e-07,
-                               min_lr                 = 1e-10,
-                               tau                    = 0.005,
-                               steps_T                = 10,
-                               num_karras             = 1,
-                               eta                    = 0.0,
-                               new_step               = 0,
-                               task_id                = task_id,
-                               log_every              = 100,
-                               accelerator            = accelerator) 
-      
-       accelerator.wait_for_everyone()
     
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
@@ -184,12 +141,13 @@ if __name__ == '__main__':  # pragma: no cover
             std = None,
             gamma = 0.99, 
             horizon = horizon,  
-            sigma = 6.0, 
-            #sigma = None,
-            target_reward = 800.0, 
+            #sigma = 6.0, 
+            sigma = None,
+            #target_reward = 800.0, 
+            target_reward = None, 
             trajs = trajs,
             task_id = task_id)
-"""
+
 
     
 

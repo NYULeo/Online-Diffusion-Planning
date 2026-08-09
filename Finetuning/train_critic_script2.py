@@ -33,7 +33,7 @@ from Pretrain.utils import set_seed
 from accelerate import Accelerator
 import random 
 
-
+"""
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
       
@@ -108,9 +108,9 @@ if __name__ == '__main__':  # pragma: no cover
             task_id = task_id)
 
 
-
-
 """
+
+
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        
@@ -125,27 +125,7 @@ if __name__ == '__main__':  # pragma: no cover
        trajs = data.get_trajectories()
        
        
-       
-       mean, std = train_critic_with_reward(trajs,
-                             dataset_name  = env_name,
-                             specific_dataset = specific_env,
-                             reward_hidden_layers = 4,
-                             reward_hidden_dim  = 512,
-                             reward_checkpoint  = 0,
-                             critic_hidden_layers = 4,
-                             critic_hidden_dim  = 512,
-                             batch_size = 256,
-                             num_steps  = 20000,
-                             gamma = 0.99,
-                             lam = 0.95,
-                             horizon = horizon,
-                             lr = 1e-07, 
-                             min_lr = 1e-08, 
-                             tau = 0.005, 
-                             old_step = None,    # from scratch
-                             new_step = step,
-                             momentum = 0.005,   # unused when old_step is None
-                             task_id = task_id)
+      
        
        
        
@@ -177,19 +157,19 @@ if __name__ == '__main__':  # pragma: no cover
                                reward_hidden_layers   = 4,
                                reward_hidden_dim      = 512,
                                batch_size             = 64,
-                               num_steps              = 1000,
+                               num_steps              = 100,
                                horizon                = 32,
                                gamma                  = 0.99,
                                lam                    = 0.95,
-                               lr                     = 1e-07,
-                               min_lr                 = 1e-10,
+                               lr                     = 1e-04,
+                               min_lr                 = 1e-05,
                                tau                    = 0.005,
                                steps_T                = 10,
                                num_karras             = 1,
                                eta                    = 0.0,
                                new_step               = 0,
                                task_id                = task_id,
-                               log_every              = 100,
+                               log_every              = 10,
                                accelerator            = accelerator) 
       
        accelerator.wait_for_everyone()
@@ -204,13 +184,14 @@ if __name__ == '__main__':  # pragma: no cover
             std = None,
             gamma = 0.99, 
             horizon = horizon,  
-            sigma = 6.0, 
-            #sigma = None,
-            target_reward = 800.0, 
+            #sigma = 6.0, 
+            sigma = None,
+            #target_reward = 800.0, 
+            target_reward = None, 
             trajs = trajs,
             task_id = task_id)
 
-"""
+
     
 
 
