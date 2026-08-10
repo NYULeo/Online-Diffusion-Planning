@@ -77,5 +77,3 @@ def check_cube_double_goal_reach(trajs, task_id):
 
 
 
-
-

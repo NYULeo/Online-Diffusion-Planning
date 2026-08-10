@@ -108,7 +108,7 @@ if __name__ == '__main__':
                  #sigma  = 6.0,
                  sigma = None,
                  alpha = None, 
-                 target_reward = None,
+                 target_reward = 10.0,
                  specific_dataset = specific_dataset, 
                  task_id = task_id, 
                  traj_length = traj_length)
@@ -124,7 +124,7 @@ if __name__ == '__main__':
                #sigma = 6.0, 
                sigma = None,
                alpha = None, 
-               target_reward = None, 
+               target_reward = 10.0, 
                task_id = task_id,
                traj_length = traj_length, 
                save_freq = 30000, 
