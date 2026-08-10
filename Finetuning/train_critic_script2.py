@@ -185,7 +185,7 @@ if __name__ == '__main__':  # pragma: no cover
             gamma = 0.99, 
             horizon = horizon,  
             #sigma = 6.0, 
-            sigma = None,
+            sigma = 3.0,
             target_reward = 10.0, 
             #target_reward = None, 
             trajs = trajs,
