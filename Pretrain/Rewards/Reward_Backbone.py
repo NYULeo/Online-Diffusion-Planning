@@ -510,7 +510,8 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
               raise ValueError(f"Invalid dataset name: {specific_dataset}")
          obs_dim = data_1.get_state_dim()
          act_dim = data_1.get_action_dim()
-         trajs = data_1.get_trajectories() + data_2.get_trajectories()
+         #trajs = data_1.get_trajectories() + data_2.get_trajectories()
+         trajs = data_1.get_trajectories() 
          #trajs = make_reward_increase(trajs)
          return trajs, name, obs_dim, act_dim
     

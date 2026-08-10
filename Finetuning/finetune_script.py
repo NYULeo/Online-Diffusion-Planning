@@ -152,7 +152,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_env = 'double-play'
     task_id = 4
-    finetune_buffer_cutoff_length = 500
+    finetune_buffer_cutoff_length = 900
     train_buffer_cutoff_length = 500
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = True)
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32, backbone_layers = 4, eta = 0.0)

@@ -282,7 +282,7 @@ if __name__ == "__main__":
                           min_lr = 5e-04,
                           #sigma = 4.0, 
                           sigma = None,
-                          target_reward = 500.0, 
+                          target_reward = None, 
                           train_goal = None,
                           task_id = task_id)
       
