@@ -981,7 +981,7 @@ class SceneDataset_Singletask:
                 else:
                     index = 0
                 
-            
+               
                 if len(act_slice) < 10:
                     last_start = i + 1
                     continue

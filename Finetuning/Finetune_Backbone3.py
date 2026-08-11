@@ -763,7 +763,7 @@ class OnlineFinetuner():
                                eta                    = self.config.AMConfig.eta,
                                new_step               = ((step+1) * self.config.AMConfig.per_round_steps),
                                task_id                = self.config.train_reward_config.task_id,
-                               log_every              = 5,
+                               log_every              = 3,
                                accelerator            = self.accelerator)
                 print(f"Finetuning round {step+1} completed")
                 print()
