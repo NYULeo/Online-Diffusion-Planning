@@ -2989,8 +2989,8 @@ class CriticDataset_Reward(Dataset):
                 #a_t = torch.clamp(a_t, -1.0, 1.0)
                 rews = reward_net(s_t, a_t).cpu().numpy().astype(np.float32)   # (T_traj,)  
                 # Scale down predicted rewards from reward model
-                rews = np.clip(rews, -20.0, 20.0)      # adjust bounds if needed
-                rews = rews / 5.0                      # or use a running std
+                #rews = np.clip(rews, -20.0, 20.0)      # adjust bounds if needed
+                #rews = rews / 5.0                      # or use a running std
             
             for t in range(len(obs) - horizon):
                  obs_chunk = self.stats.norm_obs(obs[t : t + horizon]).astype(np.float32)
@@ -4443,8 +4443,8 @@ def train_critic_with_planner4(
             ).reshape(N, n)  # (N, n)
              
             # reward clipping -----------------------------------------------------
-            r_hat = torch.clamp(r_hat, -20.0, 20.0)
-            r_hat = r_hat / 5.0
+            #r_hat = torch.clamp(r_hat, -20.0, 20.0)
+            #r_hat = r_hat / 5.0
 
             # ---------------------------------------------------------------
             # New multi-horizon average target for every plan:

@@ -1,6 +1,7 @@
 import chunk
 import sys
 import os
+from tarfile import LENGTH_PREFIX
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -598,16 +599,16 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
     horizon = 32
-    env_name = 'cube'
-    specific_train_dataset = 'double-play'
+    env_name = 'scene'
+    specific_train_dataset = 'play'
     task_id = 4
-    checkpoint = 39
+    checkpoint = 0
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
     chunk_size2 = [3,4,5,6]
     total_return = 0.0
-    return_value, _ = rollout(
+    return_value, length = rollout(
                   env_name, 
                   specific_train_dataset, 
                   horizon, 
@@ -622,8 +623,9 @@ if __name__ == "__main__":
                   #goal_cell = np.array([6, 1], dtype = int), 
                   task_id = task_id,
                   continual_rollout = True,
-                  chunk_size = 5,
+                  chunk_size = 31,
                   device = device)
+    print(length)
     exit()
     for i in range(1, 101):
        set_seed(i)
