@@ -195,7 +195,7 @@ if __name__ == "__main__":
                             hidden_layers = 4,
                             hidden_dim = 512,
                             batch_size = 64,
-                            num_steps = 20,
+                            num_steps = 3,
                             warm_up_steps = 1000,
                             warm_up_log_every = 100,
                             lr = 1e-06,
