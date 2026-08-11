@@ -157,21 +157,20 @@ if __name__ == '__main__':  # pragma: no cover
                                reward_hidden_layers   = 4,
                                reward_hidden_dim      = 512,
                                batch_size             = 64,
-                               num_steps              = 50,
+                               num_steps              = 100,
                                horizon                = 32,
                                gamma                  = 0.99,
                                lam                    = None,
                                lr                     = 1e-04,
-                               min_lr                 = 1e-05,
+                               min_lr                 = 1e-06,
                                tau                    = 0.005,
                                steps_T                = 10,
                                num_karras             = 1,
                                eta                    = 0.0,
                                new_step               = 0,
                                task_id                = task_id,
-                               log_every              = 10,
+                               log_every              = 20,
                                accelerator            = accelerator) 
-      
        accelerator.wait_for_everyone()
        
        trajs = data.get_trajectories()
