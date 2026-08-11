@@ -599,15 +599,16 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
     horizon = 32
-    env_name = 'scene'
-    specific_train_dataset = 'play'
+    env_name = 'cube'
+    specific_train_dataset = 'double-play'
     task_id = 4
-    checkpoint = 0
+    checkpoint = 48
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
     chunk_size2 = [3,4,5,6]
     total_return = 0.0
+    set_seed(3)
     return_value, length = rollout(
                   env_name, 
                   specific_train_dataset, 
@@ -623,9 +624,8 @@ if __name__ == "__main__":
                   #goal_cell = np.array([6, 1], dtype = int), 
                   task_id = task_id,
                   continual_rollout = True,
-                  chunk_size = 31,
+                  chunk_size = 15,
                   device = device)
-    print(length)
     exit()
     for i in range(1, 101):
        set_seed(i)
