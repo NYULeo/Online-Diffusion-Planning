@@ -24,7 +24,7 @@ from Finetuning.utils import (
     train_critic_with_planner,
     train_critic_with_planner3,
     train_critic_with_planner4,
-    train_critic_with_planner5,
+    train_critic_with_planner6,
     train_critic,
     test_critic,
     KernelConfig,
@@ -143,7 +143,7 @@ if __name__ == '__main__':  # pragma: no cover
         )
        
        
-       mean, std = train_critic_with_planner4(
+       mean, std = train_critic_with_planner6(
                                trajs                  = trajs,
                                dataset_name           = env_name,
                                specific_dataset       = specific_env,
@@ -161,6 +161,7 @@ if __name__ == '__main__':  # pragma: no cover
                                horizon                = 32,
                                gamma                  = 0.99,
                                lam                    = None,
+                               rho                    = 1.0,
                                lr                     = 1e-04,
                                min_lr                 = 1e-06,
                                tau                    = 0.005,
