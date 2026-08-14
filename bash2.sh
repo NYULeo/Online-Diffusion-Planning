@@ -9,7 +9,7 @@ cd Online-Diffusion-Planning/Pretrain
 # CUDA_VISIBLE_DEVICES=0 python pretrain_script4.py 2>&1 | tee "$LOGDIR/1_pretrain.log"
 
 #train reward
-CUDA_VISIBLE_DEVICES=0 python train_reward_script.py 2>&1 | tee "$LOGDIR/2_reward.log"
+# CUDA_VISIBLE_DEVICES=0 python train_reward_script.py 2>&1 | tee "$LOGDIR/2_reward.log"
 
 #train kernel
 # CUDA_VISIBLE_DEVICES=0 python train_kernel_script.py 2>&1 | tee "$LOGDIR/3_kernel.log"
