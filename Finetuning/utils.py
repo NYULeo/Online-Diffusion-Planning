@@ -5443,6 +5443,10 @@ def train_critic_with_planner6(
                 actions[:, :n].reshape(N * n, -1),
             ).reshape(N, n)  # (N, n)
 
+             # reward clipping -----------------------------------------------------
+            r_hat = torch.clamp(r_hat, -20.0, 20.0)
+            r_hat = r_hat / 5.0
+
             plan_targets = torch.zeros(N, device=device)
 
             if lam is not None:
