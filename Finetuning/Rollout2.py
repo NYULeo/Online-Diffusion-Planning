@@ -26,30 +26,68 @@ from typing import Optional, List
 from dataclasses import dataclass
 from typing import List
 from Finetuning.traj_reward4 import TotalReward_Critic, RewardConfig, TotalReward
-class Selector():
-    def __init__(self, env_name, specific_env, RConfig: RewardConfig, reward_checkpoint: int, kernel_checkpoint: Optional[int] = None, critic_checkpoint: Optional[int] = None):
-         self.env_name = env_name
-         self.specific_env = specific_env
-         self.RConfig = RConfig
-         self.reward_checkpoint = reward_checkpoint
-         self.kernel_checkpoint = kernel_checkpoint
-         self.critic_checkpoint = critic_checkpoint
-         self.device = check_device()
-         self.lam = 0.0
-         if(critic_checkpoint is not None):
-            self.model = TotalReward_Critic(self.device, RConfig, env_name, specific_env, self.reward_checkpoint, self.kernel_checkpoint, self.critic_checkpoint)
-         else:
-            self.model = TotalReward(self.device, RConfig, env_name, specific_env, self.reward_checkpoint, self.kernel_checkpoint)
-         self.model.eval()
-    
+
+
+class Selector:
+    def __init__(
+        self,
+        env_name,
+        specific_env,
+        RConfig: RewardConfig,
+        reward_checkpoint: int,
+        kernel_checkpoint: int,
+        critic_checkpoint: Optional[int] = None,
+        task_id: Optional[int] = None,
+        lam: float = 0.0,
+        n_candidates: int = 30,
+    ):
+        self.env_name = env_name
+        self.specific_env = specific_env
+        self.RConfig = RConfig
+        self.task_id = task_id
+        self.lam = lam
+        self.n_candidates = n_candidates
+        self.device = check_device()
+
+        if critic_checkpoint is not None:
+            self.model = TotalReward_Critic(
+                self.device,
+                RConfig,
+                env_name,
+                specific_env,
+                reward_checkpoint,
+                kernel_checkpoint,
+                critic_checkpoint,
+                task_id,
+            )
+        else:
+            self.model = TotalReward(
+                self.device,
+                RConfig,
+                env_name,
+                specific_env,
+                reward_checkpoint,
+                kernel_checkpoint,
+                task_id,
+            )
+        self.model.eval()
+
     def select_plan(self, plans: List[np.ndarray]) -> np.ndarray:
-         rewards = []
-         with torch.no_grad():
+        if len(plans) == 0:
+            raise ValueError("select_plan received an empty plan list")
+
+        rewards = []
+        with torch.no_grad():
             for plan in plans:
-             plan_tensor = torch.from_numpy(plan).float().to(self.device) 
-             reward = self.model.predict(plan_tensor, self.lam)
-             rewards.append(reward.item())
-         return plans[rewards.index(max(rewards))].copy()
+                if isinstance(plan, torch.Tensor):
+                    plan_tensor = plan.detach().float().to(self.device)
+                else:
+                    plan_np = np.ascontiguousarray(plan, dtype=np.float32)
+                    plan_tensor = torch.from_numpy(plan_np).to(self.device)
+                reward = self.model.predict(plan_tensor, self.lam)
+                rewards.append(float(reward.detach().cpu()))
+
+        return np.asarray(plans[int(np.argmax(rewards))], dtype=np.float32).copy()
 
 def check(env):
     print("Reward type:", getattr(env, 'reward_type', 'Not found'))
@@ -420,9 +458,10 @@ def rollout(env_name,
                      if(selector is None):
                          x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                      else:
-                         Plans = []
-                         for j in range(30):
-                              Plans.append(sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device))
+                         Plans = [
+                               sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                               for _ in range(selector.n_candidates)
+                            ]
                          x = selector.select_plan(Plans)
                      for k in range(min(chunk_size, len(x))):
                          Temp_acts.append(x[k, d_s:(d_s+d_a)].copy())
@@ -466,10 +505,15 @@ def rollout(env_name,
            rewards.append(reward)
            #current_state = obs['observation'].copy()
            #print(f"Episode {i} reward: {reward}")
+           """
            if(terminated or truncated):
-                #print(f"Episode {i} terminated or truncated")
                 break
-     
+           """
+           
+           if(terminated):
+                break
+           
+        
      env.close()
 
      
@@ -601,39 +645,77 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'double-play'
     task_id = 4
-    checkpoint = 39
+    checkpoint = 90
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
     chunk_size2 = [3,4,5,6]
     total_return = 0.0
-    return_value, _ = rollout(
+    
+    
+    set_seed(1)
+    
+    RConfig = RewardConfig(
+                    beta=1.0,
+                    min_log_prob=-170.0,
+                    quantile=0.999,
+                    critic_gamma=0.99,
+                    explore=False,
+                    type_kernel='mog',
+                    kernel_num_modes=10,
+                    kernel_noise_floor=5e-4,
+                    num_hidden_layers_kernel=4,
+                    hidden_dim_kernel=514,
+                    num_hidden_layers_reward=4,
+                    hidden_dim_reward=512,
+                    num_hidden_layers_critic=4,
+                    hidden_dim_critic=512,
+            )
+
+    selector = Selector(
+                env_name,
+                specific_train_dataset,
+                RConfig,
+                reward_checkpoint=0,
+                kernel_checkpoint=0,
+                critic_checkpoint=24,   # omit or None to use TotalReward only
+                task_id=task_id,
+                lam=0.0,
+                n_candidates=30,
+            )
+
+
+
+    return_value, length = rollout(
+            env_name,
+            specific_train_dataset,
+            horizon,
+            num_layers=4,
+            steps_T=10,
+            num_karras=1,
+            eta=0.0,
+            episode_length=5000,
+            checkpoint_steps=checkpoint,
+            render=True,
+            base_seed=1,
+            task_id=task_id,
+            continual_rollout=True,
+            chunk_size=25,
+            device=device,
+            selector=selector,
+        )
+    #print(length)
+    exit()
+
+    for i in range(1, 101):
+       set_seed(i)
+       chunk_size_index = 0
+       #while(chunk_size_index < len(chunk_size2)):
+       return_value, _ = rollout(
                   env_name, 
                   specific_train_dataset, 
                   horizon, 
                   num_layers = 4,
-                  steps_T = 10, 
-                  num_karras = 1, 
-                  eta = 0.0, 
-                  episode_length = 3000, 
-                  checkpoint_steps = checkpoint, 
-                  render = True,  
-                  base_seed = 1, 
-                  #goal_cell = np.array([6, 1], dtype = int), 
-                  task_id = task_id,
-                  continual_rollout = True,
-                  chunk_size = 25,
-                  device = device)
-    exit()
-    for i in range(1, 101):
-       set_seed(i)
-       chunk_size_index = 0
-       while(chunk_size_index < len(chunk_size2)):
-           return_value, _ = rollout(
-                  env_name, 
-                  specific_train_dataset, 
-                  horizon, 
-                  num_layers = 2,
                   steps_T = 10, 
                   num_karras = 1, 
                   eta = 0.0, 
@@ -644,13 +726,15 @@ if __name__ == "__main__":
                   #goal_cell = np.array([6, 1], dtype = int), 
                   task_id = task_id,
                   continual_rollout = True,
-                  chunk_size = chunk_size2[chunk_size_index],
+                  chunk_size = 20,
                   device = device)
-           chunk_size_index += 1
+           #chunk_size_index += 1
+       """
            if(return_value == 1.0):
                 print(f"chunk_size: {chunk_size2[chunk_size_index-1]}")
                 total_return += 1
                 break
+       """
        print(return_value)
     print(f"Total return: {total_return / 100 :.4f}")
     

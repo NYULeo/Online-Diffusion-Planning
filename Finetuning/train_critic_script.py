@@ -36,7 +36,7 @@ import random
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
       
-       """
+       
        env_name = 'cube'
        specific_env = 'single-play'
        traj_length = 200
@@ -87,10 +87,10 @@ if __name__ == '__main__':  # pragma: no cover
             trajs = trajs,
             task_id = task_id)
 
+
+
+
 """
-
-
-
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        
@@ -148,7 +148,7 @@ if __name__ == '__main__':  # pragma: no cover
             trajs = trajs,
             task_id = task_id)
 
-
+"""
     
 
 

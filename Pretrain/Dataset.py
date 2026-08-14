@@ -106,7 +106,7 @@ def reward_processor(rewards, name: str):
 
 
     if(name in ('cube', 'ogpointmaze', 'antmaze', 'humanoidmaze', 'puzzle', 'scene')):
-         #rewards = ogbench_reward_processor(rewards)
+         rewards = ogbench_reward_processor(rewards)
          #rewards = mode_reward_processor(rewards)
          return rewards
     else:
@@ -1427,142 +1427,9 @@ class PlannerDataset_Rollout(Dataset):
 
 
 
-#env, d_s, d_a = get_env('antmaze', 'medium_play')
-#data = PlannerDataset('antmaze', 'medium_play', 40, d_s, d_a)
-"""
-vectors = []
-data = get_dataset('kitchen', 'partial')
-trajs = data.get_trajectories()
-for traj in trajs:
-     for i in range(len(traj['rewards'])):
-         if(traj['rewards'][i] == 1):
-             vectors.append(traj['observations'][i])
-vectors = np.array(vectors)
 
 
 
-import numpy as np
-from sklearn.cluster import KMeans
-from scipy.spatial.distance import cdist
-
-def verify_four_clusters(vectors):
-   
-    vectors = np.array(vectors)
-    
-    # Fit K-means with 4 clusters
-    kmeans = KMeans(n_clusters=4, random_state=42, n_init=10)
-    assignments = kmeans.fit_predict(vectors)
-    
-    # Compute distances to assigned cluster centers
-    centers = kmeans.cluster_centers_
-    distances = cdist(vectors, centers, metric='euclidean')
-    min_distances = distances[np.arange(len(vectors)), assignments]
-    
-    # Inertia (within-cluster sum of squares)
-    inertia = kmeans.inertia_
-    
-    stats = {
-        'inertia': inertia,
-        'mean_distance_to_center': np.mean(min_distances),
-        'max_distance_to_center': np.max(min_distances),
-        'cluster_counts': np.bincount(assignments, minlength=4),
-        'cluster_percentages': np.bincount(assignments, minlength=4) / len(vectors) * 100,
-        'cluster_centers': centers
-    }
-    
-    return kmeans, assignments, centers, stats
 
 
-# Usage:
-kmeans, assignments, centers, stats = verify_four_clusters(vectors)
-
-
-import sklearn
-print(f"Cluster distribution: {stats['cluster_counts']}")
-print(f"Cluster percentages: {stats['cluster_percentages']}")
-print(f"Inertia (within-cluster sum of squares): {stats['inertia']:.4f}")
-print(f"Mean distance to center: {stats['mean_distance_to_center']:.4f}")
-print(f"Max distance to center: {stats['max_distance_to_center']:.4f}")
-print(f"\nCluster centers:\n{stats['cluster_centers']}")
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-from sklearn.decomposition import PCA
-from sklearn.cluster import KMeans
-
-def visualize_clusters(vectors, assignments, cluster_centers, title_prefix=""):
-   
-    vectors = np.array(vectors)
-    n_clusters = len(cluster_centers)
-    colors = cm.get_cmap('tab10')(np.linspace(0, 1, n_clusters))
-    
-    # 1. 2D PCA plot
-    pca_2d = PCA(n_components=2)
-    vectors_2d = pca_2d.fit_transform(vectors)
-    centers_2d = pca_2d.transform(cluster_centers)
-    
-    fig, axes = plt.subplots(2, 2, figsize=(14, 12))
-    
-    # 2D scatter
-    ax = axes[0, 0]
-    for i in range(n_clusters):
-        mask = assignments == i
-        ax.scatter(vectors_2d[mask, 0], vectors_2d[mask, 1], 
-                  c=[colors[i]], label=f'Cluster {i}', alpha=0.6, s=50)
-        ax.scatter(centers_2d[i, 0], centers_2d[i, 1], 
-                  c=[colors[i]], marker='x', s=200, linewidths=3, 
-                  edgecolors='black')
-    ax.set_xlabel(f'PC1 ({pca_2d.explained_variance_ratio_[0]:.2%})')
-    ax.set_ylabel(f'PC2 ({pca_2d.explained_variance_ratio_[1]:.2%})')
-    ax.set_title(f'{title_prefix}2D PCA Visualization')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    
-    # Distance histogram
-    ax = axes[0, 1]
-    from scipy.spatial.distance import cdist
-    distances = cdist(vectors, cluster_centers, metric='euclidean')
-    min_distances = distances[np.arange(len(vectors)), assignments]
-    ax.hist(min_distances, bins=30, edgecolor='black', alpha=0.7)
-    ax.axvline(np.mean(min_distances), color='red', linestyle='--', 
-               label=f'Mean: {np.mean(min_distances):.4f}')
-    ax.set_xlabel('Distance to Cluster Center')
-    ax.set_ylabel('Frequency')
-    ax.set_title('Distance Distribution')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    
-    # Box plot by cluster
-    ax = axes[1, 0]
-    cluster_distances = [min_distances[assignments == i] for i in range(n_clusters)]
-    bp = ax.boxplot(cluster_distances, labels=[f'C{i}' for i in range(n_clusters)])
-    ax.set_ylabel('Distance to Center')
-    ax.set_title('Distance by Cluster')
-    ax.grid(True, alpha=0.3, axis='y')
-    
-    # Distance matrix
-    ax = axes[1, 1]
-    from scipy.spatial.distance import pdist, squareform
-    center_distances = squareform(pdist(cluster_centers, metric='euclidean'))
-    im = ax.imshow(center_distances, cmap='viridis', aspect='auto')
-    plt.colorbar(im, ax=ax, label='Distance')
-    ax.set_xticks(range(n_clusters))
-    ax.set_yticks(range(n_clusters))
-    ax.set_xticklabels([f'C{i}' for i in range(n_clusters)])
-    ax.set_yticklabels([f'C{i}' for i in range(n_clusters)])
-    ax.set_title('Inter-Cluster Distances')
-    for i in range(n_clusters):
-        for j in range(n_clusters):
-            text = ax.text(j, i, f'{center_distances[i, j]:.2f}',
-                          ha="center", va="center", 
-                          color="white" if center_distances[i, j] > center_distances.max()/2 else "black")
-    
-    plt.tight_layout()
-    plt.show()
-
-# Usage:
-visualize_clusters(vectors, assignments, stats['cluster_centers'], "Kitchen Rewards: ")
-
-"""
-
-"""Count training windows for horizon 32 vs 70 on pointmaze large."""
 

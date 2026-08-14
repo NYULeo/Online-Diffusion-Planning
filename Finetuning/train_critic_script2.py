@@ -33,7 +33,7 @@ from Pretrain.utils import set_seed
 from accelerate import Accelerator
 import random 
 
-"""
+
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
       
@@ -60,7 +60,7 @@ if __name__ == '__main__':  # pragma: no cover
                 oversample = 5,
         )
        
-       mean, std = train_critic_with_planner4(
+       mean, std = train_critic_with_planner6(
                                trajs                  = trajs,
                                dataset_name           = env_name,
                                specific_dataset       = specific_env,
@@ -78,6 +78,7 @@ if __name__ == '__main__':  # pragma: no cover
                                horizon                = 32,
                                gamma                  = 0.99,
                                lam                    = None,
+                               rho                    = 1.0,
                                lr                     = 1e-04,
                                min_lr                 = 1e-05,
                                tau                    = 0.005,
@@ -108,9 +109,10 @@ if __name__ == '__main__':  # pragma: no cover
             task_id = task_id)
 
 
+
+
+
 """
-
-
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        
@@ -192,7 +194,7 @@ if __name__ == '__main__':  # pragma: no cover
             trajs = trajs,
             task_id = task_id)
 
-
+"""
     
 
 
