@@ -14,7 +14,7 @@ cd Online-Diffusion-Planning/Pretrain
 #train kernel
 # CUDA_VISIBLE_DEVICES=0 python train_kernel_script.py 2>&1 | tee "$LOGDIR/3_kernel.log"
 
-cd Online-Diffusion-Planning/Finetuning
+cd ../Finetuning
 #train critic
 CUDA_VISIBLE_DEVICES=0 python train_critic_script.py 2>&1 | tee "$LOGDIR/4_critic.log"
 
