@@ -692,7 +692,7 @@ if __name__ == "__main__":
             eta=0.0,
             episode_length=5000,
             checkpoint_steps=checkpoint,
-            render=True,
+            render=False,
             base_seed=1,
             task_id=task_id,
             continual_rollout=True,
