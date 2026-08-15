@@ -25,7 +25,7 @@ from gymnasium.wrappers import TimeLimit
 from typing import Optional, List
 from dataclasses import dataclass
 from typing import List
-from Finetuning.traj_reward4 import TotalReward_Critic, RewardConfig, TotalReward
+from Finetuning.traj_reward5 import TotalReward_Critic, RewardConfig, TotalReward
 
 
 class Selector:
@@ -505,14 +505,14 @@ def rollout(env_name,
            rewards.append(reward)
            #current_state = obs['observation'].copy()
            #print(f"Episode {i} reward: {reward}")
-           """
+        
            if(terminated or truncated):
                 break
-           """
            
+           """
            if(terminated):
                 break
-           
+           """
         
      env.close()
 
@@ -643,21 +643,17 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
 if __name__ == "__main__":
     horizon = 32
     env_name = 'cube'
-    specific_train_dataset = 'double-play'
+    specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 90
+    checkpoint = 63
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
-    chunk_size2 = [3,4,5,6]
+    chunk_size2 = [5,6,7,8,9,10,11]
     total_return = 0.0
-    
-    
-    set_seed(1)
-    
     RConfig = RewardConfig(
                     beta=1.0,
-                    min_log_prob=-170.0,
+                    min_log_prob=-110.0,
                     quantile=0.999,
                     critic_gamma=0.99,
                     explore=False,
@@ -678,19 +674,19 @@ if __name__ == "__main__":
                 RConfig,
                 reward_checkpoint=0,
                 kernel_checkpoint=0,
-                critic_checkpoint=24,   # omit or None to use TotalReward only
+                critic_checkpoint=checkpoint,   # omit or None to use TotalReward only
                 task_id=task_id,
                 lam=0.0,
-                n_candidates=30,
+                n_candidates=50,
             )
 
-
-
-    return_value, length = rollout(
+    for i in range(1, 101):
+         set_seed(i)
+         return_value, length = rollout(
             env_name,
             specific_train_dataset,
             horizon,
-            num_layers=4,
+            num_layers=2,
             steps_T=10,
             num_karras=1,
             eta=0.0,
@@ -700,22 +696,24 @@ if __name__ == "__main__":
             base_seed=1,
             task_id=task_id,
             continual_rollout=True,
-            chunk_size=25,
+            chunk_size=15,
             device=device,
             selector=selector,
-        )
+          )
+         print(return_value)
+         print()
     #print(length)
     exit()
 
     for i in range(1, 101):
        set_seed(i)
        chunk_size_index = 0
-       #while(chunk_size_index < len(chunk_size2)):
-       return_value, _ = rollout(
+       while(chunk_size_index < len(chunk_size2)):
+           return_value, _ = rollout(
                   env_name, 
                   specific_train_dataset, 
                   horizon, 
-                  num_layers = 4,
+                  num_layers = 2,
                   steps_T = 10, 
                   num_karras = 1, 
                   eta = 0.0, 
@@ -726,15 +724,14 @@ if __name__ == "__main__":
                   #goal_cell = np.array([6, 1], dtype = int), 
                   task_id = task_id,
                   continual_rollout = True,
-                  chunk_size = 20,
+                  chunk_size = chunk_size2[chunk_size_index],
                   device = device)
-           #chunk_size_index += 1
-       """
+           chunk_size_index += 1
            if(return_value == 1.0):
                 print(f"chunk_size: {chunk_size2[chunk_size_index-1]}")
                 total_return += 1
                 break
-       """
+       
        print(return_value)
     print(f"Total return: {total_return / 100 :.4f}")
     
