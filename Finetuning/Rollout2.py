@@ -332,21 +332,17 @@ def test_rollout_fit_for_model(traj, dataset_name=None, specific_dataset=None,
         'avg_critic': avg_critic
     }
 
-def set_seed(seed=0):
-    # Python random
+def set_seed(seed: int):
     random.seed(seed)
-    # NumPy random
     np.random.seed(seed)
-    # PyTorch random
     torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)  # if using multiple GPUs
-    # PyTorch deterministic algorithms
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    torch.use_deterministic_algorithms(True, warn_only=True)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    # Set environment variable for additional reproducibility
-    os.environ['PYTHONHASHSEED'] = str(seed)
-
+    
 def save_trajs(trajs, env_name, specific_env, step):
     os.makedirs(f'./Finetuning/Rollouts/{env_name}/{specific_env}/', exist_ok=True)
     save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info_{str(step)}.pkl'

@@ -331,7 +331,18 @@ def test_rollout_fit_for_model(traj, dataset_name=None, specific_dataset=None,
         'avg_reward': avg_reward,
         'avg_critic': avg_critic
     }
-
+"""
+def set_seed(seed: int):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    torch.use_deterministic_algorithms(True, warn_only=True)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+"""
 def set_seed(seed=0):
     # Python random
     random.seed(seed)
