@@ -677,7 +677,7 @@ if __name__ == "__main__":
                 critic_checkpoint=checkpoint,   # omit or None to use TotalReward only
                 task_id=task_id,
                 lam=0.0,
-                n_candidates=50,
+                n_candidates=10,
             )
     
     total = 0.0
