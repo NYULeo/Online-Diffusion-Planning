@@ -681,7 +681,6 @@ if __name__ == "__main__":
             )
     
     total = 0.0
-    set_seed(1)
     for i in range(1, 101):
          set_seed(i)
          return_value, length = rollout(
