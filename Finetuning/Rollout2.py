@@ -677,10 +677,11 @@ if __name__ == "__main__":
                 critic_checkpoint=checkpoint,   # omit or None to use TotalReward only
                 task_id=task_id,
                 lam=0.0,
-                n_candidates=30,
+                n_candidates=50,
             )
     
     total = 0.0
+    set_seed(1)
     for i in range(1, 101):
          set_seed(i)
          return_value, length = rollout(
