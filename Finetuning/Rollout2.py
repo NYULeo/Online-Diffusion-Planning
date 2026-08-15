@@ -679,7 +679,8 @@ if __name__ == "__main__":
                 lam=0.0,
                 n_candidates=50,
             )
-
+    
+    total = 0.0
     for i in range(1, 101):
          set_seed(i)
          return_value, length = rollout(
@@ -701,8 +702,9 @@ if __name__ == "__main__":
             selector=selector,
           )
          print(return_value)
+         total += return_value
          print()
-    #print(length)
+    print(f"Success Rate: {total / 100 :.4f}")
     exit()
 
     for i in range(1, 101):
