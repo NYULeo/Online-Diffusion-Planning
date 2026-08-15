@@ -27,30 +27,68 @@ from typing import Optional, List
 from dataclasses import dataclass
 from typing import List
 from Finetuning.traj_reward4 import TotalReward_Critic, RewardConfig, TotalReward
-class Selector():
-    def __init__(self, env_name, specific_env, RConfig: RewardConfig, reward_checkpoint: int, kernel_checkpoint: Optional[int] = None, critic_checkpoint: Optional[int] = None):
-         self.env_name = env_name
-         self.specific_env = specific_env
-         self.RConfig = RConfig
-         self.reward_checkpoint = reward_checkpoint
-         self.kernel_checkpoint = kernel_checkpoint
-         self.critic_checkpoint = critic_checkpoint
-         self.device = check_device()
-         self.lam = 0.0
-         if(critic_checkpoint is not None):
-            self.model = TotalReward_Critic(self.device, RConfig, env_name, specific_env, self.reward_checkpoint, self.kernel_checkpoint, self.critic_checkpoint)
-         else:
-            self.model = TotalReward(self.device, RConfig, env_name, specific_env, self.reward_checkpoint, self.kernel_checkpoint)
-         self.model.eval()
-    
+
+class Selector:
+    def __init__(
+        self,
+        env_name,
+        specific_env,
+        RConfig: RewardConfig,
+        reward_checkpoint: int,
+        kernel_checkpoint: int,
+        critic_checkpoint: Optional[int] = None,
+        task_id: Optional[int] = None,
+        lam: float = 0.0,
+        n_candidates: int = 30,
+    ):
+        self.env_name = env_name
+        self.specific_env = specific_env
+        self.RConfig = RConfig
+        self.task_id = task_id
+        self.lam = lam
+        self.n_candidates = n_candidates
+        self.device = check_device()
+
+        if critic_checkpoint is not None:
+            self.model = TotalReward_Critic(
+                self.device,
+                RConfig,
+                env_name,
+                specific_env,
+                reward_checkpoint,
+                kernel_checkpoint,
+                critic_checkpoint,
+                task_id,
+            )
+        else:
+            self.model = TotalReward(
+                self.device,
+                RConfig,
+                env_name,
+                specific_env,
+                reward_checkpoint,
+                kernel_checkpoint,
+                task_id,
+            )
+        self.model.eval()
+
     def select_plan(self, plans: List[np.ndarray]) -> np.ndarray:
-         rewards = []
-         with torch.no_grad():
+        if len(plans) == 0:
+            raise ValueError("select_plan received an empty plan list")
+
+        rewards = []
+        with torch.no_grad():
             for plan in plans:
-             plan_tensor = torch.from_numpy(plan).float().to(self.device) 
-             reward = self.model.predict(plan_tensor, self.lam)
-             rewards.append(reward.item())
-         return plans[rewards.index(max(rewards))].copy()
+                if isinstance(plan, torch.Tensor):
+                    plan_tensor = plan.detach().float().to(self.device)
+                else:
+                    plan_np = np.ascontiguousarray(plan, dtype=np.float32)
+                    plan_tensor = torch.from_numpy(plan_np).to(self.device)
+                reward = self.model.predict(plan_tensor, self.lam)
+                rewards.append(float(reward.detach().cpu()))
+
+        return np.asarray(plans[int(np.argmax(rewards))], dtype=np.float32).copy()
+
 
 def check(env):
     print("Reward type:", getattr(env, 'reward_type', 'Not found'))
