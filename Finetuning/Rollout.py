@@ -1,7 +1,6 @@
 import chunk
 import sys
 import os
-from tarfile import LENGTH_PREFIX
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -26,7 +25,8 @@ from gymnasium.wrappers import TimeLimit
 from typing import Optional, List
 from dataclasses import dataclass
 from typing import List
-from Finetuning.traj_reward4 import TotalReward_Critic, RewardConfig, TotalReward
+from Finetuning.traj_reward5 import TotalReward_Critic, RewardConfig, TotalReward
+
 
 class Selector:
     def __init__(
@@ -88,7 +88,6 @@ class Selector:
                 rewards.append(float(reward.detach().cpu()))
 
         return np.asarray(plans[int(np.argmax(rewards))], dtype=np.float32).copy()
-
 
 def check(env):
     print("Reward type:", getattr(env, 'reward_type', 'Not found'))
@@ -459,9 +458,10 @@ def rollout(env_name,
                      if(selector is None):
                          x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                      else:
-                         Plans = []
-                         for j in range(30):
-                              Plans.append(sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device))
+                         Plans = [
+                               sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                               for _ in range(selector.n_candidates)
+                            ]
                          x = selector.select_plan(Plans)
                      for k in range(min(chunk_size, len(x))):
                          Temp_acts.append(x[k, d_s:(d_s+d_a)].copy())
@@ -505,10 +505,15 @@ def rollout(env_name,
            rewards.append(reward)
            #current_state = obs['observation'].copy()
            #print(f"Episode {i} reward: {reward}")
+        
            if(terminated or truncated):
-                #print(f"Episode {i} terminated or truncated")
                 break
-     
+           
+           """
+           if(terminated):
+                break
+           """
+        
      env.close()
 
      
@@ -645,6 +650,7 @@ if __name__ == "__main__":
     device = check_device()
     print(f"Using device {device}")
     chunk_size2 = [5,6,7,8,9,10,11]
+    total_return = 0.0
     RConfig = RewardConfig(
                     beta=1.0,
                     min_log_prob=-110.0,
@@ -675,7 +681,6 @@ if __name__ == "__main__":
             )
     
     total = 0.0
-    print(f"checckpoint: {checkpoint}")
     for i in range(1, 101):
          set_seed(i)
          return_value, length = rollout(
@@ -701,6 +706,7 @@ if __name__ == "__main__":
          print()
     print(f"Success Rate: {total / 100 :.4f}")
     exit()
+
     for i in range(1, 101):
        set_seed(i)
        chunk_size_index = 0
@@ -727,11 +733,9 @@ if __name__ == "__main__":
                 print(f"chunk_size: {chunk_size2[chunk_size_index-1]}")
                 total_return += 1
                 break
+       
        print(return_value)
     print(f"Total return: {total_return / 100 :.4f}")
-    
-
-    
     
 
 
