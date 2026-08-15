@@ -602,33 +602,67 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 39
+    checkpoint = 90
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
     chunk_size2 = [5,6,7,8,9,10,11]
-    total_return = 0.0
-    """
-    set_seed(1)
-    return_value, length = rollout(
-                  env_name, 
-                  specific_train_dataset, 
-                  horizon, 
-                  num_layers = 4,
-                  steps_T = 10, 
-                  num_karras = 1, 
-                  eta = 0.0, 
-                  episode_length = 3000, 
-                  checkpoint_steps = checkpoint, 
-                  render = True,  
-                  base_seed = 1, 
-                  #goal_cell = np.array([6, 1], dtype = int), 
-                  task_id = task_id,
-                  continual_rollout = True,
-                  chunk_size = 31,
-                  device = device)
+    RConfig = RewardConfig(
+                    beta=1.0,
+                    min_log_prob=-110.0,
+                    quantile=0.999,
+                    critic_gamma=0.99,
+                    explore=False,
+                    type_kernel='mog',
+                    kernel_num_modes=10,
+                    kernel_noise_floor=5e-4,
+                    num_hidden_layers_kernel=4,
+                    hidden_dim_kernel=514,
+                    num_hidden_layers_reward=4,
+                    hidden_dim_reward=512,
+                    num_hidden_layers_critic=4,
+                    hidden_dim_critic=512,
+            )
+
+    selector = Selector(
+                env_name,
+                specific_train_dataset,
+                RConfig,
+                reward_checkpoint=0,
+                kernel_checkpoint=0,
+                critic_checkpoint=checkpoint,   # omit or None to use TotalReward only
+                task_id=task_id,
+                lam=0.0,
+                n_candidates=50,
+            )
+    
+    total = 0.0
+    print(f"checckpoint: {checkpoint}")
+    for i in range(1, 101):
+         set_seed(i)
+         return_value, length = rollout(
+            env_name,
+            specific_train_dataset,
+            horizon,
+            num_layers=2,
+            steps_T=10,
+            num_karras=1,
+            eta=0.0,
+            episode_length=5000,
+            checkpoint_steps=checkpoint,
+            render=False,
+            base_seed=1,
+            task_id=task_id,
+            continual_rollout=True,
+            chunk_size=15,
+            device=device,
+            selector=selector,
+          )
+         print(return_value)
+         total += return_value
+         print()
+    print(f"Success Rate: {total / 100 :.4f}")
     exit()
-    """
     for i in range(1, 101):
        set_seed(i)
        chunk_size_index = 0
