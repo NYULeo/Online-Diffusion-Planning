@@ -16,10 +16,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 from collections import deque
 import gymnasium as gym
-import gymnasium_robotics  # registers the envs
 import numpy as np
-import torch
-import pickle
 from scipy.ndimage import gaussian_filter1d
 from Pretrain.utils import ema_smooth
 from Pretrain.Dataset import get_dataset
@@ -76,6 +73,3 @@ def check_cube_double_goal_reach(trajs, task_id):
     print(f"Task {task_id} average distance: {average_dist}")
 
 
-data = get_dataset('scene','play', task_id = 4)
-trajs = data.get_trajectories()
-print(trajs[5]['rewards'])

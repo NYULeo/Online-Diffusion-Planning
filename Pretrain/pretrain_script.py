@@ -10,8 +10,8 @@ import torch
 
 if __name__ == '__main__':  # pragma: no cover
      set_seed(1)
-     dataset_name = 'cube'
-     specific_dataset = 'double-play'
+     dataset_name = 'ogpointmaze'
+     specific_dataset = 'large'
      task_id = 4
      horizon = 32
      device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

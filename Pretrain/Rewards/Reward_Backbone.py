@@ -440,38 +440,7 @@ def check_trajs_exit(env_name, specific_env, task_id, step):
         return trajs
     
 def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None, goal: Optional[np.array] = None, traj_length: Optional[int] = None):
-    from Dataset import KitchenDataset, PointMazeDataset, CubeDataset
-    if(dataset_name == 'kitchen'):
-         data_1 = KitchenDataset('complete')
-         data_2 = KitchenDataset('partial')
-         data_3 = KitchenDataset('mixed')
-         trajs = data_1.get_trajectories() + data_2.get_trajectories() + data_3.get_trajectories()
-        # trajs = data_1.get_trajectories()
-         name = 'Kitchen_Reward'
-         obs_dim = data_1.get_state_dim()
-         act_dim = data_1.get_action_dim()
-         return trajs, name, obs_dim, act_dim
-     
-    elif(dataset_name == 'pointmaze'):
-         if(specific_dataset is None): 
-             raise ValueError(f"Invalid dataset name: {dataset_name}")
-         elif(specific_dataset == 'large'):
-              data = PointMazeDataset('large', goal, mode = 'reward')
-              name = '2DMaze_Reward_large'
-         elif(specific_dataset == 'medium'):
-              data = PointMazeDataset('medium', goal, mode = 'reward')
-              name = '2DMaze_Reward_medium'
-         elif(specific_dataset == 'umaze'):
-              data = PointMazeDataset('umaze', goal, mode = 'reward')
-              name = '2DMaze_Reward_umaze'
-         else: 
-              raise ValueError(f"Invalid dataset name: {specific_dataset}")
-         obs_dim = data.get_state_dim()
-         act_dim = data.get_action_dim()
-         trajs = data.get_trajectories()
-         return trajs, name, obs_dim, act_dim
-
-    elif(dataset_name == 'ogpointmaze'):
+    if(dataset_name == 'ogpointmaze'):
          if(specific_dataset is None): 
              raise ValueError(f"Invalid dataset name: {dataset_name}")
          elif(specific_dataset == 'medium'):
@@ -1160,67 +1129,3 @@ def get_pretrained_reward_stats(reward_name):
     return stats
 
 
-'''
-def test_Single_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: float = 3, target_reward: Optional[float] = None, num: int = 10000):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device {device}")
-    if(trajs is None): 
-        train_Trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
-        dataset = RewardDataset(train_Trajs, sigma, reward_name, target_reward)
-    else:
-        _, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
-        dataset = test_dataset(trajs, sigma, reward_name, target_reward)
-    print(f"Testing the reward model on {len(dataset)} samples")
-    a = factorint(len(dataset))
-    batch_size = int(np.min(list(a.keys())))
-    dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8)
-    
-    state_dict = load_model(reward_name, num)
-    reward_net = ScalarReward(obs_dim, act_dim).to(device)
-    reward_net.load_state_dict(state_dict)
-    reward_net.eval()
-    total_mean_loss = 0
-    total_var = 0
-    for s, a, r in dataloader:
-        s = s.to(device)
-        a = a.to(device)
-        r = r.to(device)
-        mean = reward_net.predict(s, a)
-        var = reward_net.variance(s, a)
-        mean_loss = ((mean - r).abs()).mean()
-        total_mean_loss += mean_loss.item()
-        total_var += var.mean().item()
-    avg_mean_loss = total_mean_loss / len(dataloader)
-    avg_var = total_var / len(dataloader)
-    print(f"model {num}, Loss {avg_mean_loss:.4f}, Variance {avg_var:.4f}")
-
-
-
-def grad_norm(s, a, reward_net):
-     s.requires_grad_(True)
-     a.requires_grad_(True)
-     pred = reward_net(s, a)
-     
-     # Compute gradients with respect to the full batch
-     grad_outputs = torch.ones_like(pred)
-     grads_s, grads_a = torch.autograd.grad(
-         outputs=pred,
-         inputs=(s, a),
-         grad_outputs=grad_outputs,
-         create_graph=False,
-         retain_graph=False,
-         allow_unused=True  # In case one input is not used
-     )
-     
-     # Handle case where one input might not be used
-     if grads_s is None:
-         grads_s = torch.zeros_like(s)
-     if grads_a is None:
-         grads_a = torch.zeros_like(a)
-     
-     # Compute per-sample gradient norms
-     grad_norms = torch.cat([grads_s, grads_a], dim=-1).norm(p=2, dim=-1)  # [batch_size]
-     grad_norm_avg = grad_norms.mean().item()
-     
-     return pred, grad_norm_avg
-'''

@@ -27,7 +27,7 @@ from torch.utils.data import DataLoader
 import torch.optim as optim
 from Pretrain.Transition_Kernel.Kernel_Net import MoGTransitionKernel, RobustTransitionKernel
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_total_mahalanobis_score, compute_log_density_mog, compute_log_density, compute_total_mahalanobis_score_mog
-from Pretrain.Dataset import KitchenDataset, PointMazeDataset, get_env, get_dataset, Planner_Processor
+from Pretrain.Dataset import get_env, get_dataset, Planner_Processor
 from gymnasium.vector import AsyncVectorEnv
 from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 from Pretrain.Planners.Backbone.Dit import DiT1d
@@ -83,7 +83,7 @@ def build_dit(
     Only depth (and dims / device) vary by call site.
     Antmaze uses in_dim=d_s; all others use d_s + d_a.
     """
-    in_dim = d_s if env_name == 'antmaze' else (d_s + d_a)
+    in_dim = d_s + d_a
     model = DiT1d(
         in_dim=in_dim,
         emb_dim=128,
@@ -457,18 +457,12 @@ def getName(env_name, specific_env):
               raise ValueError(f"Invalid specific environment: {specific_env}")
 
      elif(env_name == 'antmaze'):
-          if specific_env == 'medium_play':
-               return 'AntMaze_MediumPlay'
-          elif specific_env == 'umaze_diverse':
-               return 'AntMaze_UmazeDiverse'
-          elif specific_env == 'large_diverse':
-               return 'AntMaze_LargeDiverse'
-          elif specific_env == 'large_play':
-               return 'AntMaze_LargePlay'
-          elif specific_env == 'medium_diverse':
-               return 'AntMaze_MediumDiverse'
-          elif specific_env == 'umaze':
-               return 'AntMaze_Umaze'
+          if specific_env == 'medium':
+               return 'AntMaze_Medium'
+          elif specific_env == 'large':
+               return 'AntMaze_Large'
+          elif specific_env == 'giant':
+               return 'AntMaze_Giant'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
      
@@ -492,6 +486,26 @@ def getName(env_name, specific_env):
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
      
+     elif(env_name == 'puzzle'):
+          if specific_env == '3x3-play':
+                return 'Puzzle_3x3Play'
+          elif specific_env == '3x3-noisy':
+                return 'Puzzle_3x3Noisy'
+          elif specific_env == '4x4-play':
+                return 'Puzzle_4x4Play'
+          elif specific_env == '4x4-noisy':
+                return 'Puzzle_4x4Noisy'
+          elif specific_env == '4x5-play':
+                return 'Puzzle_4x5Play'
+          elif specific_env == '4x5-noisy':
+                return 'Puzzle_4x5Noisy'
+          elif specific_env == '4x6-play':
+                return 'Puzzle_4x6Play'
+          elif specific_env == '4x6-noisy':
+                return 'Puzzle_4x6Noisy'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
+
      elif(env_name == 'scene'):
           if specific_env == 'play':
                 return 'Scene_Play'
@@ -509,6 +523,17 @@ def getName(env_name, specific_env):
                 return 'OG2DMaze_Giant'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
+    
+     elif(env_name == 'humanoidmaze'):
+          if specific_env == 'medium':
+                return 'HumanoidMaze_Medium'
+          elif specific_env == 'large':
+                return 'HumanoidMaze_Large'
+          elif specific_env == 'giant':
+                return 'HumanoidMaze_Giant'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
+
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
@@ -547,6 +572,18 @@ def getName2(env_name, specific_env):
                 return 'Cube_Quadruple'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
+     
+     elif(env_name == 'puzzle'):
+          if specific_env == '3x3':
+                return 'Puzzle_3x3'
+          elif specific_env == '4x4':
+                return 'Puzzle_4x4'
+          elif specific_env == '4x5':
+                return 'Puzzle_4x5'
+          elif specific_env == '4x6':
+                return 'Puzzle_4x6'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
 
      elif(env_name == 'scene'):
           return 'Scene'
@@ -560,6 +597,17 @@ def getName2(env_name, specific_env):
                 return 'OG2DMaze_Giant'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
+
+     elif(env_name == 'humanoidmaze'):
+          if specific_env == 'medium':
+                return 'HumanoidMaze_Medium'
+          elif specific_env == 'large':
+                return 'HumanoidMaze_Large'
+          elif specific_env == 'giant':
+                return 'HumanoidMaze_Giant'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
+
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
@@ -573,6 +621,7 @@ def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
                return 'Kitchen_Mixed'
           else:
                raise ValueError(f"Invalid specific environment: {specific_env}")
+     
      elif(env_name == 'pointmaze'):
          if(specific_env == 'large'):
               return 'PointMaze_Large'
@@ -603,6 +652,26 @@ def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
          else:
              raise ValueError(f"Invalid cube dataset name: {specific_env}")
      
+     elif(env_name == 'puzzle'):
+          if specific_env == '3x3-play':
+                return f'Puzzle_3x3Play_task{task_id}'
+          elif specific_env == '3x3-noisy':
+                return f'Puzzle_3x3Noisy_task{task_id}'
+          elif specific_env == '4x4-play':
+                return f'Puzzle_4x4Play_task{task_id}'
+          elif specific_env == '4x4-noisy':
+                return f'Puzzle_4x4Noisy_task{task_id}'
+          elif specific_env == '4x5-play':
+                return f'Puzzle_4x5Play_task{task_id}'
+          elif specific_env == '4x5-noisy':
+                return f'Puzzle_4x5Noisy_task{task_id}'
+          elif specific_env == '4x6-play':
+                return f'Puzzle_4x6Play_task{task_id}'
+          elif specific_env == '4x6-noisy':
+                return f'Puzzle_4x6Noisy_task{task_id}'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
+
      elif(env_name == 'scene'):
          if specific_env == 'play':
              return f'Scene_Play_task{task_id}'
@@ -610,10 +679,22 @@ def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
              return f'Scene_Noisy_task{task_id}'
          else:
              raise ValueError(f"Invalid scene dataset name: {specific_env}")
-            
+    
+     elif(env_name == 'antmaze'):
+          if(task_id is None):
+               raise ValueError('Task ID is required for antmaze dataset')
+          elif specific_env == 'medium':
+               return f'AntMaze_Medium_task{task_id}'
+          elif specific_env == 'large':
+               return f'AntMaze_Large_task{task_id}'
+          elif specific_env == 'giant':
+               return f'AntMaze_Giant_task{task_id}'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
+
      elif(env_name == 'ogpointmaze'):
          if(task_id is None):
-              raise ValueError('Task ID is required for cube dataset')
+              raise ValueError('Task ID is required for ogpointmaze dataset')
          if(specific_env == 'medium'):
               return f'OG2DMaze_Medium_task{task_id}'
          elif(specific_env == 'large'):
@@ -647,19 +728,16 @@ def get_RewardName(env_name, specific_env, task_id: Optional[int] = None):
                return 'PointMaze_Open'
           else:
               raise ValueError(f"Invalid specific environment: {specific_env}")
+     
      elif(env_name == 'antmaze'):
-          if specific_env == 'medium_play':
-               return 'AntMaze_MediumPlay'
-          elif specific_env == 'umaze_diverse':
-               return 'AntMaze_UmazeDiverse'
-          elif specific_env == 'large_diverse':
-               return 'AntMaze_LargeDiverse'
-          elif specific_env == 'large_play':
-               return 'AntMaze_LargePlay'
-          elif specific_env == 'medium_diverse':
-               return 'AntMaze_MediumDiverse'
-          elif specific_env == 'umaze':
-               return 'AntMaze_Umaze'
+          if(task_id is None):
+               raise ValueError('Task ID is required for antmaze dataset')
+          elif specific_env == 'medium':
+               return f'AntMaze_Medium_Task{task_id}'
+          elif specific_env == 'large':
+               return f'AntMaze_Large_Task{task_id}'
+          elif specific_env == 'giant':
+               return f'AntMaze_Giant_Task{task_id}'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
 
@@ -675,14 +753,28 @@ def get_RewardName(env_name, specific_env, task_id: Optional[int] = None):
          elif specific_env == 'quadruple' or specific_env == 'quadruple-play':
               return f'Cube_Quadruple_Task{task_id}'
          else:
-              raise ValueError(f"Invalid cube dataset name: {specific_env}")
+              raise ValueError(f"Invalid dataset name: {specific_env}")
+     
+     elif(env_name == 'puzzle'):
+         if(task_id is None):
+            raise ValueError('Task ID is required for puzzle dataset')
+         if specific_env == '3x3' or specific_env == '3x3-play':
+              return f'Puzzle_3x3_Task{task_id}'
+         elif specific_env == '4x4'  or specific_env == '4x4-play':
+              return f'Puzzle_4x4_Task{task_id}'
+         elif specific_env == '4x5' or specific_env == '4x5-play':
+              return f'Puzzle_4x5_Task{task_id}'
+         elif specific_env == '4x6' or specific_env == '4x6-play':
+              return f'Puzzle_4x6_Task{task_id}'
+         else:
+              raise ValueError(f"Invalid dataset name: {specific_env}")
 
      elif(env_name == 'scene'):
           return f"Scene_Task{task_id}"
 
      elif(env_name == 'ogpointmaze'):
          if(task_id is None):
-            raise ValueError('Task ID is required for cube dataset')
+            raise ValueError('Task ID is required for ogpointmaze dataset')
          if(specific_env == 'medium'):
               return f'OG2DMaze_Medium_Task{task_id}'
          elif(specific_env == 'large'):
@@ -1982,11 +2074,6 @@ def get_expert_score(dataset_name):
          return None
 
 def get_current_state(s0, env_name):
-    if env_name == 'antmaze':
-        return np.concatenate([
-            s0['observation'],
-            s0['achieved_goal']
-        ])
     if isinstance(s0, dict):
         return s0['observation']
     return s0
@@ -2463,14 +2550,9 @@ def rollout_parallel3(
     # Load model
     state_dict = get_planner(env_name, specific_env, checkpoint_step, task_id)
 
-    if env_name in ['kitchen', 'pointmaze', 'cube']:
+    if env_name in ['kitchen', 'pointmaze', 'cube', 'antmaze']:
         model = DiT1d(
             in_dim=(d_s + d_a), emb_dim=128, d_model=256,
-            n_heads=256//64, depth=2, timestep_emb_type="fourier"
-        ).to(device)
-    elif env_name == 'antmaze':
-        model = DiT1d(
-            in_dim=d_s, emb_dim=128, d_model=256,
             n_heads=256//64, depth=2, timestep_emb_type="fourier"
         ).to(device)
     else:

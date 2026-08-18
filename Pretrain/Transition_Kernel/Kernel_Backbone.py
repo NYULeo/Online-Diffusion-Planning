@@ -12,10 +12,8 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from Pretrain.Dataset import (
     CubeDataset_Singletask, 
-    KitchenDataset, 
     OGPointmazeDataset, 
     OGPointmazeDataset_Singletask, 
-    PointMazeDataset, 
     CubeDataset, 
     SceneDataset, 
     SceneDataset_Singletask
@@ -322,36 +320,7 @@ def load_model(kernel_name, num_steps, ensemble_idx):
     return state_dict
 
 def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
-    if(dataset_name == 'kitchen'):
-         data_1 = KitchenDataset('complete')
-         data_2 = KitchenDataset('partial')
-         data_3 = KitchenDataset('mixed')
-         trajs = data_1.get_trajectories() + data_2.get_trajectories() + data_3.get_trajectories()
-         name = 'Kitchen_Kernel'
-         obs_dim = data_1.get_state_dim()
-         act_dim = data_1.get_action_dim()
-         return trajs, name, obs_dim, act_dim
-     
-    elif(dataset_name == 'pointmaze'):
-         if(specific_dataset is None): 
-             raise ValueError(f"Invalid dataset name: {dataset_name}")
-         elif(specific_dataset == 'large'):
-              data = PointMazeDataset('large')
-              name = '2DMaze_Kernel_large'
-         elif(specific_dataset == 'medium'):
-              data = PointMazeDataset('medium')
-              name = '2DMaze_Kernel_medium'
-         elif(specific_dataset == 'umaze'):
-              data = PointMazeDataset('umaze')
-              name = '2DMaze_Kernel_umaze'
-         else: 
-              raise ValueError(f"Invalid dataset name: {specific_dataset}")
-         obs_dim = data.get_state_dim()
-         act_dim = data.get_action_dim()
-         trajs = data.get_trajectories()
-         return trajs, name, obs_dim, act_dim
-     
-    elif(dataset_name == 'cube'):
+    if(dataset_name == 'cube'):
         
         if(specific_dataset is None): 
              raise ValueError(f"Invalid dataset name: {dataset_name}")

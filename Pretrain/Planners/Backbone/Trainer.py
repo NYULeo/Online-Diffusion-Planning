@@ -8,7 +8,7 @@ from .utils import cosine_alpha_sigma, cosine_beta, EMA, cycle
 import torch.nn.functional as F
 from typing import Dict
 import copy
-from Dataset import get_env, determine_stride
+from Dataset import get_env
 from torch.utils.data import DataLoader
 import numpy as np
 from .Dit import DiT1d
@@ -48,12 +48,11 @@ class SDETrainer:
         self.specific_dataset = specific_dataset
         self.task_id = task_id
         _, self.state_dim, self.action_dim = get_env(self.dataset_name, self.specific_dataset)
-        if(determine_stride(self.dataset_name, self.specific_dataset)):
-            self.Dimension = self.state_dim
-            self.stride = stride
+        self.stride = stride
+        if(self.stride == 1):
+           self.Dimension = self.state_dim + self.action_dim
         else:
-            self.Dimension = self.state_dim + self.action_dim
-            self.stride = 1
+           self.Dimension = self.state_dim 
         self.backbone_name = backbone_name
         self.backbone_selection(backbone_layers)
         self.model_name = get_PlannerName(self.dataset_name, self.specific_dataset, self.task_id)

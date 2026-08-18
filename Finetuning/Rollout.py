@@ -685,12 +685,30 @@ if __name__ == "__main__":
                 RConfig,
                 reward_checkpoint=0,
                 kernel_checkpoint=0,
-                critic_checkpoint=checkpoint,   # omit or None to use TotalReward only
+                critic_checkpoint=90,   # omit or None to use TotalReward only
                 task_id=task_id,
                 lam=0.0,
                 n_candidates=50,
             )
-    
+    return_value, length = rollout(
+            env_name,
+            specific_train_dataset,
+            horizon,
+            num_layers=2,
+            steps_T=10,
+            num_karras=1,
+            eta=0.0,
+            episode_length=5000,
+            checkpoint_steps=checkpoint,
+            render=True,
+            base_seed=1,
+            task_id=task_id,
+            continual_rollout=True,
+            chunk_size=6,
+            device=device,
+            selector=selector,
+          )
+    exit()
     total = 0.0
     for i in range(1, 101):
          set_seed(i)
@@ -708,7 +726,7 @@ if __name__ == "__main__":
             base_seed=1,
             task_id=task_id,
             continual_rollout=True,
-            chunk_size=15,
+            chunk_size=2,
             device=device,
             selector=selector,
           )

@@ -342,7 +342,7 @@ def set_seed(seed: int):
     torch.use_deterministic_algorithms(True, warn_only=True)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    
+
 def save_trajs(trajs, env_name, specific_env, step):
     os.makedirs(f'./Finetuning/Rollouts/{env_name}/{specific_env}/', exist_ok=True)
     save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info_{str(step)}.pkl'
@@ -641,7 +641,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 63
+    checkpoint = 90
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -675,7 +675,25 @@ if __name__ == "__main__":
                 lam=0.0,
                 n_candidates=50,
             )
-    
+    return_value, length = rollout(
+            env_name,
+            specific_train_dataset,
+            horizon,
+            num_layers=2,
+            steps_T=10,
+            num_karras=1,
+            eta=0.0,
+            episode_length=5000,
+            checkpoint_steps=checkpoint,
+            render=True,
+            base_seed=1,
+            task_id=task_id,
+            continual_rollout=True,
+            chunk_size=31,
+            device=device,
+            selector=selector,
+          )
+    exit()
     total = 0.0
     for i in range(1, 101):
          set_seed(i)
@@ -693,7 +711,7 @@ if __name__ == "__main__":
             base_seed=1,
             task_id=task_id,
             continual_rollout=True,
-            chunk_size=15,
+            chunk_size=2,
             device=device,
             selector=selector,
           )
