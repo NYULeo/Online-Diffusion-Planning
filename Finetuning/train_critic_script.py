@@ -248,7 +248,7 @@ if __name__ == '__main__':  # pragma: no cover
             std = None,
             gamma = 0.99, 
             horizon = horizon,  
-            sigma = 6.0, 
+            sigma = 4.0, 
             #sigma = None,
             target_reward = 2000.0, 
             trajs = trajs,

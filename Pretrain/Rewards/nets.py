@@ -572,105 +572,11 @@ class EnsembleReward(nn.Module):
             return mean, std
         return mean
 
-"""
-class SimpleReward(nn.Module):
-    def __init__(self, obs_dim, act_dim, hidden = 128):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(obs_dim + act_dim, hidden),
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, 1),
-            nn.ReLU()                              
-        )
-        #self.scale = nn.Parameter(torch.tensor(5.0))
-
-    def forward(self, obs, act):
-        x = torch.cat([obs, act], dim=-1)
-        #return self.net(x).squeeze(-1) * self.scale
-        return self.net(x).squeeze(-1)
-"""
 
 
 
-"""
-class SimpleReward(nn.Module):
-    def __init__(self, obs_dim, act_dim, hidden=32):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(obs_dim + act_dim, hidden),
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, 1),
-            nn.ReLU()                              
-        )
-        #self.scale = nn.Parameter(torch.tensor(5.0))
-
-    def forward(self, obs, act):
-        x = torch.cat([obs, act], dim=-1)
-        #return self.net(x).squeeze(-1) * self.scale
-        return self.net(x).squeeze(-1)
-
-
-"""
 
 
 
-"""
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
-class DeepScaledReward(nn.Module):
-    def __init__(self, obs_dim, act_dim, hidden=512, num_layers=32, dropout_p=0.1):
-        super().__init__()
-        input_dim = obs_dim + act_dim
-        self.input_proj = nn.Linear(input_dim, hidden)
-        
-        # Deep residual stack (paper's core: residuals + LayerNorm + Swish/SiLU)
-        self.layers = nn.ModuleList([
-            nn.Sequential(
-                nn.Linear(hidden, hidden),
-                nn.LayerNorm(hidden),
-                nn.SiLU(),  # Swish: Smooth, non-dying activation (paper Fig. 16)
-                nn.Dropout(dropout_p),
-                nn.Linear(hidden, hidden),  # Paired for double-layer block
-                nn.LayerNorm(hidden),
-                nn.SiLU(),
-                nn.Dropout(dropout_p)
-            ) for _ in range(num_layers // 2)  # e.g., 32 blocks for 64 layers
-        ])
-        
-        self.output = nn.Linear(hidden, 1)
-        self.scale = nn.Parameter(torch.tensor(5.0))
-        self.residual_proj = nn.Linear(input_dim, hidden)  # Initial skip
-
-    def forward(self, obs, act):
-        x = torch.cat([obs, act], dim=-1)
-        residual = self.residual_proj(x)
-        x = self.input_proj(x) + residual  # Initial residual
-        
-        for layer in self.layers:
-            skip = x
-            x = layer(x)
-            x = x + skip  # Residual connection—key for deep scaling (paper Sec. A.7)
-        
-        out = F.softplus(self.output(x)).squeeze(-1) * self.scale  # Positive, smooth for sparse
-        return out
-"""
 
