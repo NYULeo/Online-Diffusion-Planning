@@ -65,7 +65,7 @@ if __name__ == '__main__':  # pragma: no cover
          num_steps = 5000,
          save_freq = 5000,
          ensemble_size = 10,
-         num_modes = 10,
+         num_modes = 30,
          num_hidden_layers = 4,
          hidden_dim = 514,
          λ_reg = 1e-3,
@@ -81,6 +81,6 @@ if __name__ == '__main__':  # pragma: no cover
                 num_hidden_layers = 4,
                 hidden_dim = 514,
                 ensemble_size = 10, 
-                num_modes = 10,
+                num_modes = 30,
                 quantile = 0.99,
                 noise_floor = 5e-4)
