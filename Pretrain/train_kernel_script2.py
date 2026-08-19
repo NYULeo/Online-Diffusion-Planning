@@ -17,51 +17,13 @@ from Finetuning.Rollout import Test_Kernel_on_Generated_Trajs, Kernel_Config, sa
 
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
-    """
-    dataset = 'pointmaze'
+    dataset = 'antmaze'
     specific_dataset = 'large'
-    
-    #train_kernel(dataset_name = 'kitchen', batch_size = 256, lr = 1e-4, num_steps =  50000, ensemble_size=10, λ_reg=1e-3)
-    #train_kernel(dataset_name = 'pointmaze', specific_dataset ='medium', batch_size = 256, lr = 3e-4, num_steps = 50000, ensemble_size=10, λ_reg=1e-3)
-    train_kernel(dataset_name = dataset, 
-                 specific_dataset = specific_dataset, 
-                 batch_size = 256, 
-                 lr = 3e-4, 
-                 num_steps = 1000, 
-                 save_freq = 500, 
-                 ensemble_size = 10, 
-                 hidden_layers = 2, 
-                 hidden_dim = 256,
-                 λ_reg = 1e-3)
-    """
-   
-    
-    """
-    train_kernel(dataset_name = dataset, 
-                 specific_dataset = specific_dataset, 
-                 batch_size = 256, 
-                 lr = 3e-4, 
-                 num_steps = 10000, 
-                 save_freq = 5000, 
-                 ensemble_size = 20, 
-                 hidden_layers = 4, 
-                 hidden_dim = 256,
-                 λ_reg = 1e-3)
-    """
-    
-
-
-    """
-    dataset = 'cube'
-    specific_dataset = 'single-play'
-    trajs = load_success_trajs(dataset, specific_dataset, task_id = 4, step = 0)
-    dataset = 'cube'
-    specific_dataset = 'single'
+    task_id = 4
     train_mog_kernel(
          dataset_name = dataset,
          specific_dataset = specific_dataset,
-         task_id = 4,
-         trajs = trajs,
+         task_id = task_id,
          batch_size = 512,
          lr = 1e-4,
          num_steps = 5000,
@@ -72,64 +34,17 @@ if __name__ == '__main__':  # pragma: no cover
          hidden_dim = 514,
          λ_reg = 1e-3,
          noise_floor = 5e-4)
-    """
-   
-    """
-    test_kernel_mog(dataset_name = dataset,
+      
+    test_kernel_mog(
+                dataset_name = dataset,
                 specific_dataset = specific_dataset,
-                task_id = 4,
-                trajs = trajs,
+                task_id = task_id,
+                trajs = None,
                 save_freq = 5000,
                 num_steps = 5000,
                 num_hidden_layers = 4,
                 hidden_dim = 514,
                 ensemble_size = 10, 
                 num_modes = 10,
-                quantile = 0.95,
+                quantile = 0.99,
                 noise_floor = 5e-4)
-    """
-    
-    
-    
-      
-    
-   
-
-    """
-    path = REPO_ROOT / "Finetuning" / "Rollouts" / dataset / specific_dataset / "Generated_trajs_Info_0.pkl"
-    with open(path, "rb") as f:
-          trajs = pickle.load(f)
-    test_kernel(dataset_name = dataset, 
-                specific_dataset = specific_dataset,
-                trajs = trajs, 
-                save_freq = 500, 
-                num_steps = 1000, 
-                hidden_layers = 2, 
-                hidden_dim = 256,
-                ensemble_size = 10)
-    """
-    
-    dataset = 'ogpointmaze'
-    specific_dataset = 'medium'
-    
-
-    train_kernel(dataset_name = dataset, 
-                 specific_dataset = specific_dataset, 
-                 batch_size = 256, 
-                 lr = 3e-4, 
-                 num_steps = 1000, 
-                 save_freq = 200, 
-                 ensemble_size = 10, 
-                 hidden_layers = 2, 
-                 hidden_dim = 256,
-                 λ_reg = 1e-3)
-    
-    test_kernel(dataset_name = dataset, 
-                specific_dataset = specific_dataset,
-                trajs = None,
-                save_freq = 200, 
-                num_steps = 1000, 
-                hidden_layers = 2, 
-                hidden_dim = 256, 
-                ensemble_size = 10, 
-                quantile = 0.999)

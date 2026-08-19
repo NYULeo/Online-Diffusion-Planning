@@ -46,8 +46,8 @@ def check_cube_single_goal_reach(trajs, task_id):
 if __name__ == '__main__':
     set_seed(1)
     
-    dataset_name = 'scene'
-    specific_dataset = 'play'
+    dataset_name = 'antmaze'
+    specific_dataset = 'large'
     task_id = 4
     traj_length = None
     
@@ -61,11 +61,11 @@ if __name__ == '__main__':
                  save_freq = 30000, 
                  lr = 5e-03, 
                  min_lr = 5e-04, 
-                 #sigma  = 3.0,
-                 sigma = None,
+                 sigma  = 4.0,
+                 #sigma = None,
                  alpha = None, 
-                 #target_reward = 10.0,
-                 target_reward = None,
+                 target_reward = 500.0,
+                 #target_reward = None,
                  specific_dataset = specific_dataset, 
                  task_id = task_id, 
                  traj_length = traj_length)
@@ -78,11 +78,11 @@ if __name__ == '__main__':
                hidden_dim = 512, 
                specific_dataset = specific_dataset, 
                trajs = None, 
-               #sigma = 3.0, 
-               sigma = None,
+               sigma = 4.0, 
+               #sigma = None,
                alpha = None, 
-               #target_reward = 10.0, 
-               target_reward = None, 
+               target_reward = 500.0, 
+               #target_reward = None, 
                task_id = task_id,
                traj_length = traj_length, 
                save_freq = 30000, 

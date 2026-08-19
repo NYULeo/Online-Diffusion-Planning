@@ -701,10 +701,10 @@ if __name__ == "__main__":
             episode_length=5000,
             checkpoint_steps=checkpoint,
             render=True,
-            base_seed=1,
+            base_seed=3,
             task_id=task_id,
             continual_rollout=True,
-            chunk_size=6,
+            chunk_size=15,
             device=device,
             selector=selector,
           )

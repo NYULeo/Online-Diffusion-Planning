@@ -81,7 +81,6 @@ def build_dit(
     """Standard planner DiT used everywhere in this repo.
     Fixed: emb_dim=128, d_model=256, n_heads=4, timestep_emb_type='fourier'.
     Only depth (and dims / device) vary by call site.
-    Antmaze uses in_dim=d_s; all others use d_s + d_a.
     """
     in_dim = d_s + d_a
     model = DiT1d(
@@ -134,22 +133,26 @@ def _bootstrap_per_member(s, a, r, ensemble_size, device):
     return s[idx], a[idx], r[idx]
 
 def check_specific_dataset(dataset_name):
-    if(dataset_name == 'kitchen'):
+    if(dataset_name in ['kitchen', 'scene']):
          return False
-    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze', 'scene', 'puzzle', 'antmaze', 'humanoidmaze']:
+    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze', 'puzzle', 'antmaze', 'humanoidmaze']:
         return True
 
 def reward_name_converter(specific_dataset):
-    if(specific_dataset == 'single-play' or specific_dataset == 'single-noise'):
-        return 'single'
-    elif(specific_dataset == 'double-play' or specific_dataset == 'double-noise'):
-        return 'double'
-    elif(specific_dataset == 'triple-play' or specific_dataset == 'triple-noise'):
-        return 'triple'
-    elif(specific_dataset == 'quadruple-play' or specific_dataset == 'quadruple-noise'):
-        return 'quadruple'
-    else:
-        return specific_dataset
+    cube = {
+        "single-play": "single", "single-noisy": "single",
+        "double-play": "double", "double-noisy": "double",
+        "triple-play": "triple", "triple-noisy": "triple",
+        "quadruple-play": "quadruple", "quadruple-noisy": "quadruple",
+    }
+    puzzle = {
+        "3x3-play": "3x3", "3x3-noisy": "3x3",
+        "4x4-play": "4x4", "4x4-noisy": "4x4",
+        "4x5-play": "4x5", "4x5-noisy": "4x5",
+        "4x6-play": "4x6", "4x6-noisy": "4x6",
+    }
+    scene = {"play": "play", "noisy": "play"}  # shared Scene reward/kernel
+    return cube.get(specific_dataset) or puzzle.get(specific_dataset) or scene.get(specific_dataset) or specific_dataset
 
 def reward_processor(rewards, name: str):
     def spare_reward_processor(rewards):
@@ -556,8 +559,8 @@ def getName2(env_name, specific_env):
                return 'AntMaze_Medium'
           elif specific_env == 'large':
                return 'AntMaze_Large'
-          elif specific_env == 'umaze':
-               return 'AntMaze_Umaze'
+          elif specific_env == 'giant':
+               return 'AntMaze_Giant'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
 
@@ -691,6 +694,18 @@ def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
                return f'AntMaze_Giant_task{task_id}'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
+     
+     elif(env_name == 'humanoidmaze'):
+          if(task_id is None):
+               raise ValueError('Task ID is required for humanoidmaze dataset')
+          elif specific_env == 'medium':
+               return f'HumanoidMaze_Medium_task{task_id}'
+          elif specific_env == 'large':
+               return f'HumanoidMaze_Large_task{task_id}'
+          elif specific_env == 'giant':
+               return f'HumanoidMaze_Giant_task{task_id}'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
 
      elif(env_name == 'ogpointmaze'):
          if(task_id is None):
@@ -738,6 +753,18 @@ def get_RewardName(env_name, specific_env, task_id: Optional[int] = None):
                return f'AntMaze_Large_Task{task_id}'
           elif specific_env == 'giant':
                return f'AntMaze_Giant_Task{task_id}'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
+     
+     elif(env_name == 'humanoidmaze'):
+          if(task_id is None):
+               raise ValueError('Task ID is required for humanoidmaze dataset')
+          elif specific_env == 'medium':
+               return f'HumanoidMaze_Medium_Task{task_id}'
+          elif specific_env == 'large':
+               return f'HumanoidMaze_Large_Task{task_id}'
+          elif specific_env == 'giant':
+               return f'HumanoidMaze_Giant_Task{task_id}'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
 

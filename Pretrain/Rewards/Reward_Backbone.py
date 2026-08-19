@@ -5,12 +5,13 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 os.chdir(project_root)
 from typing import Optional
 from Dataset import (
-    CubeDataset,
-    CubeDataset_Singletask,
     get_dataset,
     get_env,
+    CubeDataset_Singletask,
     OGPointmazeDataset_Singletask,
-    SceneDataset,
+    AntmazeDataset_Singletask,
+    HumanoidmazeDataset_Singletask,
+    PuzzleDataset_Singletask,
     SceneDataset_Singletask,
 )
 import random
@@ -87,9 +88,9 @@ def drop_trajs(trajs, percentage):
     return success_trajs + failed_trajs
 
 def check_specific_dataset(dataset_name):
-    if(dataset_name == 'kitchen'):
+    if(dataset_name in ['kitchen', 'scene']):
          return False
-    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze', 'scene', 'puzzle', 'antmaze', 'humanoidmaze']:
+    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze', 'puzzle', 'antmaze', 'humanoidmaze']:
         return True
 
 def get_trajs(env_name, specific_env, step, task_id: Optional[int] = None):
@@ -121,21 +122,31 @@ def getName(env_name, specific_env, task_id: Optional[int] = None):
                return 'PointMaze_Open'
           else:
               raise ValueError(f"Invalid specific environment: {specific_env}")
+     
      elif(env_name == 'antmaze'):
-          if specific_env == 'medium_play':
-               return 'AntMaze_MediumPlay'
-          elif specific_env == 'umaze_diverse':
-               return 'AntMaze_UmazeDiverse'
-          elif specific_env == 'large_diverse':
-               return 'AntMaze_LargeDiverse'
-          elif specific_env == 'large_play':
-               return 'AntMaze_LargePlay'
-          elif specific_env == 'medium_diverse':
-               return 'AntMaze_MediumDiverse'
-          elif specific_env == 'umaze':
-               return 'AntMaze_Umaze'
+          if(task_id is None):
+               raise ValueError('Task ID is required for antmaze dataset')
+          elif specific_env == 'medium':
+               return f'AntMaze_Medium_Task{task_id}'
+          elif specific_env == 'large':
+               return f'AntMaze_Large_Task{task_id}'
+          elif specific_env == 'giant':
+               return f'AntMaze_Giant_Task{task_id}'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
+     
+     elif(env_name == 'humanoidmaze'):
+          if(task_id is None):
+               raise ValueError('Task ID is required for humanoidmaze dataset')
+          elif specific_env == 'medium':
+               return f'HumanoidMaze_Medium_Task{task_id}'
+          elif specific_env == 'large':
+               return f'HumanoidMaze_Large_Task{task_id}'
+          elif specific_env == 'giant':
+               return f'HumanoidMaze_Giant_Task{task_id}'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
+
      elif(env_name == 'cube'):
          if(task_id is None):
             raise ValueError('Task ID is required for cube dataset')
@@ -151,7 +162,24 @@ def getName(env_name, specific_env, task_id: Optional[int] = None):
               raise ValueError(f"Invalid cube dataset name: {specific_env}")
 
      elif(env_name == 'scene'):
-        return f'Scene_Task{task_id}'
+        if(task_id is None):
+               raise ValueError('Task ID is required for scene dataset')
+        else:
+               return f'Scene_Task{task_id}'
+    
+     elif(env_name == 'puzzle'):
+         if(task_id is None):
+            raise ValueError('Task ID is required for puzzle dataset')
+         if specific_env == '3x3' or specific_env == '3x3-play':
+              return f'Puzzle_3x3_Task{task_id}'
+         elif specific_env == '4x4'  or specific_env == '4x4-play':
+              return f'Puzzle_4x4_Task{task_id}'
+         elif specific_env == '4x5' or specific_env == '4x5-play':
+              return f'Puzzle_4x5_Task{task_id}'
+         elif specific_env == '4x6' or specific_env == '4x6-play':
+              return f'Puzzle_4x6_Task{task_id}'
+         else:
+              raise ValueError(f"Invalid dataset name: {specific_env}")
         
      elif(env_name == 'ogpointmaze'):
          if(task_id is None):
@@ -459,6 +487,46 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
          trajs = data.get_trajectories()
          #trajs = make_reward_increase(trajs)
          return trajs, name, obs_dim, act_dim
+    
+    if(dataset_name == 'antmaze'):
+         if(specific_dataset is None): 
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+         elif(specific_dataset == 'medium'):
+              data = AntmazeDataset_Singletask('medium', task_id, mode = 'reward')
+              name = f'AntMaze_Reward_medium_task{task_id}'
+         elif(specific_dataset == 'large'):
+              data = AntmazeDataset_Singletask('large', task_id, mode = 'reward')
+              name = f'AntMaze_Reward_large_task{task_id}'
+         elif(specific_dataset == 'giant'):
+              data = AntmazeDataset_Singletask('giant', task_id, mode = 'reward')
+              name = f'AntMaze_Reward_giant_task{task_id}'
+         else: 
+              raise ValueError(f"Invalid dataset name: {specific_dataset}")
+         obs_dim = data.get_state_dim()
+         act_dim = data.get_action_dim()
+         trajs = data.get_trajectories()
+         #trajs = make_reward_increase(trajs)
+         return trajs, name, obs_dim, act_dim
+    
+    if(dataset_name == 'humanoidmaze'):
+         if(specific_dataset is None): 
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+         elif(specific_dataset == 'medium'):
+              data = HumanoidmazeDataset_Singletask('medium', task_id, mode = 'reward')
+              name = f'HumanoidMaze_Reward_medium_task{task_id}'
+         elif(specific_dataset == 'large'):
+              data = HumanoidmazeDataset_Singletask('large', task_id, mode = 'reward')
+              name = f'HumanoidMaze_Reward_large_task{task_id}'
+         elif(specific_dataset == 'giant'):
+              data = HumanoidmazeDataset_Singletask('giant', task_id, mode = 'reward')
+              name = f'HumanoidMaze_Reward_giant_task{task_id}'
+         else: 
+              raise ValueError(f"Invalid dataset name: {specific_dataset}")
+         obs_dim = data.get_state_dim()
+         act_dim = data.get_action_dim()
+         trajs = data.get_trajectories()
+         #trajs = make_reward_increase(trajs)
+         return trajs, name, obs_dim, act_dim
 
     elif(dataset_name == 'cube'):
          if(specific_dataset is None): 
@@ -475,6 +543,10 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
              data_1 = CubeDataset_Singletask('triple-play', task_id, traj_length, mode = 'reward')
              data_2 = CubeDataset_Singletask('triple-noisy', task_id, traj_length, mode = 'reward')
              name = f'Cube_Reward_triple_task{task_id}'
+         elif(specific_dataset == 'quadruple'):
+             data_1 = CubeDataset_Singletask('quadruple-play', task_id, traj_length, mode = 'reward')
+             data_2 = CubeDataset_Singletask('quadruple-noisy', task_id, traj_length, mode = 'reward')
+             name = f'Cube_Reward_quadruple_task{task_id}'
          else: 
               raise ValueError(f"Invalid dataset name: {specific_dataset}")
          obs_dim = data_1.get_state_dim()
@@ -484,6 +556,34 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
          #trajs = make_reward_increase(trajs)
          return trajs, name, obs_dim, act_dim
     
+    elif(dataset_name == 'puzzle'):
+         if(specific_dataset is None): 
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+         elif(specific_dataset == '3x3'):
+             data_1 = PuzzleDataset_Singletask('3x3-play', task_id, traj_length, mode = 'reward')
+             data_2 = PuzzleDataset_Singletask('3x3-noisy', task_id, traj_length, mode = 'reward')
+             name = f'Puzzle_Reward_3x3_task{task_id}'
+         elif(specific_dataset == '4x4'):
+             data_1 = PuzzleDataset_Singletask('4x4-play', task_id, traj_length, mode = 'reward')
+             data_2 = PuzzleDataset_Singletask('4x4-noisy', task_id, traj_length, mode = 'reward')
+             name = f'Puzzle_Reward_4x4_task{task_id}'
+         elif(specific_dataset == '4x5'):
+             data_1 = PuzzleDataset_Singletask('4x5-play', task_id, traj_length, mode = 'reward')
+             data_2 = PuzzleDataset_Singletask('4x5-noisy', task_id, traj_length, mode = 'reward')
+             name = f'Puzzle_Reward_4x5_task{task_id}'
+         elif(specific_dataset == '4x6'):
+             data_1 = PuzzleDataset_Singletask('4x6-play', task_id, traj_length, mode = 'reward')
+             data_2 = PuzzleDataset_Singletask('4x6-noisy', task_id, traj_length, mode = 'reward')
+             name = f'Puzzle_Reward_4x6_task{task_id}'
+         else: 
+              raise ValueError(f"Invalid dataset name: {specific_dataset}")
+         obs_dim = data_1.get_state_dim()
+         act_dim = data_1.get_action_dim()
+         trajs = data_1.get_trajectories() + data_2.get_trajectories()
+         #trajs = data_1.get_trajectories() 
+         #trajs = make_reward_increase(trajs)
+         return trajs, name, obs_dim, act_dim
+
     elif(dataset_name == 'scene'):
          data_1 = SceneDataset_Singletask('play', task_id, mode = 'reward')
          data_2 = SceneDataset_Singletask('noisy', task_id, mode = 'reward')
@@ -1108,11 +1208,13 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
         
          num += save_freq
 
-def get_pretrained_reward(dataset_name, checkpoints, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
-       _, _, obs_dim, act_dim  =  Train_Dataset(dataset_name, specific_dataset)
-       reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
-       reward_model_state_dict = load_model(reward_name, checkpoints)
-       return reward_model_state_dict, obs_dim, act_dim, reward_name
+def get_pretrained_reward(dataset_name, checkpoints, specific_dataset=None, task_id=None):
+    _, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id)
+    reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
+    reward_model_state_dict = load_model(
+        dataset_name, specific_dataset, task_id, checkpoints
+    )
+    return reward_model_state_dict, obs_dim, act_dim, reward_name
 
 def get_pretrained_reward_stats(reward_name):
     #stats_path = f'./Pretrain/Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'

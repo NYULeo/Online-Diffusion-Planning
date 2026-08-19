@@ -14,9 +14,15 @@ from Pretrain.Dataset import (
     CubeDataset_Singletask, 
     OGPointmazeDataset, 
     OGPointmazeDataset_Singletask, 
+    AntmazeDataset,
+    AntmazeDataset_Singletask,
+    HumanoidmazeDataset,
+    HumanoidmazeDataset_Singletask,
     CubeDataset, 
     SceneDataset, 
-    SceneDataset_Singletask
+    SceneDataset_Singletask,
+    PuzzleDataset,
+    PuzzleDataset_Singletask
 )
 from .Kernel_Net import  RobustTransitionKernel, MoGTransitionKernel
 from sympy import factorint
@@ -33,9 +39,9 @@ except ModuleNotFoundError:
 import json
 
 def check_specific_dataset(dataset_name):
-    if(dataset_name == 'kitchen'):
+    if(dataset_name in ['kitchen', 'scene']):
          return False
-    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze', 'scene', 'puzzle', 'antmaze', 'humanoidmaze']:
+    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze', 'puzzle', 'antmaze', 'humanoidmaze']:
         return True
 
 def getName(env_name, specific_env):
@@ -58,21 +64,27 @@ def getName(env_name, specific_env):
                return 'PointMaze_Open'
           else:
               raise ValueError(f"Invalid specific environment: {specific_env}")
+     
      elif(env_name == 'antmaze'):
-          if specific_env == 'medium_play':
-               return 'AntMaze_MediumPlay'
-          elif specific_env == 'umaze_diverse':
-               return 'AntMaze_UmazeDiverse'
-          elif specific_env == 'large_diverse':
-               return 'AntMaze_LargeDiverse'
-          elif specific_env == 'large_play':
-               return 'AntMaze_LargePlay'
-          elif specific_env == 'medium_diverse':
-               return 'AntMaze_MediumDiverse'
-          elif specific_env == 'umaze':
-               return 'AntMaze_Umaze'
+          if specific_env == 'medium':
+               return 'AntMaze_Medium'
+          elif specific_env == 'large':
+               return 'AntMaze_Large'
+          elif specific_env == 'giant':
+               return 'AntMaze_Giant'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
+     
+     elif(env_name == 'humanoidmaze'):
+          if specific_env == 'medium':
+                return 'HumanoidMaze_Medium'
+          elif specific_env == 'large':
+                return 'HumanoidMaze_Large'
+          elif specific_env == 'giant':
+                return 'HumanoidMaze_Giant'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
+
      elif(env_name == 'cube'):
           if specific_env == 'single':
                return 'Cube_Single'
@@ -85,6 +97,18 @@ def getName(env_name, specific_env):
           else:
                raise ValueError(f"Invalid cube dataset name: {specific_env}")
      
+     elif(env_name == 'puzzle'):
+          if specific_env == '3x3':
+                return 'Puzzle_3x3'
+          elif specific_env == '4x4':
+                return 'Puzzle_4x4'
+          elif specific_env == '4x5':
+                return 'Puzzle_4x5'
+          elif specific_env == '4x6':
+                return 'Puzzle_4x6'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
+
      elif(env_name == 'scene'):
          return 'Scene'
              
@@ -96,7 +120,7 @@ def getName(env_name, specific_env):
           elif specific_env == 'giant':
                return 'OG2DMaze_Giant'
           else:
-               raise ValueError(f"Invalid cube dataset name: {specific_env}")
+               raise ValueError(f"Invalid ogpointmaze dataset name: {specific_env}")
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
@@ -321,7 +345,6 @@ def load_model(kernel_name, num_steps, ensemble_idx):
 
 def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
     if(dataset_name == 'cube'):
-        
         if(specific_dataset is None): 
              raise ValueError(f"Invalid dataset name: {dataset_name}")
         elif(specific_dataset == 'single'):
@@ -362,6 +385,47 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
         act_dim = data_1.get_action_dim()
         return trajs, name, obs_dim, act_dim
     
+    elif(dataset_name == 'puzzle'):
+        if(specific_dataset is None): 
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+        elif(specific_dataset == '3x3'):
+             data_1 = PuzzleDataset('3x3-play')
+             data_2 = PuzzleDataset('3x3-noisy')
+             if(task_id is not None):
+                 data_3 = PuzzleDataset_Singletask('3x3-play', task_id)
+                 data_4 = PuzzleDataset_Singletask('3x3-noisy', task_id)
+             name = 'Puzzle_Kernel_3x3'
+        elif(specific_dataset == '4x4'):
+             data_1 = PuzzleDataset('4x4-play')
+             data_2 = PuzzleDataset('4x4-noisy')
+             if(task_id is not None):
+                 data_3 = PuzzleDataset_Singletask('4x4-play', task_id)
+                 data_4 = PuzzleDataset_Singletask('4x4-noisy', task_id)
+             name = 'Puzzle_Kernel_4x4'
+        elif(specific_dataset == '4x5'):
+             data_1 = PuzzleDataset('4x5-play')
+             data_2 = PuzzleDataset('4x5-noisy')
+             if(task_id is not None):
+                 data_3 = PuzzleDataset_Singletask('4x5-play', task_id)
+                 data_4 = PuzzleDataset_Singletask('4x5-noisy', task_id)
+             name = 'Puzzle_Kernel_4x5'
+        elif(specific_dataset == '4x6'):
+             data_1 = PuzzleDataset('4x6-play')
+             data_2 = PuzzleDataset('4x6-noisy')
+             if(task_id is not None):
+                 data_3 = PuzzleDataset_Singletask('4x6-play', task_id)
+                 data_4 = PuzzleDataset_Singletask('4x6-noisy', task_id)
+             name = 'Puzzle_Kernel_4x6'
+        else: 
+            raise ValueError(f"Invalid dataset name: {specific_dataset}")
+        if(task_id is not None):
+            trajs = data_1.get_trajectories() + data_2.get_trajectories() + data_3.get_trajectories() + data_4.get_trajectories()
+        else:
+            trajs = data_1.get_trajectories() + data_2.get_trajectories()
+        obs_dim = data_1.get_state_dim()
+        act_dim = data_1.get_action_dim()
+        return trajs, name, obs_dim, act_dim
+
     elif(dataset_name == 'scene'):
         data_1 = SceneDataset('play')
         data_2 = SceneDataset('noisy')
@@ -378,24 +442,79 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
         return trajs, name, obs_dim, act_dim
 
     elif(dataset_name == 'ogpointmaze'):
-        
         if(specific_dataset is None): 
              raise ValueError(f"Invalid dataset name: {dataset_name}")
         elif(specific_dataset == 'medium'):
              data_1 = OGPointmazeDataset('medium')
              if(task_id is not None):
-                 data_2 = OGPointmazeDataset_Singletask('medium', task_id, mode = 'reward')
+                 data_2 = OGPointmazeDataset_Singletask('medium', task_id)
              name = 'OG2DMaze_Kernel_medium'
         elif(specific_dataset == 'large'):
              data_1 =  OGPointmazeDataset('large')
              if(task_id is not None):
-                 data_2 = OGPointmazeDataset_Singletask('large', task_id, mode = 'reward')
+                 data_2 = OGPointmazeDataset_Singletask('large', task_id)
              name = 'OG2DMaze_Kernel_large'
         elif(specific_dataset == 'giant'):
              data_1 = OGPointmazeDataset('giant')
              if(task_id is not None):
-                 data_2 = OGPointmazeDataset_Singletask('giant', task_id, mode = 'reward')
-             name = 'Cube_Kernel_giant'
+                 data_2 = OGPointmazeDataset_Singletask('giant', task_id)
+             name = 'OG2DMaze_Kernel_giant'
+        else: 
+            raise ValueError(f"Invalid dataset name: {specific_dataset}")
+        if(task_id is not None):
+            trajs = data_1.get_trajectories() + data_2.get_trajectories() 
+        else:
+            trajs = data_1.get_trajectories()
+        obs_dim = data_1.get_state_dim()
+        act_dim = data_1.get_action_dim()
+        return trajs, name, obs_dim, act_dim
+    
+    elif(dataset_name == 'antmaze'):
+        if(specific_dataset is None): 
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+        elif(specific_dataset == 'medium'):
+             data_1 = AntmazeDataset('medium')
+             if(task_id is not None):
+                 data_2 = AntmazeDataset_Singletask('medium', task_id)
+             name = 'AntMaze_Kernel_medium'
+        elif(specific_dataset == 'large'):
+             data_1 =  AntmazeDataset('large')
+             if(task_id is not None):
+                 data_2 = AntmazeDataset_Singletask('large', task_id)
+             name = 'AntMaze_Kernel_large'
+        elif(specific_dataset == 'giant'):
+             data_1 = AntmazeDataset('giant')
+             if(task_id is not None):
+                 data_2 = AntmazeDataset_Singletask('giant', task_id)
+             name = 'AntMaze_Kernel_giant'
+        else: 
+            raise ValueError(f"Invalid dataset name: {specific_dataset}")
+        if(task_id is not None):
+            trajs = data_1.get_trajectories() + data_2.get_trajectories() 
+        else:
+            trajs = data_1.get_trajectories()
+        obs_dim = data_1.get_state_dim()
+        act_dim = data_1.get_action_dim()
+        return trajs, name, obs_dim, act_dim
+    
+    elif(dataset_name == 'humanoidmaze'):
+        if(specific_dataset is None): 
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+        elif(specific_dataset == 'medium'):
+             data_1 = HumanoidmazeDataset('medium')
+             if(task_id is not None):
+                 data_2 = HumanoidmazeDataset_Singletask('medium', task_id)
+             name = 'HumanoidMaze_Kernel_medium'
+        elif(specific_dataset == 'large'):
+             data_1 =  HumanoidmazeDataset('large')
+             if(task_id is not None):
+                 data_2 = HumanoidmazeDataset_Singletask('large', task_id)
+             name = 'HumanoidMaze_Kernel_large'
+        elif(specific_dataset == 'giant'):
+             data_1 = HumanoidmazeDataset('giant')
+             if(task_id is not None):
+                 data_2 = HumanoidmazeDataset_Singletask('giant', task_id)
+             name = 'HumanoidMaze_Kernel_giant'
         else: 
             raise ValueError(f"Invalid dataset name: {specific_dataset}")
         if(task_id is not None):
@@ -409,9 +528,6 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
     else:
         raise ValueError(f"Invalid Dataset Name: {dataset_name}")   
              
-       
-             
-
 # Build (s, a, s') transitions from your offline trajectories
 class KernelDataset(Dataset):
     def __init__(self, trajectories, kernel_name):
@@ -561,7 +677,6 @@ def train_kernel(dataset_name, specific_dataset: Optional[str] = None, batch_siz
      model.eval()
      save_model(model, kernel_name, num_steps)
      
-
 def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None,  save_freq: int = 50, num_steps: int = 500):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device {device}")
@@ -587,7 +702,6 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
         min_probs = np.min(probs)
         print(f"Model {num}, mean_prob: {mean_probs:.4f}, min_prob {min_probs:.4f}")
         num += save_freq
-        
 """
 
 import torch
@@ -722,8 +836,6 @@ def train_mog_kernel(
 
     print("MoG Transition Kernel training completed!")
     return ensemble
-
-
 
 
 def train_kernel(dataset_name, specific_dataset: str = None,
