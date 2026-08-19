@@ -154,18 +154,14 @@ if __name__ == '__main__':  # pragma: no cover
 
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
-      
-       
        env_name = 'antmaze'
        specific_env = 'large'
        traj_length = 1000
-       horizon = 1800
+       horizon = 800
        task_id = 4
        step = 0
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
-       
-      
        
        mean, std = train_critic_with_reward(trajs,
                              dataset_name  = env_name,
