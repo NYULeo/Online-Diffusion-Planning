@@ -38,10 +38,6 @@ def check_cube_single_goal_reach(trajs, task_id):
 
 
 
-
-
-
-
 """
 if __name__ == '__main__':
     set_seed(1)
@@ -91,13 +87,10 @@ if __name__ == '__main__':
 
 if __name__ == '__main__':
     set_seed(1)
-    
     dataset_name = 'humanoidmaze'
     specific_dataset = 'large'
     task_id = 2
     traj_length = None
-    
-   
     
     train_reward(dataset_name = dataset_name, 
                  hidden_layers = 4, 
@@ -105,19 +98,16 @@ if __name__ == '__main__':
                  batch_size = 256, 
                  num_steps = 30000, 
                  save_freq = 30000, 
-                 lr = 5e-04, 
-                 min_lr = 5e-05, 
+                 lr = 5e-05, 
+                 min_lr = 5e-06, 
                  sigma  = 4.0,
                  #sigma = None,
                  alpha = None, 
-                 target_reward = 4000.0,
+                 target_reward = 5000.0,
                  #target_reward = None,
                  specific_dataset = specific_dataset, 
                  task_id = task_id, 
                  traj_length = traj_length)
-    
-       
-
   
     test_Model(dataset_name, 
                hidden_layers = 4, 
@@ -127,7 +117,7 @@ if __name__ == '__main__':
                sigma = 4.0, 
                #sigma = None,
                alpha = None, 
-               target_reward = 4000.0, 
+               target_reward = 5000.0, 
                #target_reward = None, 
                task_id = task_id,
                traj_length = traj_length, 
