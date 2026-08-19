@@ -99,7 +99,7 @@ if __name__ == '__main__':
                  num_steps = 30000, 
                  save_freq = 30000, 
                  lr = 5e-05, 
-                 min_lr = 5e-06, 
+                 min_lr = 5e-08, 
                  sigma  = 4.0,
                  #sigma = None,
                  alpha = None, 
