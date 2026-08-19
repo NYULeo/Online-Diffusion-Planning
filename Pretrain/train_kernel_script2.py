@@ -60,7 +60,7 @@ if __name__ == '__main__':  # pragma: no cover
          dataset_name = dataset,
          specific_dataset = specific_dataset,
          task_id = task_id,
-         batch_size = 512,
+         batch_size = 1024,
          lr = 1e-4,
          num_steps = 20000,
          save_freq = 20000,
