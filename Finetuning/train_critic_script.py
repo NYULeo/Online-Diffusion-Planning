@@ -33,6 +33,7 @@ from Pretrain.utils import set_seed
 from accelerate import Accelerator
 import random 
 
+"""
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
       
@@ -87,7 +88,7 @@ if __name__ == '__main__':  # pragma: no cover
             trajs = trajs,
             task_id = task_id)
 
-
+"""
 
 
 """
@@ -151,7 +152,59 @@ if __name__ == '__main__':  # pragma: no cover
 """
     
 
-
+if __name__ == '__main__':  # pragma: no cover
+       set_seed(1)
+      
+       
+       env_name = 'antmaze'
+       specific_env = 'large'
+       traj_length = 1000
+       horizon = 1800
+       task_id = 4
+       step = 0
+       data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
+       trajs = data.get_trajectories()
+       
+      
+       
+       mean, std = train_critic_with_reward(trajs,
+                             dataset_name  = env_name,
+                             specific_dataset = specific_env,
+                             reward_hidden_layers = 4,
+                             reward_hidden_dim  = 512,
+                             reward_checkpoint  = 0,
+                             critic_hidden_layers = 4,
+                             critic_hidden_dim  = 512,
+                             batch_size = 256,
+                             num_steps  = 10000,
+                             gamma = 0.99,
+                             lam = 0.95,
+                             horizon = horizon,
+                             #lr = 1e-04, 
+                             lr = 1e-04,
+                             #min_lr = 1e-05, 
+                             min_lr = 1e-05,
+                             tau = 0.005, 
+                             old_step = None,    # from scratch
+                             new_step = step,
+                             momentum = 0.005,   # unused when old_step is None
+                             task_id = task_id)
+      
+       trajs = data.get_trajectories()
+       test_critic(dataset_name = env_name, 
+            specific_dataset = specific_env, 
+            hidden_layers = 4, 
+            hidden_dim = 512, 
+            checkpoint_step = 0, 
+            mean = None,
+            std = None,
+            gamma = 0.99, 
+            horizon = horizon,  
+            sigma = 4.0, 
+            #sigma = None,
+            target_reward = 1000.0, 
+            trajs = trajs,
+            task_id = task_id)
 
 
 
