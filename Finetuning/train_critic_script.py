@@ -151,7 +151,7 @@ if __name__ == '__main__':  # pragma: no cover
 
 """
     
-"""
+
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'antmaze'
@@ -196,14 +196,16 @@ if __name__ == '__main__':  # pragma: no cover
             std = None,
             gamma = 0.99, 
             horizon = horizon,  
-            sigma = 4.0, 
+            sigma = 6.0, 
             #sigma = None,
             target_reward = 2000.0, 
             trajs = trajs,
             task_id = task_id)
 
-"""
 
+
+
+"""
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'humanoidmaze'
@@ -254,7 +256,7 @@ if __name__ == '__main__':  # pragma: no cover
             trajs = trajs,
             task_id = task_id)
 
-
+"""
 
 
 

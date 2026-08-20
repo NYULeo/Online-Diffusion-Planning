@@ -14,7 +14,7 @@ from Finetuning.utils import get_trajs, check_device
 from Finetuning.Rollout import Test_Kernel_on_Generated_Trajs, Kernel_Config, save_success_trajs_for_reward, load_success_trajs
 
 
-"""
+
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     dataset = 'antmaze'
@@ -24,10 +24,10 @@ if __name__ == '__main__':  # pragma: no cover
          dataset_name = dataset,
          specific_dataset = specific_dataset,
          task_id = task_id,
-         batch_size = 512,
+         batch_size = 1024,
          lr = 1e-4,
-         num_steps = 5000,
-         save_freq = 1000,
+         num_steps = 20000,
+         save_freq = 20000,
          ensemble_size = 10,
          num_modes = 10,
          num_hidden_layers = 4,
@@ -40,17 +40,18 @@ if __name__ == '__main__':  # pragma: no cover
                 specific_dataset = specific_dataset,
                 task_id = task_id,
                 trajs = None,
-                save_freq = 5000,
-                num_steps = 5000,
+                save_freq = 20000,
+                num_steps = 20000,
                 num_hidden_layers = 4,
                 hidden_dim = 514,
                 ensemble_size = 10, 
                 num_modes = 10,
                 quantile = 0.99,
                 noise_floor = 5e-4)
+
+
+
 """
-
-
 if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     dataset = 'humanoidmaze'
@@ -84,3 +85,5 @@ if __name__ == '__main__':  # pragma: no cover
                 num_modes = 10,
                 quantile = 0.99,
                 noise_floor = 5e-4)
+
+"""
