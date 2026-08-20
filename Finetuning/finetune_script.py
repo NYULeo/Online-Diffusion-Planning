@@ -132,7 +132,7 @@ def set_seed(seed: int):
 
 
 #finetune_lr = 1e-05,
-
+"""
 if __name__ == "__main__":
     
     env_name = 'cube'
@@ -241,10 +241,132 @@ if __name__ == "__main__":
     OnlineFinetuner.finetune_planner()
     
 
+"""
 
+if __name__ == "__main__":
+    env_name = 'antmaze'
+    specific_env = 'large'
+    task_id = 4
+    finetune_buffer_cutoff_length = 500
+    #finetune_buffer_cutoff_length = 800
+    train_buffer_cutoff_length = 1000
+    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = True)
+    AMConfig = Acc_AdjointMatchingConfig(horizon = 32, backbone_layers = 2, eta = 0.0)
 
+    RWConfig = RewardConfig(
+               beta = 1.0, 
+               min_log_prob = -110.0,
+               #min_log_prob = -130.0,
+               quantile = 0.999,
+               number_of_generated_plans = 50,
+               #max_mahalanobis_score = 100.0,
+               gae_lam = 0.95,
+               critic_gamma = 0.99,
+               explore = False) 
+  
+    TrainRewardConfig = Train_Reward_Config(
+                          hidden_layers = 4,
+                          hidden_dim = 512,
+                          batch_size = 4000, 
+                          num_steps = 40000, 
+                          lr = 5e-05,
+                          min_lr = 5e-09,
+                          sigma = 6.0, 
+                          #sigma = None,
+                          target_reward = 2000.0, 
+                          train_goal = None,
+                          task_id = task_id)
+      
+    TrainKernelConfig = Train_Kernel_Config(
+                            batch_size = 1024, 
+                            num_steps = 5000,
+                            lr = 1e-4,
+                            ensemble_size = 10,
+                            num_hidden_layers = 4,
+                            hidden_dim = 514,
+                            type_kernel = 'mog',
+                            kernel_num_modes = 10,
+                            kernel_noise_floor = 5e-4,
+                            λ_reg = 1e-3,
+                            oversample = 5)
+    """
+    TrainCriticConfig = Train_Critic_Config(
+                            hidden_layers = 4,
+                            hidden_dim = 512,
+                            batch_size = 256,
+                            num_steps = 20,
+                            lr = 1e-05,
+                            min_lr = 1e-06,
+                            tau = 0.005,
+                            gamma = 0.99,
+                            data_conservation = True,
+                            momentum = 0.1)
+    """
+    TrainCriticConfig = Train_Critic_Config(
+                            hidden_layers = 4,
+                            hidden_dim = 512,
+                            batch_size = 64,
+                            #batch_size = 63,
+                            num_steps = 20,
+                            warm_up_steps = 1000,
+                            warm_up_log_every = 100,
+                            lr = 1e-06,
+                            min_lr = 1e-09,
+                            tau = 0.005,
+                            gamma = 0.99,
+                            lam = None,
+                            data_conservation = True,
+                            momentum = 0.1)
 
-    
+    FTConfig = FinetuningConfig(
+        AMConfig = AMConfig, 
+        RewardConfig = RWConfig, 
+        AlphaConfig = AlphaConfig,
+        dataset_name = env_name,
+        specific_dataset = specific_env,
+        planner_checkpoint = 0,
+        reward_model_checkpoint = 0,
+        kernel_model_checkpoint = 0,
+        critic_model_checkpoint = 0,
+        offline = True,
+        critic = True,
+        update_critic = True,
+        kernel = True,
+        update_kernel = False,
+        buffer_size = 200000,
+        finetune_buffer_cutoff_length = finetune_buffer_cutoff_length,
+        train_buffer_cutoff_length = train_buffer_cutoff_length,
+        finetune_steps = 90,
+        finetune_rounds = 30,
+        diffusion_steps = 10,
+        karras_percent = 0.1,
+        Loss_Clip_percent = 0.0,
+        #finetune_batch_size = 33,
+        finetune_batch_size = 32,
+        #finetune_batch_size = 16,
+        finetune_batch_per_sample = 8,
+        finetune_lr = 2e-05,
+        initial_lam = 0.05,
+        eta_lam = 0.5,
+        gradient_accumulate_every = 1,
+        update_lambda_every = 1,
+        #reward_scaling_factor = 50,
+        #reward_scaling_factor = 500,
+        reward_scaling_factor = 150,
+        MaxEnt = False,
+        Entropy_Scaling_Factor = 0.5,
+        rollout_length = 4000,  
+        rollout_num_envs = 8, 
+        continual_rollout = True,
+        chunk_size = 31,
+        num_rollout_processes = 8,
+        train_reward_config = TrainRewardConfig,
+        train_kernel_config = TrainKernelConfig,
+        train_critic_config = TrainCriticConfig) 
+    set_seed(1)
+    OnlineFinetuner = OnlineFinetuner(FTConfig)
+    OnlineFinetuner.finetune_planner()
+
 
 
    
