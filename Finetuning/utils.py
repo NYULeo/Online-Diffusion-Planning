@@ -5564,7 +5564,7 @@ def train_critic_with_planner6(
            
             # reward clipping -----------------------------------------------------
             r_hat = torch.clamp(r_hat, 0.0, 100.0)      # adjust bounds if needed
-            r_hat = r_hat / 5.0                      # or use a running std
+            #r_hat = r_hat / 5.0                      # or use a running std
 
             plan_targets = torch.zeros(N, device=device)
 

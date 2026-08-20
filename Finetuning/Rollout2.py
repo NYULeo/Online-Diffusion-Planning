@@ -641,13 +641,13 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'double-play'
     task_id = 4
-    checkpoint = 0
+    checkpoint = 90
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
     chunk_size2 = [5,6,7,8,9,10,11]
     total_return = 0.0
-    """
+    
     RConfig = RewardConfig(
                     beta=1.0,
                     min_log_prob=-110.0,
@@ -676,7 +676,7 @@ if __name__ == "__main__":
                 lam=0.0,
                 n_candidates=50,
             )
-    """
+    
     return_value, length = rollout(
             env_name,
             specific_train_dataset,
@@ -693,7 +693,7 @@ if __name__ == "__main__":
             continual_rollout=True,
             chunk_size=15,
             device=device,
-            #selector=selector,
+            selector=selector,
           )
     exit()
     total = 0.0
