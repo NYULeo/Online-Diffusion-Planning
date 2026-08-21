@@ -254,7 +254,7 @@ if __name__ == '__main__':  # pragma: no cover
                 min_log_prob = -110.0,
                 #min_log_prob = -130.0,
                 #oversample = 5,
-                oversample = 5
+                oversample = 15
         )
        
        mean, std = train_critic_with_planner6(
@@ -270,8 +270,8 @@ if __name__ == '__main__':  # pragma: no cover
                                kernel_config          = kernel_config,
                                reward_hidden_layers   = 4,
                                reward_hidden_dim      = 512,
-                               batch_size             = 64,
-                               #batch_size             = 128,
+                               #batch_size             = 64,
+                               batch_size             = 128,
                                num_steps              = 100,
                                horizon                = 32,
                                gamma                  = 0.99,
