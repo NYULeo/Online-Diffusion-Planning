@@ -6060,7 +6060,9 @@ def train_critic_with_planner6(
             r_hat = r_hat / 5.0
             """
             
-            
+            print(f"reward value mean: {r_hat.mean().item()}")
+            print(f"reward value min: {r_hat.min().item()}")
+            print(f"reward value max: {r_hat.max().item()}")
             # reward clipping -----------------------------------------------------
             r_hat = torch.clamp(r_hat, 0.0, 100.0)      # adjust bounds if needed
             #r_hat = r_hat / 5.0                      # or use a running std
@@ -6097,7 +6099,9 @@ def train_critic_with_planner6(
                     disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
                     s_L = (s_raw[:, L] - c_mean) / c_std
                     v_boot = target_critic(s_L)
+                    print(f"critic value normalized: {v_boot.item()}")
                     v_boot = (v_boot * running_tgt_std) + running_tgt_mean
+                    print(f"critic value denormalized: {v_boot.item()}")
                     partial = disc_return + (gamma ** L) * v_boot
                     r_list.append(partial)
 
@@ -6124,7 +6128,6 @@ def train_critic_with_planner6(
 
             # running normalization
             batch_mean = averaged_targets.mean()
-            print(f"batch_mean: {batch_mean.item()}")
             batch_std = averaged_targets.std(unbiased=False) + 1e-8
             running_tgt_mean = alpha * running_tgt_mean + (1 - alpha) * batch_mean
             running_tgt_std = alpha * running_tgt_std + (1 - alpha) * batch_std
