@@ -6099,9 +6099,9 @@ def train_critic_with_planner6(
                     disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
                     s_L = (s_raw[:, L] - c_mean) / c_std
                     v_boot = target_critic(s_L)
-                    print(f"critic value normalized: {v_boot.item()}")
+                    print(f"critic value normalized: {v_boot.mean().item()}")
                     v_boot = (v_boot * running_tgt_std) + running_tgt_mean
-                    print(f"critic value denormalized: {v_boot.item()}")
+                    print(f"critic value denormalized: {v_boot.mean().item()}")
                     partial = disc_return + (gamma ** L) * v_boot
                     r_list.append(partial)
 
