@@ -34,7 +34,7 @@ from accelerate import Accelerator
 import random 
 import wandb
 
-"""
+
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
       
@@ -89,7 +89,6 @@ if __name__ == '__main__':  # pragma: no cover
             trajs = trajs,
             task_id = task_id)
 
-"""
 
 
 """
@@ -152,7 +151,7 @@ if __name__ == '__main__':  # pragma: no cover
 
 """
     
-
+"""
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'antmaze'
@@ -232,7 +231,7 @@ if __name__ == '__main__':  # pragma: no cover
             task_id = task_id)
        wandb.finish()
       
-
+"""
 
 
 
