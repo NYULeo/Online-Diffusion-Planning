@@ -204,7 +204,7 @@ if __name__ == '__main__':  # pragma: no cover
            wandb.init(
                entity="kaiwen_hu-uc-berkeley",
                project="ODP",
-               name=f"{env_name}-{specific_env}-task{task_id}-critic2",
+               name=f"{env_name}-{specific_env}-task{task_id}-critic_2",
                config={
                    "dataset_name": env_name,
                    "specific_dataset": specific_env,
@@ -287,8 +287,9 @@ if __name__ == '__main__':  # pragma: no cover
                                accelerator            = accelerator) 
       
        accelerator.wait_for_everyone()
-       if accelerator.is_main_process:
-           wandb.finish()
+
+       #if accelerator.is_main_process:
+           #wandb.finish()
        
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
@@ -305,6 +306,8 @@ if __name__ == '__main__':  # pragma: no cover
             target_reward = 2000.0, 
             trajs = trajs,
             task_id = task_id)
+       if accelerator.is_main_process:
+           wandb.finish()
 
 
 

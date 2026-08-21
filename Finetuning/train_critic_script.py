@@ -164,7 +164,7 @@ if __name__ == '__main__':  # pragma: no cover
        wandb.init(
            entity="kaiwen_hu-uc-berkeley",
            project="ODP",
-           name=f"{env_name}-{specific_env}-task{task_id}-critic1",
+           name=f"{env_name}-{specific_env}-task{task_id}-critic_1",
            config={
                "dataset_name": env_name,
                "specific_dataset": specific_env,
@@ -214,7 +214,7 @@ if __name__ == '__main__':  # pragma: no cover
                              new_step = step,
                              momentum = 0.005,   # unused when old_step is None
                              task_id = task_id)
-       wandb.finish()
+       #wandb.finish()
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 
@@ -230,6 +230,8 @@ if __name__ == '__main__':  # pragma: no cover
             target_reward = 2000.0, 
             trajs = trajs,
             task_id = task_id)
+       wandb.finish()
+      
 
 
 
