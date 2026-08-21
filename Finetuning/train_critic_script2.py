@@ -34,6 +34,8 @@ from accelerate import Accelerator
 import random 
 import wandb
 
+
+"""
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'cube'
@@ -106,7 +108,7 @@ if __name__ == '__main__':  # pragma: no cover
             trajs = trajs,
             task_id = task_id)
 
-
+"""
 
 
 """
@@ -190,7 +192,7 @@ if __name__ == '__main__':  # pragma: no cover
             task_id = task_id)
 """
     
-"""
+
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'antmaze'
@@ -252,7 +254,7 @@ if __name__ == '__main__':  # pragma: no cover
                 min_log_prob = -110.0,
                 #min_log_prob = -130.0,
                 #oversample = 5,
-                oversample = 15
+                oversample = 5
         )
        
        mean, std = train_critic_with_planner6(
@@ -268,8 +270,8 @@ if __name__ == '__main__':  # pragma: no cover
                                kernel_config          = kernel_config,
                                reward_hidden_layers   = 4,
                                reward_hidden_dim      = 512,
-                               #batch_size             = 64,
-                               batch_size             = 128,
+                               batch_size             = 64,
+                               #batch_size             = 128,
                                num_steps              = 100,
                                horizon                = 32,
                                gamma                  = 0.99,
@@ -308,7 +310,7 @@ if __name__ == '__main__':  # pragma: no cover
             task_id = task_id)
        if accelerator.is_main_process:
            wandb.finish()
-"""
+
 
 
 
