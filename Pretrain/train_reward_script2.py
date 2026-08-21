@@ -52,6 +52,7 @@ if __name__ == '__main__':
     wandb.init(
         entity="kaiwen_hu-uc-berkeley",
         project="ODP",
+        name=f"antmaze-large-task{task_id}_reward",
         config={
             "dataset_name": dataset_name,
             "specific_dataset": specific_dataset,
