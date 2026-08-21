@@ -32,7 +32,7 @@ from Finetuning.utils import (
 from Pretrain.utils import set_seed
 from accelerate import Accelerator
 import random 
-
+import wandb
 """
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
@@ -199,10 +199,49 @@ if __name__ == '__main__':  # pragma: no cover
        horizon = 800
        task_id = 4
        step = 0
+       accelerator = Accelerator(mixed_precision='bf16')
+       if accelerator.is_main_process:
+           wandb.init(
+               entity="kaiwen_hu-uc-berkeley",
+               project="ODP",
+               name=f"{env_name}-{specific_env}-task{task_id}-critic2",
+               config={
+                   "dataset_name": env_name,
+                   "specific_dataset": specific_env,
+                   "task_id": task_id,
+                   "traj_length": traj_length,
+                   "horizon": horizon,
+                   "planner_checkpoint": 0,
+                   "reward_checkpoint": 0,
+                   "old_critic_checkpoint": 0,
+                   "backbone_layers": 4,
+                   "hidden_layers": 4,
+                   "hidden_dim": 512,
+                   "reward_hidden_layers": 4,
+                   "reward_hidden_dim": 512,
+                   "batch_size": 128,
+                   "num_steps": 100,
+                   "train_horizon": 32,
+                   "gamma": 0.99,
+                   "lam": None,
+                   "rho": 1.0,
+                   "lr": 1e-04,
+                   "min_lr": 1e-05,
+                   "tau": 0.005,
+                   "steps_T": 10,
+                   "num_karras": 1,
+                   "eta": 0.0,
+                   "new_step": 0,
+                   "log_every": 20,
+                   "kernel_type": "mog",
+                   "kernel_checkpoint": 0,
+                   "num_modes": 10,
+                   "oversample": 15,
+               }
+           )
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
     
-       accelerator = Accelerator(mixed_precision='bf16')
        kernel_config = KernelConfig(
                 checkpoint = 0,
                 type_kernel = 'mog',
@@ -248,6 +287,8 @@ if __name__ == '__main__':  # pragma: no cover
                                accelerator            = accelerator) 
       
        accelerator.wait_for_everyone()
+       if accelerator.is_main_process:
+           wandb.finish()
        
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 

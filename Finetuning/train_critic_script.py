@@ -32,6 +32,7 @@ from Finetuning.utils import (
 from Pretrain.utils import set_seed
 from accelerate import Accelerator
 import random 
+import wandb
 
 """
 if __name__ == '__main__':  # pragma: no cover
@@ -160,6 +161,33 @@ if __name__ == '__main__':  # pragma: no cover
        horizon = 800
        task_id = 4
        step = 0
+       wandb.init(
+           entity="kaiwen_hu-uc-berkeley",
+           project="ODP",
+           name=f"{env_name}-{specific_env}-task{task_id}-critic1",
+           config={
+               "dataset_name": env_name,
+               "specific_dataset": specific_env,
+               "task_id": task_id,
+               "traj_length": traj_length,
+               "horizon": horizon,
+               "reward_hidden_layers": 4,
+               "reward_hidden_dim": 512,
+               "reward_checkpoint": 0,
+               "critic_hidden_layers": 4,
+               "critic_hidden_dim": 512,
+               "batch_size": 1024,
+               "num_steps": 10000,
+               "gamma": 0.99,
+               "lam": 0.95,
+               "lr": 1e-04,
+               "min_lr": 1e-05,
+               "tau": 0.005,
+               "old_step": None,
+               "new_step": step,
+               "momentum": 0.005,
+           }
+       )
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
        
@@ -186,7 +214,7 @@ if __name__ == '__main__':  # pragma: no cover
                              new_step = step,
                              momentum = 0.005,   # unused when old_step is None
                              task_id = task_id)
-      
+       wandb.finish()
        trajs = data.get_trajectories()
        test_critic(dataset_name = env_name, 
             specific_dataset = specific_env, 

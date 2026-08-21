@@ -37,6 +37,7 @@ import json
 import torch.nn as nn
 import random
 import torch.distributed as dist
+import wandb
 
 
 
@@ -3383,6 +3384,7 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
            
            if(k % 1000 == 0):
                 print(f"Critic Training step {k} loss: {total_loss/1000}")
+                wandb.log({"loss": total_loss/1000, "step": k})     
                 total_loss = 0.0
             
            # Soft update target network
@@ -5651,6 +5653,10 @@ def train_critic_with_planner6(
         running += loss.item()
 
         if log_every > 0 and k % log_every == 0 and is_main:
+            wandb.log({"loss": running / log_every, 
+                       "tgt_mean": running_tgt_mean.item(),
+                       "tgt_std": running_tgt_std.item(),
+                       "step": k})     
             print(
                 f" step {k:>6}/{num_steps} "
                 f"loss = {running / log_every:.10f}  "
