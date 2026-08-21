@@ -6124,6 +6124,7 @@ def train_critic_with_planner6(
 
             # running normalization
             batch_mean = averaged_targets.mean()
+            print(f"batch_mean: {batch_mean.item()}")
             batch_std = averaged_targets.std(unbiased=False) + 1e-8
             running_tgt_mean = alpha * running_tgt_mean + (1 - alpha) * batch_mean
             running_tgt_std = alpha * running_tgt_std + (1 - alpha) * batch_std
