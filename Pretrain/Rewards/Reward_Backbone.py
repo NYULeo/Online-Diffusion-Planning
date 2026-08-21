@@ -39,6 +39,7 @@ import torch.nn.functional as F
 import numpy as np
 import json
 from typing import TypedDict, List
+import wandb
 
 
 def make_reward_increase(trajs) -> List[TrajectoryDict]:
@@ -745,12 +746,14 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
            scheduler.step()
            total_loss += loss.item()
            step += 1
+           
 
            if step % 2000 == 0:
-              avg_loss = total_loss / 2000
-              print(f"Step {step}, loss {avg_loss:.4f}")
-              total_loss = 0
-        
+                avg_loss = total_loss / 2000
+                print(f"Step {step}, loss {avg_loss:.4f}")
+                wandb.log({"loss": avg_loss, "step": step})         
+                total_loss = 0
+                
            if step % save_freq == 0:
               checkpoint = copy.deepcopy(reward_net)
               save_model(checkpoint, dataset_name, specific_dataset, task_id, step)

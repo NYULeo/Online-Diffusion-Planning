@@ -38,7 +38,73 @@ def check_cube_single_goal_reach(trajs, task_id):
 
 
 
+if __name__ == '__main__':
+    import wandb
+    
+    set_seed(1)
 
+    dataset_name = 'antmaze'
+    specific_dataset = 'large'
+    task_id = 4
+    traj_length = None
+
+    # Initialize wandb
+    wandb.init(
+        entity="kaiwen_hu-uc-berkeley",
+        project="ODP",
+        config={
+            "dataset_name": dataset_name,
+            "specific_dataset": specific_dataset,
+            "task_id": task_id,
+            "traj_length": traj_length,
+            "hidden_layers": 4,
+            "hidden_dim": 512,
+            "batch_size": 4000,
+            "num_steps": 40000,
+            "lr": 5e-05,
+            "min_lr": 5e-09,
+            "sigma": 6.0,
+            "alpha": None,
+            "target_reward": 2000.0,
+        }
+    )
+
+    train_reward(
+        dataset_name=dataset_name,
+        hidden_layers=4,
+        hidden_dim=512,
+        batch_size=4000,
+        num_steps=40000,
+        save_freq=40000,
+        lr=5e-05,
+        min_lr=5e-09,
+        sigma=6.0,
+        alpha=None,
+        target_reward=2000.0,
+        specific_dataset=specific_dataset,
+        task_id=task_id,
+        traj_length=traj_length
+    )
+
+    wandb.finish()
+
+    test_Model(dataset_name, 
+               hidden_layers = 4, 
+               hidden_dim = 512, 
+               specific_dataset = specific_dataset, 
+               trajs = None, 
+               sigma = 6.0, 
+               #sigma = None,
+               alpha = None, 
+               target_reward = 2000.0, 
+               #target_reward = None, 
+               task_id = task_id,
+               traj_length = traj_length, 
+               save_freq = 40000, 
+               num_steps = 40000)
+
+
+"""
 if __name__ == '__main__':
     set_seed(1)
     
@@ -84,7 +150,7 @@ if __name__ == '__main__':
                save_freq = 40000, 
                num_steps = 40000)
 
-
+"""
 
 
 """
