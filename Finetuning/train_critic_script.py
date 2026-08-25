@@ -180,11 +180,12 @@ if __name__ == '__main__':  # pragma: no cover
                "gamma": 0.99,
                "lam": 0.95,
                "lr": 1e-04,
-               "min_lr": 1e-05,
-               "tau": 0.005,
+               "min_lr": 1e-06,
+               "tau": 0.001,
                "old_step": None,
                "new_step": step,
-               "momentum": 0.005,
+               "value_scale": 5.0,
+               "momentum": 0.0005,
            }
        )
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
@@ -210,8 +211,8 @@ if __name__ == '__main__':  # pragma: no cover
                              tau = 0.005, 
                              old_step = None,    # from scratch
                              new_step = step,
-                             momentum = 0.005,   # unused when old_step is None
-                             value_scale = 1.0,
+                             momentum = 0.001,   # unused when old_step is None
+                             value_scale = 5.0,
                              task_id = task_id)
        #wandb.finish()
        trajs = data.get_trajectories()
@@ -223,7 +224,7 @@ if __name__ == '__main__':  # pragma: no cover
             critic_checkpoint = step,
             gamma = 0.99, 
             horizon = horizon, 
-            value_scale = 1.0, 
+            value_scale = 5.0, 
             sigma = 6.0, 
             #sigma = None,
             target_reward = 2000.0, 
