@@ -159,7 +159,7 @@ if __name__ == '__main__':  # pragma: no cover
        traj_length = 1000
        horizon = 800
        task_id = 4
-       step = 0
+       step = -1
        wandb.init(
            entity="kaiwen_hu-uc-berkeley",
            project="ODP",
@@ -220,7 +220,8 @@ if __name__ == '__main__':  # pragma: no cover
             specific_dataset = specific_env, 
             hidden_layers = 4, 
             hidden_dim = 512, 
-            checkpoint_step = 0, 
+            checkpoint_step = 0,
+            critic_checkpoint = step,
             gamma = 0.99, 
             horizon = horizon, 
             value_scale = 5.0, 

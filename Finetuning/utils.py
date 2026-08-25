@@ -1832,6 +1832,7 @@ def test_critic(dataset_name: str,
                 hidden_layers: int,
                 hidden_dim: int,
                 checkpoint_step: int,
+                critic_checkpoint: int,
                 gamma: float = 0.99,
                 horizon: int = 32,
                 value_scale: float = 5.0,
@@ -1848,7 +1849,7 @@ def test_critic(dataset_name: str,
     dataloader = DataLoader(dataset, batch_size=256, shuffle=False, drop_last=False)
 
     # Load model
-    model_state_dict, obs_dim = get_critic_model(dataset_name, specific_dataset, task_id, checkpoint_step)
+    model_state_dict, obs_dim = get_critic_model(dataset_name, specific_dataset, task_id, critic_checkpoint)
     model = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
     model.load_state_dict(model_state_dict)
     model.eval()
