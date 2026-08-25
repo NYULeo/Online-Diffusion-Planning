@@ -257,7 +257,7 @@ if __name__ == '__main__':  # pragma: no cover
                 #oversample = 15
         )
        
-       mean, std = train_critic_with_planner6(
+       train_critic_with_planner6(
                                trajs                  = trajs,
                                dataset_name           = env_name,
                                specific_dataset       = specific_env,
@@ -299,8 +299,6 @@ if __name__ == '__main__':  # pragma: no cover
             hidden_layers = 4, 
             hidden_dim = 512, 
             checkpoint_step = 0, 
-            mean = None,
-            std = None,
             gamma = 0.99, 
             horizon = horizon,  
             sigma = 6.0, 

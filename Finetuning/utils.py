@@ -1806,8 +1806,6 @@ def test_critic(dataset_name: str,
                 hidden_layers: int,
                 hidden_dim: int,
                 checkpoint_step: int,
-                mean: Optional[float] = None,
-                std: Optional[float] = None,
                 gamma: float = 0.99,
                 horizon: int = 32,
                 sigma: Optional[float] = None,
@@ -1831,9 +1829,11 @@ def test_critic(dataset_name: str,
     total_loss = 0.0
     all_preds = []
     all_targets = []
+    """
     if(mean is not None and std is not None):
          mean_pred = torch.tensor(mean, device = device, dtype = torch.float32)
          std_pred = torch.tensor(std, device = device, dtype = torch.float32)
+    """
     print(f"Testing critic at checkpoint {checkpoint_step}...")
 
     with torch.no_grad():
@@ -1842,28 +1842,33 @@ def test_critic(dataset_name: str,
             rews_chunk = rews_chunk.to(device)
 
             pred = model(s).squeeze(-1)                # (B,)  ← normalized V(s)
+            pred = 5.0 * pred
+            """
             if(mean is not None and std is not None):
                 pred = (pred * std_pred) + mean_pred
+            """
+            
             
             # Compute raw n-step return
             gamma_pow = torch.tensor([gamma ** i for i in range(horizon)], device=device, dtype=torch.float32)
             raw_target = (gamma_pow.unsqueeze(0) * rews_chunk).sum(dim=1)
             
             
-            
+            """
             # === Normalize target (CRITICAL) ===
             tgt_mean = raw_target.mean()
             tgt_std = raw_target.std(unbiased=False) + 1e-8
             target = (raw_target - tgt_mean) / tgt_std
+            """
         
             
-            loss = F.smooth_l1_loss(pred, target, beta=1.0)
-            #loss = F.smooth_l1_loss(pred, raw_target, beta=1.0)
+            #loss = F.smooth_l1_loss(pred, target, beta=1.0)
+            loss = F.smooth_l1_loss(pred, raw_target, beta=1.0)
             total_loss += loss.item() * s.size(0)
 
             all_preds.extend(pred.cpu().numpy())
-            all_targets.extend(target.cpu().numpy())
-            #all_targets.extend(raw_target.cpu().numpy())
+            #all_targets.extend(target.cpu().numpy())
+            all_targets.extend(raw_target.cpu().numpy())
 
 
     avg_loss = total_loss / len(dataset)

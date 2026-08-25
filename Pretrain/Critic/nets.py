@@ -5,32 +5,10 @@ import torch
 import torch.optim as optim
 import numpy as np
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 """
-class Critic(nn.Module):
-    def __init__(self, obs_dim, hidden  = 128):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(obs_dim, hidden),
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, 1),
-            nn.ReLU()                              
-        )
-        #self.scale = nn.Parameter(torch.tensor(5.0))
-
-    def forward(self, obs):
-        #return self.net([obs, act]).squeeze(-1) * self.scale
-        return self.net(obs).squeeze(-1)
-"""
-
 class Critic(nn.Module):
     def __init__(self, obs_dim, hidden_dim=128, hidden_layers=2):
         super().__init__()
@@ -57,101 +35,46 @@ class Critic(nn.Module):
 
     def forward(self, obs):
         return self.net(obs).squeeze(-1)
-
-
-
 """
+
+
+
+
+
 class Critic(nn.Module):
-    def __init__(self, obs_dim, hidden  = 128):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(obs_dim, hidden),
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, 1),
-            nn.ReLU()                              
-        )
-        #self.scale = nn.Parameter(torch.tensor(5.0))
+      def __init__(
+          self,
+          obs_dim,
+          hidden_dim=128,
+          hidden_layers=2,
+          positive_output=True,
+      ):
+          super().__init__()
+          self.positive_output = positive_output
+          layers = [
+              nn.Linear(obs_dim, hidden_dim),
+              nn.LayerNorm(hidden_dim),
+              nn.SiLU(),
+          ]
+          for _ in range(hidden_layers):
+              layers.extend([
+                  nn.Linear(hidden_dim, hidden_dim),
+                  nn.LayerNorm(hidden_dim),
+                  nn.SiLU(),
+              ])
+          layers.append(nn.Linear(hidden_dim, 1))
+          self.net = nn.Sequential(*layers)
 
-    def forward(self, obs):
-        #return self.net([obs, act]).squeeze(-1) * self.scale
-        return self.net(obs).squeeze(-1)
-
-"""
-
-
+      def forward(self, obs):
+          value = self.net(obs).squeeze(-1)
+          if self.positive_output:
+              value = F.softplus(value)
+          return value
 
 
 
 
-"""
-class Critic(nn.Module):
-    def __init__(self, obs_dim, hidden = 32):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(obs_dim, hidden),
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, 1),
-            nn.ReLU()                              
-        )
-        #self.scale = nn.Parameter(torch.tensor(5.0))
 
-    def forward(self, obs):
-        #return self.net([obs, act]).squeeze(-1) * self.scale
-        return self.net(obs).squeeze(-1)
-"""
-
-"""
-class Critic(nn.Module):
-    def __init__(self, obs_dim, hidden = 32):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(obs_dim, hidden),
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden), 
-            nn.LayerNorm(hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, 1),
-            nn.ReLU()                              
-        )
-        #self.scale = nn.Parameter(torch.tensor(5.0))
-
-    def forward(self, obs):
-        #return self.net([obs, act]).squeeze(-1) * self.scale
-        return self.net(obs).squeeze(-1)
-"""
 
 
 class CriticEnsemble(nn.Module):
