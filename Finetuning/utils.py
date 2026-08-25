@@ -3375,6 +3375,7 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
             eta_min = min_lr
         )
     critic.train()
+    NS = 0 if new_step == -1 else new_step
     buffer = Critic_Buffer_Reward(
                        dataset_name,
                        specific_dataset,
@@ -3387,7 +3388,7 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
                        lam,
                        task_id,
                        old_step,  
-                       new_step, 
+                       NS, 
                        value_scale,
                        momentum)
     g = torch.Generator()
