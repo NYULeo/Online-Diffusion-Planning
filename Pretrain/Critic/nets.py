@@ -40,14 +40,14 @@ class Critic(nn.Module):
 
 
 
-
+"""
 class Critic(nn.Module):
       def __init__(
           self,
           obs_dim,
           hidden_dim=128,
           hidden_layers=2,
-          positive_output=True,
+          positive_output=False,
       ):
           super().__init__()
           self.positive_output = positive_output
@@ -71,10 +71,39 @@ class Critic(nn.Module):
               value = F.softplus(value)
           return value
 
+"""
 
 
 
+class Critic(nn.Module):
+      def __init__(
+          self,
+          obs_dim,
+          hidden_dim=128,
+          hidden_layers=2,
+          positive_output=False,
+      ):
+          super().__init__()
+          self.positive_output = positive_output
+          layers = [
+              nn.Linear(obs_dim, hidden_dim),
+              nn.LayerNorm(hidden_dim),
+              nn.GELU(approximate='tanh'),
+          ]
+          for _ in range(hidden_layers):
+              layers.extend([
+                  nn.Linear(hidden_dim, hidden_dim),
+                  nn.LayerNorm(hidden_dim),
+                  nn.GELU(approximate='tanh'),
+              ])
+          layers.append(nn.Linear(hidden_dim, 1))
+          self.net = nn.Sequential(*layers)
 
+      def forward(self, obs):
+          value = self.net(obs).squeeze(-1)
+          if self.positive_output:
+              value = F.softplus(value)
+          return value
 
 
 class CriticEnsemble(nn.Module):
