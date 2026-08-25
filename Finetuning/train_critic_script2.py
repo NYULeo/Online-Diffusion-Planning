@@ -272,7 +272,7 @@ if __name__ == '__main__':  # pragma: no cover
                                reward_hidden_dim      = 512,
                                #batch_size             = 64,
                                batch_size             = 256,
-                               num_steps              = 50,
+                               num_steps              = 100,
                                horizon                = 32,
                                gamma                  = 0.99,
                                lam                    = None,
@@ -285,7 +285,7 @@ if __name__ == '__main__':  # pragma: no cover
                                eta                    = 0.0,
                                new_step               = step,
                                task_id                = task_id,
-                               log_every              = 10,
+                               log_every              = 20,
                                accelerator            = accelerator) 
       
        accelerator.wait_for_everyone()
