@@ -1842,8 +1842,9 @@ def test_critic(dataset_name: str,
                 task_id: Optional[int] = None):
     device = check_device()
     
+    NS = 0 if critic_checkpoint == -1 else critic_checkpoint
     dataset = Critic_Test_Dataset(
-        dataset_name, specific_dataset, checkpoint_step, trajs,
+        dataset_name, specific_dataset, NS, trajs,
         sigma, task_id, target_reward, horizon, gamma
     )
     dataloader = DataLoader(dataset, batch_size=256, shuffle=False, drop_last=False)
