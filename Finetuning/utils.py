@@ -53,6 +53,12 @@ class Q_Stats:
     def get_Q_stats(self):
         return self.Q_mean, self.Q_std
 
+class Q_Scale:
+    Q_scale: float
+    def get_Q_scale(self):
+        return self.Q_scale
+
+
 def get_Q_stats(dataset_name: str, specific_dataset: str, task_id: Optional[int] = None, step: int = 0) -> Q_Stats:
         critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
         stats_name =  str(critic_name) + f'_Q_stats_{str(step)}.pkl'
@@ -71,6 +77,26 @@ def save_Q_stats(Q_stats: Q_Stats, dataset_name: str, specific_dataset: str, tas
         with open(savepath, 'wb') as f:
               pickle.dump(Q_stats, f)
         print(f"saved stats to {savepath}")
+
+def get_Q_scale(dataset_name: str, specific_dataset: str, task_id: Optional[int] = None) -> Q_Scale:
+        critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
+        stats_name =  str(critic_name) + f'_Q_scale.pkl'
+        stats_dir = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/'
+        savepath = os.path.join(stats_dir, stats_name)
+        with open(savepath, 'rb') as f:
+             Q_scale = pickle.load(f)
+        return Q_scale
+
+def save_Q_scale(Q_scale: Q_Scale, dataset_name: str, specific_dataset: str, task_id: Optional[int] = None):
+        critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
+        stats_name =  str(critic_name) + f'_Q_scale.pkl'
+        stats_dir = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/'
+        os.makedirs(stats_dir, exist_ok=True)
+        savepath = os.path.join(stats_dir, stats_name)
+        with open(savepath, 'wb') as f:
+              pickle.dump(Q_scale, f)
+        print(f"saved Q_scale to {savepath}")
+
 
 def build_dit(
     d_s: int,
@@ -3054,6 +3080,7 @@ class CriticDataset_Reward(Dataset):
                        old_step: Optional[int] = None,  
                        new_step: int = 0, 
                        momentum: float = 0.005,
+                       value_scale: float = 5.0,
                        task_id: Optional[int] = None):
         # ----- gather raw obs/actions to fit stats -----
 
@@ -3114,7 +3141,7 @@ class CriticDataset_Reward(Dataset):
                 
                 # Scale down predicted rewards from reward model
                 rews = np.clip(rews, 0.0, 100.0)      # adjust bounds if needed
-                rews = rews / 5.0                      # or use a running std
+                rews = rews / value_scale                    # or use a running std
                 
             
             for t in range(len(obs) - horizon):
@@ -3157,6 +3184,7 @@ class Critic_Buffer_Reward():
                        task_id: Optional[int] = None,
                        old_step: Optional[int] = None,  
                        new_step: int = 0, 
+                       value_scale: float = 5.0,
                        momentum: float = 0.005):
         self.horizon = horizon
         self.gamma = gamma
@@ -3172,6 +3200,7 @@ class Critic_Buffer_Reward():
             old_step             = old_step,
             new_step             = new_step,
             momentum             = momentum,
+            value_scale          = value_scale,
             task_id              = task_id,
         )
    
@@ -3323,6 +3352,7 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
                  old_step: Optional[int] = None, 
                  new_step: int = 0, 
                  momentum: float = 0.005, 
+                 value_scale: float = 5.0,
                  task_id: Optional[int] = None):
     device = check_device()
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
@@ -3355,6 +3385,7 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
                        task_id,
                        old_step,  
                        new_step, 
+                       value_scale,
                        momentum)
     g = torch.Generator()
     g.manual_seed(1)
@@ -3403,6 +3434,11 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
     target_critic.eval()
     save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
     print(f"critic model saved")
+    q_scale = Q_Scale()
+    q_scale.Q_scale = value_scale
+    save_Q_scale(q_scale, dataset_name, specific_dataset, task_id)
+    print(f"mean: {tgt_mean.item()}, std: {tgt_std.item()}")
+    
     """
     q_stats = Q_Stats()
     q_stats.Q_mean = tgt_mean.item()
@@ -6493,6 +6529,8 @@ def train_critic_with_planner6(
         running_tgt_mean = q_stats.Q_mean
         running_tgt_std = q_stats.Q_std
     """
+    
+    Scale = get_Q_scale(dataset_name, specific_dataset, task_id)
     running_tgt_mean = torch.zeros(1, device=device)
     running_tgt_std = torch.ones(1, device=device)
     
@@ -6565,7 +6603,7 @@ def train_critic_with_planner6(
             
             # reward clipping -----------------------------------------------------
             r_hat = torch.clamp(r_hat, 0.0, 100.0)      # adjust bounds if needed
-            r_hat = r_hat / 5.0                      # or use a running std
+            r_hat = r_hat / Scale.Q_scale                     # or use a running std
         
             plan_targets = torch.zeros(N, device=device)
 

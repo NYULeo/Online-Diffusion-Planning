@@ -10,7 +10,7 @@ from Pretrain.Rewards.nets import SimpleReward
 from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel, MoGTransitionKernel
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_log_density, compute_log_density_mog
 from Pretrain.Critic.nets import Critic
-from Finetuning.utils import get_reward_model, get_kernel, get_reward_stats, get_kernel_stats, get_critic_model, get_critic_stats, get_Q_stats
+from Finetuning.utils import get_reward_model, get_kernel, get_reward_stats, get_kernel_stats, get_critic_model, get_critic_stats, get_Q_stats, get_Q_scale
 from typing import Optional
 from torch.nn import functional as F
 from dataclasses import dataclass
@@ -312,6 +312,7 @@ class TotalReward_Critic(nn.Module):
         self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint, task_id)
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
         self.critic_stat = get_critic_stats(dataset_name, specific_dataset, task_id, 0)
+        self.Q_scale = get_Q_scale(dataset_name, specific_dataset, task_id)
         #self.q_stats = get_Q_stats(dataset_name, specific_dataset, task_id, critic_checkpoint)
        
 
@@ -415,7 +416,7 @@ class TotalReward_Critic(nn.Module):
         final_s_norm_critic = self.critic_processor(final_s_critic).unsqueeze(0).requires_grad_(False)
         v = self.critic(final_s_norm_critic)
         #total_reward +=   ((self.config.critic_gamma**(H-1))*(r.squeeze(0))) + ( (self.config.critic_gamma**(H-1)) * v.squeeze(0))
-        total_reward +=   ( (self.config.critic_gamma**(H-1)) *  (  5.0 * v.squeeze(0)  ))
+        total_reward +=   ( (self.config.critic_gamma**(H-1)) *  (  self.Q_scale.Q_scale * v.squeeze(0)  ))
         total_reward = total_reward + (lam  * self.config.delta) 
         return total_reward
 
@@ -507,8 +508,8 @@ class TotalReward_Critic(nn.Module):
        
         #gradient += ((r_s_grad + r_a_grad))  + ( (self.config.critic_gamma**(H-1)) * grad_critic)
         #total_reward +=  (r.squeeze(0)) + ((self.config.critic_gamma**(H-1)) * v.squeeze(0))
-        gradient +=   ( (self.config.critic_gamma**(H-1)) *  (5.0 * grad_critic))
-        total_reward +=   ((self.config.critic_gamma**(H-1)) *  (5.0 * v.squeeze(0))   )
+        gradient +=   ( (self.config.critic_gamma**(H-1)) *  ( self.Q_scale.Q_scale * grad_critic))
+        total_reward +=   ((self.config.critic_gamma**(H-1)) *  ( self.Q_scale.Q_scale * v.squeeze(0))   )
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward, gradient
 
