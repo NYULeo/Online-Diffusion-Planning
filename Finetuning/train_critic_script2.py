@@ -301,6 +301,7 @@ if __name__ == '__main__':  # pragma: no cover
             checkpoint_step = 0, 
             gamma = 0.99, 
             horizon = horizon,  
+            value_scale = 5.0,
             sigma = 6.0, 
             #sigma = None,
             target_reward = 2000.0, 
