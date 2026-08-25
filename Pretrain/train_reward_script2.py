@@ -87,7 +87,6 @@ if __name__ == '__main__':
         traj_length=traj_length
     )
 
-    wandb.finish()
 
     test_Model(dataset_name, 
                hidden_layers = 4, 
@@ -103,6 +102,7 @@ if __name__ == '__main__':
                traj_length = traj_length, 
                save_freq = 40000, 
                num_steps = 40000)
+    wandb.finish()
 
 
 """
