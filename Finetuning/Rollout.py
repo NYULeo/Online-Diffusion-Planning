@@ -418,7 +418,7 @@ def rollout(env_name,
      elif (env_name == 'pointmaze'):
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
      elif(env_name == 'antmaze'):
-           model = DiT1d(in_dim = (d_s), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
      elif(env_name == 'cube'):
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
      elif(env_name == 'ogpointmaze'):
@@ -438,13 +438,13 @@ def rollout(env_name,
      if(env_name == 'cube'):
          s0, info = env.reset(seed = base_seed, options = dict( task_id=task_id))
          #s0, info = env.reset(seed = base_seed)
-        #s0, info = env.reset()
+         #s0, info = env.reset()
      elif(env_name == 'ogpointmaze'):
          s0, info = env.reset(seed = base_seed, options = dict( task_id=task_id))
 
      elif(goal_cell is not None and start_cell is not None):
          s0 = env.reset(seed = base_seed, options = {"goal_cell": goal_cell, "reset_cell": start_cell})
-        #s0, info = env.reset( options = {"goal_cell": goal_cell, "reset_cell": start_cell})
+         #s0, info = env.reset( options = {"goal_cell": goal_cell, "reset_cell": start_cell})
      elif(goal_cell is not None):
          s0 = env.reset(seed = base_seed, options = {"goal_cell": goal_cell})
      else:
@@ -516,14 +516,16 @@ def rollout(env_name,
            rewards.append(reward)
            #current_state = obs['observation'].copy()
            #print(f"Episode {i} reward: {reward}")
-        
+           
            if(terminated or truncated):
                 break
            
+
            """
            if(terminated):
                 break
            """
+           
         
      env.close()
 
@@ -701,10 +703,10 @@ if __name__ == "__main__":
             episode_length=5000,
             checkpoint_steps=checkpoint,
             render=True,
-            base_seed=3,
+            base_seed=1,
             task_id=task_id,
             continual_rollout=True,
-            chunk_size=15,
+            chunk_size=31,
             device=device,
             selector=selector,
           )
