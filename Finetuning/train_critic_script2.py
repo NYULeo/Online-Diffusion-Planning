@@ -253,7 +253,7 @@ if __name__ == '__main__':  # pragma: no cover
                 noise_floor = 5e-4,
                 min_log_prob = -110.0,
                 #min_log_prob = -130.0,
-                oversample = 5,
+                oversample = 10,
                 #oversample = 15
         )
        
@@ -272,20 +272,20 @@ if __name__ == '__main__':  # pragma: no cover
                                reward_hidden_dim      = 512,
                                batch_size             = 64,
                                #batch_size             = 128,
-                               num_steps              = 100,
+                               num_steps              = 50,
                                horizon                = 32,
                                gamma                  = 0.99,
                                lam                    = None,
                                rho                    = 1.0,
-                               lr                     = 1e-04,
-                               min_lr                 = 1e-05,
+                               lr                     = 1e-05,
+                               min_lr                 = 1e-06,
                                tau                    = 0.005,
                                steps_T                = 10,
                                num_karras             = 1,
                                eta                    = 0.0,
                                new_step               = 0,
                                task_id                = task_id,
-                               log_every              = 20,
+                               log_every              = 10,
                                accelerator            = accelerator) 
       
        accelerator.wait_for_everyone()
