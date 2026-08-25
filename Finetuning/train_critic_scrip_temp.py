@@ -69,10 +69,11 @@ if __name__ == '__main__':  # pragma: no cover
                "lam": 0.95,
                "lr": 1e-04,
                "min_lr": 1e-05,
-               "tau": 0.005,
+               "tau": 0.001,
+               "value_scale": 5.0,
                "old_step": None,
                "new_step": step,
-               "momentum": 0.005,
+               "momentum": 0.0005,
            }
        )
       
