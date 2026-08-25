@@ -253,7 +253,7 @@ if __name__ == '__main__':  # pragma: no cover
                 noise_floor = 5e-4,
                 min_log_prob = -110.0,
                 #min_log_prob = -130.0,
-                oversample = 10,
+                oversample = 15,
                 #oversample = 15
         )
        
@@ -277,8 +277,8 @@ if __name__ == '__main__':  # pragma: no cover
                                gamma                  = 0.99,
                                lam                    = None,
                                rho                    = 1.0,
-                               lr                     = 1e-05,
-                               min_lr                 = 1e-06,
+                               lr                     = 1e-06,
+                               min_lr                 = 1e-07,
                                tau                    = 0.005,
                                steps_T                = 10,
                                num_karras             = 1,
