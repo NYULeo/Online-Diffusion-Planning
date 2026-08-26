@@ -6672,6 +6672,7 @@ def train_critic_with_planner6(
               averaged_targets = averaged_targets / counts.clamp(min=1.0)
               
               averaged_targets = averaged_targets.detach()
+              averaged_targets  = averaged_targets.clamp(0.0, 20.0)
               
               # running normalization
               batch_mean = averaged_targets.mean()
