@@ -6689,6 +6689,8 @@ def train_critic_with_planner6(
         with torch.no_grad():
             pred_mean = v_pred.detach().mean()
             pred_std = v_pred.detach().std(unbiased=False)
+            bias = (v_pred - averaged_targets).mean()
+            mae = (v_pred - averaged_targets).abs().mean()
         #loss = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
         loss = F.smooth_l1_loss(v_pred, averaged_targets, beta=1.0)
 
@@ -6714,6 +6716,8 @@ def train_critic_with_planner6(
                         "pred_std": pred_std.item(),
                         "tgt_mean": running_tgt_mean.item(),
                         "tgt_std": running_tgt_std.item(),
+                        "bias": bias.item(),
+                        "mae": mae.item(),
                         "step": k})     
             
             print(
@@ -6723,7 +6727,9 @@ def train_critic_with_planner6(
                 f"pred_mean={pred_mean.item():.3f}  "
                 f"pred_std={pred_std.item():.3f}  "
                 f"tgt_mean={running_tgt_mean.item():.3f}  "
-                f"tgt_std={running_tgt_std.item():.3f}"
+                f"tgt_std={running_tgt_std.item():.3f}  "
+                f"bias={bias.item():.3f}  "
+                f"mae={mae.item():.3f}"
             )
             running = 0.0
 
