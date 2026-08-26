@@ -278,7 +278,7 @@ if __name__ == '__main__':  # pragma: no cover
                                horizon                = 32,
                                gamma                  = 0.99,
                                lam                    = None,
-                               rho                    = 0.0,
+                               rho                    = 0.3,
                                lr                     = 1e-04,
                                min_lr                 = 5e-05,
                                tau                    = 0.001,
