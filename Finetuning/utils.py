@@ -6557,8 +6557,8 @@ def train_critic_with_planner6(
 
     critic.train()
     running = 0.0
-    
-    
+    total_mae = 0.0
+    total_bias = 0.0
     for k in range(1, num_steps + 1):
         if (k - 1) % resample_every == 0:
             with torch.no_grad():
@@ -6696,6 +6696,8 @@ def train_critic_with_planner6(
         #loss = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
         loss = F.smooth_l1_loss(v_pred, averaged_targets, beta=1.0)
         #loss = F.mse_loss(v_pred, averaged_targets)
+        
+
 
         optimizer.zero_grad()
         accelerator.backward(loss)
@@ -6711,23 +6713,27 @@ def train_critic_with_planner6(
                 tp.data.mul_(1 - tau).add_(tau * p.data)
 
         running += loss.item()
+        total_mae += mae.item()
+        total_bias += bias.item()
 
         if log_every > 0 and k % log_every == 0 and is_main:
-            
-            wandb.log({ "loss": running / log_every, 
+            avg_loss = running / log_every
+            avg_mae = total_mae / log_every
+            avg_bias = total_bias / log_every
+            wandb.log({ "loss": avg_loss, 
                         "pred_mean": pred_mean.item(),
                         "pred_std": pred_std.item(),
                         "tgt_mean": averaged_targets.mean().item(),
                         "tgt_std": averaged_targets.std().item(),
                         "tgt_min": averaged_targets.min().item(),
                         'tgt_max': averaged_targets.max().item(),
-                        "bias": bias.item(),
-                        "mae": mae.item(),
+                        "bias": avg_bias,
+                        "mae": avg_mae,
                         "step": k})     
             
             print(
                 f" step {k:>6}/{num_steps} "
-                f"loss = {running / log_every:.10f}  "
+                f"loss = {avg_loss:.10f}  "
                 f"B_eff={B_eff}  U={U}  "
                 f"pred_mean={pred_mean.item():.3f}  "
                 f"pred_std={pred_std.item():.3f}  "
@@ -6735,10 +6741,12 @@ def train_critic_with_planner6(
                 f"tgt_std={averaged_targets.std().item():.3f}  "
                 f"tgt_min={averaged_targets.min().item():.3f}  "
                 f"tgt_max={averaged_targets.max().item():.3f}  "
-                f"bias={bias.item():.3f}  "
-                f"mae={mae.item():.3f}"
+                f"bias={avg_bias:.3f}  "
+                f"mae={avg_mae:.3f}"
             )
             running = 0.0
+            total_bias = 0.0
+            total_mae = 0.0
 
     # final save
     accelerator.wait_for_everyone()

@@ -342,11 +342,11 @@ if __name__ == '__main__':  # pragma: no cover
               "batch_size": 256,
               "oversample": 15,
               "num_steps": 500,
-              "resample_every": 20,
+              "resample_every": 5,
               "train_horizon": 32,             # passed as horizon= to the trainer
               "gamma": 0.99,
               "lam": None,
-              "rho": 0.5,
+              "rho": 0.2,
               "lr": 1e-04,
               "min_lr": 1e-05,
               "tau": 0.001,
