@@ -6714,8 +6714,8 @@ def train_critic_with_planner6(
             wandb.log({ "loss": running / log_every, 
                         "pred_mean": pred_mean.item(),
                         "pred_std": pred_std.item(),
-                        "tgt_mean": running_tgt_mean.item(),
-                        "tgt_std": running_tgt_std.item(),
+                        "tgt_mean": averaged_targets.mean().item(),
+                        "tgt_std": averaged_targets.std().item(),
                         "bias": bias.item(),
                         "mae": mae.item(),
                         "step": k})     
@@ -6726,8 +6726,8 @@ def train_critic_with_planner6(
                 f"B_eff={B_eff}  U={U}  "
                 f"pred_mean={pred_mean.item():.3f}  "
                 f"pred_std={pred_std.item():.3f}  "
-                f"tgt_mean={running_tgt_mean.item():.3f}  "
-                f"tgt_std={running_tgt_std.item():.3f}  "
+                f"tgt_mean={averaged_targets.mean().item():.3f}  "
+                f"tgt_std={averaged_targets.std().item():.3f}  "
                 f"bias={bias.item():.3f}  "
                 f"mae={mae.item():.3f}"
             )
