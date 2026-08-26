@@ -416,7 +416,7 @@ if __name__ == '__main__':  # pragma: no cover
                 critic_checkpoint=hp["new_step"],
                 gamma=hp["gamma"],
                 horizon=hp["horizon"],
-                value_scale=5.0,
+                value_scale=1.0,
                 sigma=6.0,
                 target_reward=2000.0,
                 trajs=trajs,
