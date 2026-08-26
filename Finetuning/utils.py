@@ -6692,7 +6692,8 @@ def train_critic_with_planner6(
             bias = (v_pred - averaged_targets).mean()
             mae = (v_pred - averaged_targets).abs().mean()
         #loss = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
-        loss = F.smooth_l1_loss(v_pred, averaged_targets, beta=1.0)
+        #loss = F.smooth_l1_loss(v_pred, averaged_targets, beta=1.0)
+        loss = F.mse_loss(v_pred, averaged_targets)
 
         optimizer.zero_grad()
         accelerator.backward(loss)
