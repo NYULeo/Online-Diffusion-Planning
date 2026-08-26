@@ -680,7 +680,8 @@ if __name__ == "__main__":
                     num_hidden_layers_critic=4,
                     hidden_dim_critic=512,
             )
-
+    
+    set_seed(1)
     selector = Selector(
                 env_name,
                 specific_train_dataset,
@@ -706,7 +707,7 @@ if __name__ == "__main__":
             base_seed=1,
             task_id=task_id,
             continual_rollout=True,
-            chunk_size=31,
+            chunk_size=15,
             device=device,
             selector=selector,
           )

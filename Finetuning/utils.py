@@ -3143,7 +3143,7 @@ class CriticDataset_Reward(Dataset):
                 
                 
                 # Scale down predicted rewards from reward model
-                rews = np.clip(rews, 0.0, 100.0)      # adjust bounds if needed
+                rews = np.clip(rews, 0.0, np.inf)      # adjust bounds if needed
                 rews = rews / value_scale                    # or use a running std
                 
             
@@ -3413,6 +3413,7 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
            s, target_value, tgt_mean, tgt_std = buffer.obtain_training_data(target_critic, batch, tgt_mean, tgt_std, device)
            s = s.to(device)
            target_value = target_value.to(device)
+           target_value = torch.clamp(target_value, 0.0, 50.0)
 
            # Predicted Q-values
            q_pred = critic(s)
@@ -6609,7 +6610,7 @@ def train_critic_with_planner6(
             
             
               # reward clipping -----------------------------------------------------
-              r_hat = torch.clamp(r_hat, 0.0, 100.0)      # adjust bounds if needed
+              r_hat = torch.clamp(r_hat, 0.0, float('inf'))      # adjust bounds if needed
               r_hat = r_hat / Scale.Q_scale                     # or use a running std
         
               plan_targets = torch.zeros(N, device=device)
@@ -6672,7 +6673,7 @@ def train_critic_with_planner6(
               averaged_targets = averaged_targets / counts.clamp(min=1.0)
               
               averaged_targets = averaged_targets.detach()
-              averaged_targets  = averaged_targets.clamp(0.0, 20.0)
+              averaged_targets  = averaged_targets.clamp(0.0, 50.0)
               
               # running normalization
               batch_mean = averaged_targets.mean()
