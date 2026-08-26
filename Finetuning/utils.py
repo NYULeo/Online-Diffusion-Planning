@@ -6686,6 +6686,9 @@ def train_critic_with_planner6(
         
         # gradient step
         v_pred = critic(s0_critic)
+        with torch.no_grad():
+            pred_mean = v_pred.detach().mean()
+            pred_std = v_pred.detach().std(unbiased=False)
         #loss = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
         loss = F.smooth_l1_loss(v_pred, averaged_targets, beta=1.0)
 
@@ -6706,15 +6709,19 @@ def train_critic_with_planner6(
 
         if log_every > 0 and k % log_every == 0 and is_main:
             
-            wandb.log({"loss": running / log_every, 
-                       "tgt_mean": running_tgt_mean.item(),
-                       "tgt_std": running_tgt_std.item(),
-                       "step": k})     
+            wandb.log({ "loss": running / log_every, 
+                        "pred_mean": pred_mean.item(),
+                        "pred_std": pred_std.item(),
+                        "tgt_mean": running_tgt_mean.item(),
+                        "tgt_std": running_tgt_std.item(),
+                        "step": k})     
             
             print(
                 f" step {k:>6}/{num_steps} "
                 f"loss = {running / log_every:.10f}  "
                 f"B_eff={B_eff}  U={U}  "
+                f"pred_mean={pred_mean.item():.3f}  "
+                f"pred_std={pred_std.item():.3f}  "
                 f"tgt_mean={running_tgt_mean.item():.3f}  "
                 f"tgt_std={running_tgt_std.item():.3f}"
             )
