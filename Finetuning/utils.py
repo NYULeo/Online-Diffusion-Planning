@@ -3009,16 +3009,8 @@ class CriticDataset_Reward(Dataset):
                 #a_t = torch.clamp(a_t, -1.0, 1.0)
                 rews = reward_net(s_t, a_t).cpu().numpy().astype(np.float32)   # (T_traj,)  
                 
-                """
                 # Scale down predicted rewards from reward model
-                rews = np.clip(rews, -20.0, 20.0)      # adjust bounds if needed
-                rews = rews / 5.0                      # or use a running std
-                """
-                
-                
-                
-                # Scale down predicted rewards from reward model
-                rews = np.clip(rews, 0.0, 50.0)      # adjust bounds if needed
+                rews = np.clip(rews, 0.0, float('inf'))      # adjust bounds if needed
                 rews = rews / value_scale                    # or use a running std
                 
             
@@ -6471,15 +6463,9 @@ def train_critic_with_planner6(
                 actions[:, :n].reshape(N * n, -1),
               ).reshape(N, n)  # (N, n)
 
-              """
-               # reward clipping -----------------------------------------------------
-              r_hat = torch.clamp(r_hat, -20.0, 20.0)
-              r_hat = r_hat / 5.0
-              """
-            
             
               # reward clipping -----------------------------------------------------
-              r_hat = torch.clamp(r_hat, 0.0, 50.0)      # adjust bounds if needed
+              r_hat = torch.clamp(r_hat, 0.0, float('inf'))      # adjust bounds if needed
               r_hat = r_hat / Scale.Q_scale                     # or use a running std
         
               plan_targets = torch.zeros(N, device=device)
