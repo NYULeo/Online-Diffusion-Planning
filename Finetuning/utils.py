@@ -6242,7 +6242,8 @@ def train_critic_with_planner6(
     reward_hidden_layers: int = 1,
     reward_hidden_dim: int = 128,
     batch_size: int = 64,
-    num_steps: int = 20000,
+    num_steps: int = 100,
+    resample_every: int = 10,
     horizon: int = 32,
     gamma: float = 0.99,
     lam: Optional[float] = None,
@@ -6558,8 +6559,9 @@ def train_critic_with_planner6(
     running = 0.0
 
     for k in range(1, num_steps + 1):
-        with torch.no_grad():
-            plans, _ = _generate_feasible_plans_parallel(
+        if (k - 1) % resample_every == 0:
+            with torch.no_grad():
+              plans, _ = _generate_feasible_plans_parallel(
                 s0_pool=s0_pool,
                 planner=planner,
                 planner_proc=planner_proc,
@@ -6578,108 +6580,110 @@ def train_critic_with_planner6(
                 batch_size=batch_size,
                 device=device,
                 accelerator=accelerator,
-            )
+              )
 
-            B_eff = plans.shape[0]
-            if B_eff < max(8, batch_size // 4):
-                continue
+              B_eff = plans.shape[0]
+              if B_eff < max(8, batch_size // 4):
+                  continue
 
-            s_planner = plans[..., :obs_dim]
-            actions = torch.clamp(plans[..., obs_dim:], -1.0, 1.0)
-            s_raw = s_planner * planner_std + planner_mean
+              s_planner = plans[..., :obs_dim]
+              actions = torch.clamp(plans[..., obs_dim:], -1.0, 1.0)
+              s_raw = s_planner * planner_std + planner_mean
 
-            N, H, _ = s_raw.shape
-            n = H - 1
+              N, H, _ = s_raw.shape
+              n = H - 1
 
-            # rewards for t = 0 .. n-1
-            s_for_r = (s_raw[:, :n] - r_mean) / r_std
-            r_hat = reward_net(
+              # rewards for t = 0 .. n-1
+              s_for_r = (s_raw[:, :n] - r_mean) / r_std
+              r_hat = reward_net(
                 s_for_r.reshape(N * n, -1),
                 actions[:, :n].reshape(N * n, -1),
-            ).reshape(N, n)  # (N, n)
+              ).reshape(N, n)  # (N, n)
 
-            """
-             # reward clipping -----------------------------------------------------
-            r_hat = torch.clamp(r_hat, -20.0, 20.0)
-            r_hat = r_hat / 5.0
-            """
+              """
+               # reward clipping -----------------------------------------------------
+              r_hat = torch.clamp(r_hat, -20.0, 20.0)
+              r_hat = r_hat / 5.0
+              """
             
             
-            # reward clipping -----------------------------------------------------
-            r_hat = torch.clamp(r_hat, 0.0, 100.0)      # adjust bounds if needed
-            r_hat = r_hat / Scale.Q_scale                     # or use a running std
+              # reward clipping -----------------------------------------------------
+              r_hat = torch.clamp(r_hat, 0.0, 100.0)      # adjust bounds if needed
+              r_hat = r_hat / Scale.Q_scale                     # or use a running std
         
-            plan_targets = torch.zeros(N, device=device)
+              plan_targets = torch.zeros(N, device=device)
 
-            if lam is not None:
+              if lam is not None:
                 # λ-return (unchanged)
-                w = 1.0 - lam
-                weight_sum = 0.0
+                  w = 1.0 - lam
+                  weight_sum = 0.0
 
-                for L in range(1, n):  # L = 1 .. n-1
-                    discounts = gamma_pow_t[:L]
-                    disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
-                    s_L = (s_raw[:, L] - c_mean) / c_std
-                    v_boot = target_critic(s_L)
-                    #v_boot = (v_boot * running_tgt_std) + running_tgt_mean
-                    partial = disc_return + (gamma ** L) * v_boot
-                    plan_targets += w * partial
-                    weight_sum += w
-                    w *= lam
+                  for L in range(1, n):  # L = 1 .. n-1
+                      discounts = gamma_pow_t[:L]
+                      disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
+                      s_L = (s_raw[:, L] - c_mean) / c_std
+                      v_boot = target_critic(s_L)
+                      #v_boot = (v_boot * running_tgt_std) + running_tgt_mean
+                      partial = disc_return + (gamma ** L) * v_boot
+                      plan_targets += w * partial
+                      weight_sum += w
+                      w *= lam
 
-                plan_targets = plan_targets / max(weight_sum, 1e-8)
+                  plan_targets = plan_targets / max(weight_sum, 1e-8)
 
-            else:
-                # Conservative multi-horizon target:
-                #   R^K = sum_{t=0}^{K-1} γ^t r̂_t + γ^K V_bar(s_K),  K = 1..n-1
-                #   R_mean = mean_K R^K
-                #   R_std  = std_K(R^K)
-                #   R_target = R_mean - rho * R_std
-                r_list = []
-                for L in range(1, n):  # L = 1 .. n-1  ↔ K = 2 .. N in 1-based form
-                    discounts = gamma_pow_t[:L]
-                    disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
-                    s_L = (s_raw[:, L] - c_mean) / c_std
-                    v_boot = target_critic(s_L)
-                    #print(f"critic value normalized: {v_boot.mean().item()}")
-                    #v_boot = (v_boot * running_tgt_std) + running_tgt_mean
-                    #print(f"critic value denormalized: {v_boot.mean().item()}")
-                    partial = disc_return + (gamma ** L) * v_boot
-                    r_list.append(partial)
+              else:
+                  # Conservative multi-horizon target:
+                  #   R^K = sum_{t=0}^{K-1} γ^t r̂_t + γ^K V_bar(s_K),  K = 1..n-1
+                  #   R_mean = mean_K R^K
+                  #   R_std  = std_K(R^K)
+                  #   R_target = R_mean - rho * R_std
+                  r_list = []
+                  for L in range(1, n):  # L = 1 .. n-1  ↔ K = 2 .. N in 1-based form
+                      discounts = gamma_pow_t[:L]
+                      disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
+                      s_L = (s_raw[:, L] - c_mean) / c_std
+                      v_boot = target_critic(s_L)
+                      #print(f"critic value normalized: {v_boot.mean().item()}")
+                      #v_boot = (v_boot * running_tgt_std) + running_tgt_mean
+                      #print(f"critic value denormalized: {v_boot.mean().item()}")
+                      partial = disc_return + (gamma ** L) * v_boot
+                      r_list.append(partial)
 
-                R = torch.stack(r_list, dim=1)  # (N, n-1)
-                R_mean = R.mean(dim=1)          # (N,)
-                R_std = R.std(dim=1, unbiased=False).clamp(min=0.0)  # (N,)
-                plan_targets = R_mean - rho * R_std
+                  R = torch.stack(r_list, dim=1)  # (N, n-1)
+                  R_mean = R.mean(dim=1)          # (N,)
+                  R_std = R.std(dim=1, unbiased=False).clamp(min=0.0)  # (N,)
+                  plan_targets = R_mean - rho * R_std
 
-            # ----- average targets per unique s0 -----
-            s0_raw = s_raw[:, 0]
-            s0_key = torch.round(s0_raw * 1e5) / 1e5
+              # ----- average targets per unique s0 -----
+              s0_raw = s_raw[:, 0]
+              s0_key = torch.round(s0_raw * 1e5) / 1e5
 
-            unique_s0, inverse_indices = torch.unique(
+              unique_s0, inverse_indices = torch.unique(
                 s0_key, dim=0, return_inverse=True
-            )
+              )
 
-            U = unique_s0.shape[0]
-            averaged_targets = torch.zeros(U, device=device)
-            counts = torch.zeros(U, device=device)
+              U = unique_s0.shape[0]
+              averaged_targets = torch.zeros(U, device=device)
+              counts = torch.zeros(U, device=device)
 
-            averaged_targets.index_add_(0, inverse_indices, plan_targets)
-            counts.index_add_(0, inverse_indices, torch.ones_like(plan_targets))
-            averaged_targets = averaged_targets / counts.clamp(min=1.0)
+              averaged_targets.index_add_(0, inverse_indices, plan_targets)
+              counts.index_add_(0, inverse_indices, torch.ones_like(plan_targets))
+              averaged_targets = averaged_targets / counts.clamp(min=1.0)
+              
+              averaged_targets = averaged_targets.detach()
+              
+              # running normalization
+              batch_mean = averaged_targets.mean()
+              batch_std = averaged_targets.std(unbiased=False) + 1e-8
+              running_tgt_mean = alpha * running_tgt_mean + (1 - alpha) * batch_mean
+              running_tgt_std = alpha * running_tgt_std + (1 - alpha) * batch_std
+              #normalized_target = (averaged_targets - running_tgt_mean) / running_tgt_std
             
-            
-            # running normalization
-            batch_mean = averaged_targets.mean()
-            batch_std = averaged_targets.std(unbiased=False) + 1e-8
-            running_tgt_mean = alpha * running_tgt_mean + (1 - alpha) * batch_mean
-            running_tgt_std = alpha * running_tgt_std + (1 - alpha) * batch_std
-            #normalized_target = (averaged_targets - running_tgt_mean) / running_tgt_std
-            
 
-            # critic input
-            s0_critic = (unique_s0 - c_mean) / c_std
-
+              # critic input
+              s0_critic = (unique_s0 - c_mean) / c_std
+              s0_critic = s0_critic.detach()
+        
         # gradient step
         v_pred = critic(s0_critic)
         #loss = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
