@@ -6557,7 +6557,8 @@ def train_critic_with_planner6(
 
     critic.train()
     running = 0.0
-
+    
+    
     for k in range(1, num_steps + 1):
         if (k - 1) % resample_every == 0:
             with torch.no_grad():
@@ -6692,8 +6693,8 @@ def train_critic_with_planner6(
             bias = (v_pred - averaged_targets).mean()
             mae = (v_pred - averaged_targets).abs().mean()
         #loss = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
-        #loss = F.smooth_l1_loss(v_pred, averaged_targets, beta=1.0)
-        loss = F.mse_loss(v_pred, averaged_targets)
+        loss = F.smooth_l1_loss(v_pred, averaged_targets, beta=1.0)
+        #loss = F.mse_loss(v_pred, averaged_targets)
 
         optimizer.zero_grad()
         accelerator.backward(loss)
@@ -6717,6 +6718,8 @@ def train_critic_with_planner6(
                         "pred_std": pred_std.item(),
                         "tgt_mean": averaged_targets.mean().item(),
                         "tgt_std": averaged_targets.std().item(),
+                        "tgt_min": averaged_targets.min().item(),
+                        'tgt_max': averaged_targets.max().item(),
                         "bias": bias.item(),
                         "mae": mae.item(),
                         "step": k})     
@@ -6729,6 +6732,8 @@ def train_critic_with_planner6(
                 f"pred_std={pred_std.item():.3f}  "
                 f"tgt_mean={averaged_targets.mean().item():.3f}  "
                 f"tgt_std={averaged_targets.std().item():.3f}  "
+                f"tgt_min={averaged_targets.min().item():.3f}  "
+                f"tgt_max={averaged_targets.max().item():.3f}  "
                 f"bias={bias.item():.3f}  "
                 f"mae={mae.item():.3f}"
             )
