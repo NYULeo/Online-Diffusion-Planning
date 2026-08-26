@@ -39,6 +39,11 @@ import random
 import torch.distributed as dist
 import wandb
 
+def symlog(x):
+    return torch.sign(x) * torch.log1p(x.abs())
+
+def symexp(z):
+    return torch.sign(z) * torch.expm1(z.abs())
 
 class TrajectoryDict(TypedDict):
     observations: np.ndarray
@@ -3172,6 +3177,7 @@ class Critic_Buffer_Reward():
             #value_targets = values[:, 0] + advantages[:, 0]   # (B,)
             with torch.no_grad():
                  values = target_critic(obs_chunks)                      # (B, T)
+                 values = symexp(values)
                  deltas = (
                        rews_chunks[:, :-1]
                        + self.gamma * values[:, 1:]
@@ -3283,6 +3289,7 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
            s, target_value, tgt_mean, tgt_std = buffer.obtain_training_data(target_critic, batch, tgt_mean, tgt_std, device)
            s = s.to(device)
            target_value = target_value.to(device)
+           target_value = symlog(target_value)
            #target_value = torch.clamp(target_value, 0.0, 50.0)
 
            # Predicted Q-values
@@ -6487,6 +6494,7 @@ def train_critic_with_planner6(
                       disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
                       s_L = (s_raw[:, L] - c_mean) / c_std
                       v_boot = target_critic(s_L)
+                      v_boot = symexp(v_boot)
                       #v_boot = (v_boot * running_tgt_std) + running_tgt_mean
                       partial = disc_return + (gamma ** L) * v_boot
                       plan_targets += w * partial
@@ -6510,6 +6518,7 @@ def train_critic_with_planner6(
                       #print(f"critic value normalized: {v_boot.mean().item()}")
                       #v_boot = (v_boot * running_tgt_std) + running_tgt_mean
                       #print(f"critic value denormalized: {v_boot.mean().item()}")
+                      v_boot = symexp(v_boot)
                       partial = disc_return + (gamma ** L) * v_boot
                       r_list.append(partial)
 
@@ -6536,6 +6545,7 @@ def train_critic_with_planner6(
               
               averaged_targets = averaged_targets.detach()
               #averaged_targets  = averaged_targets.clamp(0.0, 50.0)
+              averaged_targets = symlog(averaged_targets)
               
               # running normalization
               batch_mean = averaged_targets.mean()
@@ -6557,11 +6567,7 @@ def train_critic_with_planner6(
             bias = (v_pred - averaged_targets).mean()
             mae = (v_pred - averaged_targets).abs().mean()
         #loss = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
-        #loss = F.smooth_l1_loss(v_pred, averaged_targets, beta=1.0)
-        err = F.smooth_l1_loss(v_pred, averaged_targets, reduction='none')   # shape (U,)
-        w = 1.0 / (1.0 + averaged_targets.abs())
-        w = w / w.mean().clamp_min(1e-8)
-        loss = (w * err).mean()
+        loss = F.smooth_l1_loss(v_pred, averaged_targets, beta=1.0)
         #loss = F.mse_loss(v_pred, averaged_targets)
         
 
