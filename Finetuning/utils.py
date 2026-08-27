@@ -6398,7 +6398,7 @@ def train_critic_with_planner6(
         running_tgt_std = q_stats.Q_std
     """
     
-    Scale = get_Q_scale(dataset_name, specific_dataset, task_id)
+    #Scale = get_Q_scale(dataset_name, specific_dataset, task_id)
     running_tgt_mean = torch.zeros(1, device=device)
     running_tgt_std = torch.ones(1, device=device)
     
@@ -6467,7 +6467,7 @@ def train_critic_with_planner6(
             
               # reward clipping -----------------------------------------------------
               r_hat = torch.clamp(r_hat, 0.0, float('inf'))      # adjust bounds if needed
-              r_hat = r_hat / Scale.Q_scale                     # or use a running std
+              #r_hat = r_hat / Scale.Q_scale                     # or use a running std
         
               plan_targets = torch.zeros(N, device=device)
 
@@ -6531,7 +6531,7 @@ def train_critic_with_planner6(
               averaged_targets = averaged_targets / counts.clamp(min=1.0)
               
               averaged_targets = averaged_targets.detach()
-              #averaged_targets  = averaged_targets.clamp(0.0, 50.0)
+              averaged_targets  = averaged_targets.clamp(0.0, float('inf'))
               averaged_targets = symlog(averaged_targets)
               
               # running normalization

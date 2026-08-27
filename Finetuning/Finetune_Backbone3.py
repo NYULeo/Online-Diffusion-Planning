@@ -272,10 +272,14 @@ class OnlineFinetuner():
                gradient_accumulation_steps = self.config.gradient_accumulate_every,
         )
         if self.accelerator.is_main_process:
+           if(self.config.offline): 
+                name = f"{self.config.dataset_name}-{self.config.specific_dataset}-task{self.config.train_reward_config.task_id}-finetune-offline"
+           else:
+                name = f"{self.config.dataset_name}-{self.config.specific_dataset}-task{self.config.train_reward_config.task_id}-finetune-online"
            wandb.init(
                     entity="kaiwen_hu-uc-berkeley",
                     project="ODP",
-                    name=f"{self.config.dataset_name}-{self.config.specific_dataset}-task{self.config.train_reward_config.task_id}-finetune",
+                    name=name,
                     config={'finetune_config': asdict(self.config)},
                 )
         self.device = self.accelerator.device

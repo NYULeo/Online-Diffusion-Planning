@@ -311,6 +311,7 @@ if __name__ == "__main__":
                             warm_up_log_every = 100,
                             lr = 1e-04,
                             min_lr = 1e-06,
+                            rho = 0.2,
                             tau = 0.001,
                             gamma = 0.99,
                             lam = None,
