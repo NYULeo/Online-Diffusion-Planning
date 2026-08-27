@@ -682,6 +682,7 @@ if __name__ == "__main__":
             )
     
     set_seed(1)
+    
     """
     selector = Selector(
                 env_name,
@@ -689,10 +690,10 @@ if __name__ == "__main__":
                 RConfig,
                 reward_checkpoint=0,
                 kernel_checkpoint=0,
-                critic_checkpoint=90,   # omit or None to use TotalReward only
+                critic_checkpoint=checkpoint,   # omit or None to use TotalReward only
                 task_id=task_id,
                 lam=0.0,
-                n_candidates=0,
+                n_candidates=50,
             )
     """
     return_value, length = rollout(
@@ -709,7 +710,7 @@ if __name__ == "__main__":
             base_seed=1,
             task_id=task_id,
             continual_rollout=True,
-            chunk_size=15,
+            chunk_size=20,
             device=device,
             #selector=selector,
           )
