@@ -30,6 +30,7 @@ except ImportError:
     raise ImportError("accelerate is required but not installed. Run: pip install accelerate")
 from accelerate.utils import broadcast
 import pickle
+import wandb
 
 
 @dataclass
@@ -738,6 +739,7 @@ class Acc_AdjointMatchingFineTuner:
                 if ((((round-1)*self.config.per_round_steps + step) % self.config.update_ema_every) == 0):
                      self.step_ema(((round-1)*self.config.per_round_steps + step))
                 
+                """
                 if ((step % self.config.log_freq) == 0):
                     print('---------------------------------------------------------')
                     if(step == 0):
@@ -746,18 +748,56 @@ class Acc_AdjointMatchingFineTuner:
                          print(f"round: {round}, step: {step}, reward {pure_reward }")
                          print(f"round: {round}, step: {step}, constraint {total_C}")
                          print(f"round: {round}, step: {step}, alpha {self.alpha_scheduler.get_alpha()}")
+                         wandb.log({
+                             "step": step,
+                             "pure_reward": pure_reward,
+                             "constraint": total_C,
+                         })
                     else:
                          print(f"round: {round}, step: {step}, loss {total_loss / self.config.log_freq}")
                          print(f"round: {round}, step: {step}, total reward {total_reward / self.config.log_freq}")
                          print(f"round: {round}, step: {step}, reward {pure_reward / self.config.log_freq}")
                          print(f"round: {round}, step: {step}, constraint {total_C / self.config.log_freq}")
                          print(f"round: {round}, step: {step}, alpha {self.alpha_scheduler.get_alpha()}")
+                         wandb.log({
+                             "step": step,
+                             "pure_reward": pure_reward,
+                             "constraint": total_C,
+                         })
                     total_loss = 0.0
                     total_reward = 0.0
                     pure_reward = 0.0
                     total_C = 0.0
 
-                    
+                """
+                if ((step % self.config.log_freq) == 0):
+                         global_step = (round - 1) * self.config.per_round_steps + step
+                         denom = 1.0 if step == 0 else float(self.config.log_freq)
+                         log_loss = total_loss / denom
+                         log_reward = total_reward / denom
+                         log_pure = pure_reward / denom
+                         log_C = total_C / denom
+
+                         print('---------------------------------------------------------')
+                         print(f"round: {round}, step: {step}, loss {log_loss}")
+                         print(f"round: {round}, step: {step}, total reward {log_reward}")
+                         print(f"round: {round}, step: {step}, reward {log_pure}")
+                         print(f"round: {round}, step: {step}, constraint {log_C}")
+                         print(f"round: {round}, step: {step}, alpha {self.alpha_scheduler.get_alpha()}")
+                         wandb.log({
+                                "finetune/loss": log_loss,
+                                "finetune/reward": log_reward,
+                                "finetune/pure_reward": log_pure,
+                                "finetune/constraint": log_C,
+                                "finetune/alpha": self.alpha_scheduler.get_alpha(),
+                                "finetune/step": global_step,
+                         })
+
+                         total_loss = 0.0
+                         total_reward = 0.0
+                         pure_reward = 0.0
+                         total_C = 0.0
+
                 if ((step % self.config.save_freq == 0) and (step!=0)):
                     model_name = getName(self.config.dataset_name, self.config.specific_dataset)
                     #model_name = get_PlannerName(self.config.dataset_name, self.config.specific_dataset)

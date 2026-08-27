@@ -15,7 +15,7 @@ import json
 import os
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
-
+import wandb
 
 def load_finetuning_args(env_name: str, specific_env: str, base_path: str = None) -> FinetuningConfig:
    
@@ -252,7 +252,6 @@ if __name__ == "__main__":
     train_buffer_cutoff_length = 1000
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = True)
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32, backbone_layers = 4, eta = 0.0)
-
     RWConfig = RewardConfig(
                beta = 1.0, 
                min_log_prob = -110.0,
@@ -288,7 +287,7 @@ if __name__ == "__main__":
                             kernel_num_modes = 10,
                             kernel_noise_floor = 5e-4,
                             λ_reg = 1e-3,
-                            oversample = 5)
+                            oversample = 20)
     """
     TrainCriticConfig = Train_Critic_Config(
                             hidden_layers = 4,
@@ -305,16 +304,17 @@ if __name__ == "__main__":
     TrainCriticConfig = Train_Critic_Config(
                             hidden_layers = 4,
                             hidden_dim = 512,
-                            batch_size = 64,
+                            batch_size = 256,
                             #batch_size = 63,
                             num_steps = 20,
                             warm_up_steps = 1000,
                             warm_up_log_every = 100,
-                            lr = 1e-06,
-                            min_lr = 1e-09,
-                            tau = 0.005,
+                            lr = 1e-04,
+                            min_lr = 1e-06,
+                            tau = 0.001,
                             gamma = 0.99,
                             lam = None,
+                            resample_every = 2,
                             data_conservation = True,
                             momentum = 0.1)
 

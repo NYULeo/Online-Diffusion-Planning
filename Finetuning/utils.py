@@ -6580,6 +6580,7 @@ def train_critic_with_planner6(
             avg_loss = running / log_every
             avg_mae = total_mae / log_every
             avg_bias = total_bias / log_every
+            """
             wandb.log({ "loss": avg_loss, 
                         "pred_mean": pred_mean.item(),
                         "pred_std": pred_std.item(),
@@ -6590,7 +6591,19 @@ def train_critic_with_planner6(
                         "bias": avg_bias,
                         "mae": avg_mae,
                         "step": k})     
-            
+            """
+            wandb.log({
+                    "critic/loss": avg_loss,
+                    "critic/pred_mean": pred_mean.item(),
+                    "critic/pred_std": pred_std.item(),
+                    "critic/tgt_mean": averaged_targets.mean().item(),
+                    "critic/tgt_std": averaged_targets.std().item(),
+                    "critic/tgt_min": averaged_targets.min().item(),
+                    "critic/tgt_max": averaged_targets.max().item(),
+                    "critic/bias": avg_bias,
+                    "critic/mae": avg_mae,
+                    "critic/step": k,
+            })
             print(
                 f" step {k:>6}/{num_steps} "
                 f"loss = {avg_loss:.10f}  "
