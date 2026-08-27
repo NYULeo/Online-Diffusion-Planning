@@ -1746,7 +1746,8 @@ def test_critic(dataset_name: str,
             rews_chunk = rews_chunk.to(device)
 
             pred = model(s).squeeze(-1)                # (B,)  ← normalized V(s)
-            pred = value_scale * pred
+            #pred = value_scale * pred
+            pred = symexp(pred)
             """
             if(mean is not None and std is not None):
                 pred = (pred * std_pred) + mean_pred
