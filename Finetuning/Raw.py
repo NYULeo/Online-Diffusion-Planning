@@ -21,12 +21,23 @@ from scipy.ndimage import gaussian_filter1d
 from Pretrain.utils import ema_smooth
 from Pretrain.Dataset import get_dataset
 import ogbench
-from Finetuning.Rollout import load_success_trajs
-from Finetuning.utils import reward_processor
-from typing import Optional, List
+from Finetuning.utils import reward_processor, check_device, symexp
+from typing import Optional, List, Union
 from torch.utils.data import Dataset
 import torch.nn as nn
-from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
+from Pretrain.Planners.Backbone.Sampler import (
+    sample_euler_karras,
+    clip_actions,
+    karras_beta_schedule,
+    cosine_beta,
+)
+from Finetuning.traj_reward5 import TotalReward_Critic, RewardConfig, TotalReward
+from Pretrain.Transition_Kernel.Kernel_Backbone import (
+    compute_log_density_mog,
+)
+import math
+import torch
+import torch.nn.functional as F
 
 def check_increase(rewards):
     for i in range(1, len(rewards)):
@@ -36,40 +47,245 @@ def check_increase(rewards):
     return True
 
 
-goals = {'task_1': np.array( [ 0.0,       -1.0,        0.199599]), 
-         'task_2': np.array([7.50000000e-01, 8.02418254e-18, 1.99598996e-01]),
-         'task_3': np.array([-7.50000000e-01,  1.21832368e-19,  1.99598996e-01]),
-         'task_4': np.array([0.75,     2.0,       0.199599]),
-         'task_5': np.array([ 0.75,     -2.0,        0.199599])}
-    
-def check_cube_single_goal_reach(trajs, task_id):   
-    goals = {'task_1': np.array( [ 0.0,       -1.0,        0.199599]), 
-         'task_2': np.array([7.50000000e-01, 8.02418254e-18, 1.99598996e-01]),
-         'task_3': np.array([-7.50000000e-01,  1.21832368e-19,  1.99598996e-01]),
-         'task_4': np.array([0.75,     2.0,       0.199599]),
-         'task_5': np.array([ 0.75,     -2.0,        0.199599])}
-    
-    total_dist = 0.0
-    for traj in trajs:
-           position = traj['observations'][-1][19:22]
-           total_dist += np.linalg.norm(position - goals[f"task_{task_id}"])
-    average_dist = total_dist/len(trajs)
-    print(f"Task {task_id} average distance: {average_dist}")
+# ---------------------------------------------------------------------------
+# Batched selector rollout — same formulas as Rollout.py / traj_reward5.py
+# Speedup is batching only: one DiT reverse SDE and one predict over N plans.
+# ---------------------------------------------------------------------------
 
-def check_cube_double_goal_reach(trajs, task_id):   
-    goals = {   'task_1': [np.array([0.00000000e+00, 4.40762988e-19, 1.99598996e-01]),  np.array([0.0,   1.0,   0.199599])], 
-                'task_2': [np.array([-0.75,      1.0,        0.199599]),  np.array([0.75,     1.0,       0.199599])],
-                'task_3': [np.array([0.0,       -2.0,        0.199599]),  np.array([0.0,      2.0,       0.199599])],
-                'task_4': [np.array([0.0,        1.0,        0.199599]),  np.array([0.0,       -1.0,        0.199599])],
-                'task_5': [np.array([0.00000000e+00,  -3.99397428e-18,   1.99213779e-01]),  np.array([0.00000000e+00,   9.37726514e-18,   5.99039293e-01])]     }
-    total_dist = 0.0
-    for traj in trajs:
-           position_1 = traj['observations'][-1][19:22]
-           position_2 = traj['observations'][-1][28:31]
-           dist_1 = np.linalg.norm(position_1 - goals[f"task_{task_id}"][0])
-           dist_2 = np.linalg.norm(position_2 - goals[f"task_{task_id}"][1])
-           total_dist += dist_1 + dist_2
-    average_dist = total_dist/len(trajs)
-    print(f"Task {task_id} average distance: {average_dist}")
+def _flatten_sa(s: torch.Tensor, a: torch.Tensor, s_next: Optional[torch.Tensor] = None):
+    N, T, d_s = s.shape
+    s_f = s.reshape(N * T, d_s)
+    a_f = a.reshape(N * T, a.shape[-1])
+    if s_next is None:
+        return s_f, a_f, N, T
+    return s_f, a_f, s_next.reshape(N * T, d_s), N, T
 
+def _norm_obs_stat(s: torch.Tensor, stat, device) -> torch.Tensor:
+    s_n = stat.norm_obs(s.detach().cpu().numpy())
+    return torch.from_numpy(np.ascontiguousarray(s_n, dtype=np.float32)).to(device)
 
+def _constraint_c(model, s_norm: torch.Tensor, a: torch.Tensor, s_next_norm: torch.Tensor) -> torch.Tensor:
+    """Batched copy of TotalReward / TotalReward_Critic.sigmoid."""
+    if model.config.type_kernel == "robust":
+        total = None
+        for kernel in model.kernels:
+            mu, log_std = kernel(s_norm, a)
+            lp = kernel.log_prob(s_next_norm, mu, log_std)
+            total = lp if total is None else total + lp
+        avg = total / len(model.kernels)
+    else:
+        avg = compute_log_density_mog(model.kernels, s_norm, a, s_next_norm)
+    return F.softplus(model.config.min_log_prob - avg, beta=model.config.beta)
+
+@torch.no_grad()
+def sample_euler_karras_batch(
+    s0: np.ndarray,
+    score_model: torch.nn.Module,
+    d_s: int,
+    d_a: int,
+    horizon: int,
+    num_steps: int = 50,
+    num_karras: int = 5,
+    eta: float = 1.0,
+    n_samples: int = 1,
+    device: Optional[str] = None,
+) -> torch.Tensor:
+    """Same Euler–Karras reverse SDE as sample_euler_karras, batch of n_samples."""
+    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    s0_t = torch.tensor(s0, device=device, dtype=torch.float32)
+    if s0_t.shape[0] != d_s:
+        raise ValueError(f"s0 should have shape ({d_s},), but got {s0_t.shape}")
+
+    B = int(n_samples)
+    dim = d_s + d_a
+
+    t_grid, beta_1, sigma_grid = karras_beta_schedule(num_steps, device=device)
+    beta_2 = cosine_beta(t_grid, s=0.008)
+
+    x = torch.cat(
+        [torch.randn(1, horizon, dim, device=device) * sigma_grid[0] for _ in range(B)],
+        dim=0,
+    )
+    mask = torch.zeros(B, horizon, dim, device=device)
+    mask[:, 0, :d_s] = 1.0
+    y = torch.zeros_like(x)
+    y[:, 0, :d_s] = s0_t
+    x = mask * y + (1 - mask) * x
+
+    for i in range(num_steps):
+        t_now = t_grid[i]
+        t_next = t_grid[i + 1] if i < num_steps - 1 else 0.0
+        dt = (t_next - t_now).item()
+        beta_now = (beta_1[i] if i < num_karras else beta_2[i]).item()
+
+        drift = -0.5 * beta_now * x
+        score = score_model(x, t_now.unsqueeze(0))
+
+        if eta > 0:
+            noise = torch.cat(
+                [torch.randn(1, horizon, dim, device=device) for _ in range(B)],
+                dim=0,
+            )
+            noise_scale = eta * math.sqrt(beta_now * (-dt))
+            x = x + ((drift - beta_now * score) * dt + noise_scale * noise)
+        else:
+            x = x + (drift - beta_now * score) * dt
+
+        x = mask * y + (1 - mask) * x
+        x = clip_actions(x, d_s)
+
+    return x
+
+@torch.no_grad()
+def predict_batch_total_reward(model: TotalReward, x: torch.Tensor, lam: float) -> torch.Tensor:
+    """Vectorized TotalReward.predict. x: (N, H, d_s+d_a) -> scores (N,)"""
+    N, H, _ = x.shape
+    d_s = model.config.d_s
+    i = torch.arange(H - 1, device=x.device, dtype=x.dtype)
+    gamma = model.config.critic_gamma
+
+    s = x[..., :d_s]
+    a = x[..., d_s:]
+    r = model.reward_net(_norm_obs_stat(s, model.reward_stat, x.device), a)
+    total = ((gamma ** i) * r[:, :-1]).sum(dim=-1) / H
+    total = total + ((gamma ** (H - 1)) * r[:, -1]) / H
+
+    s_k = _norm_obs_stat(s, model.kernel_stat, x.device)
+    s_t, a_t, s_tp, _, _ = _flatten_sa(s_k[:, :-1], a[:, :-1], s_k[:, 1:])
+    c = _constraint_c(model, s_t, a_t, s_tp).view(N, H - 1)
+    total = total - lam * (c.sum(dim=-1) / (H - 1))
+    total = total + lam * model.config.delta
+    return total
+
+@torch.no_grad()
+def predict_batch_total_reward_critic(model: TotalReward_Critic, x: torch.Tensor, lam: float) -> torch.Tensor:
+    """Vectorized TotalReward_Critic.predict. x: (N, H, d_s+d_a) -> scores (N,)"""
+    N, H, _ = x.shape
+    d_s, d_c = model.config.d_s, model.config.critic_d_s
+    i = torch.arange(H - 1, device=x.device, dtype=x.dtype)
+    gamma = model.config.critic_gamma
+
+    s = x[..., :d_s]
+    a = x[..., d_s:].clamp(-1.0, 1.0)
+
+    r = model.reward_net(_norm_obs_stat(s, model.reward_stat, x.device)[:, :-1], a[:, :-1])
+    total = (r * ((H - 1 - i) * (gamma ** i))).sum(dim=-1)
+
+    v = symexp(model.critic(_norm_obs_stat(s[..., :d_c], model.critic_stat, x.device)[:, 1:]))
+    total = total + (v * (gamma ** (i + 1))).sum(dim=-1)
+    total = total / (H - 1)
+
+    s_k = _norm_obs_stat(s, model.kernel_stat, x.device)
+    s_t, a_t, s_tp, _, _ = _flatten_sa(s_k[:, :-1], a[:, :-1], s_k[:, 1:])
+    c = _constraint_c(model, s_t, a_t, s_tp).view(N, H - 1)
+    total = total - lam * c.sum(dim=-1)
+    total = total + lam * model.config.delta
+    return total
+
+def predict_batch(model: nn.Module, x: torch.Tensor, lam: float) -> torch.Tensor:
+    if isinstance(model, TotalReward_Critic):
+        return predict_batch_total_reward_critic(model, x, lam)
+    if isinstance(model, TotalReward):
+        return predict_batch_total_reward(model, x, lam)
+    raise TypeError(f"Unsupported selector model: {type(model)}")
+
+class Selector:
+    """Same constructor / select_plan contract as Finetuning.Rollout.Selector."""
+
+    def __init__(
+        self,
+        env_name,
+        specific_env,
+        RConfig: RewardConfig,
+        reward_checkpoint: int,
+        kernel_checkpoint: int,
+        critic_checkpoint: Optional[int] = None,
+        task_id: Optional[int] = None,
+        lam: float = 0.0,
+        n_candidates: int = 30,
+    ):
+        self.env_name = env_name
+        self.specific_env = specific_env
+        self.RConfig = RConfig
+        self.task_id = task_id
+        self.lam = lam
+        self.n_candidates = n_candidates
+        self.device = check_device()
+
+        if critic_checkpoint is not None:
+            self.model = TotalReward_Critic(
+                self.device,
+                RConfig,
+                env_name,
+                specific_env,
+                reward_checkpoint,
+                kernel_checkpoint,
+                critic_checkpoint,
+                task_id,
+            )
+        else:
+            self.model = TotalReward(
+                self.device,
+                RConfig,
+                env_name,
+                specific_env,
+                reward_checkpoint,
+                kernel_checkpoint,
+                task_id,
+            )
+        self.model.eval()
+
+    def select_plan(self, plans: Union[torch.Tensor, List[np.ndarray], np.ndarray]) -> np.ndarray:
+        if isinstance(plans, list):
+            if len(plans) == 0:
+                raise ValueError("select_plan received an empty plan list")
+            plans = torch.stack(
+                [
+                    p.detach().float() if isinstance(p, torch.Tensor)
+                    else torch.from_numpy(np.ascontiguousarray(p, dtype=np.float32))
+                    for p in plans
+                ],
+                dim=0,
+            )
+        elif isinstance(plans, np.ndarray):
+            plans = torch.from_numpy(np.ascontiguousarray(plans, dtype=np.float32))
+
+        plans = plans.detach().float().to(self.device)
+        if plans.dim() == 2:
+            plans = plans.unsqueeze(0)
+        if plans.numel() == 0:
+            raise ValueError("select_plan received an empty plan list")
+
+        with torch.no_grad():
+            rewards = predict_batch(self.model, plans, self.lam)
+            rewards_np = [float(v) for v in rewards.detach().cpu()]
+            idx = int(np.argmax(rewards_np))
+        return plans[idx].detach().cpu().numpy().astype(np.float32, copy=True)
+
+@torch.no_grad()
+def sample_selected_plan(
+    current_state_norm,
+    model,
+    d_s: int,
+    d_a: int,
+    horizon: int,
+    steps_T: int,
+    num_karras: int,
+    eta: float,
+    device,
+    selector: Selector,
+) -> np.ndarray:
+    """Replacement for the N serial sample_euler_karras + select_plan block."""
+    plans = sample_euler_karras_batch(
+        current_state_norm,
+        model,
+        d_s,
+        d_a,
+        horizon,
+        num_steps=steps_T,
+        num_karras=num_karras,
+        eta=eta,
+        n_samples=selector.n_candidates,
+        device=device,
+    )
+    return selector.select_plan(plans)

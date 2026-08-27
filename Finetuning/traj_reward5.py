@@ -247,6 +247,7 @@ class TotalReward(nn.Module):
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward, gradient
 
+
 """
 class TotalReward_Critic(nn.Module):
     def __init__(self, device, config: RewardConfig, dataset_name: str, specific_dataset: str, reward_checkpoint: int, kernel_checkpoint: int, critic_checkpoint: int, task_id: Optional[int] = None):
@@ -470,8 +471,10 @@ class TotalReward_Critic(nn.Module):
             
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward, gradient
-
 """
+
+
+
 
 class TotalReward_Critic(nn.Module):
     def __init__(self, device, config: RewardConfig, dataset_name: str, specific_dataset: str, reward_checkpoint: int, kernel_checkpoint: int, critic_checkpoint: int, task_id: Optional[int] = None):
@@ -695,7 +698,6 @@ class TotalReward_Critic(nn.Module):
             
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward, gradient
-
 
 
 

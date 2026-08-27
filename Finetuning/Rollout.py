@@ -11,11 +11,9 @@ from Pretrain.Dataset import get_env
 from Pretrain.Planners.Backbone.Dit import DiT1d
 from torch.utils.data import DataLoader
 from Finetuning.utils import cycle
-#from Pretrain.Planners.Backbone.utils import get_pretrained_planner
-from Finetuning.utils import get_planner, get_normalized_score, get_expert_score, PlannerDataset, get_current_state, reward_processor, check_device
+from Finetuning.utils import get_planner, PlannerDataset, get_current_state, reward_processor, check_device
 from Pretrain.Dataset import Planner_Processor, get_dataset
 from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde, sample_euler_karras, sample_euler_karras2
-from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
 import pickle
 import random
 import gymnasium as gym
@@ -26,8 +24,9 @@ from typing import Optional, List
 from dataclasses import dataclass
 from typing import List
 from Finetuning.traj_reward5 import TotalReward_Critic, RewardConfig, TotalReward
+from Finetuning.Raw import Selector, sample_selected_plan
 
-
+"""
 class Selector:
     def __init__(
         self,
@@ -88,6 +87,7 @@ class Selector:
                 rewards.append(float(reward.detach().cpu()))
 
         return np.asarray(plans[int(np.argmax(rewards))], dtype=np.float32).copy()
+"""
 
 def check(env):
     print("Reward type:", getattr(env, 'reward_type', 'Not found'))
@@ -469,11 +469,10 @@ def rollout(env_name,
                      if(selector is None):
                          x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                      else:
-                         Plans = [
-                               sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
-                               for _ in range(selector.n_candidates)
-                            ]
-                         x = selector.select_plan(Plans)
+                         x = sample_selected_plan(
+                                 current_state_norm, model, d_s, d_a, horizon,
+                                 steps_T, num_karras, eta, device, selector,
+                          )
                      for k in range(min(chunk_size, len(x))):
                          Temp_acts.append(x[k, d_s:(d_s+d_a)].copy())
                      for k in range(1, min(chunk_size, len(x))):
@@ -497,12 +496,13 @@ def rollout(env_name,
                 if(selector is None):
                     x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                 else:
-                    Plans = []
-                    for j in range(30):
-                        Plans.append(sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device))
-                    x = selector.select_plan(Plans)
+                    x = sample_selected_plan(
+                        current_state_norm, model, d_s, d_a, horizon,
+                        steps_T, num_karras, eta, device, selector,
+                    )
                 action = x[0, d_s:(d_s+d_a)].copy()
                 generated_state = x[1, :d_s].copy()
+                action = np.clip(action, -1.0, 1.0)
                 obs, reward, terminated, truncated, info = env.step(action)
                 if(render):
                       frames.append(env.render())
@@ -658,7 +658,7 @@ if __name__ == "__main__":
     env_name = 'antmaze'
     specific_train_dataset = 'large'
     task_id = 4
-    checkpoint = 48
+    checkpoint = 0
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -682,6 +682,8 @@ if __name__ == "__main__":
             )
     
     set_seed(1)
+    
+    """
     selector = Selector(
                 env_name,
                 specific_train_dataset,
@@ -691,26 +693,26 @@ if __name__ == "__main__":
                 critic_checkpoint=checkpoint,   # omit or None to use TotalReward only
                 task_id=task_id,
                 lam=0.0,
-                n_candidates=50,
+                n_candidates=80,
             )
-    
+    """
     return_value, length = rollout(
             env_name,
             specific_train_dataset,
             horizon,
             num_layers=4,
-            steps_T=10,
-            num_karras=1,
-            eta=0.0,
+            steps_T = 10,
+            num_karras = 1,
+            eta=0.8,
             episode_length=5000,
             checkpoint_steps=checkpoint,
             render=True,
             base_seed=1,
             task_id=task_id,
             continual_rollout=True,
-            chunk_size = 15,
+            chunk_size = 5,
             device=device,
-            selector=selector,
+            #selector=selector,
           )
     exit()
     total = 0.0

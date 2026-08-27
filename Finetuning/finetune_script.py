@@ -247,11 +247,11 @@ if __name__ == "__main__":
     env_name = 'antmaze'
     specific_env = 'large'
     task_id = 4
-    finetune_buffer_cutoff_length = 500
-    #finetune_buffer_cutoff_length = 800
+    #finetune_buffer_cutoff_length = 500
+    finetune_buffer_cutoff_length = 800
     train_buffer_cutoff_length = 1000
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = True)
-    AMConfig = Acc_AdjointMatchingConfig(horizon = 32, backbone_layers = 4, eta = 0.0)
+    AMConfig = Acc_AdjointMatchingConfig(horizon = 32, backbone_layers = 4, eta = 0.8)
     RWConfig = RewardConfig(
                beta = 1.0, 
                min_log_prob = -110.0,
@@ -287,7 +287,7 @@ if __name__ == "__main__":
                             kernel_num_modes = 10,
                             kernel_noise_floor = 5e-4,
                             λ_reg = 1e-3,
-                            oversample = 20)
+                            oversample = 30)
     """
     TrainCriticConfig = Train_Critic_Config(
                             hidden_layers = 4,
@@ -306,7 +306,7 @@ if __name__ == "__main__":
                             hidden_dim = 512,
                             batch_size = 256,
                             #batch_size = 63,
-                            num_steps = 20,
+                            num_steps = 5,
                             warm_up_steps = 1000,
                             warm_up_log_every = 100,
                             lr = 1e-04,
@@ -315,7 +315,8 @@ if __name__ == "__main__":
                             tau = 0.001,
                             gamma = 0.99,
                             lam = None,
-                            resample_every = 2,
+                            resample_every = 1,
+                            log_every = 1,
                             data_conservation = True,
                             momentum = 0.1)
 
@@ -341,7 +342,7 @@ if __name__ == "__main__":
         finetune_rounds = 30,
         diffusion_steps = 10,
         karras_percent = 0.1,
-        Loss_Clip_percent = 0.0,
+        Loss_Clip_percent = 0.5,
         #finetune_batch_size = 33,
         finetune_batch_size = 32,
         #finetune_batch_size = 16,
