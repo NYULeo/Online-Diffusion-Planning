@@ -562,6 +562,7 @@ class Acc_AdjointMatchingFineTuner:
             sigma = self.sigma_t(self.k[i]).detach().to(self.device)
             if(i <= self.config.num_Loss_Clip_steps):
                 Loss = Loss + torch.min(((v_new - v_old)*(2/sigma) + (sigma * adjoint_i)).pow(2).mean(), torch.tensor((self.config.reward_scaling_factor**2)*1.6).to(self.device))
+                #continue
             else:
                 Loss = Loss + ((v_new - v_old)*(2/sigma) + (sigma * adjoint_i)).pow(2).mean()
         Loss = Loss / len(traj_x)
