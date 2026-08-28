@@ -710,7 +710,7 @@ if __name__ == "__main__":
             base_seed=1,
             task_id=task_id,
             continual_rollout=True,
-            chunk_size = 5,
+            chunk_size = 15,
             device=device,
             selector=selector,
           )
