@@ -106,8 +106,17 @@ class Acc_AdjointMatchingFineTuner:
         self.ema = EMA(self.config.ema_decay)
         self.t_asc = torch.linspace(1.0, 0.0, self.config.diffusion_steps + 1, device = self.device)
         self.k = self.kt(self.t_asc) 
+        self.t_asc_reversed = torch.flip(self.t_asc, dims=[0])
         self.t_grid, self.beta_1, self.sigma_grid = karras_beta_schedule(self.config.diffusion_steps, self.config.sigma_min, self.config.sigma_max, self.device)
         self.beta_2 = cosine_beta(self.t_grid, s = self.config.s)
+        selected_beta = torch.where(
+            torch.arange(self.config.diffusion_steps, device=self.device) < self.config.num_karras,
+            self.beta_1[: self.config.diffusion_steps],
+            self.beta_2[: self.config.diffusion_steps],
+        )
+        step_k = -0.5 * selected_beta
+        self.adjoint_k = torch.cat([step_k, step_k[-1:]])
+        self.k_reversed = torch.flip(step_k, dims=[0])
         
         self.set_old_score_net(planner_checkpoint)
         self.set_new_score_net()
@@ -121,9 +130,13 @@ class Acc_AdjointMatchingFineTuner:
 
     def Accelerate_Prepare(self, dataloader: DataLoader, reward_model: Union[TotalReward, TotalReward_Critic], round: int):
          if round == 1:
-              self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model = self.accelerator.prepare(self.new_score_net, self.old_score_net, self.optimizer, self.scheduler, dataloader, reward_model)
+              self.new_score_net, self.optimizer, self.scheduler, dataloader = self.accelerator.prepare(
+                  self.new_score_net, self.optimizer, self.scheduler, dataloader
+              )
          else:
-              dataloader, reward_model = self.accelerator.prepare(dataloader, reward_model)
+              self.optimizer, self.scheduler, dataloader = self.accelerator.prepare(
+                  self.optimizer, self.scheduler, dataloader
+              )
          self.new_score_net.train()
          self.old_score_net.eval()
          return dataloader, reward_model
@@ -426,11 +439,56 @@ class Acc_AdjointMatchingFineTuner:
         self.new_score_net.train()
         reward = reward_model.predict(X[-1].squeeze(0).to(self.device), self.Lam.get_lam())
         return torch.stack(X).to(self.device), reward
+
+    @torch.no_grad()
+    def sample_trajs_karras_batch(
+        self,
+        s0_batch: torch.Tensor,
+        reward_model: Union[TotalReward, TotalReward_Critic],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Sample all local initial states and repetitions in one batched diffusion pass."""
+        self.new_score_net.eval()
+        repeated_s0 = s0_batch.to(self.device).repeat_interleave(
+            self.config.batch_per_sample, dim=0
+        )
+        batch_size = repeated_s0.shape[0]
+        dim = self.config.d_s + self.config.d_a
+
+        x = torch.randn(
+            batch_size, self.config.horizon, dim, dtype=torch.float32, device=self.device
+        ) * self.sigma_grid[0]
+        mask = torch.zeros_like(x)
+        mask[:, 0, : self.config.d_s] = 1.0
+        conditioned = torch.zeros_like(x)
+        conditioned[:, 0, : self.config.d_s] = repeated_s0
+        x = mask * conditioned + (1 - mask) * x
+
+        states = [x.detach().clone()]
+        for i in range(self.config.diffusion_steps):
+            t_now = self.t_grid[i]
+            t_next = self.t_grid[i + 1] if i < self.config.diffusion_steps - 1 else 0.0
+            dt = (t_next - t_now).item()
+            beta_now = self.beta_1[i] if i < self.config.num_karras else self.beta_2[i]
+            score = self.new_score_net(x, t_now.expand(batch_size))
+            update = (-0.5 * beta_now * x - beta_now * score) * dt
+            if self.config.eta > 0:
+                noise_scale = self.config.eta * torch.sqrt(beta_now * (-dt))
+                update = update + noise_scale * torch.randn_like(x)
+            x = x + update
+            x = mask * conditioned + (1 - mask) * x
+            x = clip_actions(x, self.config.d_s)
+            states.append(x.detach().clone())
+
+        self.new_score_net.train()
+        final_plans = states[-1]
+        rewards = torch.stack(
+            [reward_model.predict(plan, self.Lam.get_lam()) for plan in final_plans]
+        )
+        # Existing adjoint code expects (batch, steps, 1, horizon, dim).
+        trajectories = torch.stack(states, dim=1).unsqueeze(2)
+        return trajectories, rewards
   
     def make_a(self, X, reward_model: Union[TotalReward, TotalReward_Critic], reward_std: float):
-        base_old_score_net = self.accelerator.unwrap_model(self.old_score_net)
-        for p in base_old_score_net.parameters():
-              p.requires_grad_(True)
         X = [x.to(self.device) if x.device != self.device else x for x in X]
         steps_T = len(X)
         X_reversed = X[::-1] 
@@ -449,9 +507,6 @@ class Acc_AdjointMatchingFineTuner:
             EntGrad = torch.zeros_like(gradient).detach().unsqueeze(0).to(self.device)
 
 
-        t_asc_reversed = torch.flip(self.t_asc, dims = [0]).to(self.device)
-        k_reversed = torch.flip(self.k, dims = [0]).to(self.device)
-       
         if(reward_std == 0.0):
             reward_std = 1.0
         #current_lr = self.optimizer.param_groups[0]['lr']
@@ -470,21 +525,26 @@ class Acc_AdjointMatchingFineTuner:
         #a.append(torch.zeros_like(gradient).unsqueeze(0).to(self.device))
         for i in range(steps_T - 1):
             #t_now, t_next = self.t_asc[i], self.t_asc[i + 1]
-            t_now, t_next = t_asc_reversed[i], t_asc_reversed[i+1]
+            t_now, t_next = self.t_asc_reversed[i], self.t_asc_reversed[i+1]
             dt = (t_now - t_next)
             #dt = (t_next - t_now)
             T = X_reversed[i].to(self.device)
             T.requires_grad_(True)
             current_a = a[i].to(self.device) 
            
-            y, jvp_out = jvp(self.old_score_net, (T, t_now.unsqueeze(0)), (current_a, torch.zeros_like(t_now.unsqueeze(0)).to(self.device))) 
+            _, jvp_out = jvp(
+                self.old_score_net,
+                (T, t_now.unsqueeze(0)),
+                (current_a, torch.zeros_like(t_now.unsqueeze(0))),
+                create_graph=False,
+            )
             Jov_a = jvp_out.to(self.device)
-            new_a = current_a  + dt * ( (k_reversed[i] * current_a) + (2 * k_reversed[i] * Jov_a) )
+            new_a = current_a + dt * (
+                (self.k_reversed[i] * current_a) + (2 * self.k_reversed[i] * Jov_a)
+            )
             new_a = new_a.detach().clone().to(self.device)
             a.append(new_a)
         a.reverse()
-        for p in base_old_score_net.parameters():
-              p.requires_grad_(False)
         return a, reward
     
     """
@@ -553,65 +613,62 @@ class Acc_AdjointMatchingFineTuner:
         traj_x: List[torch.Tensor],
         adjoints: List[torch.Tensor]
     ) -> torch.Tensor:
-        Loss = torch.tensor(0.0, device = self.device, requires_grad=True)
-        for i in range(len(traj_x)):
-            traj_x_i = traj_x[i].detach().to(self.device)
-            adjoint_i = adjoints[i].unsqueeze(0).flatten().detach().to(self.device)
-            v_new = self.vector_field(traj_x_i, self.t_asc[i].detach().to(self.device), self.new_score_net).squeeze(0).flatten().to(self.device)
-            v_old = self.vector_field(traj_x_i, self.t_asc[i].detach().to(self.device), self.old_score_net).squeeze(0).flatten().detach().to(self.device)
-            sigma = self.sigma_t(self.k[i]).detach().to(self.device)
-            if(i <= self.config.num_Loss_Clip_steps):
-                Loss = Loss + torch.min(((v_new - v_old)*(2/sigma) + (sigma * adjoint_i)).pow(2).mean(), torch.tensor((self.config.reward_scaling_factor**2)*1.6).to(self.device))
-            else:
-                Loss = Loss + ((v_new - v_old)*(2/sigma) + (sigma * adjoint_i)).pow(2).mean()
-        Loss = Loss / len(traj_x)
-        return Loss
+        trajectory = torch.cat([state.detach() for state in traj_x], dim=0).to(self.device)
+        adjoint = torch.cat([value.detach() for value in adjoints], dim=0).to(self.device)
+        step_count = trajectory.shape[0]
+        times = self.t_asc[:step_count]
+        k_values = self.adjoint_k[:step_count].view(-1, 1, 1)
+
+        new_score = self.new_score_net(trajectory, times)
+        with torch.no_grad():
+            old_score = self.old_score_net(trajectory, times)
+
+        v_new = k_values * trajectory + k_values * new_score
+        v_old = k_values * trajectory + k_values * old_score
+        sigma = torch.sqrt((-2 * self.adjoint_k[:step_count]).clamp_min(1e-12)).view(-1, 1, 1)
+        per_step_loss = ((v_new - v_old) * (2 / sigma) + sigma * adjoint).square().mean(dim=(1, 2))
+
+        clip_count = min(self.config.num_Loss_Clip_steps + 1, step_count)
+        if clip_count > 0:
+            clip_value = per_step_loss.new_tensor((self.config.reward_scaling_factor**2) * 1.6)
+            per_step_loss = torch.cat(
+                [torch.minimum(per_step_loss[:clip_count], clip_value), per_step_loss[clip_count:]]
+            )
+        return per_step_loss.mean()
     
     def step(self, s0_batch: torch.Tensor, reward_model: Union[TotalReward, TotalReward_Critic]) -> Tuple[float, float, float]:
-        # 1. Split batch across processes
         base_reward_model = self.accelerator.unwrap_model(reward_model)
-        with self.accelerator.split_between_processes(s0_batch) as local_s0:
-            local_trajs = []
-            local_final_Cs = []
-            local_rewards = []
-            for s0 in local_s0:
-                s0 = s0.to (self.device)
-                #Mutiple Ones
-                for i in range(self.config.batch_per_sample):
-                   with self.accelerator.autocast():
-                       traj, reward = self.sample_Traj_karras(s0, base_reward_model) 
-                   #print(f"Reward: {reward.item()}")
-                   #if(reward.item() == 0.0):
-                       #continue
-                 
-                   local_trajs.append(traj)
-                   final_x = traj[-1].squeeze(0).to(self.device)
-                   C_val = base_reward_model.get_c(final_x)
-                   local_final_Cs.append(C_val)
-                   local_rewards.append(reward)
-            
-            if(len(local_trajs) != 0):
-                local_trajs = torch.stack(local_trajs).to(self.device)
-                local_final_Cs = torch.stack(local_final_Cs)
-                local_rewards = torch.stack(local_rewards)
-            else:
-               # Create empty tensors with appropriate shape/device
-               local_trajs = None
-               local_final_Cs = torch.tensor([0.0]*len(local_s0), device = self.device)
-               local_rewards = torch.tensor([0.0]*len(local_s0), device = self.device)
-            #print(f"Local Trajs: {local_trajs.shape}")
-            #print(f"local_trajs: {local_trajs}")
-        self.accelerator.wait_for_everyone()
-        
-        local_Cs_det = local_final_Cs.detach()
-        # 2. Gather C values and update lambda on main process
-        all_final_Cs = self.accelerator.gather_for_metrics(local_Cs_det, use_gather_object = False)
-        all_trajs = self.accelerator.gather_for_metrics(local_trajs, use_gather_object = False)
-        all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object = False)
+        local_s0 = s0_batch.to(self.device)
+        if local_s0.numel() == 0:
+            raise RuntimeError("each rank must receive at least one initial state")
+
+        # The dataloader is already split by Accelerate.  Sampling the complete
+        # local batch avoids both a second (incorrect) split and thousands of
+        # single-item DiT forward calls.
+        with self.accelerator.autocast():
+            local_trajs, sampled_rewards = self.sample_trajs_karras_batch(
+                local_s0, base_reward_model
+            )
+        final_plans = local_trajs[:, -1, 0]
+        with torch.no_grad():
+            local_final_Cs = torch.stack(
+                [base_reward_model.get_c(plan) for plan in final_plans]
+            )
+
+        # Only small statistics need cross-rank communication.  The old code
+        # all-gathered every full diffusion trajectory and immediately split it
+        # again, which dominated multi-GPU wall time.
+        all_final_Cs = self.accelerator.gather_for_metrics(
+            local_final_Cs.detach(), use_gather_object=False
+        )
+        all_sampled_rewards = self.accelerator.gather_for_metrics(
+            sampled_rewards.detach(), use_gather_object=False
+        )
         if self.accelerator.is_main_process:
             total_avgC = float(all_final_Cs.mean().item())
-            #reward_std = float(all_rewards.std().item())
-            reward_std = float(torch.max(all_rewards).item() - torch.min(all_rewards).item())
+            reward_std = float(
+                torch.max(all_sampled_rewards).item() - torch.min(all_sampled_rewards).item()
+            )
 
         else:
             total_avgC = 0.0
@@ -620,47 +677,23 @@ class Acc_AdjointMatchingFineTuner:
         stats = torch.tensor([total_avgC, reward_std], device=self.device)
         stats = broadcast(stats, from_process=0)
         total_avgC, reward_std = stats.tolist()
-        self.accelerator.wait_for_everyone()
-        
-        
-        # 3. Compute adjoints, rewards & loss tensors for each trajectory
-        with self.accelerator.split_between_processes(all_trajs) as local_trajs:
-        #if(local_trajs is not None):
-            local_loss_tensors = []
-            local_rewards = []
-            for traj in local_trajs:
-                traj = [traj[i] for i in range(traj.shape[0])]
-                with self.accelerator.autocast():
-                     adjoint, reward = self.make_a(traj, reward_model, reward_std)
-                     loss_tensor = self.adjoint_matching_loss(traj, adjoint)  # tensor with grad
-                local_loss_tensors.append(loss_tensor)
-                local_rewards.append(reward)
-            
-            local_loss = torch.stack(local_loss_tensors).mean()
-            local_rewards = torch.stack(local_rewards).mean()
-        #else:
-            #local_loss = torch.tensor(0.0, device = self.device, requires_grad = True)
-            #local_rewards = torch.tensor(0.0, device = self.device, requires_grad = False)
-            
-        
-        self.accelerator.wait_for_everyone()
-        global_loss = self.accelerator.reduce(local_loss, reduction="mean")
-        
-       
-        
-        # 5. Backward and optimizer step only on main process or all processes
-        """
-        self.optimizer.zero_grad()
-        self.new_score_net.zero_grad()
-        self.accelerator.backward(global_loss)
-        self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
-        self.optimizer.step()
-        self.scheduler.step()
-        self.alpha_scheduler.step_alpha()
-        """
-        # 5. Backward and (maybe) optimizer step under accelerate accumulation
+
+        local_loss_tensors = []
+        optimized_rewards = []
+        for trajectory_tensor in local_trajs:
+            trajectory = [trajectory_tensor[i] for i in range(trajectory_tensor.shape[0])]
+            with self.accelerator.autocast():
+                adjoint, reward = self.make_a(trajectory, reward_model, reward_std)
+                local_loss_tensors.append(self.adjoint_matching_loss(trajectory, adjoint))
+            optimized_rewards.append(reward)
+
+        local_loss = torch.stack(local_loss_tensors).mean()
+        local_reward = torch.stack(optimized_rewards).mean()
+
+        # DDP averages gradients; reducing a graph-connected loss before
+        # backward adds a redundant collective and can distort autograd.
         with self.accelerator.accumulate(self.new_score_net):
-            self.accelerator.backward(global_loss)
+            self.accelerator.backward(local_loss)
             if self.accelerator.sync_gradients:
                 self.accelerator.clip_grad_norm_(self.new_score_net.parameters(), max_norm=1.0)
                 self.optimizer.step()
@@ -671,7 +704,7 @@ class Acc_AdjointMatchingFineTuner:
 
          # 6. Logging: gather detached metrics
         local_loss_det = local_loss.detach()
-        local_rewards_det = local_rewards.detach()
+        local_rewards_det = local_reward.detach()
         all_losses = self.accelerator.gather_for_metrics(local_loss_det, use_gather_object=False)
         all_rewards = self.accelerator.gather_for_metrics(local_rewards_det, use_gather_object=False)
 
@@ -716,8 +749,6 @@ class Acc_AdjointMatchingFineTuner:
         while step < self.config.per_round_steps:
              conds = next(dataloader)
              loss, avg_reward, avg_C = self.step(conds, reward_model)
-             
-             self.accelerator.wait_for_everyone()
              
              if self.accelerator.is_main_process:
                 total_loss += loss
@@ -817,13 +848,9 @@ class Acc_AdjointMatchingFineTuner:
                  self.sync_lambda()
              
              step = step+1
-             self.accelerator.wait_for_everyone()
         
         if self.accelerator.is_main_process:
              save_planner(self.ema_model, self.config.dataset_name, self.config.specific_dataset, (round*self.config.per_round_steps), task_id = self.config.task_id)
-        self.accelerator.wait_for_everyone()
-        if torch.cuda.is_available():
-             torch.cuda.synchronize()
         self.accelerator.wait_for_everyone()
 
         

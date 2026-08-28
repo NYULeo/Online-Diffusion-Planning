@@ -10,7 +10,7 @@ from Pretrain.Rewards.nets import SimpleReward
 from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel, MoGTransitionKernel
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_log_density, compute_log_density_mog
 from Pretrain.Critic.nets import Critic
-from Finetuning.utils import get_reward_model, get_kernel, get_reward_stats, get_kernel_stats, get_critic_model, get_critic_stats, get_Q_stats, symexp
+from Finetuning.utils import get_reward_model, get_kernel, get_reward_stats, get_kernel_stats, get_critic_model, get_critic_stats, get_Q_stats, get_Q_scale, symexp
 from typing import Optional
 from torch.nn import functional as F
 from dataclasses import dataclass
@@ -43,6 +43,26 @@ class RewardConfig:
     hidden_dim_critic: int = 128
     critic_d_s: int = 0
     delta: Optional[float] = None 
+
+
+def _resolve_delta(config: RewardConfig, device: torch.device) -> torch.Tensor:
+    if config.delta is None:
+        return F.softplus(torch.tensor(0.0, device=device), beta=config.beta)
+    return torch.as_tensor(config.delta, dtype=torch.float32, device=device)
+
+
+def _freeze_module(module: nn.Module) -> None:
+    module.eval()
+    for parameter in module.parameters():
+        parameter.requires_grad_(False)
+
+
+def _normalization_tensors(stats, device: torch.device) -> tuple[torch.Tensor, torch.Tensor]:
+    mean = torch.as_tensor(stats.obs_mean, dtype=torch.float32, device=device)
+    std = torch.as_tensor(
+        np.maximum(stats.obs_std, stats.std_floor), dtype=torch.float32, device=device
+    )
+    return mean, std
     
 
 class TotalReward(nn.Module):
@@ -54,9 +74,9 @@ class TotalReward(nn.Module):
         self.config.device = device
         self.reward_net = SimpleReward(obs_dim, act_dim, self.config.hidden_dim_reward, self.config.num_hidden_layers_reward).to(self.config.device)
         self.reward_net.load_state_dict(reward_state_dict)
-        self.reward_net.eval()
+        _freeze_module(self.reward_net)
         self.kernels = []
-        self.config.delta = F.softplus(torch.tensor(0.0, requires_grad = False), beta = self.config.beta).to(self.config.device)
+        self.config.delta = _resolve_delta(self.config, self.config.device)
         kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
         if self.config.type_kernel == 'robust':
             for sd in kernel_state_dicts:
@@ -64,7 +84,7 @@ class TotalReward(nn.Module):
                     obs_dim, act_dim, self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel
                 ).to(self.config.device)
                 kernel_net.load_state_dict(sd)
-                kernel_net.eval()
+                _freeze_module(kernel_net)
                 self.kernels.append(kernel_net)
         else:
             for sd in kernel_state_dicts:
@@ -74,11 +94,17 @@ class TotalReward(nn.Module):
                     noise_floor=self.config.kernel_noise_floor
                 ).to(self.config.device)
                 kernel_net.load_state_dict(sd)
-                kernel_net.eval()
+                _freeze_module(kernel_net)
                 self.kernels.append(kernel_net)
         self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint, task_id)
        
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
+        self.reward_obs_mean, self.reward_obs_std = _normalization_tensors(
+            self.reward_stat, self.config.device
+        )
+        self.kernel_obs_mean, self.kernel_obs_std = _normalization_tensors(
+            self.kernel_stat, self.config.device
+        )
        
 
         self.config.d_s = obs_dim
@@ -106,16 +132,10 @@ class TotalReward(nn.Module):
     
 
     def reward_processor(self, s):
-        s_n = s.detach().cpu().numpy()
-        s_n = self.reward_stat.norm_obs(s_n)
-        s = torch.tensor(s_n, dtype = torch.float32, device = self.config.device, requires_grad = True)
-        return s
+        return (s - self.reward_obs_mean) / self.reward_obs_std
     
     def kernel_processor(self, s):
-        s_n = s.detach().cpu().numpy()
-        s_n = self.kernel_stat.norm_obs(s_n)
-        s = torch.tensor(s_n, dtype = torch.float32, device = self.config.device, requires_grad = True)
-        return s
+        return (s - self.kernel_obs_mean) / self.kernel_obs_std
 
     def makeGrad(self, H, s_grad, a_grad, i, s_next_grad: Optional[torch.Tensor] = None):
         S = torch.zeros(H, (self.config.d_s + self.config.d_a), device = self.config.device)
@@ -195,7 +215,7 @@ class TotalReward(nn.Module):
                         retain_graph = False,
                         allow_unused = False
                     )
-            r_s = grads[0].squeeze(0) * torch.tensor((1/np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)), device = self.config.device, dtype=torch.float32, requires_grad = False)
+            r_s = grads[0].squeeze(0) / self.reward_obs_std
             r_a = grads[1].squeeze(0)
             r_s_grad, r_a_grad = self.makeGrad(H, r_s, r_a, i)
             
@@ -205,15 +225,13 @@ class TotalReward(nn.Module):
                         outputs = c,
                         inputs = (s_norm_kernel, a, s_next_norm_kernel),
                         grad_outputs = torch.ones_like(c),
-                        create_graph = True,
-                        retain_graph = True
+                        create_graph = False,
+                        retain_graph = False
                         
                     )
-            c_s = grads[0].squeeze(0) * torch.tensor(1/np.maximum(self.kernel_stat.obs_std, self.kernel_stat.std_floor),
-                                                   device = self.config.device, dtype=torch.float32, requires_grad = False)
+            c_s = grads[0].squeeze(0) / self.kernel_obs_std
             c_a = grads[1].squeeze(0)   
-            c_s_next = grads[2].squeeze(0) * torch.tensor(1/np.maximum(self.kernel_stat.obs_std, self.kernel_stat.std_floor),
-                                                   device = self.config.device, dtype=torch.float32, requires_grad = False)
+            c_s_next = grads[2].squeeze(0) / self.kernel_obs_std
             c_s_grad, c_a_grad, c_s_next_grad = self.makeGrad(H, c_s, c_a, i, c_s_next)
             
             gradient +=  (1/H)*((self.config.critic_gamma**i)*(r_s_grad + r_a_grad)) - lam * (1/(H-1)) * (c_s_grad + c_a_grad + c_s_next_grad)
@@ -236,7 +254,7 @@ class TotalReward(nn.Module):
                         create_graph = False,
                         retain_graph = False
                 )
-        r_s = grads[0].squeeze(0) * torch.tensor((1/np.maximum(self.reward_stat.obs_std, self.reward_stat.std_floor)), device = self.config.device, dtype=torch.float32, requires_grad = False)
+        r_s = grads[0].squeeze(0) / self.reward_obs_std
         r_a = grads[1].squeeze(0)
         r_s_grad, r_a_grad = self.makeGrad(H, r_s, r_a, H-1)
 
@@ -257,15 +275,15 @@ class TotalReward_Critic(nn.Module):
         self.config.device = device
         self.reward_net = SimpleReward(obs_dim, act_dim, self.config.hidden_dim_reward, self.config.num_hidden_layers_reward).to(self.config.device)
         self.reward_net.load_state_dict(reward_state_dict)
-        self.reward_net.eval()
+        _freeze_module(self.reward_net)
         self.kernels = []
-        self.config.delta = F.softplus(torch.tensor(0.0, requires_grad = False), beta = self.config.beta).to(self.config.device)
+        self.config.delta = _resolve_delta(self.config, self.config.device)
 
 
         critic_state_dict, critic_obs_dim = get_critic_model(dataset_name, specific_dataset, task_id, critic_checkpoint)
         self.critic = Critic(critic_obs_dim, self.config.hidden_dim_critic, self.config.num_hidden_layers_critic).to(self.config.device)
         self.critic.load_state_dict(critic_state_dict)
-        self.critic.eval()
+        _freeze_module(self.critic)
 
         kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
         if self.config.type_kernel == 'robust':
@@ -274,7 +292,7 @@ class TotalReward_Critic(nn.Module):
                     obs_dim, act_dim, self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel
                 ).to(self.config.device)
                 kernel_net.load_state_dict(sd)
-                kernel_net.eval()
+                _freeze_module(kernel_net)
                 self.kernels.append(kernel_net)
         else:
             for sd in kernel_state_dicts:
@@ -284,11 +302,30 @@ class TotalReward_Critic(nn.Module):
                     noise_floor=self.config.kernel_noise_floor
                 ).to(self.config.device)
                 kernel_net.load_state_dict(sd)
-                kernel_net.eval()
+                _freeze_module(kernel_net)
                 self.kernels.append(kernel_net)
         self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint, task_id)
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
         self.critic_stat = get_critic_stats(dataset_name, specific_dataset, task_id, 0)
+        self.Q_scale = get_Q_scale(dataset_name, specific_dataset, task_id)
+        self.reward_obs_mean, self.reward_obs_std = _normalization_tensors(
+            self.reward_stat, self.config.device
+        )
+        self.kernel_obs_mean, self.kernel_obs_std = _normalization_tensors(
+            self.kernel_stat, self.config.device
+        )
+        self.critic_obs_mean, self.critic_obs_std = _normalization_tensors(
+            self.critic_stat, self.config.device
+        )
+        self.reward_obs_mean, self.reward_obs_std = _normalization_tensors(
+            self.reward_stat, self.config.device
+        )
+        self.kernel_obs_mean, self.kernel_obs_std = _normalization_tensors(
+            self.kernel_stat, self.config.device
+        )
+        self.critic_obs_mean, self.critic_obs_std = _normalization_tensors(
+            self.critic_stat, self.config.device
+        )
         self.q_stats = get_Q_stats(dataset_name, specific_dataset, task_id, critic_checkpoint)
        
 
@@ -316,22 +353,13 @@ class TotalReward_Critic(nn.Module):
         return c
     
     def reward_processor(self, s):
-        s_n = s.detach().cpu().numpy()
-        s_n = self.reward_stat.norm_obs(s_n)
-        s = torch.tensor(s_n, dtype = torch.float32, device = self.config.device, requires_grad = True)
-        return s
+        return (s - self.reward_obs_mean) / self.reward_obs_std
     
     def kernel_processor(self, s):
-        s_n = s.detach().cpu().numpy()
-        s_n = self.kernel_stat.norm_obs(s_n)
-        s = torch.tensor(s_n, dtype = torch.float32, device = self.config.device, requires_grad = True)
-        return s
+        return (s - self.kernel_obs_mean) / self.kernel_obs_std
     
     def critic_processor(self, s):
-        s_n = s.detach().cpu().numpy()
-        s_n = self.critic_stat.norm_obs(s_n)
-        s = torch.tensor(s_n, dtype = torch.float32, device = self.config.device, requires_grad = True)
-        return s
+        return (s - self.critic_obs_mean) / self.critic_obs_std
 
     def makeGrad(self, H, s_grad, a_grad, i, s_next_grad: Optional[torch.Tensor] = None):
         S = torch.zeros(H, (self.config.d_s + self.config.d_a), device = self.config.device)
@@ -354,7 +382,7 @@ class TotalReward_Critic(nn.Module):
         C = torch.tensor(0.0, device = self.config.device, requires_grad=False)
         for i in range(H-1):
             s = x[i][:self.config.d_s]
-            a = x[i][self.config.d_s:].unsqueeze(0)
+            a = torch.clamp(x[i][self.config.d_s:].unsqueeze(0), -1.0, 1.0)
             s_next = x[i+1][:self.config.d_s]
             s_norm_kernel = self.kernel_processor(s).unsqueeze(0)
             s_next_norm_kernel = self.kernel_processor(s_next).unsqueeze(0)
@@ -456,8 +484,8 @@ class TotalReward_Critic(nn.Module):
                         outputs = c,
                         inputs = (s_norm_kernel, a, s_next_norm_kernel),
                         grad_outputs = torch.ones_like(c),
-                        create_graph = True,
-                        retain_graph = True
+                        create_graph = False,
+                        retain_graph = False
                         
                     )
             c_s = grads[0].squeeze(0) * torch.tensor(1/np.maximum(self.kernel_stat.obs_std, self.kernel_stat.std_floor),
@@ -484,15 +512,15 @@ class TotalReward_Critic(nn.Module):
         self.config.device = device
         self.reward_net = SimpleReward(obs_dim, act_dim, self.config.hidden_dim_reward, self.config.num_hidden_layers_reward).to(self.config.device)
         self.reward_net.load_state_dict(reward_state_dict)
-        self.reward_net.eval()
+        _freeze_module(self.reward_net)
         self.kernels = []
-        self.config.delta = F.softplus(torch.tensor(0.0, requires_grad = False), beta = self.config.beta).to(self.config.device)
+        self.config.delta = _resolve_delta(self.config, self.config.device)
 
 
         critic_state_dict, critic_obs_dim = get_critic_model(dataset_name, specific_dataset, task_id, critic_checkpoint)
         self.critic = Critic(critic_obs_dim, self.config.hidden_dim_critic, self.config.num_hidden_layers_critic).to(self.config.device)
         self.critic.load_state_dict(critic_state_dict)
-        self.critic.eval()
+        _freeze_module(self.critic)
 
         kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
         if self.config.type_kernel == 'robust':
@@ -501,7 +529,7 @@ class TotalReward_Critic(nn.Module):
                     obs_dim, act_dim, self.config.num_hidden_layers_kernel, self.config.hidden_dim_kernel
                 ).to(self.config.device)
                 kernel_net.load_state_dict(sd)
-                kernel_net.eval()
+                _freeze_module(kernel_net)
                 self.kernels.append(kernel_net)
         else:
             for sd in kernel_state_dicts:
@@ -511,11 +539,21 @@ class TotalReward_Critic(nn.Module):
                     noise_floor=self.config.kernel_noise_floor
                 ).to(self.config.device)
                 kernel_net.load_state_dict(sd)
-                kernel_net.eval()
+                _freeze_module(kernel_net)
                 self.kernels.append(kernel_net)
         self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint, task_id)
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
         self.critic_stat = get_critic_stats(dataset_name, specific_dataset, task_id, 0)
+        self.Q_scale = get_Q_scale(dataset_name, specific_dataset, task_id)
+        self.reward_obs_mean, self.reward_obs_std = _normalization_tensors(
+            self.reward_stat, self.config.device
+        )
+        self.kernel_obs_mean, self.kernel_obs_std = _normalization_tensors(
+            self.kernel_stat, self.config.device
+        )
+        self.critic_obs_mean, self.critic_obs_std = _normalization_tensors(
+            self.critic_stat, self.config.device
+        )
         #self.q_stats = get_Q_stats(dataset_name, specific_dataset, task_id, critic_checkpoint)
        
 
@@ -543,22 +581,13 @@ class TotalReward_Critic(nn.Module):
         return c
     
     def reward_processor(self, s):
-        s_n = s.detach().cpu().numpy()
-        s_n = self.reward_stat.norm_obs(s_n)
-        s = torch.tensor(s_n, dtype = torch.float32, device = self.config.device, requires_grad = True)
-        return s
+        return (s - self.reward_obs_mean) / self.reward_obs_std
     
     def kernel_processor(self, s):
-        s_n = s.detach().cpu().numpy()
-        s_n = self.kernel_stat.norm_obs(s_n)
-        s = torch.tensor(s_n, dtype = torch.float32, device = self.config.device, requires_grad = True)
-        return s
+        return (s - self.kernel_obs_mean) / self.kernel_obs_std
     
     def critic_processor(self, s):
-        s_n = s.detach().cpu().numpy()
-        s_n = self.critic_stat.norm_obs(s_n)
-        s = torch.tensor(s_n, dtype = torch.float32, device = self.config.device, requires_grad = True)
-        return s
+        return (s - self.critic_obs_mean) / self.critic_obs_std
 
     def makeGrad(self, H, s_grad, a_grad, i, s_next_grad: Optional[torch.Tensor] = None):
         S = torch.zeros(H, (self.config.d_s + self.config.d_a), device = self.config.device)
@@ -581,7 +610,7 @@ class TotalReward_Critic(nn.Module):
         C = torch.tensor(0.0, device = self.config.device, requires_grad=False)
         for i in range(H-1):
             s = x[i][:self.config.d_s]
-            a = x[i][self.config.d_s:].unsqueeze(0)
+            a = torch.clamp(x[i][self.config.d_s:].unsqueeze(0), -1.0, 1.0)
             s_next = x[i+1][:self.config.d_s]
             s_norm_kernel = self.kernel_processor(s).unsqueeze(0)
             s_next_norm_kernel = self.kernel_processor(s_next).unsqueeze(0)
@@ -606,8 +635,8 @@ class TotalReward_Critic(nn.Module):
         for i in range(1, H):
             final_s_critic = x[i][:self.config.critic_d_s]
             final_s_norm_critic = self.critic_processor(final_s_critic).unsqueeze(0).requires_grad_(True)
-            v = symexp(self.critic(final_s_norm_critic))
-            total_reward +=   ((self.config.critic_gamma**(i)) * (  ( v.squeeze(0))  )  )
+            v = self.Q_scale.Q_scale * symexp(self.critic(final_s_norm_critic))
+            total_reward += (self.config.critic_gamma**i) * v.squeeze(0)
         
         total_reward = total_reward * (1/(H-1))
 
@@ -621,7 +650,7 @@ class TotalReward_Critic(nn.Module):
             s_norm_kernel = self.kernel_processor(s).unsqueeze(0).requires_grad_(True).to(self.config.device)
             s_next_norm_kernel = self.kernel_processor(s_next).unsqueeze(0).requires_grad_(True).to(self.config.device)
             c = self.sigmoid(s_norm_kernel, a, s_next_norm_kernel)
-            total_reward -= (lam  * ( c.squeeze(0)))
+            total_reward -= lam * c.squeeze(0) / (H - 1)
 
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward
@@ -653,7 +682,7 @@ class TotalReward_Critic(nn.Module):
         for i in range(1, H):
             final_s_critic = x[i][:self.config.critic_d_s]
             final_s_norm_critic = self.critic_processor(final_s_critic).unsqueeze(0).requires_grad_(True)
-            v = symexp(self.critic(final_s_norm_critic))
+            v = self.Q_scale.Q_scale * symexp(self.critic(final_s_norm_critic))
             grads = torch.autograd.grad(
                 outputs = v,
                 inputs = (final_s_norm_critic),
@@ -683,8 +712,8 @@ class TotalReward_Critic(nn.Module):
                         outputs = c,
                         inputs = (s_norm_kernel, a, s_next_norm_kernel),
                         grad_outputs = torch.ones_like(c),
-                        create_graph = True,
-                        retain_graph = True
+                        create_graph = False,
+                        retain_graph = False
                         
                     )
             c_s = grads[0].squeeze(0) * torch.tensor(1/np.maximum(self.kernel_stat.obs_std, self.kernel_stat.std_floor),
@@ -693,13 +722,8 @@ class TotalReward_Critic(nn.Module):
             c_s_next = grads[2].squeeze(0) * torch.tensor(1/np.maximum(self.kernel_stat.obs_std, self.kernel_stat.std_floor),
                                                    device = self.config.device, dtype=torch.float32, requires_grad = False)
             c_s_grad, c_a_grad, c_s_next_grad = self.makeGrad(H, c_s, c_a, i, c_s_next)
-            gradient -= (lam * (c_s_grad + c_a_grad + c_s_next_grad))
-            total_reward -= (lam  * ( c.squeeze(0)))
+            gradient -= lam * (c_s_grad + c_a_grad + c_s_next_grad) / (H - 1)
+            total_reward -= lam * c.squeeze(0) / (H - 1)
             
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward, gradient
-
-
-
-
-

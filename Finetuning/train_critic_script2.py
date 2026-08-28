@@ -342,7 +342,7 @@ if __name__ == '__main__':  # pragma: no cover
               "batch_size": 256,
               "oversample": 30,
               "num_steps": 10,
-              "resample_every": 1,
+              "resample_every": 5,
               "train_horizon": 32,             # passed as horizon= to the trainer
               "gamma": 0.99,
               "lam": None,
@@ -412,7 +412,7 @@ if __name__ == '__main__':  # pragma: no cover
                 specific_dataset=hp["specific_dataset"],
                 hidden_layers=hp["hidden_layers"],
                 hidden_dim=hp["hidden_dim"],
-                checkpoint_step=hp["new_step"],
+                checkpoint_step=hp["reward_checkpoint"],
                 critic_checkpoint=hp["new_step"],
                 gamma=hp["gamma"],
                 horizon=hp["horizon"],
@@ -424,7 +424,5 @@ if __name__ == '__main__':  # pragma: no cover
         )
         if accelerator.is_main_process:
            wandb.finish()
-
-
 
 

@@ -9,8 +9,10 @@ import torch
 
 if __name__ == '__main__':  # pragma: no cover
      set_seed(1)
-     dataset_name = 'puzzle'
-     specific_dataset = '3x3-play'
+     # Keep this entry point aligned with the downstream AntMaze pipeline
+     # (reward/kernel/critic/finetune/rollout all use this exact task).
+     dataset_name = 'antmaze'
+     specific_dataset = 'large'
      task_id = 4
      horizon = 32
      device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -20,7 +22,7 @@ if __name__ == '__main__':  # pragma: no cover
          task_id,
          horizon, 
          backbone_name = 'transformer',
-         backbone_layers = 2,
+         backbone_layers = 4,
          num_steps = 1000000, 
          batch_size = 128,
          lr = 2e-4,
@@ -28,5 +30,4 @@ if __name__ == '__main__':  # pragma: no cover
          stride = 1)
      trainer.train()
      #trainer.selector('complete', times = 1000)
-
 

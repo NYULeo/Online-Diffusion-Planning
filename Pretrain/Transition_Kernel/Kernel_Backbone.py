@@ -788,22 +788,31 @@ def train_mog_kernel(
         a = a.to(device)
         s_next = s_next.to(device)
 
-        losses = []
+        outputs = [m(s, a) for m in ensemble]
+        losses = [
+            m.mog_nll(s_next, mu, log_std, weights)
+            for m, (mu, log_std, weights) in zip(ensemble, outputs)
+        ]
 
-        for m in ensemble:
-            mu, log_std, weights = m(s, a)
-            loss = m.mog_nll(s_next, mu, log_std, weights)
+        # Calibrate uncertainty from *ensemble* disagreement.  The previous
+        # implementation measured disagreement between mixture modes inside a
+        # single model and therefore penalized the multimodality that a MoG is
+        # intended to learn.
+        member_means = torch.stack(
+            [(weights.unsqueeze(-1) * mu).sum(dim=1) for mu, _, weights in outputs],
+            dim=0,
+        )  # (E, B, obs_dim)
+        ensemble_mean = member_means.mean(dim=0)
+        disagreement = ((member_means - ensemble_mean.unsqueeze(0)) ** 2).mean(dim=0).detach()
 
-            # === Optional: disagreement regularization ===
-            # Average over modes for disagreement calculation
-            mu_mean = mu.mean(dim=1)                    # (B, obs_dim)
-            disagreement = ((mu - mu_mean.unsqueeze(1)) ** 2).mean(dim=1).mean(dim=0)
-            
-            var = torch.exp(2 * log_std) + m.noise_floor
-            penalty = (disagreement / (var.mean(dim=1) + 1e-6)).mean()
-            
-            loss = loss + λ_reg * penalty
-            losses.append(loss)
+        for i, (m, (mu, log_std, weights)) in enumerate(zip(ensemble, outputs)):
+            component_var = torch.exp(2 * log_std) + m.noise_floor
+            centered_mu = mu - member_means[i].unsqueeze(1)
+            predictive_var = (
+                weights.unsqueeze(-1) * (component_var + centered_mu.square())
+            ).sum(dim=1)
+            penalty = (disagreement / (predictive_var + 1e-6)).mean()
+            losses[i] = losses[i] + λ_reg * penalty
 
         # Backprop
         for m, opt, loss in zip(ensemble, optimizers, losses):
@@ -1284,4 +1293,3 @@ def compute_total_mahalanobis_score_mog(
     D2_total = ((residual ** 2) / var_total).sum(dim=-1)   # (B,)
     
     return D2_total
-

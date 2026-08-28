@@ -114,6 +114,8 @@ def load_finetuning_args(env_name: str, specific_env: str, base_path: str = None
         rollout_num_envs=exploration_hyperparams.get('rollout_num_envs', 1),
         num_rollout_processes=exploration_hyperparams.get('num_rollout_processes'),
         continual_rollout=exploration_hyperparams.get('continual_rollout', False),
+        rollout_every=exploration_hyperparams.get('rollout_every', 1),
+        chunk_size=exploration_hyperparams.get('chunk_size', 10),
         train_reward_config=TrainRewardConfig,
         train_kernel_config=TrainKernelConfig,
         train_critic_config=TrainCriticConfig
@@ -230,6 +232,9 @@ if __name__ == "__main__":
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value
         rollout_num_envs = 8, 
+        # This run is offline and Rollout2 performs the final evaluation, so
+        # intermediate environment rollouts only add wall time.
+        rollout_every = 0,
         continual_rollout = True,
         chunk_size = 31,
         num_rollout_processes = 8,
@@ -314,7 +319,7 @@ if __name__ == "__main__":
                             tau = 0.001,
                             gamma = 0.99,
                             lam = None,
-                            resample_every = 1,
+                            resample_every = 5,
                             log_every = 1,
                             data_conservation = True,
                             momentum = 0.1)
@@ -358,6 +363,9 @@ if __name__ == "__main__":
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  
         rollout_num_envs = 8, 
+        # Offline critic updates use the fixed dataset; final evaluation is
+        # performed by Rollout2, so skip costly per-round environment rollouts.
+        rollout_every = 0,
         continual_rollout = True,
         chunk_size = 31,
         num_rollout_processes = 8,

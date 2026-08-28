@@ -14,7 +14,7 @@ from Finetuning.utils import cycle
 #from Pretrain.Planners.Backbone.utils import get_pretrained_planner
 from Finetuning.utils import get_planner, get_normalized_score, get_expert_score, PlannerDataset, get_current_state, reward_processor, check_device
 from Pretrain.Dataset import Planner_Processor, get_dataset
-from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde, sample_euler_karras, sample_euler_karras2
+from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde, sample_euler_karras, sample_euler_karras2, sample_euler_karras_batch
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
 import pickle
 import random
@@ -454,10 +454,18 @@ def rollout(env_name,
                      if(selector is None):
                          x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                      else:
-                         Plans = [
-                               sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
-                               for _ in range(selector.n_candidates)
-                            ]
+                         Plans = sample_euler_karras_batch(
+                             current_state_norm,
+                             model,
+                             d_s,
+                             d_a,
+                             horizon,
+                             steps_T,
+                             num_karras,
+                             eta,
+                             device,
+                             num_samples=selector.n_candidates,
+                         )
                          x = selector.select_plan(Plans)
                      for k in range(min(chunk_size, len(x))):
                          Temp_acts.append(x[k, d_s:(d_s+d_a)].copy())
@@ -482,9 +490,18 @@ def rollout(env_name,
                 if(selector is None):
                     x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                 else:
-                    Plans = []
-                    for j in range(30):
-                        Plans.append(sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device))
+                    Plans = sample_euler_karras_batch(
+                        current_state_norm,
+                        model,
+                        d_s,
+                        d_a,
+                        horizon,
+                        steps_T,
+                        num_karras,
+                        eta,
+                        device,
+                        num_samples=selector.n_candidates,
+                    )
                     x = selector.select_plan(Plans)
                 action = x[0, d_s:(d_s+d_a)].copy()
                 generated_state = x[1, :d_s].copy()
@@ -638,15 +655,12 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
     horizon = 32
-    env_name = 'cube'
-    specific_train_dataset = 'double-play'
+    env_name = 'antmaze'
+    specific_train_dataset = 'large'
     task_id = 4
     checkpoint = 90
-    total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
-    chunk_size2 = [5,6,7,8,9,10,11]
-    total_return = 0.0
     
     RConfig = RewardConfig(
                     beta=1.0,
@@ -674,28 +688,9 @@ if __name__ == "__main__":
                 critic_checkpoint=checkpoint,   # omit or None to use TotalReward only
                 task_id=task_id,
                 lam=0.0,
-                n_candidates=50,
+                n_candidates=32,
             )
-    
-    return_value, length = rollout(
-            env_name,
-            specific_train_dataset,
-            horizon,
-            num_layers=4,
-            steps_T=10,
-            num_karras=1,
-            eta=0.0,
-            episode_length=5000,
-            checkpoint_steps=checkpoint,
-            render=True,
-            base_seed=1,
-            task_id=task_id,
-            continual_rollout=True,
-            chunk_size=15,
-            device=device,
-            selector=selector,
-          )
-    exit()
+
     total = 0.0
     for i in range(1, 101):
          set_seed(i)
@@ -703,17 +698,17 @@ if __name__ == "__main__":
             env_name,
             specific_train_dataset,
             horizon,
-            num_layers=2,
+            num_layers=4,
             steps_T=10,
             num_karras=1,
             eta=0.0,
-            episode_length=5000,
+            episode_length=4000,
             checkpoint_steps=checkpoint,
             render=False,
-            base_seed=1,
+            base_seed=i,
             task_id=task_id,
             continual_rollout=True,
-            chunk_size=2,
+            chunk_size=5,
             device=device,
             selector=selector,
           )
@@ -721,37 +716,3 @@ if __name__ == "__main__":
          total += return_value
          print()
     print(f"Success Rate: {total / 100 :.4f}")
-    exit()
-
-    for i in range(1, 101):
-       set_seed(i)
-       chunk_size_index = 0
-       while(chunk_size_index < len(chunk_size2)):
-           return_value, _ = rollout(
-                  env_name, 
-                  specific_train_dataset, 
-                  horizon, 
-                  num_layers = 2,
-                  steps_T = 10, 
-                  num_karras = 1, 
-                  eta = 0.0, 
-                  episode_length = 3000, 
-                  checkpoint_steps = checkpoint, 
-                  render = False,  
-                  base_seed = 1, 
-                  #goal_cell = np.array([6, 1], dtype = int), 
-                  task_id = task_id,
-                  continual_rollout = True,
-                  chunk_size = chunk_size2[chunk_size_index],
-                  device = device)
-           chunk_size_index += 1
-           if(return_value == 1.0):
-                print(f"chunk_size: {chunk_size2[chunk_size_index-1]}")
-                total_return += 1
-                break
-       
-       print(return_value)
-    print(f"Total return: {total_return / 100 :.4f}")
-    
-
-    

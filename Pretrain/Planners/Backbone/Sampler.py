@@ -111,8 +111,8 @@ def karras_beta_schedule(
 # 4. EULER + KARRAS with β(t) (50 steps)
 # ================================
 @torch.no_grad()
-def sample_euler_karras(
-    s0: np.ndarray,
+def sample_euler_karras_batch(
+    s0: np.ndarray | torch.Tensor,
     score_model: torch.nn.Module,
     d_s: int,
     d_a: int,
@@ -121,11 +121,30 @@ def sample_euler_karras(
     num_karras: int = 5,
     eta: float = 1.0,
     device: Optional[str] = None,
+    num_samples: int = 1,
 ) -> np.ndarray:
+    """Generate Karras-Euler plans for one or more initial states in one model pass per step.
+
+    ``s0`` may be a single ``(d_s,)`` state or a batch ``(B, d_s)``.  For a
+    single state, ``num_samples`` controls how many independent plans are
+    generated.  For a state batch, values greater than one repeat each state
+    consecutively, which is useful for candidate selection.
+    """
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    s0_t = torch.tensor(s0, device=device, dtype=torch.float32)
-    if s0_t.shape[0] != d_s:
-        raise ValueError(f"s0 should have shape ({d_s},), but got {s0_t.shape}")
+    s0_t = torch.as_tensor(s0, device=device, dtype=torch.float32)
+    if s0_t.ndim == 1:
+        if s0_t.shape[0] != d_s:
+            raise ValueError(f"s0 should have shape ({d_s},), but got {tuple(s0_t.shape)}")
+        s0_t = s0_t.unsqueeze(0).repeat(num_samples, 1)
+    elif s0_t.ndim == 2:
+        if s0_t.shape[1] != d_s:
+            raise ValueError(f"s0 should have shape (B, {d_s}), but got {tuple(s0_t.shape)}")
+        if num_samples > 1:
+            s0_t = s0_t.repeat_interleave(num_samples, dim=0)
+    else:
+        raise ValueError(f"s0 must be one- or two-dimensional, got {tuple(s0_t.shape)}")
+
+    batch_size = s0_t.shape[0]
 
     dim = d_s + d_a
 
@@ -136,14 +155,13 @@ def sample_euler_karras(
     beta_2 = cosine_beta(t_grid, s=0.008)
 
     # Initialize x_T
-    x = torch.randn(1, horizon, dim, device=device) * sigma_grid[0]
-    #x2 = torch.randn(1, horizon, dim, device=device)
+    x = torch.randn(batch_size, horizon, dim, device=device) * sigma_grid[0]
 
     # Conditioning
-    mask = torch.zeros(1, horizon, dim, device=device)
+    mask = torch.zeros(batch_size, horizon, dim, device=device)
     mask[:, 0, :d_s] = 1.0
     y = torch.zeros_like(x)
-    y[:, 0, :d_s] = s0_t.unsqueeze(0)
+    y[:, 0, :d_s] = s0_t
     x = mask * y + (1 - mask) * x
     
     
@@ -161,7 +179,7 @@ def sample_euler_karras(
         drift = -0.5 * beta_now * x
 
         # Score
-        score = score_model(x, t_now.unsqueeze(0))
+        score = score_model(x, t_now.expand(batch_size))
 
         # Euler step
         if eta > 0:
@@ -175,7 +193,33 @@ def sample_euler_karras(
         x = mask * y + (1 - mask) * x
         x = clip_actions(x, d_s)
 
-    return x.squeeze(0).cpu().numpy()
+    return x.cpu().numpy()
+
+
+@torch.no_grad()
+def sample_euler_karras(
+    s0: np.ndarray,
+    score_model: torch.nn.Module,
+    d_s: int,
+    d_a: int,
+    horizon: int,
+    num_steps: int = 50,
+    num_karras: int = 5,
+    eta: float = 1.0,
+    device: Optional[str] = None,
+) -> np.ndarray:
+    """Backward-compatible single-plan wrapper around the batched sampler."""
+    return sample_euler_karras_batch(
+        s0,
+        score_model,
+        d_s,
+        d_a,
+        horizon,
+        num_steps=num_steps,
+        num_karras=num_karras,
+        eta=eta,
+        device=device,
+    )[0]
 
 
 import math
@@ -745,7 +789,6 @@ def sample_ddim(
 
     return x.squeeze(0).cpu().numpy()
 """
-
 
 
 

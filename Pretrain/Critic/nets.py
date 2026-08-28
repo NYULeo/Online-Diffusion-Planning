@@ -47,7 +47,7 @@ class Critic(nn.Module):
           obs_dim,
           hidden_dim=128,
           hidden_layers=2,
-          positive_output=False,
+          positive_output=True,
       ):
           super().__init__()
           self.positive_output = positive_output
@@ -81,7 +81,7 @@ class Critic(nn.Module):
           obs_dim,
           hidden_dim=128,
           hidden_layers=2,
-          positive_output=False,
+          positive_output=True,
       ):
           super().__init__()
           self.positive_output = positive_output

@@ -430,8 +430,9 @@ class MLPNetwork(nn.Module):
 
 """
 class SimpleReward(nn.Module):
-    def __init__(self, obs_dim, act_dim, hidden_dim, hidden_layers):
+    def __init__(self, obs_dim, act_dim, hidden_dim, hidden_layers, positive_output=True):
         super().__init__()
+        self.positive_output = positive_output
         layers = []
         layers.extend([
             nn.Linear(obs_dim + act_dim, hidden_dim),
@@ -450,13 +451,17 @@ class SimpleReward(nn.Module):
 
     def forward(self, obs, act):
         x = torch.cat([obs, act], dim=-1)
-        return self.net(x).squeeze(-1)
+        reward = self.net(x).squeeze(-1)
+        if self.positive_output:
+            reward = F.softplus(reward)
+        return reward
 """
 
 
 class SimpleReward(nn.Module):
-    def __init__(self, obs_dim, act_dim, hidden_dim, hidden_layers):
+    def __init__(self, obs_dim, act_dim, hidden_dim, hidden_layers, positive_output=True):
         super().__init__()
+        self.positive_output = positive_output
         layers = []
         layers.extend([
             nn.Linear(obs_dim + act_dim, hidden_dim),
@@ -475,7 +480,10 @@ class SimpleReward(nn.Module):
 
     def forward(self, obs, act):
         x = torch.cat([obs, act], dim=-1)
-        return self.net(x).squeeze(-1)
+        reward = self.net(x).squeeze(-1)
+        if self.positive_output:
+            reward = F.softplus(reward)
+        return reward
 
 
 
@@ -514,8 +522,6 @@ class EnsembleReward(nn.Module):
             std = preds.std(dim=0)
             return mean, std
         return mean
-
-
 
 
 
