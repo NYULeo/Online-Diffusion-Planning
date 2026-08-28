@@ -410,6 +410,8 @@ def rollout(env_name,
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
      elif(env_name == 'scene'):
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
+     elif(env_name == 'puzzle'):
+           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
      else:
           raise ValueError(f"Invalid Environment: {env_name}")
      model.load_state_dict(state_dict)
@@ -682,7 +684,7 @@ if __name__ == "__main__":
             env_name,
             specific_train_dataset,
             horizon,
-            num_layers=4,
+            num_layers=2,
             steps_T=10,
             num_karras=1,
             eta=0.0,
