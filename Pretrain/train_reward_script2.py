@@ -64,9 +64,9 @@ if __name__ == '__main__':
             "num_steps": 40000,
             "lr": 5e-05,
             "min_lr": 5e-09,
-            "sigma": 6.0,
+            "sigma": 4.0,
             "alpha": None,
-            "target_reward": 2000.0,
+            "target_reward": 500.0,
         }
     )
 
@@ -93,10 +93,10 @@ if __name__ == '__main__':
                hidden_dim = 512, 
                specific_dataset = specific_dataset, 
                trajs = None, 
-               sigma = 6.0, 
+               sigma = 4.0, 
                #sigma = None,
                alpha = None, 
-               target_reward = 2000.0, 
+               target_reward = 500.0, 
                #target_reward = None, 
                task_id = task_id,
                traj_length = traj_length, 

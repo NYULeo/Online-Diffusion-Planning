@@ -218,8 +218,8 @@ if __name__ == '__main__':  # pragma: no cover
             gamma=hp["gamma"],
             horizon=hp["horizon"],
             value_scale=hp["value_scale"],
-            sigma=6.0,
-            target_reward=2000.0,
+            sigma=4.0,
+            target_reward=500.0,
             trajs=trajs,
             task_id=hp["task_id"],
        )
