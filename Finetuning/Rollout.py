@@ -658,7 +658,7 @@ if __name__ == "__main__":
     env_name = 'antmaze'
     specific_train_dataset = 'large'
     task_id = 4
-    checkpoint = 9
+    checkpoint = 18
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -693,7 +693,7 @@ if __name__ == "__main__":
                 critic_checkpoint=checkpoint,   # omit or None to use TotalReward only
                 task_id=task_id,
                 lam=0.0,
-                n_candidates=32,
+                n_candidates=80,
             )
     
     return_value, length = rollout(
