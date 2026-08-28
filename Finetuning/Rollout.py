@@ -693,7 +693,7 @@ if __name__ == "__main__":
                 critic_checkpoint=checkpoint,   # omit or None to use TotalReward only
                 task_id=task_id,
                 lam=0.0,
-                n_candidates=80,
+                n_candidates=32,
             )
     
     return_value, length = rollout(
@@ -710,7 +710,7 @@ if __name__ == "__main__":
             base_seed=1,
             task_id=task_id,
             continual_rollout=True,
-            chunk_size = 3,
+            chunk_size = 5,
             device=device,
             selector=selector,
           )
