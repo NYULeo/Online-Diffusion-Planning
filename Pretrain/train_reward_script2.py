@@ -47,61 +47,45 @@ if __name__ == '__main__':
     specific_dataset = 'large'
     task_id = 4
     traj_length = None
+    hp = {
+        "dataset_name": dataset_name,
+        "specific_dataset": specific_dataset,
+        "task_id": task_id,
+        "traj_length": traj_length,
+        "hidden_layers": 4,
+        "hidden_dim": 512,
+        "batch_size": 4000,
+        "num_steps": 40000,
+        "save_freq": 40000,
+        "lr": 5e-05,
+        "min_lr": 5e-09,
+        "sigma": 4.0,
+        "alpha": None,
+        "target_reward": 500.0,
+    }
 
     # Initialize wandb
     wandb.init(
         entity="kaiwen_hu-uc-berkeley",
         project="ODP",
         name=f"{dataset_name}-{specific_dataset}-task{task_id}-reward",
-        config={
-            "dataset_name": dataset_name,
-            "specific_dataset": specific_dataset,
-            "task_id": task_id,
-            "traj_length": traj_length,
-            "hidden_layers": 4,
-            "hidden_dim": 512,
-            "batch_size": 4000,
-            "num_steps": 40000,
-            "lr": 5e-05,
-            "min_lr": 5e-09,
-            "sigma": 4.0,
-            "alpha": None,
-            "target_reward": 500.0,
-        }
+        config=hp,
     )
 
-    train_reward(
-        dataset_name=dataset_name,
-        hidden_layers=4,
-        hidden_dim=512,
-        batch_size=4000,
-        num_steps=40000,
-        save_freq=40000,
-        lr=5e-05,
-        min_lr=5e-09,
-        sigma=6.0,
-        alpha=None,
-        target_reward=2000.0,
-        specific_dataset=specific_dataset,
-        task_id=task_id,
-        traj_length=traj_length
+    train_keys = (
+        "dataset_name", "hidden_layers", "hidden_dim", "batch_size",
+        "num_steps", "save_freq", "lr", "min_lr", "sigma", "alpha",
+        "target_reward", "specific_dataset", "task_id", "traj_length",
     )
+    train_reward(**{k: hp[k] for k in train_keys})
 
 
-    test_Model(dataset_name, 
-               hidden_layers = 4, 
-               hidden_dim = 512, 
-               specific_dataset = specific_dataset, 
-               trajs = None, 
-               sigma = 4.0, 
-               #sigma = None,
-               alpha = None, 
-               target_reward = 500.0, 
-               #target_reward = None, 
-               task_id = task_id,
-               traj_length = traj_length, 
-               save_freq = 40000, 
-               num_steps = 40000)
+    test_keys = (
+        "dataset_name", "hidden_layers", "hidden_dim", "specific_dataset",
+        "sigma", "alpha", "target_reward", "task_id", "traj_length",
+        "save_freq", "num_steps",
+    )
+    test_Model(trajs=None, **{k: hp[k] for k in test_keys})
     wandb.finish()
 
 

@@ -638,10 +638,10 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
     horizon = 32
-    env_name = 'cube'
-    specific_train_dataset = 'double-play'
+    env_name = 'puzzle'
+    specific_train_dataset = '3x3-play'
     task_id = 4
-    checkpoint = 90
+    checkpoint = 0
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -664,7 +664,8 @@ if __name__ == "__main__":
                     num_hidden_layers_critic=4,
                     hidden_dim_critic=512,
             )
-
+   
+    """
     selector = Selector(
                 env_name,
                 specific_train_dataset,
@@ -676,7 +677,7 @@ if __name__ == "__main__":
                 lam=0.0,
                 n_candidates=50,
             )
-    
+    """
     return_value, length = rollout(
             env_name,
             specific_train_dataset,
@@ -693,7 +694,7 @@ if __name__ == "__main__":
             continual_rollout=True,
             chunk_size=15,
             device=device,
-            selector=selector,
+            #selector=selector,
           )
     exit()
     total = 0.0
