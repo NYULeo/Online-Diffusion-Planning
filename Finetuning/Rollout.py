@@ -658,7 +658,7 @@ if __name__ == "__main__":
     env_name = 'antmaze'
     specific_train_dataset = 'large'
     task_id = 4
-    checkpoint = 12
+    checkpoint = 9
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
