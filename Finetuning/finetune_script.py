@@ -341,7 +341,7 @@ if __name__ == "__main__":
         finetune_rounds = 30,
         diffusion_steps = 10,
         karras_percent = 0.1,
-        Loss_Clip_percent = 0.75,
+        Loss_Clip_percent = 0.7,
         #finetune_batch_size = 33,
         finetune_batch_size = 32,
         #finetune_batch_size = 16,
