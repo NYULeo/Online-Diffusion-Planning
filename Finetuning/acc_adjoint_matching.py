@@ -457,7 +457,8 @@ class Acc_AdjointMatchingFineTuner:
         #current_lr = self.optimizer.param_groups[0]['lr']
         alpha = self.alpha_scheduler.get_alpha()
         #a0 =  (-1 * ((self.config.reward_scaling_factor/alpha)/reward_std) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * (-1) * EntGrad)
-        a0 =  (-1 * ((self.config.reward_scaling_factor/alpha/reward_std)) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * (-1) * EntGrad)
+        #a0 =  (-1 * ((self.config.reward_scaling_factor/alpha/reward_std)) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * (-1) * EntGrad)
+        a0 =  (-1 * ((self.config.reward_scaling_factor/alpha)) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * (-1) * EntGrad)
         #print(f"gradient norm: {gradient.norm().item()}")
         #max_norm = 5.0
         #a0 =   a0 * torch.clamp(max_norm / torch.norm(a0), max=1.0)

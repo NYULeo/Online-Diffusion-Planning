@@ -249,7 +249,7 @@ if __name__ == "__main__":
     #finetune_buffer_cutoff_length = 500
     finetune_buffer_cutoff_length = 800
     train_buffer_cutoff_length = 1000
-    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = True)
+    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = False)
     AMConfig = Acc_AdjointMatchingConfig(horizon = 32, backbone_layers = 4, eta = 0.8)
     RWConfig = RewardConfig(
                beta = 1.0, 
@@ -341,7 +341,7 @@ if __name__ == "__main__":
         finetune_rounds = 30,
         diffusion_steps = 10,
         karras_percent = 0.1,
-        Loss_Clip_percent = 0.6,
+        Loss_Clip_percent = 0.7,
         #finetune_batch_size = 33,
         finetune_batch_size = 32,
         #finetune_batch_size = 16,
@@ -351,9 +351,9 @@ if __name__ == "__main__":
         eta_lam = 0.5,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
-        #reward_scaling_factor = 50,
-        #reward_scaling_factor = 500,
         reward_scaling_factor = 50,
+        #reward_scaling_factor = 500,
+        #reward_scaling_factor = 10,
         MaxEnt = False,
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  
