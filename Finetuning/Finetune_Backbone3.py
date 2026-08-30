@@ -19,7 +19,8 @@ from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 from typing import List
 from utils import TrajectoryDict, rollout_parallel, get_planner, rollout_parallel2, save_planner, train_reward, train_kernel, train_kernel_mog, train_critic, save_trajs, AlphaSchedulerConfig, checktrajs, rollout_parallel3, train_reward_ensemble
 from Pretrain.Dataset import get_env
-from torch.utils.data import DataLoader, DistributedSampler
+from Pretrain.utils import init_wandb_run
+from torch.utils.data import DataLoader
 from accelerate.utils import broadcast
 import torch
 import copy
@@ -123,6 +124,7 @@ class FinetuningConfig():
     num_rollout_processes: Optional[int] = None 
     continual_rollout: bool = False
     chunk_size: int = 10
+    rollout_every: int = 1
    
 def save_hyperparameters(config: FinetuningConfig, filepath: Optional[str] = None):
     if filepath is None:
@@ -191,6 +193,7 @@ def save_hyperparameters(config: FinetuningConfig, filepath: Optional[str] = Non
             'rollout_num_envs': config.rollout_num_envs,
             'num_rollout_processes': config.num_rollout_processes,
             'continual_rollout': config.continual_rollout,
+            'rollout_every': config.rollout_every,
             'rollout_goal': config.train_reward_config.rollout_goal.tolist() if hasattr(config.train_reward_config.rollout_goal, 'tolist') else config.train_reward_config.rollout_goal,
         },
 
@@ -269,9 +272,29 @@ class OnlineFinetuner():
         #self.accelerator = Accelerator(mixed_precision = 'bf16')
         self.accelerator = Accelerator(
                mixed_precision='bf16',
+               split_batches=True,
                gradient_accumulation_steps = self.config.gradient_accumulate_every,
         )
+        if self.config.finetune_batch_size % self.accelerator.num_processes != 0:
+            raise ValueError("finetune_batch_size must be divisible by num_processes")
         self.device = self.accelerator.device
+        self.wandb_run = None
+        if self.accelerator.is_main_process:
+            self.wandb_run = init_wandb_run(
+                "cube-single-task4-finetune",
+                {
+                    "stage": "finetune",
+                    "dataset_name": self.config.dataset_name,
+                    "specific_dataset": self.config.specific_dataset,
+                    "task_id": self.config.train_reward_config.task_id,
+                    "finetune_steps": self.config.finetune_steps,
+                    "finetune_rounds": self.config.finetune_rounds,
+                    "batch_size": self.config.finetune_batch_size,
+                    "batch_per_sample": self.config.finetune_batch_per_sample,
+                    "diffusion_steps": self.config.diffusion_steps,
+                    "num_processes": self.accelerator.num_processes,
+                },
+            )
         
         self.Initialize_BufferDataset()
         self.set_reward_model(self.device)
@@ -632,39 +655,15 @@ class OnlineFinetuner():
         """
         
         for step in range(self.config.finetune_rounds):
-            if (torch.cuda.device_count() > 1):
-                world_size = self.accelerator.num_processes
-                num_workers = min(8, max(1, os.cpu_count() // (2 * world_size)))  # 
-                sampler = DistributedSampler(self.PlannerDataset, shuffle=True, drop_last=True)
-                sampler.set_epoch(step)
-                
-                dataloader = DataLoader(
-                    self.PlannerDataset, 
-                    self.config.finetune_batch_size, 
-                    pin_memory = True, 
-                    num_workers = (os.cpu_count() // 2),  
-                    sampler = sampler,  
-                    drop_last = True)
-                """
-                dataloader = DataLoader(
-                    self.PlannerDataset,
-                    self.config.finetune_batch_size,
-                    sampler = sampler,
-                    drop_last = True,
-                    pin_memory = True,
-                    num_workers = num_workers,
-                    persistent_workers = True,
-                    prefetch_factor = 4)
-                """
-            else:
-                dataloader = DataLoader(
-                    self.PlannerDataset, 
-                    self.config.finetune_batch_size, 
-                    pin_memory = True, 
-                    num_workers = (os.cpu_count() // 2), 
-                    #num_workers = 0,
-                    shuffle = True, 
-                    drop_last = True)
+            dataloader = DataLoader(
+                self.PlannerDataset,
+                batch_size=self.config.finetune_batch_size,
+                shuffle=True,
+                drop_last=True,
+                pin_memory=torch.cuda.is_available(),
+                num_workers=0,
+                generator=torch.Generator().manual_seed(1 + step),
+            )
             
             if self.accelerator.is_main_process:
                  print(f"Finetuning round {step+1} started")
@@ -680,12 +679,16 @@ class OnlineFinetuner():
                   torch.cuda.synchronize()  
             self.accelerator.wait_for_everyone() 
 
-            if self.accelerator.is_main_process:
+            run_rollout = self.config.rollout_every > 0 and (
+                (step + 1) % self.config.rollout_every == 0
+                or step + 1 == self.config.finetune_rounds
+            )
+            if self.accelerator.is_main_process and run_rollout:
                   print(f"Starting Rollout")
                   
             
             num_rollout_procs = self.config.num_rollout_processes
-            do_rollout = (num_rollout_procs is None) or (rank < num_rollout_procs)
+            do_rollout = run_rollout and ((num_rollout_procs is None) or (rank < num_rollout_procs))
             if do_rollout:
                 seed_base = rank * num_envs_per_process
                 trajs, score, success_rate, total_steps = rollout_parallel2(self.config.dataset_name, 
@@ -708,7 +711,7 @@ class OnlineFinetuner():
             else:
                 trajs, score, success_rate, total_steps = [], 0.0, 0.0, 0      
             self.accelerator.wait_for_everyone()                    
-            if self.accelerator.is_main_process:
+            if self.accelerator.is_main_process and run_rollout:
                   print(f"Rollout Completed") 
             if(not self.config.offline): 
                  update_reward = self.gather_and_sync_trajs_and_buffer(trajs)
@@ -957,11 +960,10 @@ class OnlineFinetuner():
                    print(f"Finetuning round {step+1} completed")
                    print()
             self.accelerator.wait_for_everyone()
-            
+        if self.accelerator.is_main_process and self.wandb_run is not None:
+            self.wandb_run.finish()
 
      
         
             
-
-
 
