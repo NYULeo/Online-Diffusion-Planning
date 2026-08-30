@@ -77,8 +77,8 @@ if __name__ == '__main__':  # pragma: no cover
             hidden_layers = 4, 
             hidden_dim = 512, 
             checkpoint_step = 0, 
-            mean = None,
-            std = None,
+            mean = mean,
+            std = std,
             gamma = 0.99, 
             horizon = horizon,  
             sigma = 4.0, 
@@ -192,7 +192,6 @@ if __name__ == '__main__':  # pragma: no cover
 """
 
     
-
 
 
 

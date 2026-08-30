@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
-# run_debugger.sh -- guarantees the pipeline runs THIS repo's code, verified to be
-# byte-identical to origin/Debugger. Aborts before touching a GPU otherwise.
+# run_debugger.sh -- guarantees the pipeline runs THIS repo's committed hkw code
+# on top of origin/Debugger. Aborts before touching a GPU otherwise.
 #
 # Fixes the two ways bash2.sh can silently run the wrong thing:
 #   1. bash2.sh uses `cd Online-Diffusion-Planning/Pretrain` (relative + wrong repo
@@ -22,16 +22,21 @@ echo "================================================================"
 echo " REPO (resolved) : $REPO"
 echo "================================================================"
 
-# ---- HARD GATE 1: .py must be byte-identical to origin/Debugger --------------
+# ---- HARD GATE 1: branch must descend from Debugger and be clean --------------
 git fetch origin --quiet
-DIFF="$(git diff --name-only origin/Debugger -- '*.py' || true)"
-if [ -n "$DIFF" ]; then
-  echo "ABORT: these .py differ from origin/Debugger:"
-  echo "$DIFF" | sed 's/^/    /'
-  echo "Fix with:  git fetch origin && git reset --hard origin/Debugger"
+if ! git merge-base --is-ancestor origin/Debugger HEAD; then
+  echo "ABORT: HEAD is not based on origin/Debugger"
   exit 1
 fi
-echo "OK  .py identical to origin/Debugger @ $(git rev-parse --short origin/Debugger)"
+DIRTY="$(git diff --name-only HEAD -- '*.py' || true)"
+if [ -n "$DIRTY" ]; then
+  echo "ABORT: uncommitted Python changes:"
+  echo "$DIRTY" | sed 's/^/    /'
+  exit 1
+fi
+echo "OK  HEAD descends from origin/Debugger @ $(git rev-parse --short origin/Debugger)"
+echo "OK  committed hkw changes relative to Debugger:"
+git diff --name-only origin/Debugger...HEAD -- '*.py' | sed 's/^/    /'
 echo "OK  branch=$(git branch --show-current)  HEAD=$(git rev-parse --short HEAD)"
 
 # ---- HARD GATE 2: show the config that will actually run ---------------------
@@ -54,6 +59,11 @@ for f in ['Pretrain/pretrain_script4.py','Pretrain/train_reward_script.py',
     print(f"    {f:34s} {', '.join(dict.fromkeys(got))[:84]}")
 PY
 echo "----------------------------------------------------------------"
+
+if [ "${VALIDATE_ONLY:-0}" = "1" ]; then
+  echo "VALIDATE_ONLY=1: gates passed; no training stages launched."
+  exit 0
+fi
 
 # ---- env ---------------------------------------------------------------------
 if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then

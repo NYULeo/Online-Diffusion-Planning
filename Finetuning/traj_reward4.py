@@ -43,6 +43,12 @@ class RewardConfig:
     hidden_dim_critic: int = 128
     critic_d_s: int = 0
     delta: Optional[float] = None 
+
+
+def _resolve_delta(config: RewardConfig, device: torch.device) -> torch.Tensor:
+    if config.delta is None:
+        return F.softplus(torch.tensor(0.0, device=device), beta=config.beta)
+    return torch.as_tensor(config.delta, dtype=torch.float32, device=device)
     
 
 class TotalReward(nn.Module):
@@ -56,7 +62,7 @@ class TotalReward(nn.Module):
         self.reward_net.load_state_dict(reward_state_dict)
         self.reward_net.eval()
         self.kernels = []
-        self.config.delta = F.softplus(torch.tensor(0.0, requires_grad = False), beta = self.config.beta).to(self.config.device)
+        self.config.delta = _resolve_delta(self.config, self.config.device)
 
 
         
@@ -80,7 +86,7 @@ class TotalReward(nn.Module):
         self.reward_net.load_state_dict(reward_state_dict)
         self.reward_net.eval()
         self.kernels = []
-        self.config.delta = F.softplus(torch.tensor(0.0, requires_grad = False), beta = self.config.beta).to(self.config.device)
+        self.config.delta = _resolve_delta(self.config, self.config.device)
         kernel_state_dicts, obs_dim, act_dim = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
         if self.config.type_kernel == 'robust':
             for sd in kernel_state_dicts:
@@ -157,7 +163,7 @@ class TotalReward(nn.Module):
         C = torch.tensor(0.0, device = self.config.device, requires_grad=False)
         for i in range(H-1):
             s = x[i][:self.config.d_s]
-            a = x[i][self.config.d_s:].unsqueeze(0)
+            a = torch.clamp(x[i][self.config.d_s:].unsqueeze(0), -1.0, 1.0)
             s_next = x[i+1][:self.config.d_s]
             s_norm_kernel = self.kernel_processor(s).unsqueeze(0)
             s_next_norm_kernel = self.kernel_processor(s_next).unsqueeze(0)
@@ -282,7 +288,7 @@ class TotalReward_Critic(nn.Module):
         self.reward_net.load_state_dict(reward_state_dict)
         self.reward_net.eval()
         self.kernels = []
-        self.config.delta = F.softplus(torch.tensor(0.0, requires_grad = False), beta = self.config.beta).to(self.config.device)
+        self.config.delta = _resolve_delta(self.config, self.config.device)
 
 
         critic_state_dict, critic_obs_dim = get_critic_model(dataset_name, specific_dataset, task_id, critic_checkpoint)
@@ -403,7 +409,9 @@ class TotalReward_Critic(nn.Module):
            
             r = self.reward_net(s_norm_reward, a)
             c = self.sigmoid(s_norm_kernel, a, s_next_norm_kernel)
-            total_reward += ((self.config.critic_gamma**i)*(r.squeeze(0))) - (lam  *  c.squeeze(0))
+            total_reward += ((self.config.critic_gamma**i) * r.squeeze(0)) - (
+                lam * c.squeeze(0) / (H - 1)
+            )
         
         s = x[H-1][:self.config.d_s]
         s_norm_reward = self.reward_processor(s).unsqueeze(0).requires_grad_(False)
@@ -465,9 +473,13 @@ class TotalReward_Critic(nn.Module):
                                                    device = self.config.device, dtype=torch.float32, requires_grad = False)
             c_s_grad, c_a_grad, c_s_next_grad = self.makeGrad(H, c_s, c_a, i, c_s_next)
             
-            gradient +=  ((self.config.critic_gamma**i)*(r_s_grad + r_a_grad)) - (lam * (c_s_grad + c_a_grad + c_s_next_grad))
+            gradient += ((self.config.critic_gamma**i) * (r_s_grad + r_a_grad)) - (
+                lam * (c_s_grad + c_a_grad + c_s_next_grad) / (H - 1)
+            )
             
-            total_reward += ((self.config.critic_gamma**i)*(r.squeeze(0))) - (lam  * ( c.squeeze(0)))
+            total_reward += ((self.config.critic_gamma**i) * r.squeeze(0)) - (
+                lam * c.squeeze(0) / (H - 1)
+            )
             #total_reward += (1/H)*(r.squeeze(0)) - lam * (1/(H-1)) * (c.squeeze(0) - self.config.delta)
             
         
@@ -510,10 +522,5 @@ class TotalReward_Critic(nn.Module):
         total_reward +=   ((self.config.critic_gamma**(H-1)) * (  (self.q_stats.Q_std * v.squeeze(0)) + self.q_stats.Q_mean  )  )
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward, gradient
-
-
-
-
-
 
 

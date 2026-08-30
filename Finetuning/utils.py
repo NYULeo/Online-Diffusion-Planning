@@ -29,7 +29,7 @@ from Pretrain.Transition_Kernel.Kernel_Net import MoGTransitionKernel, RobustTra
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_total_mahalanobis_score, compute_log_density_mog, compute_log_density, compute_total_mahalanobis_score_mog
 from Pretrain.Dataset import KitchenDataset, PointMazeDataset, get_env, get_dataset, Planner_Processor
 from gymnasium.vector import AsyncVectorEnv
-from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
+from Pretrain.Planners.Backbone.Sampler import sample_euler_karras, sample_euler_karras_batch
 from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Critic.nets import Critic
 from Pretrain.Dataset import get_dataset
@@ -1534,6 +1534,7 @@ class Critic_Test_Dataset(Dataset):
                 rews = self.boost_signal(target_reward, rews)
             if sigma is not None:
                 rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate=200/sigma)
+            rews = np.clip(rews, 0.0, 20.0)
 
             for t in range(len(obs) - horizon):        # consistent with training
                 obs_t = self.stats.norm_obs(obs[t])
@@ -1657,6 +1658,7 @@ class Critic_Test_Dataset(Dataset):
                 rews = self.boost_signal(target_reward, rews)
             if sigma is not None:
                 rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate=200/sigma)
+            rews = np.clip(rews, 0.0, 20.0)
 
             for t in range(len(obs) - horizon):
                 obs_t = self.stats.norm_obs(obs[t])
@@ -1721,7 +1723,7 @@ def test_critic(dataset_name: str,
             s = s.to(device)
             rews_chunk = rews_chunk.to(device)
 
-            pred = model(s).squeeze(-1)                # (B,)  ← normalized V(s)
+            pred = model(s)
             if(mean is not None and std is not None):
                 pred = (pred * std_pred) + mean_pred
             
@@ -1731,19 +1733,12 @@ def test_critic(dataset_name: str,
             
             
             
-            # === Normalize target (CRITICAL) ===
-            tgt_mean = raw_target.mean()
-            tgt_std = raw_target.std(unbiased=False) + 1e-8
-            target = (raw_target - tgt_mean) / tgt_std
-        
-            
+            target = raw_target
             loss = F.smooth_l1_loss(pred, target, beta=1.0)
-            #loss = F.smooth_l1_loss(pred, raw_target, beta=1.0)
             total_loss += loss.item() * s.size(0)
 
-            all_preds.extend(pred.cpu().numpy())
-            all_targets.extend(target.cpu().numpy())
-            #all_targets.extend(raw_target.cpu().numpy())
+            all_preds.extend(pred.cpu().numpy().reshape(-1))
+            all_targets.extend(target.cpu().numpy().reshape(-1))
 
 
     avg_loss = total_loss / len(dataset)
@@ -2939,7 +2934,13 @@ class CriticDataset_Reward(Dataset):
                        old_step: Optional[int] = None,  
                        new_step: int = 0, 
                        momentum: float = 0.005,
+                       value_scale: float = 5.0,
                        task_id: Optional[int] = None):
+        if horizon < 1:
+            raise ValueError(f"horizon must be positive, got {horizon}")
+        if value_scale <= 0:
+            raise ValueError(f"value_scale must be positive, got {value_scale}")
+        self.horizon = int(horizon)
         # ----- gather raw obs/actions to fit stats -----
 
         obs_all = []
@@ -2972,14 +2973,16 @@ class CriticDataset_Reward(Dataset):
             dataset_name, specific_dataset, reward_checkpoint, task_id,
         )
 
-        transitions = []
+        self._normalized_observations = []
+        self._scaled_rewards = []
+        self._windows = []
         
         for traj in trajs:
             obs = traj['observations'] 
             acts = traj['actions']   
             T_traj = min(len(obs), len(acts))
             
-            if T_traj < horizon:
+            if T_traj == 0:
                 continue
             
             with torch.no_grad():
@@ -2988,16 +2991,23 @@ class CriticDataset_Reward(Dataset):
                 a_t = torch.as_tensor(acts[:T_traj], dtype=torch.float32, device=device)
                 #a_t = torch.clamp(a_t, -1.0, 1.0)
                 rews = reward_net(s_t, a_t).cpu().numpy().astype(np.float32)   # (T_traj,)  
-                # Scale down predicted rewards from reward model
-                rews = np.clip(rews, -20.0, 20.0)      # adjust bounds if needed
-                rews = rews / 5.0                      # or use a running std
-            
-            for t in range(len(obs) - horizon):
-                 obs_chunk = self.stats.norm_obs(obs[t : t + horizon]).astype(np.float32)
-                 rews_chunk = rews[t: min(t+horizon, len(rews))]
-                 transitions.append((obs_chunk, rews_chunk))
+                # Cube Single rewards are nonnegative.  Keep the established
+                # cap while using an explicit fixed scale shared downstream.
+                rews = np.clip(rews, 0.0, 20.0) / value_scale
 
-        self.transitions = transitions
+            trajectory_index = len(self._normalized_observations)
+            self._normalized_observations.append(
+                self.stats.norm_obs(obs[:T_traj]).astype(np.float32)
+            )
+            self._scaled_rewards.append(rews[:T_traj])
+            self._windows.extend((trajectory_index, start) for start in range(T_traj))
+
+        if not self._windows:
+            raise ValueError("critic dataset contains no usable transitions")
+        print(
+            f"Critic dataset: {len(self._normalized_observations)} trajectories, "
+            f"{len(self._windows)} start states, horizon={self.horizon}"
+        )
         self.save_stats(dataset_name, specific_dataset, task_id, new_step)
     
     def save_stats(self, dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
@@ -3011,13 +3021,36 @@ class CriticDataset_Reward(Dataset):
         print(f"saved stats to {savepath}")
 
     def __getitem__(self, idx):
-        obs_chunk, rews_chunk = self.transitions[idx]
+        trajectory_index, start = self._windows[idx]
+        observations = self._normalized_observations[trajectory_index]
+        rewards = self._scaled_rewards[trajectory_index]
+        trajectory_length, obs_dim = observations.shape
+        valid_length = min(self.horizon, trajectory_length - start)
+
+        obs_chunk = np.empty((self.horizon + 1, obs_dim), dtype=np.float32)
+        if start + valid_length < trajectory_length:
+            state_sequence = observations[start : start + valid_length + 1]
+        else:
+            state_sequence = observations[start:trajectory_length]
+        obs_chunk[: len(state_sequence)] = state_sequence
+        obs_chunk[len(state_sequence) :] = state_sequence[-1]
+
+        rewards_chunk = np.zeros(self.horizon, dtype=np.float32)
+        rewards_chunk[:valid_length] = rewards[start : start + valid_length]
+        valid = np.zeros(self.horizon, dtype=np.float32)
+        valid[:valid_length] = 1.0
+        next_nonterminal = np.zeros(self.horizon, dtype=np.float32)
+        transition_indices = np.arange(start, start + valid_length)
+        next_nonterminal[:valid_length] = transition_indices < (trajectory_length - 1)
+
         return (
             torch.tensor(obs_chunk, dtype = torch.float32),
-            torch.tensor(rews_chunk, dtype = torch.float32)
+            torch.tensor(rewards_chunk, dtype = torch.float32),
+            torch.tensor(valid, dtype=torch.float32),
+            torch.tensor(next_nonterminal, dtype=torch.float32),
         )
     def __len__(self):
-        return len(self.transitions)
+        return len(self._windows)
 
 class Critic_Buffer_Reward():
     def __init__(self, dataset_name: str,
@@ -3032,6 +3065,7 @@ class Critic_Buffer_Reward():
                        task_id: Optional[int] = None,
                        old_step: Optional[int] = None,  
                        new_step: int = 0, 
+                       value_scale: float = 5.0,
                        momentum: float = 0.005):
         self.horizon = horizon
         self.gamma = gamma
@@ -3047,6 +3081,7 @@ class Critic_Buffer_Reward():
             old_step             = old_step,
             new_step             = new_step,
             momentum             = momentum,
+            value_scale          = value_scale,
             task_id              = task_id,
         )
    
@@ -3119,65 +3154,32 @@ class Critic_Buffer_Reward():
         #return obs_chunks[:, 0], value_targets
     """
 
-    def obtain_training_data(self, target_critic: nn.Module, batch, tgt_mean: torch.Tensor, tgt_std: torch.Tensor, device: str):
-        
-        obs_chunks, rews_chunks = batch
+    def obtain_training_data(self, target_critic: nn.Module, batch, device: str):
+        obs_chunks, rews_chunks, valid, next_nonterminal = batch
         obs_chunks = obs_chunks.to(device)
         rews_chunks = rews_chunks.to(device)
-        B, T = obs_chunks.shape[0], obs_chunks.shape[1]
-        
+        valid = valid.to(device)
+        next_nonterminal = next_nonterminal.to(device)
+        batch_size, transition_count = rews_chunks.shape
 
         with torch.no_grad():
-            values = target_critic(obs_chunks)            # (B, T)
-
+            values = target_critic(obs_chunks)
             deltas = (
-                  rews_chunks[:, :-1]
-                  + self.gamma * values[:, 1:]
-                   - values[:, :-1]
-              )                                             # (B, T-1)
+                rews_chunks
+                + self.gamma * next_nonterminal * values[:, 1:]
+                - values[:, :-1]
+            ) * valid
+            advantages = torch.zeros_like(deltas)
+            last_advantage = torch.zeros(batch_size, device=device)
+            for t in reversed(range(transition_count)):
+                last_advantage = (
+                    deltas[:, t]
+                    + self.gamma * self.lam * next_nonterminal[:, t] * last_advantage
+                ) * valid[:, t]
+                advantages[:, t] = last_advantage
+            value_targets = (values[:, 0] + advantages[:, 0]).clamp_min(0.0)
 
-            advantages = torch.zeros(B, T - 1, device=device)
-            last_adv = torch.zeros(B, device=device)
-            for t in reversed(range(T - 1)):
-                last_adv = deltas[:, t] + self.gamma * self.lam * last_adv
-                advantages[:, t] = last_adv
-
-            #value_targets = values[:, 0] + advantages[:, 0]   # (B,)
-            with torch.no_grad():
-                 values = target_critic(obs_chunks)                      # (B, T)
-                 deltas = (
-                       rews_chunks[:, :-1]
-                       + self.gamma * values[:, 1:]
-                       - values[:, :-1]
-                 )                                                       # (B, T-1)
-
-                  # GAE advantages
-                 advantages = torch.zeros_like(deltas)
-                 last_adv = torch.zeros(B, device=device)
-                 for t in reversed(range(deltas.shape[1])):
-                     last_adv = deltas[:, t] + self.gamma * self.lam * last_adv
-                     advantages[:, t] = last_adv
-
-                 # === ADD NORMALIZATION HERE ===
-                 value_targets = values[:, 0] + advantages[:, 0]         # raw targets
-                
-                 
-                 # Normalize advantages and targets (running stats or batch stats)
-                 adv_mean = advantages.mean()
-                 adv_std  = advantages.std() + 1e-8
-                 advantages = (advantages - adv_mean) / adv_std
-                 
-                 alpha = 0.99
-                 tgt_mean_new = value_targets.mean()
-                 tgt_std_new  = value_targets.std() + 1e-8
-                 tgt_mean_new = alpha * tgt_mean + ((1 - alpha) * tgt_mean_new)
-                 tgt_std_new = alpha * tgt_std + ((1 - alpha) * tgt_std_new)
-                 value_targets = (value_targets - tgt_mean_new) / tgt_std_new
-                 # =================================
-                 
-
-        return obs_chunks[:, 0], value_targets, tgt_mean_new, tgt_std_new
-        #return obs_chunks[:, 0], value_targets
+        return obs_chunks[:, 0], value_targets
 
 def train_critic_with_reward(trajs: List[TrajectoryDict], 
                  dataset_name: str, 
@@ -3196,6 +3198,7 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
                  old_step: Optional[int] = None, 
                  new_step: int = 0, 
                  momentum: float = 0.005, 
+                 value_scale: float = 5.0,
                  task_id: Optional[int] = None):
     device = check_device()
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
@@ -3228,6 +3231,7 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
                        task_id,
                        old_step,  
                        new_step, 
+                       value_scale,
                        momentum)
     g = torch.Generator()
     g.manual_seed(1)
@@ -3244,11 +3248,9 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
     )
     print(f"Training critic for {dataset_name}-{specific_dataset}")
     total_loss = 0.0
-    tgt_mean = torch.zeros(1, device=device)
-    tgt_std = torch.ones(1, device=device)
     for k in range(1, num_steps + 1):  # number of passes over dataset
            batch = next(loader)
-           s, target_value, tgt_mean, tgt_std = buffer.obtain_training_data(target_critic, batch, tgt_mean, tgt_std, device)
+           s, target_value = buffer.obtain_training_data(target_critic, batch, device)
            #s, target_value = buffer.obtain_training_data(target_critic, batch_size, tgt_mean, tgt_std, device)
            s = s.to(device)
            target_value = target_value.to(device)
@@ -3276,12 +3278,12 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
     target_critic.eval()
     save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
     q_stats = Q_Stats()
-    q_stats.Q_mean = tgt_mean.item()
-    q_stats.Q_std = tgt_std.item()
+    q_stats.Q_mean = 0.0
+    q_stats.Q_std = value_scale
     save_Q_stats(q_stats, dataset_name, specific_dataset, task_id, new_step)
     print(f"critic model saved")
-    print(f"mean: {tgt_mean.item()}, std: {tgt_std.item()}")
-    return tgt_mean.item(), tgt_std.item()
+    print(f"critic fixed value scale: {value_scale}")
+    return 0.0, value_scale
 
 @dataclass
 class KernelConfig:
@@ -3321,6 +3323,7 @@ def train_critic_with_planner2(
     new_step: int = 0,
     task_id: Optional[int] = None,
     log_every: int = 1,
+    value_scale: float = 5.0,
 ):
 
     # ---------------------------------------------------------------- helpers
@@ -3421,47 +3424,53 @@ def train_critic_with_planner2(
         device:         torch.device,
     ):
         accepted_plans = []
-        accepted_s0    = []
-        max_attempts   = kernel_config.oversample * batch_size
-        attempts       = 0
+        accepted_s0 = []
+        max_attempts = kernel_config.oversample * batch_size
+        candidate_indices = np.random.randint(0, len(s0_pool), size=max_attempts)
+        candidate_s0 = s0_pool[candidate_indices]
+        normalized_s0 = np.stack(
+            [planner_proc.preprocess(state) for state in candidate_s0]
+        ).astype(np.float32)
+        candidate_plans = sample_euler_karras_batch(
+            normalized_s0,
+            planner,
+            obs_dim,
+            act_dim,
+            horizon,
+            num_steps=steps_T,
+            num_karras=num_karras,
+            eta=eta,
+            device=device,
+        )
 
-        while len(accepted_plans) < batch_size and attempts < max_attempts:
-            idx    = np.random.randint(0, len(s0_pool))
-            s0_raw = s0_pool[idx]
-            s0_p   = planner_proc.preprocess(s0_raw)
-            x      = sample_euler_karras(
-                s0_p, planner, obs_dim, act_dim, horizon,
-                num_steps=steps_T, num_karras=num_karras,
-                eta=eta, device=device,
-            )
-
-            x_t       = torch.from_numpy(x).float().to(device)
+        for s0_raw, plan in zip(candidate_s0, candidate_plans):
+            x_t = torch.from_numpy(plan).float().to(device)
             s_planner = x_t[..., :obs_dim]
-            a_raw     = x_t[..., obs_dim:]
-            s_raw_pl  = s_planner * planner_std + planner_mean
-
+            a_raw = torch.clamp(x_t[..., obs_dim:], -1.0, 1.0)
+            s_raw_pl = s_planner * planner_std + planner_mean
             if is_plan_feasible(
-                s_raw_plan    = s_raw_pl,
-                a_raw_plan    = a_raw,
-                kernels       = kernels,
-                k_mean        = k_mean,
-                k_std         = k_std,
-                kernel_config = kernel_config,
-                device        = device,
+                s_raw_plan=s_raw_pl,
+                a_raw_plan=a_raw,
+                kernels=kernels,
+                k_mean=k_mean,
+                k_std=k_std,
+                kernel_config=kernel_config,
+                device=device,
             ):
                 accepted_plans.append(x_t)
                 accepted_s0.append(s0_raw)
-            attempts += 1
+                if len(accepted_plans) == batch_size:
+                    break
 
         if len(accepted_plans) == 0:
             raise RuntimeError(
-                f"No feasible plans found after {attempts} attempts. "
+                f"No feasible plans found after {max_attempts} attempts. "
                 f"Lower `kernel_config.min_log_prob` or raise "
                 f"`kernel_config.oversample`."
             )
         if len(accepted_plans) < batch_size:
             print(f"[Critic-Online] only {len(accepted_plans)}/{batch_size} "
-                  f"feasible plans after {attempts} attempts "
+                  f"feasible plans after {max_attempts} attempts "
                   f"(min_log_prob={kernel_config.min_log_prob}); proceeding")
 
         plans      = torch.stack(accepted_plans, dim=0)
@@ -3550,12 +3559,6 @@ def train_critic_with_planner2(
         [t['observations'] for t in trajs], axis=0,
     ).astype(np.float32)
     
-    # === NEW: Running stats for targets ===
-    running_tgt_mean = torch.zeros(1, device=device)
-    running_tgt_std  = torch.ones(1, device=device)
-    alpha = 0.99   # momentum
-    # ======================================
-
     # ----------------------------------------------------------------- optim
     optimizer = optim.AdamW(critic.parameters(), lr=lr, weight_decay = 1e-2)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(
@@ -3606,12 +3609,7 @@ def train_critic_with_planner2(
                 s_for_r.reshape(B * n, -1),
                 actions[:, :n].reshape(B * n, -1),
             ).reshape(B, n)  
-            
-            """
-            # NEW: Strong scaling
-            r_hat = torch.clamp(r_hat, -20.0, 20.0)
-            r_hat = r_hat / 5.0 
-            """                                # (B', n)
+            r_hat = torch.clamp(r_hat, 0.0, 20.0) / value_scale
 
             # 4) discounted return + bootstrapped target value
             disc_return  = (gamma_pow_t.unsqueeze(0) * r_hat).sum(dim=1)      # (B',)
@@ -3620,22 +3618,14 @@ def train_critic_with_planner2(
             target_value = disc_return + gamma_n * v_bootstrap                # (B',)
 
            
-            # === NEW: Running normalization ===
-            batch_mean = target_value.mean()
-            batch_std  = target_value.std(unbiased=False) + 1e-8
-
-            running_tgt_mean = alpha * running_tgt_mean + (1 - alpha) * batch_mean
-            running_tgt_std  = alpha * running_tgt_std  + (1 - alpha) * batch_std
-
-            normalized_target = (target_value - running_tgt_mean) / running_tgt_std
-            # =================================
+            target_value = target_value.clamp_min(0.0)
 
             # 5) input for V_β(s_0)
             s0_critic = (s_raw[:, 0] - c_mean) / c_std                        # (B', d_s)
 
         # 6) gradient step on V_β
         v_pred = critic(s0_critic)                                            # (B',)
-        loss   = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
+        loss   = F.smooth_l1_loss(v_pred, target_value, beta=1.0)
 
         optimizer.zero_grad()
         loss.backward()
@@ -3657,6 +3647,10 @@ def train_critic_with_planner2(
 
     target_critic.eval()
     save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
+    q_stats = Q_Stats()
+    q_stats.Q_mean = 0.0
+    q_stats.Q_std = value_scale
+    save_Q_stats(q_stats, dataset_name, specific_dataset, task_id, new_step)
     print("critic saved.")
 
 def train_critic_with_planner3(
@@ -4087,6 +4081,7 @@ def train_critic_with_planner4(
     new_step: int = 0,
     task_id: Optional[int] = None,
     log_every: int = 0,
+    value_scale: float = 5.0,
     accelerator=None,
 ):
 
@@ -4208,8 +4203,7 @@ def train_critic_with_planner4(
 
         # 1. Sample batch_size starting states (same on every rank)
         if accelerator.is_main_process:
-            rng = np.random.RandomState(42)
-            s0_indices = rng.randint(0, len(s0_pool), size=batch_size)
+            s0_indices = np.random.randint(0, len(s0_pool), size=batch_size)
             selected_s0 = s0_pool[s0_indices]
         else:
             selected_s0 = np.empty((batch_size, s0_pool.shape[1]), dtype=np.float32)
@@ -4230,14 +4224,13 @@ def train_critic_with_planner4(
 
         for s0_raw in local_s0:
             s0_p = planner_proc.preprocess(s0_raw)
-            accepted_for_this_s0 = []
+            candidates = sample_euler_karras_batch(
+                s0_p, planner, obs_dim, act_dim, horizon,
+                num_steps=steps_T, num_karras=num_karras,
+                eta=eta, device=device, num_samples=oversample,
+            )
 
-            for _ in range(oversample):
-                x = sample_euler_karras(
-                    s0_p, planner, obs_dim, act_dim, horizon,
-                    num_steps=steps_T, num_karras=num_karras,
-                    eta=eta, device=device,
-                )
+            for x in candidates:
                 x_t = torch.from_numpy(x).float().to(device)
 
                 s_planner = x_t[..., :obs_dim]
@@ -4254,9 +4247,7 @@ def train_critic_with_planner4(
                     kernel_config=kernel_config,
                     device=device,
                 ):
-                    accepted_for_this_s0.append(x_t.cpu())
-
-            local_accepted.extend(accepted_for_this_s0)
+                    local_accepted.append(x_t.cpu())
 
         # 4. Collect from all GPUs
         if accelerator.num_processes > 1:
@@ -4266,6 +4257,8 @@ def train_critic_with_planner4(
             all_accepted_lists = [local_accepted]
 
         all_plans = [p for sublist in all_accepted_lists for p in sublist]
+        if not all_plans:
+            return None, None
         
         """
         if len(all_plans) == 0:
@@ -4372,16 +4365,6 @@ def train_critic_with_planner4(
         [t['observations'] for t in trajs], axis=0,
     ).astype(np.float32)
 
-    # running target stats
-    if(old_critic_checkpoint is None):
-        running_tgt_mean = torch.zeros(1, device=device)
-        running_tgt_std = torch.ones(1, device=device)
-    else:
-        q_stats = get_Q_stats(dataset_name, specific_dataset, task_id, old_critic_checkpoint)
-        running_tgt_mean = q_stats.Q_mean
-        running_tgt_std = q_stats.Q_std
-    alpha = 0.99
-
     # optim
     optimizer = optim.AdamW(critic.parameters(), lr=lr, weight_decay=1e-2)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(
@@ -4423,6 +4406,11 @@ def train_critic_with_planner4(
                 accelerator=accelerator,
             )
 
+            if plans is None:
+                if is_main:
+                    print("No feasible critic plans generated; skipping update")
+                continue
+
             B_eff = plans.shape[0]
             if B_eff < max(8, batch_size // 4):
                 continue
@@ -4443,8 +4431,7 @@ def train_critic_with_planner4(
             ).reshape(N, n)  # (N, n)
              
             # reward clipping -----------------------------------------------------
-            r_hat = torch.clamp(r_hat, -20.0, 20.0)
-            r_hat = r_hat / 5.0
+            r_hat = torch.clamp(r_hat, 0.0, 20.0) / value_scale
 
             # ---------------------------------------------------------------
             # New multi-horizon average target for every plan:
@@ -4475,36 +4462,25 @@ def train_critic_with_planner4(
             plan_targets = plan_targets / (n - 1)            # average over H=2..n
             """
             
-            plan_targets = torch.zeros(N, device=device)
+            horizon_indices = torch.arange(1, n, device=device)
+            discounted_prefix = torch.cumsum(
+                r_hat[:, : n - 1] * gamma_pow_t[: n - 1].unsqueeze(0), dim=1
+            )
+            bootstrap_states = (s_raw[:, 1:n] - c_mean) / c_std
+            bootstrap_values = target_critic(
+                bootstrap_states.reshape(-1, obs_dim)
+            ).reshape(N, n - 1)
+            partial_returns = discounted_prefix + (
+                gamma ** horizon_indices
+            ).unsqueeze(0) * bootstrap_values
 
-            if(lam is not None):
-                  w = 1.0 - lam       # first weight = (1-λ)
-                  weight_sum = 0.0
-
-                  for L in range(1, n):                               # L = 1 .. n-1
-                         discounts = gamma_pow_t[:L]                     # γ⁰ … γ^{L-1}
-                         disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
-                         s_L = (s_raw[:, L] - c_mean) / c_std
-                         v_boot = target_critic(s_L)
-                         partial = disc_return + (gamma ** L) * v_boot   # R^{(L)}
-                         plan_targets += w * partial
-                         weight_sum += w
-                         w *= lam
-            
-                  plan_targets = plan_targets / max(weight_sum, 1e-8)
-            
+            if lam is not None:
+                weights = (1.0 - lam) * (lam ** (horizon_indices - 1))
+                plan_targets = (
+                    partial_returns * weights.unsqueeze(0)
+                ).sum(dim=1) / weights.sum().clamp_min(1e-8)
             else:
-                    # ----- equal weight on all multi-step estimators -----
-                    #plan_targets = torch.zeros(N, device=device)
-                    N_est = n - 1                                 # L = 1 … n-1
-
-                    for L in range(1, n):
-                        discounts = gamma_pow_t[:L]               # γ⁰ … γ^{L-1}
-                        disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
-                        s_L = (s_raw[:, L] - c_mean) / c_std
-                        v_boot = target_critic(s_L)
-                        partial = disc_return + (gamma ** L) * v_boot   # classic sum return
-                        plan_targets += partial / N_est                 # equal weight
+                plan_targets = partial_returns.mean(dim=1)
             
 
             # ----- average targets per unique s0 -----
@@ -4522,20 +4498,14 @@ def train_critic_with_planner4(
             averaged_targets.index_add_(0, inverse_indices, plan_targets)
             counts.index_add_(0, inverse_indices, torch.ones_like(plan_targets))
             averaged_targets = averaged_targets / counts.clamp(min=1.0)
-
-            # running normalization
-            batch_mean = averaged_targets.mean()
-            batch_std = averaged_targets.std(unbiased=False) + 1e-8
-            running_tgt_mean = alpha * running_tgt_mean + (1 - alpha) * batch_mean
-            running_tgt_std = alpha * running_tgt_std + (1 - alpha) * batch_std
-            normalized_target = (averaged_targets - running_tgt_mean) / running_tgt_std
+            averaged_targets = averaged_targets.clamp_min(0.0)
 
             # critic input
             s0_critic = (unique_s0 - c_mean) / c_std
 
         # gradient step
         v_pred = critic(s0_critic)
-        loss = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
+        loss = F.smooth_l1_loss(v_pred, averaged_targets, beta=1.0)
 
         optimizer.zero_grad()
         accelerator.backward(loss)
@@ -4557,8 +4527,8 @@ def train_critic_with_planner4(
                 f" step {k:>6}/{num_steps} "
                 f"loss = {running / log_every:.10f}  "
                 f"B_eff={B_eff}  U={U}  "
-                f"tgt_mean={running_tgt_mean.item():.3f}  "
-                f"tgt_std={running_tgt_std.item():.3f}"
+                f"tgt_mean={averaged_targets.mean().item():.3f}  "
+                f"tgt_std={averaged_targets.std(unbiased=False).item():.3f}"
             )
             running = 0.0
 
@@ -4571,12 +4541,12 @@ def train_critic_with_planner4(
         save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
 
         q_stats = Q_Stats()
-        q_stats.Q_mean = running_tgt_mean.item()
-        q_stats.Q_std = running_tgt_std.item()
+        q_stats.Q_mean = 0.0
+        q_stats.Q_std = value_scale
         save_Q_stats(q_stats, dataset_name, specific_dataset, task_id, new_step)
         print("critic saved.")
 
-    return running_tgt_mean.item(), running_tgt_std.item()
+    return 0.0, value_scale
 
 def train_critic_with_planner5(
     trajs: List[TrajectoryDict],
@@ -5064,5 +5034,3 @@ def train_critic_with_planner5(
         print("critic saved.")
 
     return running_tgt_mean.item(), running_tgt_std.item()
-
-

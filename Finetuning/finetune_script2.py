@@ -237,6 +237,7 @@ if __name__ == "__main__":
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value
         rollout_num_envs = 8, 
+        rollout_every = 0,
         continual_rollout = True,
         chunk_size = 31,
         num_rollout_processes = 8,
@@ -366,6 +367,7 @@ if __name__ == "__main__":
         Entropy_Scaling_Factor = 0.5,
         rollout_length = 4000,  # or your desired value
         rollout_num_envs = 8, 
+        rollout_every = 0,
         continual_rollout = True,
         chunk_size = 31,
         num_rollout_processes = 8,
@@ -382,4 +384,3 @@ if __name__ == "__main__":
 
 
     
-

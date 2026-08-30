@@ -5,9 +5,11 @@ import torch
 from torch import Tensor
 import sys
 import os
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.append(project_root)
-os.chdir(project_root)
+from pathlib import Path
+
+repo_root = Path(__file__).resolve().parents[3]
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
 import torch.nn as nn
 import einops
 from einops.layers.torch import Rearrange
@@ -16,7 +18,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import pickle
 import os
-from Dataset import get_PlannerName
+from Pretrain.Dataset import get_PlannerName
 
 
 #-----------------------------------------------------------------------------#
@@ -630,5 +632,4 @@ def getName(env_name, specific_env):
             raise ValueError(f"Invalid ogpointmaze dataset name: {specific_env}")
      else:
            raise ValueError(f"Invalid environment name: {env_name}")
-
 
