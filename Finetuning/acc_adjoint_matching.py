@@ -552,6 +552,65 @@ class Acc_AdjointMatchingFineTuner:
         a.reverse()
         return a, reward
 
+    def make_a_batch(
+        self,
+        trajectories: torch.Tensor,
+        reward_model: Union[TotalReward, TotalReward_Critic],
+        reward_std: float,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Propagate adjoints for all local trajectories with one JVP per time point."""
+        trajectory_count, step_count = trajectories.shape[:2]
+        reversed_states = torch.flip(trajectories[:, :, 0], dims=[1]).to(self.device)
+        terminal_adjoints = []
+        rewards = []
+
+        if reward_std == 0.0:
+            reward_std = 1.0
+        alpha = self.alpha_scheduler.get_alpha()
+
+        for terminal_state in reversed_states[:, 0]:
+            reward, gradient = reward_model(terminal_state, self.Lam.get_lam())
+            if self.config.MaxEnt:
+                score = self.old_score_net(
+                    terminal_state.unsqueeze(0),
+                    torch.zeros(1, device=self.device),
+                ).squeeze(0)
+                entropy_gradient = -score.detach()
+            else:
+                entropy_gradient = torch.zeros_like(gradient)
+            terminal_adjoint = (
+                -1 * (self.config.reward_scaling_factor / alpha / reward_std) * gradient
+                - self.config.Entropy_Scaling_Factor * entropy_gradient
+            ).detach()
+            terminal_adjoints.append(terminal_adjoint)
+            rewards.append(reward)
+
+        current_adjoint = torch.stack(terminal_adjoints, dim=0)
+        reversed_adjoints = [current_adjoint]
+        for i in range(step_count - 1):
+            t_now = self.t_asc_reversed[i]
+            t_next = self.t_asc_reversed[i + 1]
+            dt = t_now - t_next
+            state_batch = reversed_states[:, i]
+            time_batch = t_now.expand(trajectory_count)
+            _, jvp_out = jvp(
+                self.old_score_net,
+                (state_batch, time_batch),
+                (current_adjoint, torch.zeros_like(time_batch)),
+                create_graph=False,
+            )
+            current_adjoint = (
+                current_adjoint
+                + dt * (
+                    self.k_reversed[i] * current_adjoint
+                    + 2 * self.k_reversed[i] * jvp_out
+                )
+            ).detach()
+            reversed_adjoints.append(current_adjoint)
+
+        adjoints = torch.stack(reversed_adjoints[::-1], dim=1)
+        return adjoints, torch.stack(rewards)
+
     """
     def make_a(self, X, reward_model: TotalReward, reward_std: float):
         base_old_score_net = self.accelerator.unwrap_model(self.old_score_net)
@@ -640,6 +699,41 @@ class Acc_AdjointMatchingFineTuner:
             )
         return losses.mean()
 
+    def adjoint_matching_loss_batch(
+        self,
+        trajectories: torch.Tensor,
+        adjoints: torch.Tensor,
+    ) -> torch.Tensor:
+        """Evaluate the unchanged per-time loss for every local trajectory at once."""
+        trajectory_count, step_count, _, horizon, dimension = trajectories.shape
+        flat_trajectories = trajectories[:, :, 0].detach().reshape(
+            trajectory_count * step_count, horizon, dimension
+        )
+        flat_adjoints = adjoints.detach().reshape(
+            trajectory_count * step_count, horizon, dimension
+        )
+        times = self.t_asc[:step_count].repeat(trajectory_count)
+        k_values = self.k[:step_count].repeat(trajectory_count).view(-1, 1, 1)
+
+        new_score = self.new_score_net(flat_trajectories, times)
+        with torch.no_grad():
+            old_score = self.old_score_net(flat_trajectories, times)
+        v_new = k_values * flat_trajectories + k_values * new_score
+        v_old = k_values * flat_trajectories + k_values * old_score
+        sigma = torch.sqrt((-2 * k_values).clamp_min(1e-12))
+        losses = (
+            (v_new - v_old) * (2 / sigma) + sigma * flat_adjoints
+        ).square().mean(dim=(1, 2)).reshape(trajectory_count, step_count)
+
+        clip_count = min(self.config.num_Loss_Clip_steps + 1, step_count)
+        if clip_count > 0:
+            cap = losses.new_tensor((self.config.reward_scaling_factor**2) * 1.6)
+            losses = torch.cat(
+                [torch.minimum(losses[:, :clip_count], cap), losses[:, clip_count:]],
+                dim=1,
+            )
+        return losses.mean()
+
     def step(self, s0_batch: torch.Tensor, reward_model: Union[TotalReward, TotalReward_Critic]) -> Tuple[float, float, float]:
         # 1. Split batch across processes
         base_reward_model = self.accelerator.unwrap_model(reward_model)
@@ -674,18 +768,14 @@ class Acc_AdjointMatchingFineTuner:
         # 3. Each trajectory stays on the rank that generated it.  The previous
         # all-gather + immediate re-split transferred the full diffusion history
         # without changing the global objective.
-        local_loss_tensors = []
-        optimized_rewards = []
-        for traj in local_trajs:
-            traj = [traj[i] for i in range(traj.shape[0])]
-            with self.accelerator.autocast():
-                 adjoint, reward = self.make_a(traj, reward_model, reward_std)
-                 loss_tensor = self.adjoint_matching_loss(traj, adjoint)
-            local_loss_tensors.append(loss_tensor)
-            optimized_rewards.append(reward)
-
-        local_loss = torch.stack(local_loss_tensors).mean()
-        local_rewards = torch.stack(optimized_rewards).mean()
+        with self.accelerator.autocast():
+            local_adjoints, optimized_rewards = self.make_a_batch(
+                local_trajs, reward_model, reward_std
+            )
+            local_loss = self.adjoint_matching_loss_batch(
+                local_trajs, local_adjoints
+            )
+        local_rewards = optimized_rewards.mean()
 
         global_loss = self.accelerator.reduce(local_loss, reduction="mean")
 

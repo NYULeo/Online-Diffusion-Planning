@@ -136,6 +136,56 @@ class SafeOptimizationTest(unittest.TestCase):
             scalar += value
         self.assertTrue(torch.allclose(vectorized, scalar / 4, atol=1e-6))
 
+    def test_batched_adjoint_matches_scalar_trajectory_loop(self):
+        class Score(torch.nn.Module):
+            def forward(self, value, timestep):
+                return 0.2 * value + timestep[:, None, None]
+
+        class Reward:
+            def __call__(self, plan, lam):
+                return plan.square().sum() + lam, 2 * plan
+
+        tuner = Acc_AdjointMatchingFineTuner.__new__(Acc_AdjointMatchingFineTuner)
+        tuner.device = torch.device("cpu")
+        tuner.old_score_net = Score()
+        tuner.new_score_net = Score()
+        tuner.config = types.SimpleNamespace(
+            MaxEnt=False,
+            reward_scaling_factor=5.0,
+            Entropy_Scaling_Factor=0.5,
+            num_Loss_Clip_steps=1,
+        )
+        tuner.Lam = types.SimpleNamespace(get_lam=lambda: 0.25)
+        tuner.alpha_scheduler = types.SimpleNamespace(get_alpha=lambda: 0.8)
+        tuner.t_asc = torch.linspace(0.9, 0.1, 4)
+        tuner.k = -torch.tensor([0.3, 0.5, 0.7, 0.9])
+        tuner.t_asc_reversed = torch.flip(tuner.t_asc, dims=[0])
+        tuner.k_reversed = torch.flip(tuner.k, dims=[0])
+        trajectories = torch.randn(3, 4, 1, 3, 2)
+
+        scalar_adjoints = []
+        scalar_rewards = []
+        scalar_losses = []
+        for trajectory_tensor in trajectories.clone():
+            trajectory = [trajectory_tensor[index] for index in range(4)]
+            adjoint, reward = tuner.make_a(trajectory, Reward(), reward_std=1.7)
+            scalar_adjoints.append(torch.cat(adjoint, dim=0))
+            scalar_rewards.append(reward)
+            scalar_losses.append(tuner.adjoint_matching_loss(trajectory, adjoint))
+        scalar_adjoints = torch.stack(scalar_adjoints)
+        scalar_rewards = torch.stack(scalar_rewards)
+        scalar_loss = torch.stack(scalar_losses).mean()
+
+        batch_adjoints, batch_rewards = tuner.make_a_batch(
+            trajectories.clone(), Reward(), reward_std=1.7
+        )
+        batch_loss = tuner.adjoint_matching_loss_batch(
+            trajectories.clone(), batch_adjoints
+        )
+        self.assertTrue(torch.allclose(batch_adjoints, scalar_adjoints, atol=1e-6))
+        self.assertTrue(torch.equal(batch_rewards, scalar_rewards))
+        self.assertTrue(torch.allclose(batch_loss, scalar_loss, atol=1e-6))
+
 
 if __name__ == "__main__":
     unittest.main()
