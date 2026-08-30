@@ -19,9 +19,9 @@ import torch
 import torch.optim as optim
 import numpy as np
 try:
-    from Pretrain.utils import set_seed, SAStats, ema_smooth, cycle, check_device
+    from Pretrain.utils import set_seed, SAStats, ema_smooth, cycle, check_device, wandb_log
 except ModuleNotFoundError:
-    from utils import set_seed, SAStats, ema_smooth, cycle, check_device
+    from utils import set_seed, SAStats, ema_smooth, cycle, check_device, wandb_log
 import torch.nn as nn
 import pickle
 try:
@@ -679,6 +679,10 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
            if step % 2000 == 0:
               avg_loss = total_loss / 2000
               print(f"Step {step}, loss {avg_loss:.4f}")
+              wandb_log(
+                  {"reward/loss": avg_loss, "reward/lr": scheduler.get_last_lr()[0]},
+                  step=step,
+              )
               total_loss = 0
         
            if step % save_freq == 0:

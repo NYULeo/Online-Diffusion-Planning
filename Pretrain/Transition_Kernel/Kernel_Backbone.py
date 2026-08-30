@@ -29,9 +29,9 @@ import math
 import copy
 
 try:
-    from Pretrain.utils import SAStats, cycle, check_device
+    from Pretrain.utils import SAStats, cycle, check_device, wandb_log
 except ModuleNotFoundError:
-    from utils import SAStats, cycle, check_device
+    from utils import SAStats, cycle, check_device, wandb_log
 import json
 
 def check_specific_dataset(dataset_name):
@@ -740,7 +740,9 @@ def train_mog_kernel(
         total_loss += avg_loss
 
         if step % 100 == 0:
-            print(f"Step {step:6d} | Avg Loss: {total_loss/100:.6f}")
+            logged_loss = total_loss / 100
+            print(f"Step {step:6d} | Avg Loss: {logged_loss:.6f}")
+            wandb_log({"kernel/loss": logged_loss}, step=step)
             total_loss = 0.0
 
         # Save checkpoints

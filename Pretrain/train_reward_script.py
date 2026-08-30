@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Rewards.Reward_Backbone import train_reward, test_Model, train_reward_pos_weight, train_reward_ensemble, test_Model_ensemble
-from Pretrain.utils import set_seed
+from Pretrain.utils import init_wandb_run, set_seed
 import numpy as np
 import pickle
 
@@ -47,10 +47,21 @@ if __name__ == '__main__':
     specific_dataset = 'single'
     task_id = 4
     traj_length = None
+    run = init_wandb_run(
+        "cube-single-task4-reward",
+        {
+            "stage": "reward", "dataset_name": dataset_name,
+            "specific_dataset": specific_dataset, "task_id": task_id,
+            "hidden_layers": 4, "hidden_dim": 512, "batch_size": 256,
+            "num_steps": 30000, "lr": 5e-3, "min_lr": 5e-4,
+            "sigma": 4.0, "target_reward": 500.0,
+        },
+    )
     
    
 
-    train_reward(dataset_name = dataset_name, 
+    try:
+      train_reward(dataset_name = dataset_name,
                  hidden_layers = 4, 
                  hidden_dim = 512, 
                  batch_size = 256, 
@@ -68,7 +79,7 @@ if __name__ == '__main__':
     
 
   
-    test_Model(dataset_name, 
+      test_Model(dataset_name,
                hidden_layers = 4, 
                hidden_dim = 512, 
                specific_dataset = specific_dataset, 
@@ -81,6 +92,8 @@ if __name__ == '__main__':
                traj_length = traj_length, 
                save_freq = 30000, 
                num_steps = 30000)
+    finally:
+      run.finish()
 
 
 
@@ -130,8 +143,6 @@ if __name__ == '__main__':
                save_freq = 2000, 
                num_steps = 2000)
 """
-
-
 
 
 

@@ -9,6 +9,26 @@ import os
 import pickle
 
 
+def init_wandb_run(name: str, config: dict):
+    """Initialize a project W&B run with environment-overridable ownership."""
+    import wandb
+
+    return wandb.init(
+        entity=os.environ.get("WANDB_ENTITY", "kaiwen_hu-uc-berkeley"),
+        project=os.environ.get("WANDB_PROJECT", "ODP"),
+        name=name,
+        config=config,
+    )
+
+
+def wandb_log(metrics: dict, step: Optional[int] = None) -> None:
+    """Log only when the current process owns an initialized W&B run."""
+    import wandb
+
+    if wandb.run is not None:
+        wandb.log(metrics, step=step)
+
+
 def cycle(dl):
     while True:
         for data in dl:
@@ -126,4 +146,4 @@ def check_device():
     else:
         device = torch.device("cpu")
         print("⚠️  Falling back to CPU (no GPU acceleration)")
-    return device 
+    return device

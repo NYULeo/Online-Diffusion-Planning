@@ -5,7 +5,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 from Transition_Kernel.Kernel_Backbone import test_kernel, train_kernel, train_mog_kernel, test_kernel_mog
-from utils import set_seed
+from utils import init_wandb_run, set_seed
 from Finetuning.utils import get_trajs
 import pickle
 
@@ -15,7 +15,17 @@ if __name__ == '__main__':  # pragma: no cover
     set_seed(1)
     dataset = 'cube'
     specific_dataset = 'single'
-    train_mog_kernel(
+    run = init_wandb_run(
+        "cube-single-task4-kernel",
+        {
+            "stage": "kernel", "dataset_name": dataset,
+            "specific_dataset": specific_dataset, "batch_size": 512,
+            "num_steps": 5000, "ensemble_size": 10, "num_modes": 10,
+            "hidden_layers": 4, "hidden_dim": 514, "lr": 1e-4,
+        },
+    )
+    try:
+      train_mog_kernel(
          dataset_name = dataset,
          specific_dataset = specific_dataset,
          batch_size = 512,
@@ -29,7 +39,7 @@ if __name__ == '__main__':  # pragma: no cover
          λ_reg = 1e-3,
          noise_floor = 5e-4)
       
-    test_kernel_mog(dataset_name = dataset,
+      test_kernel_mog(dataset_name = dataset,
                 specific_dataset = specific_dataset,
                 trajs = None,
                 save_freq = 5000,
@@ -40,6 +50,8 @@ if __name__ == '__main__':  # pragma: no cover
                 num_modes = 10,
                 quantile = 0.99,
                 noise_floor = 5e-4)
+    finally:
+      run.finish()
 
 
 """
@@ -61,7 +73,7 @@ if __name__ == '__main__':  # pragma: no cover
          λ_reg = 1e-3,
          noise_floor = 5e-4)
       
-    test_kernel_mog(dataset_name = dataset,
+      test_kernel_mog(dataset_name = dataset,
                 specific_dataset = specific_dataset,
                 trajs = None,
                 save_freq = 5000,
@@ -72,4 +84,6 @@ if __name__ == '__main__':  # pragma: no cover
                 num_modes = 10,
                 quantile = 0.99,
                 noise_floor = 5e-4)
+    finally:
+      run.finish()
 """

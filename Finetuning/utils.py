@@ -11,7 +11,7 @@ import torch
 import os
 import pickle
 from torch.utils.data import Dataset
-from Pretrain.utils import SAStats
+from Pretrain.utils import SAStats, wandb_log
 from scipy.ndimage import gaussian_filter1d
 from typing import TypedDict, List, Union
 from typing import Optional
@@ -3268,7 +3268,9 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
            scheduler.step()
            
            if(k % 1000 == 0):
-                print(f"Critic Training step {k} loss: {total_loss/1000}")
+                logged_loss = total_loss / 1000
+                print(f"Critic Training step {k} loss: {logged_loss}")
+                wandb_log({"critic/loss": logged_loss}, step=k)
                 total_loss = 0.0
             
            # Soft update target network
@@ -3639,11 +3641,11 @@ def train_critic_with_planner2(
                 tp.data.mul_(1 - tau).add_(tau * p.data)
 
         running += loss.item()
-        """
-        if k % log_every == 0:
-            print(f"  step {k:>6}/{num_steps}   loss = {running / log_every:.4f}")
+        if log_every > 0 and k % log_every == 0:
+            logged_loss = running / log_every
+            print(f"  step {k:>6}/{num_steps}   loss = {logged_loss:.4f}")
+            wandb_log({"critic_online/loss": logged_loss})
             running = 0.0
-        """
 
     target_critic.eval()
     save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
@@ -4523,12 +4525,22 @@ def train_critic_with_planner4(
         running += loss.item()
     
         if log_every > 0 and k % log_every == 0 and is_main:
+            logged_loss = running / log_every
             print(
                 f" step {k:>6}/{num_steps} "
-                f"loss = {running / log_every:.10f}  "
+                f"loss = {logged_loss:.10f}  "
                 f"B_eff={B_eff}  U={U}  "
                 f"tgt_mean={averaged_targets.mean().item():.3f}  "
                 f"tgt_std={averaged_targets.std(unbiased=False).item():.3f}"
+            )
+            wandb_log(
+                {
+                    "critic_warmup/loss": logged_loss,
+                    "critic_warmup/target_mean": averaged_targets.mean().item(),
+                    "critic_warmup/target_std": averaged_targets.std(unbiased=False).item(),
+                    "critic_warmup/effective_plans": B_eff,
+                },
+                step=k,
             )
             running = 0.0
 

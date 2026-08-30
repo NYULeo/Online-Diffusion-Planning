@@ -19,6 +19,7 @@ from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 from typing import List
 from utils import TrajectoryDict, rollout_parallel, get_planner, rollout_parallel2, save_planner, train_reward, train_kernel, train_kernel_mog, train_critic, save_trajs, AlphaSchedulerConfig, checktrajs, rollout_parallel3, train_reward_ensemble
 from Pretrain.Dataset import get_env
+from Pretrain.utils import init_wandb_run
 from torch.utils.data import DataLoader
 from accelerate.utils import broadcast
 import torch
@@ -272,6 +273,23 @@ class OnlineFinetuner():
         if self.config.finetune_batch_size % self.accelerator.num_processes != 0:
             raise ValueError("finetune_batch_size must be divisible by num_processes")
         self.device = self.accelerator.device
+        self.wandb_run = None
+        if self.accelerator.is_main_process:
+            self.wandb_run = init_wandb_run(
+                "cube-single-task4-finetune",
+                {
+                    "stage": "finetune",
+                    "dataset_name": self.config.dataset_name,
+                    "specific_dataset": self.config.specific_dataset,
+                    "task_id": self.config.train_reward_config.task_id,
+                    "finetune_steps": self.config.finetune_steps,
+                    "finetune_rounds": self.config.finetune_rounds,
+                    "batch_size": self.config.finetune_batch_size,
+                    "batch_per_sample": self.config.finetune_batch_per_sample,
+                    "diffusion_steps": self.config.diffusion_steps,
+                    "num_processes": self.accelerator.num_processes,
+                },
+            )
         
         self.Initialize_BufferDataset()
         self.set_reward_model(self.device)
@@ -613,7 +631,6 @@ class OnlineFinetuner():
             self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1, old_planner_checkpoint = (step * self.config.AMConfig.per_round_steps))
             self.accelerator.wait_for_everyone()
             
-            
 
             if torch.cuda.is_available():
                   torch.cuda.synchronize()  
@@ -895,10 +912,9 @@ class OnlineFinetuner():
                    print(f"Finetuning round {step+1} completed")
                    print()
             self.accelerator.wait_for_everyone()
-            
+        if self.accelerator.is_main_process and self.wandb_run is not None:
+            self.wandb_run.finish()
 
      
         
             
-
-

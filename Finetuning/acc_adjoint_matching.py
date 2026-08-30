@@ -30,6 +30,7 @@ try:
 except ImportError:
     raise ImportError("accelerate is required but not installed. Run: pip install accelerate")
 from accelerate.utils import broadcast
+from Pretrain.utils import wandb_log
 import pickle
 
 
@@ -736,6 +737,7 @@ class Acc_AdjointMatchingFineTuner:
                      self.step_ema(((round-1)*self.config.per_round_steps + step))
                 
                 if ((step % self.config.log_freq) == 0):
+                    global_step = (round - 1) * self.config.per_round_steps + step
                     print('---------------------------------------------------------')
                     if(step == 0):
                          print(f"round: {round}, step: {step}, loss {total_loss}")
@@ -749,6 +751,17 @@ class Acc_AdjointMatchingFineTuner:
                          print(f"round: {round}, step: {step}, reward {pure_reward / self.config.log_freq}")
                          print(f"round: {round}, step: {step}, constraint {total_C / self.config.log_freq}")
                          print(f"round: {round}, step: {step}, alpha {self.alpha_scheduler.get_alpha()}")
+                    wandb_log(
+                        {
+                            "finetune/loss": total_loss if step == 0 else total_loss / self.config.log_freq,
+                            "finetune/reward": total_reward if step == 0 else total_reward / self.config.log_freq,
+                            "finetune/objective": pure_reward if step == 0 else pure_reward / self.config.log_freq,
+                            "finetune/constraint": total_C if step == 0 else total_C / self.config.log_freq,
+                            "finetune/alpha": self.alpha_scheduler.get_alpha(),
+                            "finetune/lambda": self.Lam.get_lam(),
+                        },
+                        step=global_step,
+                    )
                     total_loss = 0.0
                     total_reward = 0.0
                     pure_reward = 0.0

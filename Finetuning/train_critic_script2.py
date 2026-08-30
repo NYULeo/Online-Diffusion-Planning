@@ -29,7 +29,7 @@ from Finetuning.utils import (
     test_critic,
     KernelConfig,
 )
-from Pretrain.utils import set_seed
+from Pretrain.utils import init_wandb_run, set_seed
 from accelerate import Accelerator
 import random 
 
@@ -48,6 +48,17 @@ if __name__ == '__main__':  # pragma: no cover
        trajs = data.get_trajectories()
     
        accelerator = Accelerator(mixed_precision='bf16')
+       run = None
+       if accelerator.is_main_process:
+            run = init_wandb_run(
+                "cube-single-task4-critic-warmup",
+                {
+                    "stage": "critic_warmup", "dataset_name": env_name,
+                    "specific_dataset": specific_env, "task_id": task_id,
+                    "horizon": 32, "batch_size": 64, "num_steps": 100,
+                    "num_processes": accelerator.num_processes, "value_scale": 5.0,
+                },
+            )
        kernel_config = KernelConfig(
                 checkpoint = 0,
                 type_kernel = 'mog',
@@ -106,6 +117,8 @@ if __name__ == '__main__':  # pragma: no cover
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
+       if run is not None:
+            run.finish()
 
 
 
@@ -212,7 +225,6 @@ if __name__ == '__main__':  # pragma: no cover
 
 """
     
-
 
 
 

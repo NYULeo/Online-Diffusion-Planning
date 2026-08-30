@@ -29,7 +29,7 @@ from Finetuning.utils import (
     test_critic,
     KernelConfig,
 )
-from Pretrain.utils import set_seed
+from Pretrain.utils import init_wandb_run, set_seed
 from accelerate import Accelerator
 import random 
 
@@ -45,6 +45,15 @@ if __name__ == '__main__':  # pragma: no cover
        step = 0
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
+       run = init_wandb_run(
+            "cube-single-task4-critic",
+            {
+                "stage": "critic", "dataset_name": env_name,
+                "specific_dataset": specific_env, "task_id": task_id,
+                "horizon": horizon, "batch_size": 256, "num_steps": 10000,
+                "gamma": 0.99, "lam": 0.95, "value_scale": 5.0,
+            },
+       )
        
       
        
@@ -86,6 +95,7 @@ if __name__ == '__main__':  # pragma: no cover
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
+       run.finish()
 
 
 
@@ -192,7 +202,6 @@ if __name__ == '__main__':  # pragma: no cover
 """
 
     
-
 
 
 

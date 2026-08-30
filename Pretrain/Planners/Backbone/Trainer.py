@@ -16,6 +16,7 @@ from .UNet import TemporalUnet
 import os
 from Dataset import get_PlannerName, PlannerDataset, PlannerDataset_Rollout
 from .utils import LossTracker, get_pretrained_planner, getName
+from Pretrain.utils import wandb_log
 import json
 
 
@@ -291,7 +292,12 @@ class SDETrainer:
                 self.step_ema()
             
             if ((self.step % self.log_freq) == 0):
-                print(f"step {self.step} loss {total_loss/self.log_freq}")
+                logged_loss = total_loss / self.log_freq
+                print(f"step {self.step} loss {logged_loss}")
+                wandb_log(
+                    {"planner/loss": logged_loss, "planner/lr": self.optim.param_groups[0]['lr']},
+                    step=self.step,
+                )
                 total_loss = 0
             
             if ((self.step % self.save_freq == 0) and (self.step!=0)):
@@ -399,4 +405,3 @@ class SDETrainer:
         loss = (lam * mse).mean()
         loss = loss/((H*D) - self.state_dim)
         return loss
-
