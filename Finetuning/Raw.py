@@ -292,3 +292,157 @@ def sample_selected_plan(
 
 
 
+import pickle
+import torch
+from Pretrain.Critic.nets import Critic
+from Finetuning.utils import symexp
+from Pretrain.Rewards.nets import SimpleReward
+
+
+def critic_heatmap(checkpoint: int, show: bool = True):
+    from matplotlib.patches import Rectangle
+
+    ckpt = f"Finetuning/Critics/antmaze/large/Models/AntMaze_Large_task4_Critic_{checkpoint}.pkl"
+    stats_path = "Finetuning/Critics/antmaze/large/Stats/AntMaze_Large_task4_Critic_stats_0.pkl"
+
+    critic = Critic(obs_dim=29, hidden_dim=512, hidden_layers=4)
+    critic.load_state_dict(torch.load(ckpt, map_location="cpu", weights_only=True))
+    critic.eval()
+
+    with open(stats_path, "rb") as f:
+        stats = pickle.load(f)
+
+    xs = np.linspace(-6, 42, 200)
+    ys = np.linspace(-6, 30, 160)
+    XX, YY = np.meshgrid(xs, ys)
+    obs = np.broadcast_to(stats.obs_mean, (XX.size, 29)).copy()
+    obs[:, 0] = XX.ravel()
+    obs[:, 1] = YY.ravel()
+    s = stats.norm_obs(obs)
+    with torch.no_grad():
+        V = symexp(critic(torch.as_tensor(s, dtype=torch.float32))).numpy().reshape(XX.shape)
+
+    MAZE = np.array([
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1],
+        [1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+        [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1],
+        [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1],
+        [1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1],
+        [1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1],
+        [1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    ])
+    UNIT, OFF = 4.0, 4.0
+
+    def ij_to_xy(ij):
+        i, j = ij
+        return j * UNIT - OFF, i * UNIT - OFF
+
+    fig, ax = plt.subplots(figsize=(8, 5.5))
+    im = ax.pcolormesh(XX, YY, V, shading="auto", cmap="magma")
+    plt.colorbar(im, ax=ax, label=r"$V(s)$")
+
+    for i in range(MAZE.shape[0]):
+        for j in range(MAZE.shape[1]):
+            if MAZE[i, j] == 1:
+                cx, cy = ij_to_xy((i, j))
+                ax.add_patch(Rectangle(
+                    (cx - UNIT / 2, cy - UNIT / 2), UNIT, UNIT,
+                    facecolor="k", edgecolor="none", zorder=2,
+                ))
+
+    ax.scatter(*ij_to_xy((3, 8)), c="lime", s=60, zorder=3, label="start")
+    ax.scatter(*ij_to_xy((5, 4)), c="cyan", s=80, marker="*", zorder=3, label="goal")
+    ax.set_aspect("equal")
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_title(f"task4 critic @ {checkpoint}")
+    ax.legend()
+    plt.tight_layout()
+    out = f"critic_heatmap_task4_{checkpoint}.png"
+    plt.savefig(out, dpi=150)
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+    return out
+
+
+def reward_heatmap(checkpoint: int = 0, show: bool = True):
+    from matplotlib.patches import Rectangle
+
+    ckpt = f"Finetuning/Rewards/antmaze/large/Models/AntMaze_Large_Task4_Reward_{checkpoint}.pkl"
+    stats_path = "Finetuning/Rewards/antmaze/large/Stats/AntMaze_Large_Task4_Reward_stats_0.pkl"
+
+    reward_net = SimpleReward(obs_dim=29, act_dim=8, hidden_dim=512, hidden_layers=4)
+    reward_net.load_state_dict(torch.load(ckpt, map_location="cpu", weights_only=True))
+    reward_net.eval()
+
+    with open(stats_path, "rb") as f:
+        stats = pickle.load(f)
+
+    xs = np.linspace(-6, 42, 200)
+    ys = np.linspace(-6, 30, 160)
+    XX, YY = np.meshgrid(xs, ys)
+    obs = np.broadcast_to(stats.obs_mean, (XX.size, 29)).copy()
+    obs[:, 0] = XX.ravel()
+    obs[:, 1] = YY.ravel()
+    s = torch.as_tensor(stats.norm_obs(obs), dtype=torch.float32)
+    a = torch.zeros(s.shape[0], 8)
+    with torch.no_grad():
+        R = reward_net(s, a).numpy().reshape(XX.shape)
+
+    MAZE = np.array([
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1],
+        [1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+        [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1],
+        [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1],
+        [1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1],
+        [1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1],
+        [1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    ])
+    UNIT, OFF = 4.0, 4.0
+
+    def ij_to_xy(ij):
+        i, j = ij
+        return j * UNIT - OFF, i * UNIT - OFF
+
+    fig, ax = plt.subplots(figsize=(8, 5.5))
+    im = ax.pcolormesh(XX, YY, R, shading="auto", cmap="magma")
+    plt.colorbar(im, ax=ax, label=r"$r(s, a=0)$")
+
+    for i in range(MAZE.shape[0]):
+        for j in range(MAZE.shape[1]):
+            if MAZE[i, j] == 1:
+                cx, cy = ij_to_xy((i, j))
+                ax.add_patch(Rectangle(
+                    (cx - UNIT / 2, cy - UNIT / 2), UNIT, UNIT,
+                    facecolor="k", edgecolor="none", zorder=2,
+                ))
+
+    ax.scatter(*ij_to_xy((3, 8)), c="lime", s=60, zorder=3, label="start")
+    ax.scatter(*ij_to_xy((5, 4)), c="cyan", s=80, marker="*", zorder=3, label="goal")
+    ax.set_aspect("equal")
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_title(f"task4 reward @ {checkpoint}")
+    ax.legend()
+    plt.tight_layout()
+    out = f"reward_heatmap_task4_{checkpoint}.png"
+    plt.savefig(out, dpi=150)
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+    return out
+
+"""
+if __name__ == "__main__":
+    #critic_heatmap(90)
+    reward_heatmap(0)
+
+"""
+

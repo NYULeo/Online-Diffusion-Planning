@@ -25,6 +25,7 @@ from Finetuning.utils import (
     train_critic_with_planner3,
     train_critic_with_planner4,
     train_critic_with_planner6,
+    train_critic_with_planner7,
     train_critic,
     test_critic,
     KernelConfig,
@@ -397,8 +398,8 @@ if __name__ == '__main__':  # pragma: no cover
               "steps_T", "num_karras", "eta", "new_step", "task_id", "log_every",
          )
 
-        train_critic_with_planner6(
-                   trajs=trajs,
+        train_critic_with_planner7(
+                   max_length = traj_length,
                    kernel_config=kernel_config,
                    horizon=hp["train_horizon"],
                    accelerator=accelerator,
