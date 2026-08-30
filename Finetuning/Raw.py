@@ -439,10 +439,9 @@ def reward_heatmap(checkpoint: int = 0, show: bool = True):
         plt.close(fig)
     return out
 
+
 """
 if __name__ == "__main__":
-    #critic_heatmap(90)
-    reward_heatmap(0)
-
+    critic_heatmap(0)
+    #reward_heatmap(0)
 """
-

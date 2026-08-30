@@ -342,8 +342,8 @@ if __name__ == '__main__':  # pragma: no cover
               "reward_hidden_dim": 512,
               "batch_size": 256,
               "oversample": 30,
-              "num_steps": 10,
-              "resample_every": 1,
+              "num_steps": 50,
+              "resample_every": 5,
               "train_horizon": 32,             # passed as horizon= to the trainer
               "gamma": 0.99,
               "lam": None,
