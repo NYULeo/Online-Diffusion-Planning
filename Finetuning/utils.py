@@ -29,7 +29,7 @@ from Pretrain.Transition_Kernel.Kernel_Net import MoGTransitionKernel, RobustTra
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_total_mahalanobis_score, compute_log_density_mog, compute_log_density, compute_total_mahalanobis_score_mog
 from Pretrain.Dataset import KitchenDataset, PointMazeDataset, get_env, get_dataset, Planner_Processor
 from gymnasium.vector import AsyncVectorEnv
-from Pretrain.Planners.Backbone.Sampler import sample_euler_karras, sample_euler_karras_batch
+from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Critic.nets import Critic
 from Pretrain.Dataset import get_dataset
@@ -43,7 +43,7 @@ import torch.distributed as dist
 
 class TrajectoryDict(TypedDict):
     observations: np.ndarray
-    actions: np.ndarray  
+    actions: np.ndarray
     rewards: np.ndarray
 
 class Q_Stats:
@@ -172,7 +172,7 @@ def reward_processor(rewards, name: str):
          dist = 0 - Min
          rews = rewards + dist
          return rews
-    
+
     if(name in ('cube', 'ogpointmaze', 'antmaze', 'humanoidmaze', 'puzzle', 'scene')):
          return ogbench_reward_processor(rewards)
     else:
@@ -181,10 +181,10 @@ def reward_processor(rewards, name: str):
 def reward_filter(obs, rews, goal):
     #target_goals = np.array([[-2.5, -2.5], [2.5, 2.5], [2.5, -2.5], [-2.5, 2.5]])
     for i in range(1, len(obs)):
-        pos = obs[i][:2] 
+        pos = obs[i][:2]
         g = np.asarray(goal, dtype=np.float32).reshape(-1)
-        #goal_coord = np.asarray(goal_coord, dtype=np.float32).reshape(-1)  
-        dist = np.linalg.norm(pos - g) 
+        #goal_coord = np.asarray(goal_coord, dtype=np.float32).reshape(-1)
+        dist = np.linalg.norm(pos - g)
         if (dist < 0.5):
             rews[i-1] = 1.0
         else:
@@ -198,12 +198,12 @@ def reward_filter_goals(trajs: List[TrajectoryDict], goal) -> List[TrajectoryDic
         new_trajs = []
         new_rews = [0]*len(traj['rewards'])
         traj['rewards'] = new_rews
-        
+
         #while(i < len(traj['observations'])):
         for i in range(1, len(traj['observations'])):
           pos = traj['observations'][i][:2]
           g = np.asarray(goal, dtype=np.float32).reshape(-1)
-          dist = np.linalg.norm(pos - g) 
+          dist = np.linalg.norm(pos - g)
           if(dist < 0.5):
               if((i - last_step) < 3):
                   last_step = i+1
@@ -214,12 +214,12 @@ def reward_filter_goals(trajs: List[TrajectoryDict], goal) -> List[TrajectoryDic
                   new_trajs.append({'observations': traj['observations'][last_step:i-1], 'actions': traj['actions'][last_step:i-1], 'rewards': rews})
                   last_step = i+1
         return new_trajs
-    
+
     new_trajs = []
     for traj in trajs:
         new_trajs.extend(reward_filter2(traj, goal))
     return new_trajs
-   
+
 def save_reward_model(reward_net, dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
     reward_net.eval()
     net_dict = reward_net.state_dict()
@@ -229,7 +229,7 @@ def save_reward_model(reward_net, dataset_name, specific_dataset, task_id: Optio
     if(check_specific_dataset(dataset_name)):
           os.makedirs(f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/', exist_ok=True)
           save_path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Models/{reward_name}_Reward_{str(step)}.pkl'
-    else: 
+    else:
           os.makedirs(f'./Finetuning/Rewards/{dataset_name}/Models/', exist_ok=True)
           save_path = f'./Finetuning/Rewards/{dataset_name}/Models/{reward_name}_Reward_{str(step)}.pkl'
     #print("Exists:", os.path.isfile(save_path), "Size:", os.path.getsize(save_path) if os.path.isfile(save_path) else None)
@@ -243,7 +243,7 @@ def save_kernel_model(kernel_net, dataset_name, specific_dataset, step, ensemble
     if(check_specific_dataset(dataset_name)):
           os.makedirs(f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}', exist_ok=True)
           save_path = f'./Finetuning/Kernels/{dataset_name}/{specific_dataset}/Models/{str(step)}/{name}_Kernel_{str(ensemble_idx)}.pkl'
-    else: 
+    else:
           os.makedirs(f'./Finetuning/Kernels/{dataset_name}/Models/{str(step)}', exist_ok=True)
           save_path = f'./Finetuning/Kernels/{dataset_name}/Models/{str(step)}/{name}_Kernel_{str(ensemble_idx)}.pkl'
     torch.save(net_dict, save_path)
@@ -267,12 +267,12 @@ def get_reward_stats(dataset_name, specific_dataset, step, task_id: Optional[int
     reward_name = get_RewardName(dataset_name, specific_dataset, task_id)
     if(check_specific_dataset(dataset_name)):
         path = f'./Finetuning/Rewards/{dataset_name}/{specific_dataset}/Stats/{reward_name}_Reward_stats_{str(step)}.pkl'
-        
+
     else:
         path = f'./Finetuning/Rewards/{dataset_name}/Stats/{reward_name}_Reward_stats_{str(step)}.pkl'
     with open(path, 'rb') as f:
         stats = pickle.load(f)
-    return stats  
+    return stats
 
 def get_kernel(dataset_name, specific_dataset, step):
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
@@ -301,7 +301,7 @@ def get_kernel_stats(dataset_name, specific_dataset, step):
         path = f'./Finetuning/Kernels/{dataset_name}/Stats/{name}_Kernel_stats_{str(step)}.pkl'
     with open(path, 'rb') as f:
         stats = pickle.load(f)
-    return stats  
+    return stats
 
 """
 def save_planner(model, dataset_name, specific_dataset, step: int):
@@ -379,7 +379,7 @@ def get_critic_stats(dataset_name, specific_dataset, task_id: Optional[int] = No
     path = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/{critic_name}_Critic_stats_{str(step)}.pkl'
     with open(path, 'rb') as f:
         stats = pickle.load(f)
-    return stats 
+    return stats
 
 def save_trajs(trajs, env_name, specific_env, step, task_id: Optional[int] = None):
     if(task_id is not None):
@@ -420,11 +420,11 @@ class Lambda:
         self.base_lam = lam
         self.beta = beta
         self.eta_lam = eta_lam
-    
+
     def update(self, C):
         self.lam = np.maximum(self.base_lam, self.lam + (self.eta_lam * C))
         self.lam = np.clip(self.lam, 0.0, 5.0)
-    
+
     def set_lam(self, lam: float):
         self.lam = lam
 
@@ -436,7 +436,7 @@ def function(x, beta: float):
 
 def getName(env_name, specific_env):
      if(env_name == 'kitchen'):
-        
+
           return 'Kitchen'
      elif(env_name == 'pointmaze'):
           if specific_env == 'open_dense':
@@ -471,7 +471,7 @@ def getName(env_name, specific_env):
                return 'AntMaze_Umaze'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
-     
+
      elif(env_name == 'cube'):
           if specific_env == 'single-play':
                 return 'Cube_SinglePlay'
@@ -491,7 +491,7 @@ def getName(env_name, specific_env):
                 return 'Cube_QuadrupleNoisy'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
-     
+
      elif(env_name == 'scene'):
           if specific_env == 'play':
                 return 'Scene_Play'
@@ -602,7 +602,7 @@ def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
              return f'Cube_QuadrupleNoisy_task{task_id}'
          else:
              raise ValueError(f"Invalid cube dataset name: {specific_env}")
-     
+
      elif(env_name == 'scene'):
          if specific_env == 'play':
              return f'Scene_Play_task{task_id}'
@@ -610,7 +610,7 @@ def get_CriticName(env_name, specific_env, task_id: Optional[int] = None):
              return f'Scene_Noisy_task{task_id}'
          else:
              raise ValueError(f"Invalid scene dataset name: {specific_env}")
-            
+
      elif(env_name == 'ogpointmaze'):
          if(task_id is None):
               raise ValueError('Task ID is required for cube dataset')
@@ -697,7 +697,7 @@ def get_RewardName(env_name, specific_env, task_id: Optional[int] = None):
 class KernelDataset(Dataset):
     def __init__(self, trajectories: List[TrajectoryDict], dataset_name: str, specific_dataset: str, step: int):
          obs_list, act_list = [], []
-        
+
          for traj in trajectories:
             obs, acts = traj['observations'], traj['actions']
             L = min(len(obs), len(acts))
@@ -705,7 +705,7 @@ class KernelDataset(Dataset):
             act_list.append(acts[:L])
          obs_all = np.concatenate(obs_list, axis=0)  # [N, d_s]
          #act_all = np.concatenate(act_list, axis=0)  # [N, d_a]
-        
+
         #get stats
          self.stats = SAStats()
          self.stats.obs_mean = obs_all.mean(axis=0)
@@ -721,7 +721,7 @@ class KernelDataset(Dataset):
                 data.append((s_t, a_t, s_tp1))
          self.data = data
          self.save_stats(dataset_name, specific_dataset, step)
-    
+
     def save_stats(self, dataset_name, specific_dataset, step):
         specific_dataset = reward_name_converter(specific_dataset)
         name = getName2(dataset_name, specific_dataset)
@@ -749,10 +749,10 @@ class KernelDataset(Dataset):
 
 class RewardDataset(Dataset):
     def __init__(self, trajs: List[TrajectoryDict], sigma: float, dataset_name: str, specific_dataset: str, step: int, goal: Optional[np.array] = None, target_reward: Optional[float] = None, task_id: Optional[int] = None):
-            
+
         # ----- gather raw obs/actions to fit stats -----
         obs_list, act_list = [], []
-        
+
         for traj in trajs:
             obs, acts = traj['observations'], traj['actions']
             L = min(len(obs), len(acts))
@@ -760,8 +760,8 @@ class RewardDataset(Dataset):
             act_list.append(acts[:L])
         obs_all = np.concatenate(obs_list, axis=0)  # [N, d_s]
         #act_all = np.concatenate(act_list, axis=0)  # [N, d_a]
-        
-        
+
+
         #get stats
         self.stats = SAStats()
         self.stats.obs_mean = obs_all.mean(axis=0)
@@ -770,7 +770,7 @@ class RewardDataset(Dataset):
 
         transitions = []
         for traj in trajs:
-            obs = traj['observations']      
+            obs = traj['observations']
             acts = traj['actions']
             rews = traj['rewards']
             """
@@ -788,7 +788,7 @@ class RewardDataset(Dataset):
 
         self.transitions = transitions
         self.save_stats(dataset_name, specific_dataset, task_id, step)
-    
+
     def save_stats(self, dataset_name, specific_dataset, task_id: Optional[int] = 0, step = 0):
         specific_dataset = reward_name_converter(specific_dataset)
         #reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
@@ -814,27 +814,27 @@ class RewardDataset(Dataset):
             torch.tensor(a, dtype=torch.float32),
             torch.tensor(r, dtype=torch.float32),
         )
-    
+
     def boost_signal(self, target_reward, rews):
          rews = np.asarray(rews, dtype=np.float64).copy()
          rews = rews * target_reward
          return rews
 
-def train_reward(trajs: List[TrajectoryDict], 
+def train_reward(trajs: List[TrajectoryDict],
                  dataset_name: str,
-                 hidden_layers: int, 
-                 hidden_dim: int, 
-                 batch_size, 
-                 num_steps, 
-                 lr, min_lr, sigma, 
-                 step, 
-                 target_reward: Optional[float] = None, 
-                 specific_dataset: Optional[str] = None, 
-                 goal: Optional[np.array] = None, 
+                 hidden_layers: int,
+                 hidden_dim: int,
+                 batch_size,
+                 num_steps,
+                 lr, min_lr, sigma,
+                 step,
+                 target_reward: Optional[float] = None,
+                 specific_dataset: Optional[str] = None,
+                 goal: Optional[np.array] = None,
                  task_id: Optional[int] = None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
-    print(f"Training reward approximator for {dataset_name}_{specific_dataset} Dataset") 
+    print(f"Training reward approximator for {dataset_name}_{specific_dataset} Dataset")
     dataset = RewardDataset(trajs, sigma, dataset_name, specific_dataset, step, goal, target_reward, task_id)
     dataloader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8))
     reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
@@ -851,7 +851,7 @@ def train_reward(trajs: List[TrajectoryDict],
            s = s.to(device)
            a = a.to(device)
            r = r.to(device)
-        
+
            # Predicted Reward
            optimizer.zero_grad()
            pred = reward_net(s, a)
@@ -867,7 +867,7 @@ def train_reward(trajs: List[TrajectoryDict],
     print(f"reward model saved")
 
 def train_reward_ensemble(
-    trajs: List[TrajectoryDict], 
+    trajs: List[TrajectoryDict],
     dataset_name: str,
     hidden_layers: int,
     hidden_dim: int,
@@ -886,8 +886,8 @@ def train_reward_ensemble(
     task_id: Optional[int] = None,
     weight_decay: float = 1e-4,
     grad_clip: Optional[float] = 1.0,
-):  
-   
+):
+
     device = check_device()
     trajs = drop_trajs(trajs, save_percentage)
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
@@ -956,7 +956,7 @@ def train_kernel(
     x_generated_plans: Optional[list] = None,
     accelerator=None,
 ):
-   
+
     if accelerator is not None and accelerator.is_main_process:
           print(f"Training kernel for {dataset_name}_{specific_dataset}")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -1081,10 +1081,10 @@ def train_kernel(
             t = torch.tensor([threshold], device=device, dtype=torch.float32)
             torch.distributed.broadcast(t, src=0)
             threshold = float(t.item())
-    
+
     if accelerator is not None:
         accelerator.wait_for_everyone()
-        
+
     return threshold
 
 def train_kernel_mog(
@@ -1105,7 +1105,7 @@ def train_kernel_mog(
     quantile: float = 0.95,
     x_generated_plans: Optional[List] = None,
     accelerator=None,
-):   
+):
     if accelerator is not None and accelerator.is_main_process:
           print(f"Training kernel for {dataset_name}_{specific_dataset}")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -1223,7 +1223,7 @@ def train_kernel_mog(
             t = torch.tensor([threshold], device=device, dtype=torch.float32)
             torch.distributed.broadcast(t, src=0)
             threshold = float(t.item())
-    
+
     if accelerator is not None:
         accelerator.wait_for_everyone()
 
@@ -1270,7 +1270,7 @@ def compute_threshold(kernels, kernel_stats, obs_dim, act_dim, x, constraint_typ
     else:
          raise ValueError(f"Invalid constraint type: {constraint_type}")
     return threshold
-     
+
 def check_Critic(dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
     name = get_CriticName(dataset_name, specific_dataset, task_id)
     path = f"./Finetuning/Critics/{dataset_name}/{specific_dataset}/Models/{name}_Critic_{str(step)}.pkl"
@@ -1278,7 +1278,7 @@ def check_Critic(dataset_name, specific_dataset, task_id: Optional[int] = None, 
         return True
     else:
         return False
-         
+
 def update_critic_stats(dataset_name, specific_dataset, new_stats: SAStats, task_id: Optional[int] = None, old_step: int = 0, momentum: float = 0.005) -> SAStats:
     old_stats = get_critic_stats(dataset_name, specific_dataset, task_id = task_id, step = old_step)
     stats = SAStats()
@@ -1301,34 +1301,34 @@ class Critic_Buffer():
                        specific_dataset: str,
                        trajs:  List[TrajectoryDict],
                        sigma: float,
-                       target_reward: Optional[float] = None, 
+                       target_reward: Optional[float] = None,
                        horizon: int = 32,
                        gamma: float = 0.99,
                        lam: float = 0.95,
                        task_id: Optional[int] = None,
-                       old_step: Optional[int] = None,  
-                       new_step: int = 0, 
+                       old_step: Optional[int] = None,
+                       new_step: int = 0,
                        momentum: float = 0.005):
         self.horizon = horizon
         self.gamma = gamma
         self.lam = lam
         self.data = CriticDataset(dataset_name,
-                                  specific_dataset, 
-                                  trajs, 
+                                  specific_dataset,
+                                  trajs,
                                   sigma,
                                   target_reward,
                                   horizon,
-                                  task_id, 
-                                  old_step,  
-                                  new_step, 
+                                  task_id,
+                                  old_step,
+                                  new_step,
                                   momentum)
-       
-     
+
+
     def obtain_training_data(self, target_critic: nn.Module, batch_size: int, device: str):
         loader = cycle(DataLoader(
-            self.data, 
-            batch_size=batch_size, 
-            shuffle=True, 
+            self.data,
+            batch_size=batch_size,
+            shuffle=True,
             drop_last=True,
             num_workers=0,
             pin_memory=torch.cuda.is_available(),
@@ -1358,22 +1358,22 @@ class Critic_Buffer():
         return obs_chunks[:, 0], value_targets
 
 class CriticDataset(Dataset):
-    def __init__(self, dataset_name: str, 
-                       specific_dataset: str, 
-                       trajs: List[TrajectoryDict], 
+    def __init__(self, dataset_name: str,
+                       specific_dataset: str,
+                       trajs: List[TrajectoryDict],
                        sigma: float,
                        target_reward: Optional[float] = None,
                        horizon: int = 32,
-                       task_id: Optional[int] = None, 
-                       old_step: Optional[int] = None,  
-                       new_step: int = 0, 
+                       task_id: Optional[int] = None,
+                       old_step: Optional[int] = None,
+                       new_step: int = 0,
                        momentum: float = 0.005):
         # ----- gather raw obs/actions to fit stats -----
         obs_all = []
         for traj in trajs:
             obs_all.append(traj['observations'])
         obs_all = np.concatenate(obs_all, axis = 0)
-        
+
         #get stats
         stats = SAStats()
         stats.obs_mean = obs_all.mean(axis=0)
@@ -1386,7 +1386,7 @@ class CriticDataset(Dataset):
 
         transitions = []
         for traj in trajs:
-            obs = traj['observations']      
+            obs = traj['observations']
             rews = traj['rewards']
             """
             if(not np.all(np.isin(rews, allowed_values))):
@@ -1397,7 +1397,7 @@ class CriticDataset(Dataset):
             if(sigma is not None):
                 rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate = 200/sigma)
             if len(obs) < horizon:
-                continue 
+                continue
             for t in range(len(obs) - horizon):
                  obs_chunk = self.stats.norm_obs(obs[t : t + horizon]).astype(np.float32)
                  rews_chunk = rews[t: min(t+horizon, len(rews))]
@@ -1405,7 +1405,7 @@ class CriticDataset(Dataset):
 
         self.transitions = transitions
         self.save_stats(dataset_name, specific_dataset, task_id, new_step)
-    
+
     def save_stats(self, dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
         critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
         stats_name =  str(critic_name) + f'_Critic_stats_{str(step)}.pkl'
@@ -1430,22 +1430,22 @@ class CriticDataset(Dataset):
         rews = rews * target_reward
         return rews
 
-def train_critic(trajs: List[TrajectoryDict], 
-                 dataset_name: str, 
-                 specific_dataset: str, 
-                 hidden_layers: int, 
-                 hidden_dim: int, 
-                 sigma: float, 
-                 batch_size, 
-                 num_steps, 
-                 gamma, lam, horizon, 
-                 lr, 
-                 min_lr, 
-                 tau, 
-                 old_step: Optional[int] = None, 
-                 new_step: int = 0, 
-                 momentum: float = 0.005, 
-                 target_reward = 1.0, 
+def train_critic(trajs: List[TrajectoryDict],
+                 dataset_name: str,
+                 specific_dataset: str,
+                 hidden_layers: int,
+                 hidden_dim: int,
+                 sigma: float,
+                 batch_size,
+                 num_steps,
+                 gamma, lam, horizon,
+                 lr,
+                 min_lr,
+                 tau,
+                 old_step: Optional[int] = None,
+                 new_step: int = 0,
+                 momentum: float = 0.005,
+                 target_reward = 1.0,
                  task_id: Optional[int] = None):
     device = check_device()
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
@@ -1494,11 +1494,11 @@ def train_critic(trajs: List[TrajectoryDict],
            torch.nn.utils.clip_grad_norm_(critic.parameters(), max_norm=1.0)
            optimizer.step()
            scheduler.step()
-           
+
            if(k % 1000 == 0):
                 print(f"Critic Training step {k} loss: {total_loss/200}")
                 total_loss = 0.0
-            
+
            # Soft update target network
            for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):
                tgt_param.data.mul_(1 - tau)
@@ -1509,9 +1509,9 @@ def train_critic(trajs: List[TrajectoryDict],
 
 """
 class Critic_Test_Dataset(Dataset):
-    def __init__(self, 
-                 dataset_name: str, 
-                 specific_dataset: str, 
+    def __init__(self,
+                 dataset_name: str,
+                 specific_dataset: str,
                  checkpoint_step: int,
                  trajs: List[TrajectoryDict],
                  sigma: Optional[float] = None,
@@ -1519,7 +1519,7 @@ class Critic_Test_Dataset(Dataset):
                  target_reward: Optional[float] = None,
                  horizon: int = 32,
                  gamma: float = 0.99):
-        
+
         self.stats = get_critic_stats(dataset_name, specific_dataset, task_id, checkpoint_step)
         self.horizon = horizon
         self.gamma = gamma
@@ -1528,13 +1528,12 @@ class Critic_Test_Dataset(Dataset):
         for traj in trajs:
             obs = traj['observations']
             rews = traj['rewards'].copy()
-             
-            
+
+
             if target_reward is not None:
                 rews = self.boost_signal(target_reward, rews)
             if sigma is not None:
                 rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate=200/sigma)
-            rews = np.clip(rews, 0.0, 20.0)
 
             for t in range(len(obs) - horizon):        # consistent with training
                 obs_t = self.stats.norm_obs(obs[t])
@@ -1571,9 +1570,9 @@ def test_critic(dataset_name: str,
                 target_reward: float = 1.0,
                 trajs: List[TrajectoryDict] = None,
                 task_id: Optional[int] = None):
-    
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
+
     if(finetune):
         dataset = Critic_Test_Dataset(
            dataset_name, specific_dataset, 0, trajs,
@@ -1658,7 +1657,6 @@ class Critic_Test_Dataset(Dataset):
                 rews = self.boost_signal(target_reward, rews)
             if sigma is not None:
                 rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate=200/sigma)
-            rews = np.clip(rews, 0.0, 20.0)
 
             for t in range(len(obs) - horizon):
                 obs_t = self.stats.norm_obs(obs[t])
@@ -1697,7 +1695,7 @@ def test_critic(dataset_name: str,
                 trajs: List[TrajectoryDict] = None,
                 task_id: Optional[int] = None):
     device = check_device()
-    
+
     dataset = Critic_Test_Dataset(
         dataset_name, specific_dataset, checkpoint_step, trajs,
         sigma, task_id, target_reward, horizon, gamma
@@ -1723,22 +1721,29 @@ def test_critic(dataset_name: str,
             s = s.to(device)
             rews_chunk = rews_chunk.to(device)
 
-            pred = model(s)
+            pred = model(s).squeeze(-1)                # (B,)  ← normalized V(s)
             if(mean is not None and std is not None):
                 pred = (pred * std_pred) + mean_pred
-            
+
             # Compute raw n-step return
             gamma_pow = torch.tensor([gamma ** i for i in range(horizon)], device=device, dtype=torch.float32)
             raw_target = (gamma_pow.unsqueeze(0) * rews_chunk).sum(dim=1)
-            
-            
-            
-            target = raw_target
+
+
+
+            # === Normalize target (CRITICAL) ===
+            tgt_mean = raw_target.mean()
+            tgt_std = raw_target.std(unbiased=False) + 1e-8
+            target = (raw_target - tgt_mean) / tgt_std
+
+
             loss = F.smooth_l1_loss(pred, target, beta=1.0)
+            #loss = F.smooth_l1_loss(pred, raw_target, beta=1.0)
             total_loss += loss.item() * s.size(0)
 
-            all_preds.extend(pred.cpu().numpy().reshape(-1))
-            all_targets.extend(target.cpu().numpy().reshape(-1))
+            all_preds.extend(pred.cpu().numpy())
+            all_targets.extend(target.cpu().numpy())
+            #all_targets.extend(raw_target.cpu().numpy())
 
 
     avg_loss = total_loss / len(dataset)
@@ -1789,10 +1794,10 @@ class PlannerDataset(Dataset):
                 s_norm = self.planner_processor.preprocess(obs[t])
                 s_norm = torch.tensor(s_norm, dtype=torch.float32)
                 self.conditions.append(s_norm)
-    
+
     def __len__(self):
         return len(self.conditions)
-   
+
     def __getitem__(self, idx):
         return self.conditions[idx]
 
@@ -1861,9 +1866,9 @@ class RewardTracker:
 
         okabe_ito = ["#D55E00","#000000", "#E69F00", "#56B4E9", "#009E73",
                        "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#FF0000"]
-        raw_color    = okabe_ito[3]   
-        smooth_color = okabe_ito[4] 
-        constraint_color     = okabe_ito[9]  
+        raw_color    = okabe_ito[3]
+        smooth_color = okabe_ito[4]
+        constraint_color     = okabe_ito[9]
 
         fig, ax1 = plt.subplots(figsize=(12, 8))
         steps = np.array(self.steps)
@@ -1878,8 +1883,8 @@ class RewardTracker:
             ax1.plot(steps[valid_idx], smoothed[valid_idx],
                      color=smooth_color, linewidth=2.5,
                      label=f'Smoothed Reward (window={smooth_window})')
-        
-        
+
+
         ax1.plot(steps, rewards, alpha=0.3, color=raw_color, linewidth=1.0, label='Raw Reward')
         ax1.set_title(title, fontsize=16, fontweight='bold')
         ax1.set_xlabel('Steps', fontsize=12)
@@ -1896,12 +1901,12 @@ class RewardTracker:
             ax2.set_ylabel('Constraint', fontsize=12, color=constraint_color)
             ax2.tick_params(axis='y', labelcolor=constraint_color)
             ax2.legend(loc='upper right')
-        
+
         sns.despine()
         #plt.title(title, fontsize=14, fontweight='bold')
         plt.tight_layout()
 
-       
+
         if save_path is None:
             save_path = os.path.join(self.save_dir, "reward_curve.png")
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -1937,7 +1942,7 @@ def karras_beta_schedule(
     # Compute β(t) from dσ²/dt = β(t) * σ²(t)
     # From VP-SDE: dσ²/dt = β(t) * (1 - σ²(t))
     # But we use numerical diff for stability
-    
+
     sigma_sq = sigma**2
     d_sigma_sq = torch.diff(sigma_sq, dim=0)
     dt = torch.diff(t, dim=0)
@@ -1961,7 +1966,7 @@ def get_normalized_score(trajs, expert_score: Optional[float] = None):
         total += temp
     avg_discounted_return = total / len(trajs)
     # 5. Compute normalized score
-    normalized_score = 100 * avg_discounted_return 
+    normalized_score = 100 * avg_discounted_return
     if(expert_score is not None):
         normalized_score = 100 * (normalized_score / expert_score)
     #print(f"Normalized Score: {normalized_score:.2f}")
@@ -1992,18 +1997,18 @@ def load_hyperparameters(filepath: str) -> Dict:
     return hyperparams
 
 def rollout_parallel(
-    env_name, 
-    specific_env, 
-    horizon = 32, 
-    steps_T = 50, 
-    num_karras = 10, 
-    eta = 0.8, 
-    episode_length = 4000, 
-    checkpoint_step = 1000000, 
-    num_envs = 8, 
-    goal_cell = None, 
-    start_cells = None, 
-    device: torch.device = None, 
+    env_name,
+    specific_env,
+    horizon = 32,
+    steps_T = 50,
+    num_karras = 10,
+    eta = 0.8,
+    episode_length = 4000,
+    checkpoint_step = 1000000,
+    num_envs = 8,
+    goal_cell = None,
+    start_cells = None,
+    device: torch.device = None,
     seed_base: int = 0):
      #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
      #print(f"Running {num_envs} environments in parallel")
@@ -2011,24 +2016,24 @@ def rollout_parallel(
           device = "cuda" if torch.cuda.is_available() else "cpu"
      trajs = []
      #print(f"Using device {device}")
-     
+
      # Uses Accelerate's RANK env var (automatically set in DDP)
      rank = int(os.environ.get("RANK", 0))
      np.random.seed(12345 + rank + seed_base)
      torch.manual_seed(12345 + rank + seed_base)
-     
+
      # Create environment factory function
      _, d_s, d_a = get_env(env_name, specific_env)
      def make_env():
          env, _, _ = get_env(env_name, specific_env)
          return env
-     
+
      # Create vectorized environment
      vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
      #maze = env.unwrapped.maze  # Access the internal Maze object
      #maze_map = maze.maze_map
      #rows, cols = len(maze_map), len(maze_map[0])
-    
+
      # Get Planner
      state_dict = get_planner(env_name, specific_env, checkpoint_step)
      if env_name == 'kitchen':
@@ -2039,13 +2044,13 @@ def rollout_parallel(
          raise ValueError(f"Invalid Environment: {env_name}")
      model.load_state_dict(state_dict)
      model.eval()
-     
+
      # Get Processor
      planner_processor = Planner_Processor(env_name, specific_env)
-     
+
      # <<< MODIFIED: Unique env reset seeds per process to prevent identical trajectories across GPUs
      reset_seeds = list(range(seed_base, seed_base + num_envs))
-     
+
      """
      if(goal_cell is not None):
          maze = env.unwrapped.maze  # Access the internal Maze object
@@ -2057,12 +2062,12 @@ def rollout_parallel(
                  if maze_map[row][col] != 1:  # 1 = wall; others are free/open
                        free_cells.append(np.array([row, col]))
          free_cells = np.array(free_cells)
-         
-         
+
+
          free_cells = np.array([[6,6], [1,1], [1,6], [3,2], [5,4], [3,4], [4,1], [4,6], [2,4], [2,1]])
          selected_indices = np.random.choice(len(free_cells), size=4, replace=False)
          selected_free_cells = free_cells[selected_indices]
-         
+
          selected_free_cells = np.array([[6,6], [5,4], [2,4], [2,1]])
          start_cells = []
          for i in range(len(selected_free_cells)):
@@ -2077,7 +2082,7 @@ def rollout_parallel(
      total_steps = 0
      for start_cell in start_cells:
        # Reset all environments
-       #seeds = list(range(num_envs)) 
+       #seeds = list(range(num_envs))
        opt = {}
        if goal_cell is not None:
              opt["goal_cell"] = goal_cell.copy()
@@ -2089,7 +2094,7 @@ def rollout_parallel(
              opt['reset_cell'] = None
        s0_vec = vec_env.reset(seed = reset_seeds, options=[opt for _ in range(num_envs)])
        current_states = s0_vec[0]['observation']
-     
+
        # Store trajectories for each environment
        all_rewards = [0.0 for _ in range(num_envs)]
        done_envs = [False for _ in range(num_envs)]
@@ -2098,10 +2103,10 @@ def rollout_parallel(
        rewards = [[] for _ in range(num_envs)]
        for env_idx in range(num_envs):
           observations[env_idx].append(current_states[env_idx].copy())
-     
+
        for i in range(episode_length):
           actions = np.zeros((num_envs, d_a))
-         
+
           # Generate actions for each environment
           for env_idx in range(num_envs):
              if done_envs[env_idx]:
@@ -2111,32 +2116,32 @@ def rollout_parallel(
              x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
              action = x[0, d_s:(d_s+d_a)].copy()
              actions[env_idx] = action
-         
+
           # Step all environments at once
           obs_vec, rewards_vec, terminated_vec, truncated_vec, info_vec = vec_env.step(actions)
-         
+
           # Update trajectories
           for env_idx in range(num_envs):
              if done_envs[env_idx]:
                  continue
-             
+
              observations[env_idx].append(obs_vec['observation'][env_idx].copy())
              acts[env_idx].append(actions[env_idx].copy())
              rewards[env_idx].append(rewards_vec[env_idx])
              all_rewards[env_idx] += rewards_vec[env_idx]
-             
+
              current_states[env_idx] = obs_vec['observation'][env_idx].copy()
-             
+
              if terminated_vec[env_idx] or truncated_vec[env_idx]:
                  done_envs[env_idx] = True
                  #print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
-         
-        
+
+
           # Check if all environments are done
           if all(done_envs):
              #print("All environments completed!")
              break
-     
+
        # Find the trajectory with the maximum reward
        for env_idx in range(num_envs):
           total_steps += (len(observations[env_idx]) - 1)
@@ -2145,7 +2150,7 @@ def rollout_parallel(
               'actions': np.asarray(acts[env_idx].copy()),
               'rewards': np.asarray(reward_processor(rewards[env_idx].copy(), env_name))
           })
-        
+
      vec_env.close()
      if(goal_cell is None):
           expert_score = get_expert_score(env_name)
@@ -2157,22 +2162,22 @@ def rollout_parallel(
      return trajs, score, total_steps
 
 def rollout_parallel2(
-     env_name, 
-     specific_env, 
+     env_name,
+     specific_env,
      backbone_layers = 2,
-     horizon = 32, 
-     steps_T = 50, 
-     num_karras = 10, 
-     eta = 0.8, 
-     episode_length = 4000, 
-     checkpoint_step = 1000000, 
-     num_envs = 8, 
-     goal_cell: Optional[np.ndarray] = None, 
-     start_cells: Optional[List[np.ndarray]] = None, 
-     task_id: Optional[int] = None, 
-     device: torch.device = None, 
-     seed_base: int = 0, 
-     continual_rollout = False, 
+     horizon = 32,
+     steps_T = 50,
+     num_karras = 10,
+     eta = 0.8,
+     episode_length = 4000,
+     checkpoint_step = 1000000,
+     num_envs = 8,
+     goal_cell: Optional[np.ndarray] = None,
+     start_cells: Optional[List[np.ndarray]] = None,
+     task_id: Optional[int] = None,
+     device: torch.device = None,
+     seed_base: int = 0,
+     continual_rollout = False,
      chunk_size = 5):
      #print(f"Horizon: {horizon}, step_T: {steps_T}, eta: {eta}, critic: {critic}, Checkpoint_steps: {checkpoint_steps}")
      #print(f"Running {num_envs} environments in parallel")
@@ -2180,24 +2185,24 @@ def rollout_parallel2(
           device = "cuda" if torch.cuda.is_available() else "cpu"
      trajs = []
      #print(f"Using device {device}")
-     
+
      # Uses Accelerate's RANK env var (automatically set in DDP)
      rank = int(os.environ.get("RANK", 0))
      np.random.seed(12345 + rank + seed_base)
      torch.manual_seed(12345 + rank + seed_base)
-     
+
      # Create environment factory function
      _, d_s, d_a = get_env(env_name, specific_env, task_id = task_id)
      def make_env():
          env, _, _ = get_env(env_name, specific_env, task_id = task_id)
          return env
-     
+
      # Create vectorized environment
      vec_env = AsyncVectorEnv([make_env for _ in range(num_envs)])
      #maze = env.unwrapped.maze  # Access the internal Maze object
      #maze_map = maze.maze_map
      #rows, cols = len(maze_map), len(maze_map[0])
-    
+
      # Get Planner
      state_dict = get_planner(env_name, specific_env, checkpoint_step, task_id)
      """
@@ -2217,8 +2222,8 @@ def rollout_parallel2(
      model.eval()
      """
      model = load_dit(d_s, d_a, state_dict, backbone_layers, device, env_name, eval_mode = True)
-     
-     
+
+
 
 
 
@@ -2227,17 +2232,17 @@ def rollout_parallel2(
 
      # Get Processor
      planner_processor = Planner_Processor(env_name, specific_env, task_id)
-     
+
      # <<< MODIFIED: Unique env reset seeds per process to prevent identical trajectories across GPUs
      reset_seeds = list(range(seed_base, seed_base + num_envs))
-     
-    
+
+
      total_steps = 0
      successes = []
      if (start_cells is not None):
       for start_cell in start_cells:
          # Reset all environments
-         #seeds = list(range(num_envs)) 
+         #seeds = list(range(num_envs))
         opt = {}
         if goal_cell is not None:
              opt["goal_cell"] = goal_cell.copy()
@@ -2247,10 +2252,10 @@ def rollout_parallel2(
              opt["reset_cell"] = start_cell.copy()
         else:
              opt['reset_cell'] = None
-        
+
         s0_vec = vec_env.reset(seed = reset_seeds, options=[opt for _ in range(num_envs)])
         current_states = s0_vec[0]['observation']
-     
+
         # Store trajectories for each environment
         all_rewards = [0.0 for _ in range(num_envs)]
         done_envs = [False for _ in range(num_envs)]
@@ -2260,10 +2265,10 @@ def rollout_parallel2(
         Temp_acts = [[] for _ in range(num_envs)]
         for env_idx in range(num_envs):
             observations[env_idx].append(current_states[env_idx].copy())
-     
+
         for i in range(episode_length):
             actions = np.zeros((num_envs, d_a))
-         
+
           # Generate actions for each environment
             for env_idx in range(num_envs):
                if done_envs[env_idx]:
@@ -2275,7 +2280,7 @@ def rollout_parallel2(
                       x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                       for k in range(len(x)):
                           Temp_acts[env_idx].append(x[k, d_s:(d_s+d_a)].copy())
-                    
+
                    actions[env_idx] = Temp_acts[env_idx][0].copy()
                    Temp_acts[env_idx] = Temp_acts[env_idx][1:].copy()
                else:
@@ -2284,44 +2289,44 @@ def rollout_parallel2(
                    x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                    action = x[0, d_s:(d_s+d_a)].copy()
                    actions[env_idx] = action
-         
+
             # Step all environments at once
             obs_vec, rewards_vec, terminated_vec, truncated_vec, info_vec = vec_env.step(actions)
-         
+
              # Update trajectories
             for env_idx in range(num_envs):
                if done_envs[env_idx]:
                    continue
-             
+
                observations[env_idx].append(obs_vec['observation'][env_idx].copy())
                acts[env_idx].append(actions[env_idx].copy())
                rewards[env_idx].append(rewards_vec[env_idx])
                all_rewards[env_idx] += rewards_vec[env_idx]
-             
+
                current_states[env_idx] = obs_vec['observation'][env_idx].copy()
-             
+
                if terminated_vec[env_idx] or truncated_vec[env_idx]:
                    done_envs[env_idx] = True
                    successes.append(int(info_vec['success'][env_idx]))
                    #print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
-         
-        
+
+
              # Check if all environments are done
             if all(done_envs):
                 #print("All environments completed!")
                 break
-        
+
         for env_idx in range(num_envs):
             if not done_envs[env_idx]:
                 successes.append(0)
-        
+
         for env_idx in range(num_envs):
                    total_steps += (len(observations[env_idx]) - 1)
                    trajs.append({
                       'observations': np.asarray(observations[env_idx].copy()),
                       'actions': np.asarray(acts[env_idx].copy()),
                       'rewards': np.asarray(rewards[env_idx].copy())
-         }) 
+         })
      else:
         opt =  {"task_id": task_id}
         #s0_vec = vec_env.reset(seed = reset_seeds, options=[opt for _ in range(num_envs)])
@@ -2332,7 +2337,7 @@ def rollout_parallel2(
               current_states = obs0['observation']
         else:
               current_states = obs0
-     
+
         # Store trajectories for each environment
         all_rewards = [0.0 for _ in range(num_envs)]
         done_envs = [False for _ in range(num_envs)]
@@ -2342,10 +2347,10 @@ def rollout_parallel2(
         Temp_acts = [[] for _ in range(num_envs)]
         for env_idx in range(num_envs):
             observations[env_idx].append(current_states[env_idx].copy())
-     
+
         for i in range(episode_length):
             actions = np.zeros((num_envs, d_a))
-         
+
             # Generate actions for each environment
             for env_idx in range(num_envs):
                if done_envs[env_idx]:
@@ -2357,7 +2362,7 @@ def rollout_parallel2(
                       x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                       for k in range(chunk_size):
                           Temp_acts[env_idx].append(x[k, d_s:(d_s+d_a)].copy())
-                    
+
                    actions[env_idx] = Temp_acts[env_idx][0].copy()
                    Temp_acts[env_idx] = Temp_acts[env_idx][1:].copy()
                else:
@@ -2366,36 +2371,36 @@ def rollout_parallel2(
                    x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                    action = x[0, d_s:(d_s+d_a)].copy()
                    actions[env_idx] = action
-            
+
             # Step all environments at once
             obs_vec, rewards_vec, terminated_vec, truncated_vec, info_vec = vec_env.step(actions)
             obs_batch = obs_vec['observation'] if isinstance(obs_vec, dict) else obs_vec
-         
+
              # Update trajectories
             for env_idx in range(num_envs):
                if done_envs[env_idx]:
                    continue
-             
+
                observations[env_idx].append(obs_batch[env_idx].copy())
                acts[env_idx].append(actions[env_idx].copy())
                rewards[env_idx].append(rewards_vec[env_idx])
                all_rewards[env_idx] += rewards_vec[env_idx]
                current_states[env_idx] = obs_batch[env_idx].copy()
-             
+
                if terminated_vec[env_idx] or truncated_vec[env_idx]:
                    done_envs[env_idx] = True
                    successes.append(int(info_vec['success'][env_idx]))
                    #print(f"Env {env_idx} finished at step {i}, total reward: {all_rewards[env_idx]:.4f}")
-         
-        
+
+
              # Check if all environments are done
             if all(done_envs):
                     #print("All environments completed!")
                     break
-     
+
             # Find the trajectory with the maximum reward
-        
-        
+
+
         for env_idx in range(num_envs):
             if not done_envs[env_idx]:
                  successes.append(0)
@@ -2406,10 +2411,10 @@ def rollout_parallel2(
                       'observations': np.asarray(observations[env_idx].copy()),
                       'actions': np.asarray(acts[env_idx].copy()),
                       'rewards': np.asarray(reward_processor(rewards[env_idx].copy(), env_name))
-        })     
-     
+        })
 
-     
+
+
      vec_env.close()
      success_rate = np.mean(successes) if len(successes) > 0 else 0.0
      print(f"success rate: {success_rate:.2f}")
@@ -2480,15 +2485,15 @@ def rollout_parallel3(
     def run_rollout(options_list: Optional[dict] = None):
         """Helper to run one batch of environments (avoids duplication)."""
         nonlocal total_steps
-        
+
         if(options_list is not None):
              obs, info = vec_env.reset(seed=reset_seeds, options=options_list)
              #obs, info = vec_env.reset(options=options_list)
         else:
              obs, info = vec_env.reset(seed=reset_seeds)
              #obs, info = vec_env.reset()
-        
-        
+
+
         if isinstance(obs, dict):
             current_states = obs['observation']
         else:
@@ -2522,7 +2527,7 @@ def rollout_parallel3(
                         horizon, steps_T, num_karras, eta, device
                     )
                     if continual_rollout:
-                        Temp_acts[env_idx] = [x[k, d_s:(d_s + d_a)].copy() 
+                        Temp_acts[env_idx] = [x[k, d_s:(d_s + d_a)].copy()
                                               for k in range(chunk_size)]
                         action = Temp_acts[env_idx].pop(0)
                     else:
@@ -2569,7 +2574,7 @@ def rollout_parallel3(
                 "goal_cell": goal_cell.copy() if goal_cell is not None else None,
                 "reset_cell": start_cell.copy() if start_cell is not None else None,
             }
-           
+
             run_rollout([opt] * num_envs)
     else:
         run_rollout()
@@ -2584,7 +2589,7 @@ def rollout_parallel3(
         score = get_normalized_score(trajs, expert_score)
     else:
         score = get_normalized_score(trajs)
-    
+
     return trajs, score, success_rate, total_steps
 
 import math
@@ -2595,7 +2600,7 @@ class AlphaSchedulerConfig:
     alpha_end: float
     total_steps: int
     decay: bool = True
-    
+
 class AlphaScheduler:
     def __init__(self, config: AlphaSchedulerConfig):
         self.alpha_start = config.alpha_start
@@ -2605,7 +2610,7 @@ class AlphaScheduler:
         self.current_step = 1
         self.current_alpha = self.alpha_start
         self.decay = config.decay
-    
+
     def step_alpha(self):
         if self.decay:
            if self.current_step > self.total_steps:
@@ -2644,7 +2649,7 @@ def check_success_rate(trajs: List[TrajectoryDict]):
         if(traj['rewards'][-1] == 1.0):
             success += 1
     return success / len(trajs)
- 
+
 def check_device():
     if torch.backends.mps.is_available():
         device = torch.device("mps")
@@ -2655,8 +2660,8 @@ def check_device():
     else:
         device = torch.device("cpu")
         print("⚠️  Falling back to CPU (no GPU acceleration)")
-    return device 
-      
+    return device
+
 def compute_threshold_mahalanobis(kernels, dataloader, quantile):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     all_D2_total = []
@@ -2668,7 +2673,7 @@ def compute_threshold_mahalanobis(kernels, dataloader, quantile):
         with torch.no_grad():
             D2_total = compute_total_mahalanobis_score(kernels, s, a, s_next)
         all_D2_total.extend(D2_total.detach().cpu().numpy())
-    
+
     all_D2_total = np.array(all_D2_total)
     mean_D2_total = float(all_D2_total.mean())
     min_D2_total = float(all_D2_total.min())
@@ -2711,7 +2716,7 @@ def compute_threshold_log_prob(kernels, dataloader, quantile):
         with torch.no_grad():
             log_density_total = compute_log_density(kernels, s, a, s_next)
         all_log_density_total.extend(log_density_total.detach().cpu().numpy())
-    
+
     all_log_density_total = np.array(all_log_density_total)
     mean_log_density_total = float(all_log_density_total.mean())
     min_log_density_total = float(all_log_density_total.min())
@@ -2724,7 +2729,7 @@ def compute_threshold_log_prob(kernels, dataloader, quantile):
     print(f"variance_D2_total = {var_log_density_total:.4f}")
     print(f"τ ({(1 - quantile)*100:.0f}th percentile) : {tau:.4f}")
     return tau
-    
+
 def compute_threshold_log_prob_mog(kernels, dataloader, quantile, device):
     chunks = []
     with torch.no_grad():
@@ -2776,7 +2781,7 @@ def train_critic_with_planner(
            steps_T: int, num_karras: int, eta: float,
            device: torch.device,
     ) -> torch.Tensor:
-   
+
         plans = []
         for s0 in s0_planner_norm:
            x = sample_euler_karras(
@@ -2786,7 +2791,7 @@ def train_critic_with_planner(
            plans.append(x)
         return torch.from_numpy(np.stack(plans, axis=0)).float().to(device)
 
-    
+
     device = check_device()
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
 
@@ -2924,30 +2929,24 @@ def train_critic_with_planner(
     print("critic saved.")
 
 class CriticDataset_Reward(Dataset):
-    def __init__(self, dataset_name: str, 
-                       specific_dataset: str, 
+    def __init__(self, dataset_name: str,
+                       specific_dataset: str,
                        reward_hidden_layers: int,
                        reward_hidden_dim: int,
                        reward_checkpoint: int,
-                       trajs: List[TrajectoryDict], 
+                       trajs: List[TrajectoryDict],
                        horizon: int = 32,
-                       old_step: Optional[int] = None,  
-                       new_step: int = 0, 
+                       old_step: Optional[int] = None,
+                       new_step: int = 0,
                        momentum: float = 0.005,
-                       value_scale: float = 5.0,
                        task_id: Optional[int] = None):
-        if horizon < 1:
-            raise ValueError(f"horizon must be positive, got {horizon}")
-        if value_scale <= 0:
-            raise ValueError(f"value_scale must be positive, got {value_scale}")
-        self.horizon = int(horizon)
         # ----- gather raw obs/actions to fit stats -----
 
         obs_all = []
         for traj in trajs:
             obs_all.append(traj['observations'])
         obs_all = np.concatenate(obs_all, axis = 0)
-        
+
         #get stats
         stats = SAStats()
         stats.obs_mean = obs_all.mean(axis=0)
@@ -2956,7 +2955,7 @@ class CriticDataset_Reward(Dataset):
              self.stats = update_critic_stats(dataset_name, specific_dataset, stats, task_id, old_step, momentum)
         else:
              self.stats = stats
-        
+
         device = check_device()
         _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
         reward_state, _, _ = get_reward_model(
@@ -2973,43 +2972,34 @@ class CriticDataset_Reward(Dataset):
             dataset_name, specific_dataset, reward_checkpoint, task_id,
         )
 
-        self._normalized_observations = []
-        self._scaled_rewards = []
-        self._windows = []
-        
+        transitions = []
+
         for traj in trajs:
-            obs = traj['observations'] 
-            acts = traj['actions']   
+            obs = traj['observations']
+            acts = traj['actions']
             T_traj = min(len(obs), len(acts))
-            
-            if T_traj == 0:
+
+            if T_traj < horizon:
                 continue
-            
+
             with torch.no_grad():
                 obs_for_r = reward_stat.norm_obs(obs[:T_traj]).astype(np.float32)
                 s_t = torch.as_tensor(obs_for_r, dtype=torch.float32, device=device)
                 a_t = torch.as_tensor(acts[:T_traj], dtype=torch.float32, device=device)
                 #a_t = torch.clamp(a_t, -1.0, 1.0)
-                rews = reward_net(s_t, a_t).cpu().numpy().astype(np.float32)   # (T_traj,)  
-                # Cube Single rewards are nonnegative.  Keep the established
-                # cap while using an explicit fixed scale shared downstream.
-                rews = np.clip(rews, 0.0, 20.0) / value_scale
+                rews = reward_net(s_t, a_t).cpu().numpy().astype(np.float32)   # (T_traj,)
+                # Scale down predicted rewards from reward model
+                rews = np.clip(rews, -20.0, 20.0)      # adjust bounds if needed
+                rews = rews / 5.0                      # or use a running std
 
-            trajectory_index = len(self._normalized_observations)
-            self._normalized_observations.append(
-                self.stats.norm_obs(obs[:T_traj]).astype(np.float32)
-            )
-            self._scaled_rewards.append(rews[:T_traj])
-            self._windows.extend((trajectory_index, start) for start in range(T_traj))
+            for t in range(len(obs) - horizon):
+                 obs_chunk = self.stats.norm_obs(obs[t : t + horizon]).astype(np.float32)
+                 rews_chunk = rews[t: min(t+horizon, len(rews))]
+                 transitions.append((obs_chunk, rews_chunk))
 
-        if not self._windows:
-            raise ValueError("critic dataset contains no usable transitions")
-        print(
-            f"Critic dataset: {len(self._normalized_observations)} trajectories, "
-            f"{len(self._windows)} start states, horizon={self.horizon}"
-        )
+        self.transitions = transitions
         self.save_stats(dataset_name, specific_dataset, task_id, new_step)
-    
+
     def save_stats(self, dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
         critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
         stats_name =  str(critic_name) + f'_Critic_stats_{str(step)}.pkl'
@@ -3021,36 +3011,13 @@ class CriticDataset_Reward(Dataset):
         print(f"saved stats to {savepath}")
 
     def __getitem__(self, idx):
-        trajectory_index, start = self._windows[idx]
-        observations = self._normalized_observations[trajectory_index]
-        rewards = self._scaled_rewards[trajectory_index]
-        trajectory_length, obs_dim = observations.shape
-        valid_length = min(self.horizon, trajectory_length - start)
-
-        obs_chunk = np.empty((self.horizon + 1, obs_dim), dtype=np.float32)
-        if start + valid_length < trajectory_length:
-            state_sequence = observations[start : start + valid_length + 1]
-        else:
-            state_sequence = observations[start:trajectory_length]
-        obs_chunk[: len(state_sequence)] = state_sequence
-        obs_chunk[len(state_sequence) :] = state_sequence[-1]
-
-        rewards_chunk = np.zeros(self.horizon, dtype=np.float32)
-        rewards_chunk[:valid_length] = rewards[start : start + valid_length]
-        valid = np.zeros(self.horizon, dtype=np.float32)
-        valid[:valid_length] = 1.0
-        next_nonterminal = np.zeros(self.horizon, dtype=np.float32)
-        transition_indices = np.arange(start, start + valid_length)
-        next_nonterminal[:valid_length] = transition_indices < (trajectory_length - 1)
-
+        obs_chunk, rews_chunk = self.transitions[idx]
         return (
             torch.tensor(obs_chunk, dtype = torch.float32),
-            torch.tensor(rewards_chunk, dtype = torch.float32),
-            torch.tensor(valid, dtype=torch.float32),
-            torch.tensor(next_nonterminal, dtype=torch.float32),
+            torch.tensor(rews_chunk, dtype = torch.float32)
         )
     def __len__(self):
-        return len(self._windows)
+        return len(self.transitions)
 
 class Critic_Buffer_Reward():
     def __init__(self, dataset_name: str,
@@ -3063,9 +3030,8 @@ class Critic_Buffer_Reward():
                        gamma: float = 0.99,
                        lam: float = 0.95,
                        task_id: Optional[int] = None,
-                       old_step: Optional[int] = None,  
-                       new_step: int = 0, 
-                       value_scale: float = 5.0,
+                       old_step: Optional[int] = None,
+                       new_step: int = 0,
                        momentum: float = 0.005):
         self.horizon = horizon
         self.gamma = gamma
@@ -3081,16 +3047,15 @@ class Critic_Buffer_Reward():
             old_step             = old_step,
             new_step             = new_step,
             momentum             = momentum,
-            value_scale          = value_scale,
             task_id              = task_id,
         )
-   
+
     """
     def obtain_training_data(self, target_critic: nn.Module, batch_size: int, tgt_mean: torch.Tensor, tgt_std: torch.Tensor, device: str):
         loader = cycle(DataLoader(
-            self.data, 
-            batch_size=batch_size, 
-            shuffle=True, 
+            self.data,
+            batch_size=batch_size,
+            shuffle=True,
             drop_last=True,
             num_workers=0,
             pin_memory=torch.cuda.is_available(),
@@ -3099,7 +3064,7 @@ class Critic_Buffer_Reward():
         obs_chunks = obs_chunks.to(device)
         rews_chunks = rews_chunks.to(device)
         B, T = obs_chunks.shape[0], obs_chunks.shape[1]
-        
+
 
         with torch.no_grad():
             values = target_critic(obs_chunks)            # (B, T)
@@ -3134,13 +3099,13 @@ class Critic_Buffer_Reward():
 
                  # === ADD NORMALIZATION HERE ===
                  value_targets = values[:, 0] + advantages[:, 0]         # raw targets
-                
-                 
+
+
                  # Normalize advantages and targets (running stats or batch stats)
                  adv_mean = advantages.mean()
                  adv_std  = advantages.std() + 1e-8
                  advantages = (advantages - adv_mean) / adv_std
-                 
+
                  alpha = 0.99
                  tgt_mean_new = value_targets.mean()
                  tgt_std_new  = value_targets.std() + 1e-8
@@ -3148,57 +3113,89 @@ class Critic_Buffer_Reward():
                  tgt_std_new = alpha * tgt_std + ((1 - alpha) * tgt_std_new)
                  value_targets = (value_targets - tgt_mean_new) / tgt_std_new
                  # =================================
-                 
+
 
         return obs_chunks[:, 0], value_targets, tgt_mean_new, tgt_std_new
         #return obs_chunks[:, 0], value_targets
     """
 
-    def obtain_training_data(self, target_critic: nn.Module, batch, device: str):
-        obs_chunks, rews_chunks, valid, next_nonterminal = batch
+    def obtain_training_data(self, target_critic: nn.Module, batch, tgt_mean: torch.Tensor, tgt_std: torch.Tensor, device: str):
+
+        obs_chunks, rews_chunks = batch
         obs_chunks = obs_chunks.to(device)
         rews_chunks = rews_chunks.to(device)
-        valid = valid.to(device)
-        next_nonterminal = next_nonterminal.to(device)
-        batch_size, transition_count = rews_chunks.shape
+        B, T = obs_chunks.shape[0], obs_chunks.shape[1]
+
 
         with torch.no_grad():
-            values = target_critic(obs_chunks)
+            values = target_critic(obs_chunks)            # (B, T)
+
             deltas = (
-                rews_chunks
-                + self.gamma * next_nonterminal * values[:, 1:]
-                - values[:, :-1]
-            ) * valid
-            advantages = torch.zeros_like(deltas)
-            last_advantage = torch.zeros(batch_size, device=device)
-            for t in reversed(range(transition_count)):
-                last_advantage = (
-                    deltas[:, t]
-                    + self.gamma * self.lam * next_nonterminal[:, t] * last_advantage
-                ) * valid[:, t]
-                advantages[:, t] = last_advantage
-            value_targets = (values[:, 0] + advantages[:, 0]).clamp_min(0.0)
+                  rews_chunks[:, :-1]
+                  + self.gamma * values[:, 1:]
+                   - values[:, :-1]
+              )                                             # (B, T-1)
 
-        return obs_chunks[:, 0], value_targets
+            advantages = torch.zeros(B, T - 1, device=device)
+            last_adv = torch.zeros(B, device=device)
+            for t in reversed(range(T - 1)):
+                last_adv = deltas[:, t] + self.gamma * self.lam * last_adv
+                advantages[:, t] = last_adv
 
-def train_critic_with_reward(trajs: List[TrajectoryDict], 
-                 dataset_name: str, 
-                 specific_dataset: str, 
+            #value_targets = values[:, 0] + advantages[:, 0]   # (B,)
+            with torch.no_grad():
+                 values = target_critic(obs_chunks)                      # (B, T)
+                 deltas = (
+                       rews_chunks[:, :-1]
+                       + self.gamma * values[:, 1:]
+                       - values[:, :-1]
+                 )                                                       # (B, T-1)
+
+                  # GAE advantages
+                 advantages = torch.zeros_like(deltas)
+                 last_adv = torch.zeros(B, device=device)
+                 for t in reversed(range(deltas.shape[1])):
+                     last_adv = deltas[:, t] + self.gamma * self.lam * last_adv
+                     advantages[:, t] = last_adv
+
+                 # === ADD NORMALIZATION HERE ===
+                 value_targets = values[:, 0] + advantages[:, 0]         # raw targets
+
+
+                 # Normalize advantages and targets (running stats or batch stats)
+                 adv_mean = advantages.mean()
+                 adv_std  = advantages.std() + 1e-8
+                 advantages = (advantages - adv_mean) / adv_std
+
+                 alpha = 0.99
+                 tgt_mean_new = value_targets.mean()
+                 tgt_std_new  = value_targets.std() + 1e-8
+                 tgt_mean_new = alpha * tgt_mean + ((1 - alpha) * tgt_mean_new)
+                 tgt_std_new = alpha * tgt_std + ((1 - alpha) * tgt_std_new)
+                 value_targets = (value_targets - tgt_mean_new) / tgt_std_new
+                 # =================================
+
+
+        return obs_chunks[:, 0], value_targets, tgt_mean_new, tgt_std_new
+        #return obs_chunks[:, 0], value_targets
+
+def train_critic_with_reward(trajs: List[TrajectoryDict],
+                 dataset_name: str,
+                 specific_dataset: str,
                  reward_hidden_layers: int,
                  reward_hidden_dim: int,
                  reward_checkpoint: int,
-                 critic_hidden_layers: int, 
-                 critic_hidden_dim: int, 
-                 batch_size, 
-                 num_steps, 
-                 gamma, lam, horizon, 
-                 lr, 
-                 min_lr, 
-                 tau, 
-                 old_step: Optional[int] = None, 
-                 new_step: int = 0, 
-                 momentum: float = 0.005, 
-                 value_scale: float = 5.0,
+                 critic_hidden_layers: int,
+                 critic_hidden_dim: int,
+                 batch_size,
+                 num_steps,
+                 gamma, lam, horizon,
+                 lr,
+                 min_lr,
+                 tau,
+                 old_step: Optional[int] = None,
+                 new_step: int = 0,
+                 momentum: float = 0.005,
                  task_id: Optional[int] = None):
     device = check_device()
     _, obs_dim, _ = get_env(dataset_name, specific_dataset)
@@ -3229,9 +3226,8 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
                        gamma,
                        lam,
                        task_id,
-                       old_step,  
-                       new_step, 
-                       value_scale,
+                       old_step,
+                       new_step,
                        momentum)
     g = torch.Generator()
     g.manual_seed(1)
@@ -3248,9 +3244,11 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
     )
     print(f"Training critic for {dataset_name}-{specific_dataset}")
     total_loss = 0.0
+    tgt_mean = torch.zeros(1, device=device)
+    tgt_std = torch.ones(1, device=device)
     for k in range(1, num_steps + 1):  # number of passes over dataset
            batch = next(loader)
-           s, target_value = buffer.obtain_training_data(target_critic, batch, device)
+           s, target_value, tgt_mean, tgt_std = buffer.obtain_training_data(target_critic, batch, tgt_mean, tgt_std, device)
            #s, target_value = buffer.obtain_training_data(target_critic, batch_size, tgt_mean, tgt_std, device)
            s = s.to(device)
            target_value = target_value.to(device)
@@ -3266,13 +3264,13 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
            torch.nn.utils.clip_grad_norm_(critic.parameters(), max_norm=1.0)
            optimizer.step()
            scheduler.step()
-           
+
            if(k % 1000 == 0):
                 logged_loss = total_loss / 1000
                 print(f"Critic Training step {k} loss: {logged_loss}")
                 wandb_log({"critic/loss": logged_loss}, step=k)
                 total_loss = 0.0
-            
+
            # Soft update target network
            for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):
                tgt_param.data.mul_(1 - tau)
@@ -3280,12 +3278,12 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
     target_critic.eval()
     save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
     q_stats = Q_Stats()
-    q_stats.Q_mean = 0.0
-    q_stats.Q_std = value_scale
+    q_stats.Q_mean = tgt_mean.item()
+    q_stats.Q_std = tgt_std.item()
     save_Q_stats(q_stats, dataset_name, specific_dataset, task_id, new_step)
     print(f"critic model saved")
-    print(f"critic fixed value scale: {value_scale}")
-    return 0.0, value_scale
+    print(f"mean: {tgt_mean.item()}, std: {tgt_std.item()}")
+    return tgt_mean.item(), tgt_std.item()
 
 @dataclass
 class KernelConfig:
@@ -3297,7 +3295,7 @@ class KernelConfig:
     num_modes: int = 8                             # mog only
     noise_floor: Optional[float] = 1e-4            # mog only
     min_log_prob: float = -10.0                    # feasibility threshold
-    oversample: int = 4  
+    oversample: int = 4
 
 def train_critic_with_planner2(
     trajs: List[TrajectoryDict],
@@ -3325,7 +3323,6 @@ def train_critic_with_planner2(
     new_step: int = 0,
     task_id: Optional[int] = None,
     log_every: int = 1,
-    value_scale: float = 5.0,
 ):
 
     # ---------------------------------------------------------------- helpers
@@ -3426,53 +3423,47 @@ def train_critic_with_planner2(
         device:         torch.device,
     ):
         accepted_plans = []
-        accepted_s0 = []
-        max_attempts = kernel_config.oversample * batch_size
-        candidate_indices = np.random.randint(0, len(s0_pool), size=max_attempts)
-        candidate_s0 = s0_pool[candidate_indices]
-        normalized_s0 = np.stack(
-            [planner_proc.preprocess(state) for state in candidate_s0]
-        ).astype(np.float32)
-        candidate_plans = sample_euler_karras_batch(
-            normalized_s0,
-            planner,
-            obs_dim,
-            act_dim,
-            horizon,
-            num_steps=steps_T,
-            num_karras=num_karras,
-            eta=eta,
-            device=device,
-        )
+        accepted_s0    = []
+        max_attempts   = kernel_config.oversample * batch_size
+        attempts       = 0
 
-        for s0_raw, plan in zip(candidate_s0, candidate_plans):
-            x_t = torch.from_numpy(plan).float().to(device)
+        while len(accepted_plans) < batch_size and attempts < max_attempts:
+            idx    = np.random.randint(0, len(s0_pool))
+            s0_raw = s0_pool[idx]
+            s0_p   = planner_proc.preprocess(s0_raw)
+            x      = sample_euler_karras(
+                s0_p, planner, obs_dim, act_dim, horizon,
+                num_steps=steps_T, num_karras=num_karras,
+                eta=eta, device=device,
+            )
+
+            x_t       = torch.from_numpy(x).float().to(device)
             s_planner = x_t[..., :obs_dim]
-            a_raw = torch.clamp(x_t[..., obs_dim:], -1.0, 1.0)
-            s_raw_pl = s_planner * planner_std + planner_mean
+            a_raw     = x_t[..., obs_dim:]
+            s_raw_pl  = s_planner * planner_std + planner_mean
+
             if is_plan_feasible(
-                s_raw_plan=s_raw_pl,
-                a_raw_plan=a_raw,
-                kernels=kernels,
-                k_mean=k_mean,
-                k_std=k_std,
-                kernel_config=kernel_config,
-                device=device,
+                s_raw_plan    = s_raw_pl,
+                a_raw_plan    = a_raw,
+                kernels       = kernels,
+                k_mean        = k_mean,
+                k_std         = k_std,
+                kernel_config = kernel_config,
+                device        = device,
             ):
                 accepted_plans.append(x_t)
                 accepted_s0.append(s0_raw)
-                if len(accepted_plans) == batch_size:
-                    break
+            attempts += 1
 
         if len(accepted_plans) == 0:
             raise RuntimeError(
-                f"No feasible plans found after {max_attempts} attempts. "
+                f"No feasible plans found after {attempts} attempts. "
                 f"Lower `kernel_config.min_log_prob` or raise "
                 f"`kernel_config.oversample`."
             )
         if len(accepted_plans) < batch_size:
             print(f"[Critic-Online] only {len(accepted_plans)}/{batch_size} "
-                  f"feasible plans after {max_attempts} attempts "
+                  f"feasible plans after {attempts} attempts "
                   f"(min_log_prob={kernel_config.min_log_prob}); proceeding")
 
         plans      = torch.stack(accepted_plans, dim=0)
@@ -3560,7 +3551,13 @@ def train_critic_with_planner2(
     s0_pool = np.concatenate(
         [t['observations'] for t in trajs], axis=0,
     ).astype(np.float32)
-    
+
+    # === NEW: Running stats for targets ===
+    running_tgt_mean = torch.zeros(1, device=device)
+    running_tgt_std  = torch.ones(1, device=device)
+    alpha = 0.99   # momentum
+    # ======================================
+
     # ----------------------------------------------------------------- optim
     optimizer = optim.AdamW(critic.parameters(), lr=lr, weight_decay = 1e-2)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(
@@ -3610,8 +3607,13 @@ def train_critic_with_planner2(
             r_hat   = reward_net(
                 s_for_r.reshape(B * n, -1),
                 actions[:, :n].reshape(B * n, -1),
-            ).reshape(B, n)  
-            r_hat = torch.clamp(r_hat, 0.0, 20.0) / value_scale
+            ).reshape(B, n)
+
+            """
+            # NEW: Strong scaling
+            r_hat = torch.clamp(r_hat, -20.0, 20.0)
+            r_hat = r_hat / 5.0
+            """                                # (B', n)
 
             # 4) discounted return + bootstrapped target value
             disc_return  = (gamma_pow_t.unsqueeze(0) * r_hat).sum(dim=1)      # (B',)
@@ -3619,15 +3621,23 @@ def train_critic_with_planner2(
             v_bootstrap  = target_critic(s_n_critic)                          # (B',)
             target_value = disc_return + gamma_n * v_bootstrap                # (B',)
 
-           
-            target_value = target_value.clamp_min(0.0)
+
+            # === NEW: Running normalization ===
+            batch_mean = target_value.mean()
+            batch_std  = target_value.std(unbiased=False) + 1e-8
+
+            running_tgt_mean = alpha * running_tgt_mean + (1 - alpha) * batch_mean
+            running_tgt_std  = alpha * running_tgt_std  + (1 - alpha) * batch_std
+
+            normalized_target = (target_value - running_tgt_mean) / running_tgt_std
+            # =================================
 
             # 5) input for V_β(s_0)
             s0_critic = (s_raw[:, 0] - c_mean) / c_std                        # (B', d_s)
 
         # 6) gradient step on V_β
         v_pred = critic(s0_critic)                                            # (B',)
-        loss   = F.smooth_l1_loss(v_pred, target_value, beta=1.0)
+        loss   = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
 
         optimizer.zero_grad()
         loss.backward()
@@ -3641,18 +3651,14 @@ def train_critic_with_planner2(
                 tp.data.mul_(1 - tau).add_(tau * p.data)
 
         running += loss.item()
-        if log_every > 0 and k % log_every == 0:
-            logged_loss = running / log_every
-            print(f"  step {k:>6}/{num_steps}   loss = {logged_loss:.4f}")
-            wandb_log({"critic_online/loss": logged_loss})
+        """
+        if k % log_every == 0:
+            print(f"  step {k:>6}/{num_steps}   loss = {running / log_every:.4f}")
             running = 0.0
+        """
 
     target_critic.eval()
     save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
-    q_stats = Q_Stats()
-    q_stats.Q_mean = 0.0
-    q_stats.Q_std = value_scale
-    save_Q_stats(q_stats, dataset_name, specific_dataset, task_id, new_step)
     print("critic saved.")
 
 def train_critic_with_planner3(
@@ -3839,7 +3845,7 @@ def train_critic_with_planner3(
             dataset_name, specific_dataset, task_id=task_id, step=old_critic_checkpoint,
          )
         critic.load_state_dict(critic_state)
-    
+
 
     target_critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
     target_critic.load_state_dict(critic.state_dict())
@@ -3894,8 +3900,8 @@ def train_critic_with_planner3(
         dataset_name, specific_dataset, kernel_config,
         obs_dim, act_dim, device,
     )
-    
-    
+
+
     # ----------------------------------- critic stats: load once, never save
     if(old_critic_checkpoint is not None):
          critic_stat = get_critic_stats(
@@ -3904,7 +3910,7 @@ def train_critic_with_planner3(
          )
     else:
          critic_stat = obtain_and_save_critic_stats(trajs, dataset_name, specific_dataset, task_id, step = 0)
-    
+
     c_mean = torch.as_tensor(
         critic_stat.obs_mean, device=device, dtype=torch.float32,
     )
@@ -3916,8 +3922,8 @@ def train_critic_with_planner3(
     s0_pool = np.concatenate(
         [t['observations'] for t in trajs], axis=0,
     ).astype(np.float32)
-    
-    
+
+
     # === NEW: Running stats for targets ===
     running_tgt_mean = torch.zeros(1, device=device)
     running_tgt_std  = torch.ones(1, device=device)
@@ -3974,12 +3980,12 @@ def train_critic_with_planner3(
             r_hat   = reward_net(
                 s_for_r.reshape(B * n, -1),
                 actions[:, :n].reshape(B * n, -1),
-            ).reshape(B, n)  
-            
+            ).reshape(B, n)
+
             """
             # NEW: Strong scaling
             r_hat = torch.clamp(r_hat, -10.0, 10.0)
-            r_hat = r_hat / 5.0          
+            r_hat = r_hat / 5.0
             """             # (B', n)
 
             # 4) discounted return + bootstrapped target value
@@ -3988,8 +3994,8 @@ def train_critic_with_planner3(
             v_bootstrap  = target_critic(s_n_critic)                          # (B',)
             target_value = disc_return + gamma_n * v_bootstrap                # (B',)
 
-            
-            
+
+
             # === NEW: Running normalization ===
             batch_mean = target_value.mean()
             batch_std  = target_value.std(unbiased=False) + 1e-8
@@ -3999,7 +4005,7 @@ def train_critic_with_planner3(
 
             normalized_target = (target_value - running_tgt_mean) / running_tgt_std
             # =================================
-        
+
 
             # 5) input for V_β(s_0)
             s0_critic = (s_raw[:, 0] - c_mean) / c_std                        # (B', d_s)
@@ -4021,11 +4027,11 @@ def train_critic_with_planner3(
                 tp.data.mul_(1 - tau).add_(tau * p.data)
 
         running += loss.item()
-        
+
         if log_every > 0 and k % log_every == 0:
             print(f"  step {k:>6}/{num_steps}   loss = {running / log_every:.4f}")
             running = 0.0
-    
+
 
     target_critic.eval()
     save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
@@ -4035,13 +4041,13 @@ def train_critic_with_planner3(
     save_Q_stats(q_stats, dataset_name, specific_dataset, task_id, new_step)
     print("critic saved.")
     return running_tgt_mean.item(), running_tgt_std.item()
-               
+
 def obtain_and_save_critic_stats(trajs: List[TrajectoryDict], dataset_name: str, specific_dataset: str, task_id: Optional[int] = None, step: int = 0):
         obs_all = []
         for traj in trajs:
             obs_all.append(traj['observations'])
         obs_all = np.concatenate(obs_all, axis = 0)
-        
+
         #get stats
         stats = SAStats()
         stats.obs_mean = obs_all.mean(axis=0)
@@ -4083,7 +4089,6 @@ def train_critic_with_planner4(
     new_step: int = 0,
     task_id: Optional[int] = None,
     log_every: int = 0,
-    value_scale: float = 5.0,
     accelerator=None,
 ):
 
@@ -4205,7 +4210,8 @@ def train_critic_with_planner4(
 
         # 1. Sample batch_size starting states (same on every rank)
         if accelerator.is_main_process:
-            s0_indices = np.random.randint(0, len(s0_pool), size=batch_size)
+            rng = np.random.RandomState(42)
+            s0_indices = rng.randint(0, len(s0_pool), size=batch_size)
             selected_s0 = s0_pool[s0_indices]
         else:
             selected_s0 = np.empty((batch_size, s0_pool.shape[1]), dtype=np.float32)
@@ -4226,13 +4232,14 @@ def train_critic_with_planner4(
 
         for s0_raw in local_s0:
             s0_p = planner_proc.preprocess(s0_raw)
-            candidates = sample_euler_karras_batch(
-                s0_p, planner, obs_dim, act_dim, horizon,
-                num_steps=steps_T, num_karras=num_karras,
-                eta=eta, device=device, num_samples=oversample,
-            )
+            accepted_for_this_s0 = []
 
-            for x in candidates:
+            for _ in range(oversample):
+                x = sample_euler_karras(
+                    s0_p, planner, obs_dim, act_dim, horizon,
+                    num_steps=steps_T, num_karras=num_karras,
+                    eta=eta, device=device,
+                )
                 x_t = torch.from_numpy(x).float().to(device)
 
                 s_planner = x_t[..., :obs_dim]
@@ -4249,7 +4256,9 @@ def train_critic_with_planner4(
                     kernel_config=kernel_config,
                     device=device,
                 ):
-                    local_accepted.append(x_t.cpu())
+                    accepted_for_this_s0.append(x_t.cpu())
+
+            local_accepted.extend(accepted_for_this_s0)
 
         # 4. Collect from all GPUs
         if accelerator.num_processes > 1:
@@ -4259,9 +4268,7 @@ def train_critic_with_planner4(
             all_accepted_lists = [local_accepted]
 
         all_plans = [p for sublist in all_accepted_lists for p in sublist]
-        if not all_plans:
-            return None, None
-        
+
         """
         if len(all_plans) == 0:
             raise RuntimeError(
@@ -4367,6 +4374,16 @@ def train_critic_with_planner4(
         [t['observations'] for t in trajs], axis=0,
     ).astype(np.float32)
 
+    # running target stats
+    if(old_critic_checkpoint is None):
+        running_tgt_mean = torch.zeros(1, device=device)
+        running_tgt_std = torch.ones(1, device=device)
+    else:
+        q_stats = get_Q_stats(dataset_name, specific_dataset, task_id, old_critic_checkpoint)
+        running_tgt_mean = q_stats.Q_mean
+        running_tgt_std = q_stats.Q_std
+    alpha = 0.99
+
     # optim
     optimizer = optim.AdamW(critic.parameters(), lr=lr, weight_decay=1e-2)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(
@@ -4408,11 +4425,6 @@ def train_critic_with_planner4(
                 accelerator=accelerator,
             )
 
-            if plans is None:
-                if is_main:
-                    print("No feasible critic plans generated; skipping update")
-                continue
-
             B_eff = plans.shape[0]
             if B_eff < max(8, batch_size // 4):
                 continue
@@ -4431,9 +4443,10 @@ def train_critic_with_planner4(
                 s_for_r.reshape(N * n, -1),
                 actions[:, :n].reshape(N * n, -1),
             ).reshape(N, n)  # (N, n)
-             
+
             # reward clipping -----------------------------------------------------
-            r_hat = torch.clamp(r_hat, 0.0, 20.0) / value_scale
+            r_hat = torch.clamp(r_hat, -20.0, 20.0)
+            r_hat = r_hat / 5.0
 
             # ---------------------------------------------------------------
             # New multi-horizon average target for every plan:
@@ -4450,7 +4463,7 @@ def train_critic_with_planner4(
             for L in range(1, n):  # L = 1 .. n-1  → H = 2 .. n
                 # sum_{t=0}^{L-1} gamma^{t+1} * r[t]
                 #discounts = gamma_pow_t[:L] * gamma          # gamma^1 ... gamma^L
-                discounts = gamma_pow_t[:L]         
+                discounts = gamma_pow_t[:L]
                 disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
 
                 # bootstrap at step L
@@ -4463,27 +4476,38 @@ def train_critic_with_planner4(
 
             plan_targets = plan_targets / (n - 1)            # average over H=2..n
             """
-            
-            horizon_indices = torch.arange(1, n, device=device)
-            discounted_prefix = torch.cumsum(
-                r_hat[:, : n - 1] * gamma_pow_t[: n - 1].unsqueeze(0), dim=1
-            )
-            bootstrap_states = (s_raw[:, 1:n] - c_mean) / c_std
-            bootstrap_values = target_critic(
-                bootstrap_states.reshape(-1, obs_dim)
-            ).reshape(N, n - 1)
-            partial_returns = discounted_prefix + (
-                gamma ** horizon_indices
-            ).unsqueeze(0) * bootstrap_values
 
-            if lam is not None:
-                weights = (1.0 - lam) * (lam ** (horizon_indices - 1))
-                plan_targets = (
-                    partial_returns * weights.unsqueeze(0)
-                ).sum(dim=1) / weights.sum().clamp_min(1e-8)
+            plan_targets = torch.zeros(N, device=device)
+
+            if(lam is not None):
+                  w = 1.0 - lam       # first weight = (1-λ)
+                  weight_sum = 0.0
+
+                  for L in range(1, n):                               # L = 1 .. n-1
+                         discounts = gamma_pow_t[:L]                     # γ⁰ … γ^{L-1}
+                         disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
+                         s_L = (s_raw[:, L] - c_mean) / c_std
+                         v_boot = target_critic(s_L)
+                         partial = disc_return + (gamma ** L) * v_boot   # R^{(L)}
+                         plan_targets += w * partial
+                         weight_sum += w
+                         w *= lam
+
+                  plan_targets = plan_targets / max(weight_sum, 1e-8)
+
             else:
-                plan_targets = partial_returns.mean(dim=1)
-            
+                    # ----- equal weight on all multi-step estimators -----
+                    #plan_targets = torch.zeros(N, device=device)
+                    N_est = n - 1                                 # L = 1 … n-1
+
+                    for L in range(1, n):
+                        discounts = gamma_pow_t[:L]               # γ⁰ … γ^{L-1}
+                        disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
+                        s_L = (s_raw[:, L] - c_mean) / c_std
+                        v_boot = target_critic(s_L)
+                        partial = disc_return + (gamma ** L) * v_boot   # classic sum return
+                        plan_targets += partial / N_est                 # equal weight
+
 
             # ----- average targets per unique s0 -----
             s0_raw = s_raw[:, 0]
@@ -4500,14 +4524,20 @@ def train_critic_with_planner4(
             averaged_targets.index_add_(0, inverse_indices, plan_targets)
             counts.index_add_(0, inverse_indices, torch.ones_like(plan_targets))
             averaged_targets = averaged_targets / counts.clamp(min=1.0)
-            averaged_targets = averaged_targets.clamp_min(0.0)
+
+            # running normalization
+            batch_mean = averaged_targets.mean()
+            batch_std = averaged_targets.std(unbiased=False) + 1e-8
+            running_tgt_mean = alpha * running_tgt_mean + (1 - alpha) * batch_mean
+            running_tgt_std = alpha * running_tgt_std + (1 - alpha) * batch_std
+            normalized_target = (averaged_targets - running_tgt_mean) / running_tgt_std
 
             # critic input
             s0_critic = (unique_s0 - c_mean) / c_std
 
         # gradient step
         v_pred = critic(s0_critic)
-        loss = F.smooth_l1_loss(v_pred, averaged_targets, beta=1.0)
+        loss = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
 
         optimizer.zero_grad()
         accelerator.backward(loss)
@@ -4523,21 +4553,21 @@ def train_critic_with_planner4(
                 tp.data.mul_(1 - tau).add_(tau * p.data)
 
         running += loss.item()
-    
+
         if log_every > 0 and k % log_every == 0 and is_main:
             logged_loss = running / log_every
             print(
                 f" step {k:>6}/{num_steps} "
                 f"loss = {logged_loss:.10f}  "
                 f"B_eff={B_eff}  U={U}  "
-                f"tgt_mean={averaged_targets.mean().item():.3f}  "
-                f"tgt_std={averaged_targets.std(unbiased=False).item():.3f}"
+                f"tgt_mean={running_tgt_mean.item():.3f}  "
+                f"tgt_std={running_tgt_std.item():.3f}"
             )
             wandb_log(
                 {
                     "critic_warmup/loss": logged_loss,
-                    "critic_warmup/target_mean": averaged_targets.mean().item(),
-                    "critic_warmup/target_std": averaged_targets.std(unbiased=False).item(),
+                    "critic_warmup/target_mean": running_tgt_mean.item(),
+                    "critic_warmup/target_std": running_tgt_std.item(),
                     "critic_warmup/effective_plans": B_eff,
                 },
                 step=k,
@@ -4553,12 +4583,12 @@ def train_critic_with_planner4(
         save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
 
         q_stats = Q_Stats()
-        q_stats.Q_mean = 0.0
-        q_stats.Q_std = value_scale
+        q_stats.Q_mean = running_tgt_mean.item()
+        q_stats.Q_std = running_tgt_std.item()
         save_Q_stats(q_stats, dataset_name, specific_dataset, task_id, new_step)
         print("critic saved.")
 
-    return 0.0, value_scale
+    return running_tgt_mean.item(), running_tgt_std.item()
 
 def train_critic_with_planner5(
     trajs: List[TrajectoryDict],
@@ -4765,7 +4795,7 @@ def train_critic_with_planner5(
             all_accepted_lists = [local_accepted]
 
         all_plans = [p for sublist in all_accepted_lists for p in sublist]
-        
+
         """
         if len(all_plans) == 0:
             raise RuntimeError(

@@ -16,7 +16,10 @@ from .UNet import TemporalUnet
 import os
 from Dataset import get_PlannerName, PlannerDataset, PlannerDataset_Rollout
 from .utils import LossTracker, get_pretrained_planner, getName
-from Pretrain.utils import wandb_log
+try:
+    from Pretrain.utils import wandb_log
+except ModuleNotFoundError:
+    from utils import wandb_log
 import json
 
 

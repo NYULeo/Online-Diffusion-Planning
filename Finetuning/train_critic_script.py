@@ -31,12 +31,12 @@ from Finetuning.utils import (
 )
 from Pretrain.utils import init_wandb_run, set_seed
 from accelerate import Accelerator
-import random 
+import random
 
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
-      
-       
+
+
        env_name = 'cube'
        specific_env = 'single-play'
        traj_length = 200
@@ -51,12 +51,12 @@ if __name__ == '__main__':  # pragma: no cover
                 "stage": "critic", "dataset_name": env_name,
                 "specific_dataset": specific_env, "task_id": task_id,
                 "horizon": horizon, "batch_size": 256, "num_steps": 10000,
-                "gamma": 0.99, "lam": 0.95, "value_scale": 5.0,
+                "gamma": 0.99, "lam": 0.95,
             },
        )
-       
-      
-       
+
+
+
        mean, std = train_critic_with_reward(trajs,
                              dataset_name  = env_name,
                              specific_dataset = specific_env,
@@ -70,29 +70,29 @@ if __name__ == '__main__':  # pragma: no cover
                              gamma = 0.99,
                              lam = 0.95,
                              horizon = horizon,
-                             #lr = 1e-04, 
+                             #lr = 1e-04,
                              lr = 1e-04,
-                             #min_lr = 1e-05, 
+                             #min_lr = 1e-05,
                              min_lr = 1e-05,
-                             tau = 0.005, 
+                             tau = 0.005,
                              old_step = None,    # from scratch
                              new_step = step,
                              momentum = 0.005,   # unused when old_step is None
                              task_id = task_id)
-      
+
        trajs = data.get_trajectories()
-       test_critic(dataset_name = env_name, 
-            specific_dataset = specific_env, 
-            hidden_layers = 4, 
-            hidden_dim = 512, 
-            checkpoint_step = 0, 
-            mean = mean,
-            std = std,
-            gamma = 0.99, 
-            horizon = horizon,  
-            sigma = 4.0, 
+       test_critic(dataset_name = env_name,
+            specific_dataset = specific_env,
+            hidden_layers = 4,
+            hidden_dim = 512,
+            checkpoint_step = 0,
+            mean = None,
+            std = None,
+            gamma = 0.99,
+            horizon = horizon,
+            sigma = 4.0,
             #sigma = None,
-            target_reward = 500.0, 
+            target_reward = 500.0,
             trajs = trajs,
             task_id = task_id)
        run.finish()
@@ -103,8 +103,8 @@ if __name__ == '__main__':  # pragma: no cover
 """
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
-       
-       
+
+
        env_name = 'cube'
        specific_env = 'double-play'
        traj_length = 500
@@ -113,9 +113,9 @@ if __name__ == '__main__':  # pragma: no cover
        step = 0
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
-       
-       
-       
+
+
+
        mean, std = train_critic_with_reward(trajs,
                              dataset_name  = env_name,
                              specific_dataset = specific_env,
@@ -129,16 +129,16 @@ if __name__ == '__main__':  # pragma: no cover
                              gamma = 0.99,
                              lam = 0.95,
                              horizon = horizon,
-                             lr = 1e-07, 
-                             min_lr = 1e-08, 
-                             tau = 0.005, 
+                             lr = 1e-07,
+                             min_lr = 1e-08,
+                             tau = 0.005,
                              old_step = None,    # from scratch
                              new_step = step,
                              momentum = 0.005,   # unused when old_step is None
                              task_id = task_id)
-    
-       
-       
+
+
+
        accelerator = Accelerator(mixed_precision='bf16')
        #accelerator.wait_for_everyone()
        kernel_config = KernelConfig(
@@ -151,8 +151,8 @@ if __name__ == '__main__':  # pragma: no cover
                 min_log_prob = -170.0,
                 oversample = 5,
         )
-       
-       
+
+
        mean, std = train_critic_with_planner4(
                                trajs                  = trajs,
                                dataset_name           = env_name,
@@ -180,36 +180,23 @@ if __name__ == '__main__':  # pragma: no cover
                                new_step               = 0,
                                task_id                = task_id,
                                log_every              = 100,
-                               accelerator            = accelerator) 
-      
+                               accelerator            = accelerator)
+
        accelerator.wait_for_everyone()
-    
+
        trajs = data.get_trajectories()
-       test_critic(dataset_name = env_name, 
-            specific_dataset = specific_env, 
-            hidden_layers = 4, 
-            hidden_dim = 512, 
-            checkpoint_step = 0, 
+       test_critic(dataset_name = env_name,
+            specific_dataset = specific_env,
+            hidden_layers = 4,
+            hidden_dim = 512,
+            checkpoint_step = 0,
             mean = None,
             std = None,
-            gamma = 0.99, 
-            horizon = horizon,  
-            sigma = 6.0, 
+            gamma = 0.99,
+            horizon = horizon,
+            sigma = 6.0,
             #sigma = None,
-            target_reward = 800.0, 
+            target_reward = 800.0,
             trajs = trajs,
             task_id = task_id)
 """
-
-    
-
-
-
-
-
-
-
-
-
-
-

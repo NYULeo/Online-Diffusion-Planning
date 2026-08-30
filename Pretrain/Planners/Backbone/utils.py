@@ -5,11 +5,9 @@ import torch
 from torch import Tensor
 import sys
 import os
-from pathlib import Path
-
-repo_root = Path(__file__).resolve().parents[3]
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(project_root)
+os.chdir(project_root)
 import torch.nn as nn
 import einops
 from einops.layers.torch import Rearrange
@@ -18,7 +16,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import pickle
 import os
-from Pretrain.Dataset import get_PlannerName
+from Dataset import get_PlannerName
 
 
 #-----------------------------------------------------------------------------#
@@ -81,17 +79,17 @@ def cosine_alpha_sigma(t: torch.Tensor, s: float = 0.008) -> Tuple[torch.Tensor,
 
 def compute_dot_alpha_beta(t: Tensor, s: float = 0.008
                         ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
-   
+
     eps = 1e-3
     t2 = t.clamp(0.0, 1.0 - eps)
-    
+
     # --- compute beta and dot_beta ---
     a = (math.pi / 2.0) * ((t2 + s) / (1.0 + s))
     da_dt = (math.pi / 2.0) * (1.0 / (1.0 + s))
     beta = (math.pi / (1.0 + s)) * torch.tan(a)
     # derivative: β' = (π/(1+s)) * sec^2(a) * da/dt
     dot_beta = (math.pi / (1.0 + s)) * (1.0 / torch.cos(a))**2 * da_dt
-    
+
     # --- compute alpha and dot_alpha ---
     # Match cosine_alpha_sigma exactly
     factor = (t2 + s) / (1.0 + s)
@@ -100,7 +98,7 @@ def compute_dot_alpha_beta(t: Tensor, s: float = 0.008
     f0 = torch.cos(torch.tensor((s / (1.0 + s)) * (math.pi / 2)))** 2
     alpha_bar = (f_t / f0).clamp(0.0, 1.0 - 1e-3)
     alpha = torch.sqrt(alpha_bar)
-    
+
     # derivative of f_t: d[cos^2(u)]/dt = - sin(2u) * du/dt
     # where u = factor * (math.pi / 2)
     u = factor * (math.pi / 2.0)
@@ -110,27 +108,27 @@ def compute_dot_alpha_beta(t: Tensor, s: float = 0.008
     # α = sqrt(α_bar) => dot α = dot α_bar / (2 * sqrt(α_bar))
     # => dot_alpha = dot_alpha_bar / (2 α)
     dot_alpha = dot_alpha_bar / (2.0 * alpha)
-    
+
     return alpha, dot_alpha, beta, dot_beta
 
 
-    
+
 
 
 # 2. Autograd (derivative) version
 def compute_dot_autograd(t: Tensor, s: float = 0.008
                          ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
- 
+
     # Make t require gradient
     eps = 1e-3
     t2 = t.clamp(0.0, 1.0 - eps)
-    
-    
+
+
     t_req = t2.clone().detach().requires_grad_(True)
-    
+
     alpha_req, _ = cosine_alpha_sigma(t_req, s=s)
     beta_req = cosine_beta(t_req, s=s)
-    
+
     dot_alpha = torch.autograd.grad(
         outputs=alpha_req,
         inputs=t_req,
@@ -138,7 +136,7 @@ def compute_dot_autograd(t: Tensor, s: float = 0.008
         create_graph=True,
         retain_graph=False
     )[0]
-    
+
     dot_beta = torch.autograd.grad(
         outputs=beta_req,
         inputs=t_req,
@@ -146,10 +144,10 @@ def compute_dot_autograd(t: Tensor, s: float = 0.008
         create_graph=True,
         retain_graph=False
     )[0]
-    
+
     # detach and return
     return alpha_req, dot_alpha, beta_req, dot_beta
-    
+
 
 
 
@@ -460,21 +458,21 @@ Losses = {
 # Add this class before SDETrainer
 class LossTracker:
     """Class to track and plot training losses"""
-    
+
     def __init__(self, save_dir: str = "./logs/"):
         self.save_dir = save_dir
         self.losses = []
         self.steps = []
         self.learning_rates = []
         os.makedirs(save_dir, exist_ok=True)
-    
+
     def log_loss(self, step: int, loss: float, lr: Optional[float] = None):
         """Log a loss value at a specific step"""
         self.steps.append(step)
         self.losses.append(loss)
         if lr is not None:
             self.learning_rates.append(lr)
-    
+
     def save_logs(self, filename: str = "training_logs.pkl"):
         """Save logs to pickle file"""
         log_data = {
@@ -486,38 +484,38 @@ class LossTracker:
         with open(save_path, 'wb') as f:
             pickle.dump(log_data, f)
         print(f"Logs saved to {save_path}")
-    
-    def plot_loss_curve(self, 
+
+    def plot_loss_curve(self,
                        save_path: Optional[str] = None,
                        title: str = "Training Loss Curve",
                        show_lr: bool = False,
                        smooth_window: int = 50):
         """Plot the loss curve with optional smoothing and learning rate"""
-        
+
         if not self.losses:
             print("No loss data to plot!")
             return
-        
+
         fig, ax1 = plt.subplots(figsize=(12, 8))
-        
+
         # Convert to numpy arrays
         steps = np.array(self.steps)
         losses = np.array(self.losses)
-        
+
         # Plot raw loss
         ax1.plot(steps, losses, alpha=0.3, color='blue', label='Raw Loss')
-        
+
         # Plot smoothed loss
         if len(losses) > smooth_window:
             smoothed_losses = self._smooth_curve(losses, smooth_window)
             ax1.plot(steps, smoothed_losses, color='red', linewidth=2, label=f'Smoothed Loss (window={smooth_window})')
-        
+
         ax1.set_xlabel('Training Steps', fontsize=12)
         ax1.set_ylabel('Loss', fontsize=12, color='blue')
         ax1.tick_params(axis='y', labelcolor='blue')
         ax1.grid(True, alpha=0.3)
         ax1.legend()
-        
+
         # Plot learning rate on secondary axis if available
         if show_lr and self.learning_rates:
             ax2 = ax1.twinx()
@@ -525,30 +523,30 @@ class LossTracker:
             ax2.set_ylabel('Learning Rate', fontsize=12, color='green')
             ax2.tick_params(axis='y', labelcolor='green')
             ax2.legend(loc='upper right')
-        
+
         plt.title(title, fontsize=14, fontweight='bold')
         plt.tight_layout()
-        
+
         # Save plot
         if save_path is None:
             save_path = os.path.join(self.save_dir, "loss_curve.png")
-        
+
         # Create directory if it doesn't exist
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        
+
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Loss curve saved to {save_path}")
-        
+
         # Show plot
         plt.show()
-        
+
         return fig
-    
+
     def _smooth_curve(self, data: np.ndarray, window: int) -> np.ndarray:
         """Apply moving average smoothing to the data"""
         if window <= 1:
             return data
-        
+
         smoothed = np.convolve(data, np.ones(window)/window, mode='valid')
         # Pad the beginning to maintain the same length
         padded = np.full_like(data, np.nan)
@@ -612,7 +610,7 @@ def getName(env_name, specific_env):
             return 'Cube_QuadrupleNoisy'
          else:
             raise ValueError(f"Invalid cube dataset name: {specific_env}")
-            
+
      elif(env_name == 'scene'):
          if specific_env == 'play':
              return 'Scene_Play'
@@ -632,4 +630,3 @@ def getName(env_name, specific_env):
             raise ValueError(f"Invalid ogpointmaze dataset name: {specific_env}")
      else:
            raise ValueError(f"Invalid environment name: {env_name}")
-
