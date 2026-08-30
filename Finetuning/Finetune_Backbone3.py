@@ -19,7 +19,7 @@ from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 from typing import List
 from utils import TrajectoryDict, rollout_parallel, get_planner, rollout_parallel2, save_planner, train_reward, train_kernel, train_kernel_mog, train_critic, save_trajs, AlphaSchedulerConfig, checktrajs, rollout_parallel3, train_reward_ensemble
 from Pretrain.Dataset import get_env
-from Pretrain.utils import init_wandb_run
+from Pretrain.utils import init_wandb_run, wandb_log
 from torch.utils.data import DataLoader, DistributedSampler
 from accelerate.utils import broadcast
 import torch
@@ -33,6 +33,7 @@ import json
 from dataclasses import asdict
 from random import random
 import random
+import time
 
 
 
@@ -650,9 +651,9 @@ class OnlineFinetuner():
         """
 
         for step in range(self.config.finetune_rounds):
+            round_started = time.perf_counter()
             if (torch.cuda.device_count() > 1):
                 world_size = self.accelerator.num_processes
-                num_workers = min(8, max(1, os.cpu_count() // (2 * world_size)))  #
                 sampler = DistributedSampler(self.PlannerDataset, shuffle=True, drop_last=True)
                 sampler.set_epoch(step)
 
@@ -660,7 +661,7 @@ class OnlineFinetuner():
                     self.PlannerDataset,
                     self.config.finetune_batch_size,
                     pin_memory = True,
-                    num_workers = (os.cpu_count() // 2),
+                    num_workers = 0,
                     sampler = sampler,
                     drop_last = True)
                 """
@@ -679,8 +680,7 @@ class OnlineFinetuner():
                     self.PlannerDataset,
                     self.config.finetune_batch_size,
                     pin_memory = True,
-                    num_workers = (os.cpu_count() // 2),
-                    #num_workers = 0,
+                    num_workers = 0,
                     shuffle = True,
                     drop_last = True)
 
@@ -689,6 +689,7 @@ class OnlineFinetuner():
 
 
             #self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
+            am_started = time.perf_counter()
             self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1, old_planner_checkpoint = (step * self.config.AMConfig.per_round_steps))
             self.accelerator.wait_for_everyone()
 
@@ -697,7 +698,9 @@ class OnlineFinetuner():
             if torch.cuda.is_available():
                   torch.cuda.synchronize()
             self.accelerator.wait_for_everyone()
+            am_seconds = time.perf_counter() - am_started
 
+            rollout_started = time.perf_counter()
             if self.accelerator.is_main_process:
                   print(f"Starting Rollout")
 
@@ -726,6 +729,7 @@ class OnlineFinetuner():
             else:
                 trajs, score, success_rate, total_steps = [], 0.0, 0.0, 0
             self.accelerator.wait_for_everyone()
+            rollout_seconds = time.perf_counter() - rollout_started
             if self.accelerator.is_main_process:
                   print(f"Rollout Completed")
             if(not self.config.offline):
@@ -756,6 +760,7 @@ class OnlineFinetuner():
             self.accelerator.wait_for_everyone()
 
             if(self.config.offline):
+                critic_started = time.perf_counter()
                 if self.config.critic and self.config.update_critic:
                       print(f"Starting Critic Training with Planner")
                       train_critic_with_planner4(
@@ -786,6 +791,7 @@ class OnlineFinetuner():
                                task_id                = self.config.train_reward_config.task_id,
                                log_every              = 5,
                                accelerator            = self.accelerator)
+                critic_seconds = time.perf_counter() - critic_started
                 print(f"Finetuning round {step+1} completed")
                 print()
                 self.accelerator.wait_for_everyone()
@@ -793,6 +799,22 @@ class OnlineFinetuner():
                       self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
                 self.set_reward_model(self.device)
                 self.accelerator.wait_for_everyone()
+                round_seconds = time.perf_counter() - round_started
+                if self.accelerator.is_main_process:
+                      print(
+                          f"Round timing: finetune={am_seconds:.1f}s "
+                          f"rollout={rollout_seconds:.1f}s "
+                          f"critic={critic_seconds:.1f}s total={round_seconds:.1f}s"
+                      )
+                      wandb_log(
+                          {
+                              "timing/finetune_seconds": am_seconds,
+                              "timing/rollout_seconds": rollout_seconds,
+                              "timing/critic_seconds": critic_seconds,
+                              "timing/round_seconds": round_seconds,
+                          },
+                          step=(step + 1) * self.config.AMConfig.per_round_steps,
+                      )
                 continue
 
 
