@@ -6,7 +6,7 @@ from torch.autograd.functional import jvp
 import types
 
 from Finetuning.acc_adjoint_matching import Acc_AdjointMatchingFineTuner
-from Finetuning.traj_reward4 import _normalization_tensors
+from Finetuning.traj_reward4 import TotalReward_Critic, _normalization_tensors
 from Pretrain.utils import SAStats
 
 
@@ -185,6 +185,88 @@ class SafeOptimizationTest(unittest.TestCase):
         self.assertTrue(torch.allclose(batch_adjoints, scalar_adjoints, atol=1e-6))
         self.assertTrue(torch.equal(batch_rewards, scalar_rewards))
         self.assertTrue(torch.allclose(batch_loss, scalar_loss, atol=1e-6))
+
+    def test_vectorized_total_reward_matches_scalar_reference(self):
+        class RewardNet(torch.nn.Module):
+            def forward(self, state, action):
+                return state.square().sum(dim=-1) + 0.3 * action.square().sum(dim=-1)
+
+        class Critic(torch.nn.Module):
+            def forward(self, state):
+                return 0.4 * state.square().sum(dim=-1)
+
+        model = TotalReward_Critic.__new__(TotalReward_Critic)
+        torch.nn.Module.__init__(model)
+        model.config = types.SimpleNamespace(
+            d_s=2, d_a=1, critic_d_s=2, critic_gamma=0.9,
+            delta=torch.tensor(0.2), device=torch.device("cpu"),
+        )
+        model.reward_obs_mean = torch.tensor([0.2, -0.3])
+        model.reward_obs_std = torch.tensor([1.5, 0.7])
+        model.kernel_obs_mean = torch.tensor([-0.1, 0.4])
+        model.kernel_obs_std = torch.tensor([0.8, 1.2])
+        model.critic_obs_mean = torch.tensor([0.5, -0.2])
+        model.critic_obs_std = torch.tensor([1.1, 0.9])
+        model.reward_net = RewardNet()
+        model.critic = Critic()
+        model.q_stats = types.SimpleNamespace(Q_mean=0.6, Q_std=1.7)
+        model.sigmoid = lambda state, action, next_state: (
+            (next_state - state).square().sum(dim=-1)
+            + 0.2 * action.square().sum(dim=-1)
+        )
+        plan = torch.tensor(
+            [[0.1, -0.2, 1.4], [0.3, 0.5, -0.4], [-0.7, 0.8, 0.2], [0.9, -0.1, -1.3]],
+            dtype=torch.float32,
+        )
+        lam = 0.35
+
+        scalar_constraint = torch.tensor(0.0)
+        scalar_total = torch.tensor(0.0)
+        scalar_gradient = torch.zeros_like(plan)
+        horizon = plan.shape[0]
+        for index in range(horizon - 1):
+            reward_state = model.reward_processor(plan[index, :2]).unsqueeze(0).requires_grad_(True)
+            action = torch.clamp(plan[index, 2:].unsqueeze(0).requires_grad_(True), -1.0, 1.0)
+            kernel_state = model.kernel_processor(plan[index, :2]).unsqueeze(0).requires_grad_(True)
+            kernel_next = model.kernel_processor(plan[index + 1, :2]).unsqueeze(0).requires_grad_(True)
+            reward = model.reward_net(reward_state, action)
+            constraint = model.sigmoid(kernel_state, action, kernel_next)
+            scalar_constraint += model.sigmoid(
+                model.kernel_processor(plan[index, :2]).unsqueeze(0),
+                plan[index, 2:].unsqueeze(0),
+                model.kernel_processor(plan[index + 1, :2]).unsqueeze(0),
+            ).squeeze(0)
+            reward_state_grad, reward_action_grad = torch.autograd.grad(
+                reward, (reward_state, action), torch.ones_like(reward)
+            )
+            constraint_state_grad, constraint_action_grad, constraint_next_grad = torch.autograd.grad(
+                constraint, (kernel_state, action, kernel_next), torch.ones_like(constraint)
+            )
+            discount = model.config.critic_gamma**index
+            scalar_gradient[index, :2] += discount * reward_state_grad.squeeze(0) / model.reward_obs_std
+            scalar_gradient[index, 2:] += discount * reward_action_grad.squeeze(0)
+            scalar_gradient[index, :2] -= lam * constraint_state_grad.squeeze(0) / model.kernel_obs_std
+            scalar_gradient[index, 2:] -= lam * constraint_action_grad.squeeze(0)
+            scalar_gradient[index + 1, :2] -= lam * constraint_next_grad.squeeze(0) / model.kernel_obs_std
+            scalar_total += discount * reward.squeeze(0) - lam * constraint.squeeze(0)
+
+        final_state = model.critic_processor(plan[-1, :2]).unsqueeze(0).requires_grad_(True)
+        value = model.critic(final_state)
+        value_grad = torch.autograd.grad(value, final_state, torch.ones_like(value))[0].squeeze(0)
+        final_discount = model.config.critic_gamma ** (horizon - 1)
+        scalar_gradient[-1, :2] += final_discount * model.q_stats.Q_std * value_grad / model.critic_obs_std
+        scalar_total += final_discount * (
+            model.q_stats.Q_std * value.squeeze(0) + model.q_stats.Q_mean
+        ) + lam * model.config.delta
+        scalar_constraint = scalar_constraint / (horizon - 1) - model.config.delta
+
+        vector_constraint = model.get_c(plan)
+        vector_prediction = model.predict(plan, lam)
+        vector_total, vector_gradient = model(plan, lam)
+        self.assertTrue(torch.allclose(vector_constraint, scalar_constraint, atol=1e-6))
+        self.assertTrue(torch.allclose(vector_prediction, scalar_total, atol=1e-6))
+        self.assertTrue(torch.allclose(vector_total, scalar_total, atol=1e-6))
+        self.assertTrue(torch.allclose(vector_gradient, scalar_gradient, atol=1e-6))
 
 
 if __name__ == "__main__":
