@@ -658,7 +658,7 @@ if __name__ == "__main__":
     env_name = 'antmaze'
     specific_train_dataset = 'large'
     task_id = 4
-    checkpoint = 0
+    checkpoint = 33
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -684,7 +684,7 @@ if __name__ == "__main__":
 
     set_seed(1)
     
-    """
+    
     selector = Selector(
                 env_name,
                 specific_train_dataset,
@@ -694,28 +694,28 @@ if __name__ == "__main__":
                 critic_checkpoint=checkpoint,   # omit or None to use TotalReward only
                 task_id=task_id,
                 lam=0.0,
-                n_candidates=80,
+                n_candidates=50,
             )
-    """
+    
     return_value, length = rollout(
             env_name,
             specific_train_dataset,
             horizon,
             num_layers=4,
-            steps_T = 50,
-            num_karras = 10,
-            eta=0.8,
+            steps_T = 10,
+            num_karras = 1,
+            eta=0.0,
             episode_length=5000,
             checkpoint_steps=checkpoint,
             render=True,
             base_seed=1,
             task_id=task_id,
             continual_rollout=True,
-            chunk_size = 5,
+            chunk_size = 15,
             device=device,
-            #selector=selector,
+            selector=selector,
           )
-    print(length)
+    #print(length)
     exit()
     total = 0.0
     for i in range(1, 101):

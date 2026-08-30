@@ -130,11 +130,9 @@ def set_seed(seed: int):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-
 #finetune_lr = 1e-05,
 """
 if __name__ == "__main__":
-    
     env_name = 'cube'
     specific_env = 'double-play'
     task_id = 4
@@ -239,7 +237,6 @@ if __name__ == "__main__":
     set_seed(1)
     OnlineFinetuner = OnlineFinetuner(FTConfig)
     OnlineFinetuner.finetune_planner()
-    
 """
 
 if __name__ == "__main__":
@@ -299,7 +296,7 @@ if __name__ == "__main__":
                             gamma = 0.99,
                             data_conservation = True,
                             momentum = 0.1)
-    """
+    """   
     TrainCriticConfig = Train_Critic_Config(
                             hidden_layers = 4,
                             hidden_dim = 512,
