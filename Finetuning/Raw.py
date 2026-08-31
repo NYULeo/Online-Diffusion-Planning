@@ -298,8 +298,8 @@ from Pretrain.Critic.nets import Critic
 from Finetuning.utils import symexp
 from Pretrain.Rewards.nets import SimpleReward
 
-
 def critic_heatmap(checkpoint: int, show: bool = True):
+    from matplotlib.colors import PowerNorm
     from matplotlib.patches import Rectangle
 
     ckpt = f"Finetuning/Critics/antmaze/large/Models/AntMaze_Large_task4_Critic_{checkpoint}.pkl"
@@ -321,6 +321,7 @@ def critic_heatmap(checkpoint: int, show: bool = True):
     s = stats.norm_obs(obs)
     with torch.no_grad():
         V = symexp(critic(torch.as_tensor(s, dtype=torch.float32))).numpy().reshape(XX.shape)
+    V = np.maximum(V, 0.0)
 
     MAZE = np.array([
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -339,8 +340,27 @@ def critic_heatmap(checkpoint: int, show: bool = True):
         i, j = ij
         return j * UNIT - OFF, i * UNIT - OFF
 
+    def xy_to_ij(xy):
+        return (int((xy[1] + OFF + 0.5 * UNIT) / UNIT),
+                int((xy[0] + OFF + 0.5 * UNIT) / UNIT))
+
+    wall = np.zeros_like(V, dtype=bool)
+    for r in range(XX.shape[0]):
+        for c in range(XX.shape[1]):
+            i, j = xy_to_ij((XX[r, c], YY[r, c]))
+            if not (0 <= i < MAZE.shape[0] and 0 <= j < MAZE.shape[1]) or MAZE[i, j] == 1:
+                wall[r, c] = True
+
+    V_plot = np.ma.array(V, mask=wall)
+    vmax = float(np.nanpercentile(V[~wall], 99.5))
+    vmax = max(vmax, 1e-3)
+
     fig, ax = plt.subplots(figsize=(8, 5.5))
-    im = ax.pcolormesh(XX, YY, V, shading="auto", cmap="magma")
+    ax.set_facecolor("0.85")  # free cells at V=0 stay visible vs walls
+    im = ax.pcolormesh(
+           XX, YY, V_plot, shading="auto", cmap="magma",
+           norm=PowerNorm(gamma=0.45, vmin=0.0, vmax=vmax),
+    )
     plt.colorbar(im, ax=ax, label=r"$V(s)$")
 
     for i in range(MAZE.shape[0]):
@@ -349,7 +369,7 @@ def critic_heatmap(checkpoint: int, show: bool = True):
                 cx, cy = ij_to_xy((i, j))
                 ax.add_patch(Rectangle(
                     (cx - UNIT / 2, cy - UNIT / 2), UNIT, UNIT,
-                    facecolor="k", edgecolor="none", zorder=2,
+                    facecolor="0.25", edgecolor="none", zorder=2,
                 ))
 
     ax.scatter(*ij_to_xy((3, 8)), c="lime", s=60, zorder=3, label="start")
@@ -359,6 +379,9 @@ def critic_heatmap(checkpoint: int, show: bool = True):
     ax.set_ylabel("y")
     ax.set_title(f"task4 critic @ {checkpoint}")
     ax.legend()
+    ax.legend(loc="lower left", framealpha=0.9)
+    plt.tight_layout()
+    ax.legend(loc="upper left", bbox_to_anchor=(1.28, 1.0), borderaxespad=0.0)
     plt.tight_layout()
     out = f"critic_heatmap_task4_{checkpoint}.png"
     plt.savefig(out, dpi=150)
@@ -368,8 +391,8 @@ def critic_heatmap(checkpoint: int, show: bool = True):
         plt.close(fig)
     return out
 
-
 def reward_heatmap(checkpoint: int = 0, show: bool = True):
+    from matplotlib.colors import PowerNorm
     from matplotlib.patches import Rectangle
 
     ckpt = f"Finetuning/Rewards/antmaze/large/Models/AntMaze_Large_Task4_Reward_{checkpoint}.pkl"
@@ -392,6 +415,7 @@ def reward_heatmap(checkpoint: int = 0, show: bool = True):
     a = torch.zeros(s.shape[0], 8)
     with torch.no_grad():
         R = reward_net(s, a).numpy().reshape(XX.shape)
+    R = np.maximum(R, 0.0)
 
     MAZE = np.array([
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -410,8 +434,27 @@ def reward_heatmap(checkpoint: int = 0, show: bool = True):
         i, j = ij
         return j * UNIT - OFF, i * UNIT - OFF
 
+    def xy_to_ij(xy):
+        return (int((xy[1] + OFF + 0.5 * UNIT) / UNIT),
+                int((xy[0] + OFF + 0.5 * UNIT) / UNIT))
+
+    wall = np.zeros_like(R, dtype=bool)
+    for r in range(XX.shape[0]):
+        for c in range(XX.shape[1]):
+            i, j = xy_to_ij((XX[r, c], YY[r, c]))
+            if not (0 <= i < MAZE.shape[0] and 0 <= j < MAZE.shape[1]) or MAZE[i, j] == 1:
+                wall[r, c] = True
+
+    R_plot = np.ma.array(R, mask=wall)
+    vmax = float(np.nanpercentile(R[~wall], 99.5))
+    vmax = max(vmax, 1e-3)
+
     fig, ax = plt.subplots(figsize=(8, 5.5))
-    im = ax.pcolormesh(XX, YY, R, shading="auto", cmap="magma")
+    ax.set_facecolor("0.85")
+    im = ax.pcolormesh(
+        XX, YY, R_plot, shading="auto", cmap="magma",
+        norm=PowerNorm(gamma=0.45, vmin=0.0, vmax=vmax),
+    )
     plt.colorbar(im, ax=ax, label=r"$r(s, a=0)$")
 
     for i in range(MAZE.shape[0]):
@@ -420,7 +463,7 @@ def reward_heatmap(checkpoint: int = 0, show: bool = True):
                 cx, cy = ij_to_xy((i, j))
                 ax.add_patch(Rectangle(
                     (cx - UNIT / 2, cy - UNIT / 2), UNIT, UNIT,
-                    facecolor="k", edgecolor="none", zorder=2,
+                    facecolor="0.25", edgecolor="none", zorder=2,
                 ))
 
     ax.scatter(*ij_to_xy((3, 8)), c="lime", s=60, zorder=3, label="start")
@@ -429,7 +472,7 @@ def reward_heatmap(checkpoint: int = 0, show: bool = True):
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.set_title(f"task4 reward @ {checkpoint}")
-    ax.legend()
+    ax.legend(loc="upper left", bbox_to_anchor=(1.28, 1.0), borderaxespad=0.0)
     plt.tight_layout()
     out = f"reward_heatmap_task4_{checkpoint}.png"
     plt.savefig(out, dpi=150)
@@ -439,9 +482,7 @@ def reward_heatmap(checkpoint: int = 0, show: bool = True):
         plt.close(fig)
     return out
 
-
-"""
 if __name__ == "__main__":
-    critic_heatmap(0)
+    critic_heatmap(33)
     #reward_heatmap(0)
-"""
+

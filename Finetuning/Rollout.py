@@ -469,10 +469,19 @@ def rollout(env_name,
                      if(selector is None):
                          x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                      else:
+                         
                          x = sample_selected_plan(
                                  current_state_norm, model, d_s, d_a, horizon,
                                  steps_T, num_karras, eta, device, selector,
                           )
+                         
+                         """
+                         Plans = [
+                               sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                               for _ in range(selector.n_candidates)
+                            ]
+                         x = selector.select_plan(Plans)
+                         """
                      for k in range(min(chunk_size, len(x))):
                          Temp_acts.append(x[k, d_s:(d_s+d_a)].copy())
                      for k in range(1, min(chunk_size, len(x))):
@@ -496,10 +505,12 @@ def rollout(env_name,
                 if(selector is None):
                     x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                 else:
+                    
                     x = sample_selected_plan(
                         current_state_norm, model, d_s, d_a, horizon,
                         steps_T, num_karras, eta, device, selector,
                     )
+                    
                 action = x[0, d_s:(d_s+d_a)].copy()
                 generated_state = x[1, :d_s].copy()
                 action = np.clip(action, -1.0, 1.0)
@@ -655,10 +666,10 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
     horizon = 32
-    env_name = 'antmaze'
-    specific_train_dataset = 'large'
+    env_name = 'cube'
+    specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 0
+    checkpoint = 90
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -681,10 +692,8 @@ if __name__ == "__main__":
                     num_hidden_layers_critic=4,
                     hidden_dim_critic=512,
             )
-
-    set_seed(1)
-    
-    """
+   
+    #set_seed(1)
     selector = Selector(
                 env_name,
                 specific_train_dataset,
@@ -701,22 +710,23 @@ if __name__ == "__main__":
             env_name,
             specific_train_dataset,
             horizon,
-            num_layers=4,
+            num_layers=2,
             steps_T = 10,
-            num_karras = 0,
-            eta=0.8,
+            num_karras = 1,
+            eta=0.0,
             episode_length=5000,
             checkpoint_steps=checkpoint,
             render=True,
             base_seed=1,
             task_id=task_id,
             continual_rollout=True,
-            chunk_size = 5,
+            chunk_size = 15,
             device=device,
-            #selector=selector,
+            selector=selector,
           )
-    print(length)
+   # print(length)
     exit()
+    """
     total = 0.0
     for i in range(1, 101):
          set_seed(i)
@@ -734,13 +744,13 @@ if __name__ == "__main__":
             base_seed=1,
             task_id=task_id,
             continual_rollout=True,
-            chunk_size=2,
+            chunk_size=15,
             device=device,
             selector=selector,
           )
          print(return_value)
          total += return_value
-         print()
+         #print()
     print(f"Success Rate: {total / 100 :.4f}")
     exit()
 
