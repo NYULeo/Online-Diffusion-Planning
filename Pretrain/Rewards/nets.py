@@ -428,7 +428,7 @@ class MLPNetwork(nn.Module):
 
 
 
-"""
+
 class SimpleReward(nn.Module):
     def __init__(self, obs_dim, act_dim, hidden_dim, hidden_layers):
         super().__init__()
@@ -451,9 +451,10 @@ class SimpleReward(nn.Module):
     def forward(self, obs, act):
         x = torch.cat([obs, act], dim=-1)
         return self.net(x).squeeze(-1)
+
+
+
 """
-
-
 class SimpleReward(nn.Module):
     def __init__(self, obs_dim, act_dim, hidden_dim, hidden_layers):
         super().__init__()
@@ -476,7 +477,7 @@ class SimpleReward(nn.Module):
     def forward(self, obs, act):
         x = torch.cat([obs, act], dim=-1)
         return self.net(x).squeeze(-1)
-
+"""
 
 
 

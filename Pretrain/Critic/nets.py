@@ -40,7 +40,7 @@ class Critic(nn.Module):
 
 
 
-"""
+
 class Critic(nn.Module):
       def __init__(
           self,
@@ -71,10 +71,10 @@ class Critic(nn.Module):
               value = F.softplus(value)
           return value
 
+
+
+
 """
-
-
-
 class Critic(nn.Module):
       def __init__(
           self,
@@ -105,6 +105,7 @@ class Critic(nn.Module):
               value = F.softplus(value)
           return value
 
+"""
 
 class CriticEnsemble(nn.Module):
     def __init__(self, obs_dim, hidden_dim=128, hidden_layers=2, num_heads=5):
