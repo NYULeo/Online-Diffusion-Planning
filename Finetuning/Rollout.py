@@ -1,6 +1,7 @@
 import chunk
 import sys
 import os
+import hydra
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -14,6 +15,7 @@ from Finetuning.utils import cycle
 #from Pretrain.Planners.Backbone.utils import get_pretrained_planner
 from Finetuning.utils import get_planner, get_normalized_score, get_expert_score, PlannerDataset, get_current_state, reward_processor, check_device
 from Pretrain.Dataset import Planner_Processor, get_dataset
+from Pretrain.utils import init_wandb_run, wandb_log
 from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde, sample_euler_karras, sample_euler_karras2
 from gymnasium.vector import AsyncVectorEnv, SyncVectorEnv 
 import pickle
@@ -23,6 +25,7 @@ import gymnasium_robotics
 from Pretrain.Dataset import get_dataset
 from gymnasium.wrappers import TimeLimit
 from typing import Optional, List
+from omegaconf import DictConfig, OmegaConf
 from dataclasses import dataclass
 from typing import List
 from Finetuning.traj_reward4 import TotalReward_Critic, RewardConfig, TotalReward
@@ -595,71 +598,56 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
      #print(get_normalized_score([traj]))
 
 
-# ---- 4) Example usage (fill ScoreWrapper first) ----
-if __name__ == "__main__":
-    horizon = 32
-    env_name = 'cube'
-    specific_train_dataset = 'single-play'
-    task_id = 4
-    checkpoint = 60
-    total_reward = 0.0
+@hydra.main(version_base="1.3", config_path="conf", config_name="cube_single")
+def main(config: DictConfig) -> None:
+    OmegaConf.set_struct(config, True)
+    print(OmegaConf.to_yaml(config, resolve=True))
+    if config.run.validate_only:
+        return
+
+    env = config.environment
+    rollout_config = config.rollout
+    set_seed(int(config.run.seed))
     device = check_device()
     print(f"Using device {device}")
-    chunk_size2 = [3,4,5,6,7,8]
-    total_return = 0.0
-    set_seed(1)
-    return_value, _ = rollout(
-                  env_name, 
-                  specific_train_dataset, 
-                  horizon, 
-                  num_layers = 2,
-                  steps_T = 10, 
-                  num_karras = 1, 
-                  eta = 0.0, 
-                  episode_length = 3000, 
-                  checkpoint_steps = checkpoint, 
-                  render = True,  
-                  base_seed = 1, 
-                  #goal_cell = np.array([6, 1], dtype = int), 
-                  task_id = task_id,
-                  continual_rollout = True,
-                  chunk_size = 10,
-                  device = device)
-    exit()
-    for i in range(1, 101):
-       set_seed(i)
-       chunk_size_index = 0
-       while(chunk_size_index < len(chunk_size2)):
-           return_value, _ = rollout(
-                  env_name, 
-                  specific_train_dataset, 
-                  horizon, 
-                  num_layers = 2,
-                  steps_T = 10, 
-                  num_karras = 1, 
-                  eta = 0.0, 
-                  episode_length = 3000, 
-                  checkpoint_steps = checkpoint, 
-                  render = False,  
-                  base_seed = 1, 
-                  #goal_cell = np.array([6, 1], dtype = int), 
-                  task_id = task_id,
-                  continual_rollout = True,
-                  chunk_size = chunk_size2[chunk_size_index],
-                  device = device)
-           chunk_size_index += 1
-           if(return_value == 1.0):
-                print(f"chunk_size: {chunk_size2[chunk_size_index-1]}")
-                total_return += 1
-                break
-       print(return_value)
-    print(f"Total return: {total_return / 100 :.4f}")
-    
-
-    
-    
-
-    
+    wandb_run = init_wandb_run(
+        f"{env.dataset_name}-{env.specific_dataset}-task{env.task_id}-rollout",
+        {
+            "stage": "rollout",
+            "resolved_hydra_config": OmegaConf.to_container(config, resolve=True),
+        },
+        group=config.wandb.group,
+        job_type="rollout",
+    )
+    try:
+        success, episode_length = rollout(
+            env.dataset_name,
+            env.specific_dataset,
+            rollout_config.horizon,
+            num_layers=rollout_config.num_layers,
+            steps_T=rollout_config.diffusion_steps,
+            num_karras=rollout_config.num_karras,
+            eta=rollout_config.eta,
+            episode_length=rollout_config.episode_length,
+            checkpoint_steps=rollout_config.checkpoint,
+            render=rollout_config.render,
+            base_seed=rollout_config.base_seed,
+            task_id=env.task_id,
+            continual_rollout=rollout_config.continual_rollout,
+            chunk_size=rollout_config.chunk_size,
+            device=device,
+        )
+        wandb_log(
+            {
+                "rollout/success": success,
+                "rollout/episode_length": episode_length,
+                "rollout/checkpoint": rollout_config.checkpoint,
+                "rollout/chunk_size": rollout_config.chunk_size,
+            }
+        )
+    finally:
+        wandb_run.finish()
 
 
-
+if __name__ == "__main__":
+    main()

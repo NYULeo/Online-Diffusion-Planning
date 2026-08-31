@@ -8,7 +8,8 @@
 #      name) -> can cd into a DIFFERENT clone. Here every path is absolute.
 #   2. bash2.sh has no `set -e` -> a failed cd cascades silently. Here it aborts.
 #
-# The python commands themselves are byte-identical to bash2.sh.
+# Finetune parameters are explicit CLI arguments below; no Python-side defaults
+# are used for the experiment configuration.
 #
 # Usage (from anywhere):   bash /projects/bhpx/khu5/ODP/run_debugger.sh
 # =============================================================================
@@ -39,8 +40,8 @@ echo "OK  committed hkw changes relative to Debugger:"
 git diff --name-only origin/Debugger...HEAD -- '*.py' | sed 's/^/    /'
 echo "OK  branch=$(git branch --show-current)  HEAD=$(git rev-parse --short HEAD)"
 
-# ---- HARD GATE 2: show the config that will actually run ---------------------
-echo "--- live config (AST-resolved, comment blocks skipped) ---"
+# ---- HARD GATE 2: show fixed configs in the remaining stage scripts ----------
+echo "--- fixed stage config (AST-resolved, comment blocks skipped) ---"
 python3 - <<'PY'
 import ast, glob, os
 for f in ['Pretrain/pretrain_script4.py','Pretrain/train_reward_script.py',
@@ -82,7 +83,7 @@ echo "logs -> $LOGDIR"
 
 stage () { echo; echo "======== $1  ($(date '+%F %T')) ========"; echo "  cwd=$(pwd -P)"; }
 
-# ---- stages: identical python commands to bash2.sh, absolute cwd -------------
+# ---- stages ------------------------------------------------------------------
 cd "$REPO/Pretrain"
 
 #pretrain planner
@@ -118,7 +119,8 @@ export NCCL_TIMEOUT=1000000
 export NCCL_BLOCKING_WAIT=1
 export NCCL_ASYNC_ERROR_HANDLING=1
 
-accelerate launch --multi_gpu --num_processes=4   finetune_script2.py 2>&1 | tee output.txt "$LOGDIR/6_finetune.log"
+accelerate launch --multi_gpu --num_processes=4 finetune_script2.py --config-name cube_single \
+  2>&1 | tee output.txt "$LOGDIR/6_finetune.log"
 
 #rollout
 stage "7 ROLLOUT2"

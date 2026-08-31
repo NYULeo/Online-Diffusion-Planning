@@ -9,14 +9,22 @@ import os
 import pickle
 
 
-def init_wandb_run(name: str, config: dict):
-    """Initialize a project W&B run with environment-overridable ownership."""
+def init_wandb_run(
+    name: str,
+    config: dict,
+    *,
+    group: Optional[str] = None,
+    job_type: Optional[str] = None,
+):
+    """Initialize one stage run inside an optional shared pipeline group."""
     import wandb
 
     return wandb.init(
         entity=os.environ.get("WANDB_ENTITY", "kaiwen_hu-uc-berkeley"),
         project=os.environ.get("WANDB_PROJECT", "ODP"),
         name=name,
+        group=os.environ.get("WANDB_RUN_GROUP", group),
+        job_type=job_type,
         config=config,
     )
 

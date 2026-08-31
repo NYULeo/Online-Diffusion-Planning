@@ -1,226 +1,117 @@
-import numpy as np
-import matplotlib.pyplot as plt
+from __future__ import annotations
+
 import os
-import numpy as np
-import ogbench as og
-import mediapy as media
-import matplotlib.pyplot as plt
-import numpy as np
-import seaborn as sns
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-os.chdir(project_root)
-import gymnasium as gym
-import numpy as np
-import torch
-import pickle
-from scipy.ndimage import gaussian_filter1d
-from Pretrain.Dataset import get_dataset
-import ogbench
-from Finetuning.Rollout import load_success_trajs
-from Finetuning.utils import (
-    train_critic_with_reward,
-    train_critic_with_planner,
-    train_critic_with_planner3,
-    train_critic_with_planner4,
-    train_critic_with_planner5,
-    train_critic,
-    test_critic,
-    KernelConfig,
-)
-from Pretrain.utils import init_wandb_run, set_seed
+from pathlib import Path
+
+import hydra
 from accelerate import Accelerator
-import random
+from omegaconf import DictConfig, OmegaConf
 
 
-if __name__ == '__main__':  # pragma: no cover
-       set_seed(1)
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+os.chdir(REPO_ROOT)
+
+from Finetuning.utils import KernelConfig, test_critic, train_critic_with_planner4
+from Pretrain.Dataset import get_dataset
+from Pretrain.utils import init_wandb_run, set_seed
 
 
-       env_name = 'cube'
-       specific_env = 'single-play'
-       traj_length = 200
-       horizon = 128
-       task_id = 4
-       step = 0
-       data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
-       trajs = data.get_trajectories()
+@hydra.main(version_base="1.3", config_path="conf", config_name="cube_single")
+def main(config: DictConfig) -> None:
+    OmegaConf.set_struct(config, True)
+    if int(os.environ.get("RANK", "0")) == 0:
+        print(OmegaConf.to_yaml(config, resolve=True))
+    if config.run.validate_only:
+        return
 
-       accelerator = Accelerator(mixed_precision='bf16')
-       run = None
-       if accelerator.is_main_process:
-            run = init_wandb_run(
-                "cube-single-task4-critic-warmup",
-                {
-                    "stage": "critic_warmup", "dataset_name": env_name,
-                    "specific_dataset": specific_env, "task_id": task_id,
-                    "horizon": 32, "batch_size": 64, "num_steps": 100,
-                    "num_processes": accelerator.num_processes,
-                },
-            )
-       kernel_config = KernelConfig(
-                checkpoint = 0,
-                type_kernel = 'mog',
-                num_hidden_layers = 4,
-                hidden_dim = 514,
-                num_modes = 10,
-                noise_floor = 5e-4,
-                min_log_prob = -110.0,
-                #min_log_prob = -130.0,
-                oversample = 5,
+    env = config.environment
+    warmup = config.critic_warmup
+    set_seed(int(config.run.seed))
+    data = get_dataset(
+        env.dataset_name,
+        env.specific_dataset,
+        task_id=env.task_id,
+        traj_length=warmup.traj_length,
+    )
+    trajectories = data.get_trajectories()
+    accelerator = Accelerator(mixed_precision=warmup.mixed_precision)
+    wandb_run = None
+    if accelerator.is_main_process:
+        wandb_run = init_wandb_run(
+            f"{env.dataset_name}-{env.specific_dataset}-task{env.task_id}-critic-warmup",
+            {
+                "stage": "critic_warmup",
+                "resolved_hydra_config": OmegaConf.to_container(config, resolve=True),
+                "num_processes": accelerator.num_processes,
+            },
+            group=config.wandb.group,
+            job_type="critic_warmup",
         )
+        wandb_run.define_metric("critic_warmup_step")
+        wandb_run.define_metric("critic_warmup/*", step_metric="critic_warmup_step")
 
-       mean, std = train_critic_with_planner4(
-                               trajs                  = trajs,
-                               dataset_name           = env_name,
-                               specific_dataset       = specific_env,
-                               planner_checkpoint     = 0,
-                               reward_checkpoint      = 0,
-                               old_critic_checkpoint  = 0,
-                               backbone_layers        = 2,
-                               hidden_layers          = 4,
-                               hidden_dim             = 512,
-                               kernel_config          = kernel_config,
-                               reward_hidden_layers   = 4,
-                               reward_hidden_dim      = 512,
-                               batch_size             = 64,
-                               num_steps              = 100,
-                               horizon                = 32,
-                               gamma                  = 0.99,
-                               lam                    = None,
-                               lr                     = 1e-04,
-                               min_lr                 = 1e-05,
-                               tau                    = 0.005,
-                               steps_T                = 10,
-                               num_karras             = 1,
-                               eta                    = 0.0,
-                               new_step               = 0,
-                               task_id                = task_id,
-                               log_every              = 20,
-                               accelerator            = accelerator)
+    kernel = warmup.kernel
+    kernel_config = KernelConfig(
+        checkpoint=kernel.checkpoint,
+        type_kernel=kernel.type_kernel,
+        num_hidden_layers=kernel.num_hidden_layers,
+        hidden_dim=kernel.hidden_dim,
+        num_modes=kernel.num_modes,
+        noise_floor=kernel.noise_floor,
+        min_log_prob=kernel.min_log_prob,
+        oversample=kernel.oversample,
+    )
+    train_critic_with_planner4(
+        trajs=trajectories,
+        dataset_name=env.dataset_name,
+        specific_dataset=env.specific_dataset,
+        planner_checkpoint=warmup.planner_checkpoint,
+        reward_checkpoint=warmup.reward_checkpoint,
+        old_critic_checkpoint=warmup.old_critic_checkpoint,
+        backbone_layers=warmup.backbone_layers,
+        hidden_layers=warmup.hidden_layers,
+        hidden_dim=warmup.hidden_dim,
+        kernel_config=kernel_config,
+        reward_hidden_layers=warmup.reward_hidden_layers,
+        reward_hidden_dim=warmup.reward_hidden_dim,
+        batch_size=warmup.batch_size,
+        num_steps=warmup.num_steps,
+        horizon=warmup.horizon,
+        gamma=warmup.gamma,
+        lam=warmup.lam,
+        lr=warmup.lr,
+        min_lr=warmup.min_lr,
+        tau=warmup.tau,
+        steps_T=warmup.diffusion_steps,
+        num_karras=warmup.num_karras,
+        eta=warmup.eta,
+        new_step=warmup.new_step,
+        task_id=env.task_id,
+        log_every=warmup.log_every,
+        accelerator=accelerator,
+    )
 
-       accelerator.wait_for_everyone()
-
-       trajs = data.get_trajectories()
-       test_critic(dataset_name = env_name,
-            specific_dataset = specific_env,
-            hidden_layers = 4,
-            hidden_dim = 512,
-            checkpoint_step = 0,
-            mean = None,
-            std = None,
-            gamma = 0.99,
-            horizon = horizon,
-            sigma = 4.0,
-            #sigma = None,
-            target_reward = 500.0,
-            trajs = trajs,
-            task_id = task_id)
-       if run is not None:
-            run.finish()
-
-
-
-
-"""
-if __name__ == '__main__':  # pragma: no cover
-       set_seed(1)
-
-
-       env_name = 'cube'
-       specific_env = 'double-play'
-       traj_length = 500
-       horizon = 480
-       task_id = 4
-       step = 0
-       data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
-       trajs = data.get_trajectories()
+    accelerator.wait_for_everyone()
+    test_critic(
+        dataset_name=env.dataset_name,
+        specific_dataset=env.specific_dataset,
+        hidden_layers=warmup.hidden_layers,
+        hidden_dim=warmup.hidden_dim,
+        checkpoint_step=warmup.new_step,
+        mean=None,
+        std=None,
+        gamma=warmup.gamma,
+        horizon=warmup.test_horizon,
+        sigma=warmup.test_sigma,
+        target_reward=warmup.test_target_reward,
+        trajs=data.get_trajectories(),
+        task_id=env.task_id,
+    )
+    if wandb_run is not None:
+        wandb_run.finish()
 
 
-
-       mean, std = train_critic_with_reward(trajs,
-                             dataset_name  = env_name,
-                             specific_dataset = specific_env,
-                             reward_hidden_layers = 4,
-                             reward_hidden_dim  = 512,
-                             reward_checkpoint  = 0,
-                             critic_hidden_layers = 4,
-                             critic_hidden_dim  = 512,
-                             batch_size = 256,
-                             num_steps  = 20000,
-                             gamma = 0.99,
-                             lam = 0.95,
-                             horizon = horizon,
-                             lr = 1e-07,
-                             min_lr = 1e-08,
-                             tau = 0.005,
-                             old_step = None,    # from scratch
-                             new_step = step,
-                             momentum = 0.005,   # unused when old_step is None
-                             task_id = task_id)
-
-
-
-       accelerator = Accelerator(mixed_precision='bf16')
-       #accelerator.wait_for_everyone()
-       kernel_config = KernelConfig(
-                checkpoint = 0,
-                type_kernel = 'mog',
-                num_hidden_layers = 4,
-                hidden_dim = 514,
-                num_modes = 10,
-                noise_floor = 5e-4,
-                min_log_prob = -170.0,
-                oversample = 5,
-        )
-
-
-       mean, std = train_critic_with_planner4(
-                               trajs                  = trajs,
-                               dataset_name           = env_name,
-                               specific_dataset       = specific_env,
-                               planner_checkpoint     = 0,
-                               reward_checkpoint      = 0,
-                               old_critic_checkpoint  = 0,
-                               backbone_layers        = 4,
-                               hidden_layers          = 4,
-                               hidden_dim             = 512,
-                               kernel_config          = kernel_config,
-                               reward_hidden_layers   = 4,
-                               reward_hidden_dim      = 512,
-                               batch_size             = 64,
-                               num_steps              = 1000,
-                               horizon                = 32,
-                               gamma                  = 0.99,
-                               lam                    = 0.95,
-                               lr                     = 1e-07,
-                               min_lr                 = 1e-10,
-                               tau                    = 0.005,
-                               steps_T                = 10,
-                               num_karras             = 1,
-                               eta                    = 0.0,
-                               new_step               = 0,
-                               task_id                = task_id,
-                               log_every              = 100,
-                               accelerator            = accelerator)
-
-       accelerator.wait_for_everyone()
-
-       trajs = data.get_trajectories()
-       test_critic(dataset_name = env_name,
-            specific_dataset = specific_env,
-            hidden_layers = 4,
-            hidden_dim = 512,
-            checkpoint_step = 0,
-            mean = None,
-            std = None,
-            gamma = 0.99,
-            horizon = horizon,
-            sigma = 6.0,
-            #sigma = None,
-            target_reward = 800.0,
-            trajs = trajs,
-            task_id = task_id)
-
-"""
+if __name__ == "__main__":
+    main()

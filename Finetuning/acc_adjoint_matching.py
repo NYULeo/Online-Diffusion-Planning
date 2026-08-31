@@ -870,8 +870,20 @@ class Acc_AdjointMatchingFineTuner:
                 if ((((round-1)*self.config.per_round_steps + step) % self.config.update_ema_every) == 0):
                      self.step_ema(((round-1)*self.config.per_round_steps + step))
 
+                global_step = (round - 1) * self.config.per_round_steps + step
+                wandb_log(
+                    {
+                        "finetune/step": global_step,
+                        "finetune/loss": loss,
+                        "finetune/reward": avg_reward,
+                        "finetune/objective": Reward,
+                        "finetune/constraint": avg_C,
+                        "finetune/alpha": self.alpha_scheduler.get_alpha(),
+                        "finetune/lambda": self.Lam.get_lam(),
+                    }
+                )
+
                 if ((step % self.config.log_freq) == 0):
-                    global_step = (round - 1) * self.config.per_round_steps + step
                     print('---------------------------------------------------------')
                     if(step == 0):
                          print(f"round: {round}, step: {step}, loss {total_loss}")
@@ -885,18 +897,6 @@ class Acc_AdjointMatchingFineTuner:
                          print(f"round: {round}, step: {step}, reward {pure_reward / self.config.log_freq}")
                          print(f"round: {round}, step: {step}, constraint {total_C / self.config.log_freq}")
                          print(f"round: {round}, step: {step}, alpha {self.alpha_scheduler.get_alpha()}")
-                    denom = 1.0 if step == 0 else float(self.config.log_freq)
-                    wandb_log(
-                        {
-                            "finetune/loss": total_loss / denom,
-                            "finetune/reward": total_reward / denom,
-                            "finetune/objective": pure_reward / denom,
-                            "finetune/constraint": total_C / denom,
-                            "finetune/alpha": self.alpha_scheduler.get_alpha(),
-                            "finetune/lambda": self.Lam.get_lam(),
-                        },
-                        step=global_step,
-                    )
                     total_loss = 0.0
                     total_reward = 0.0
                     pure_reward = 0.0

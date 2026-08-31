@@ -4090,6 +4090,9 @@ def train_critic_with_planner4(
     task_id: Optional[int] = None,
     log_every: int = 0,
     accelerator=None,
+    wandb_prefix: str = "critic_warmup",
+    wandb_step_metric: str = "critic_warmup_step",
+    wandb_step_offset: int = 0,
 ):
 
     from accelerate import Accelerator
@@ -4565,12 +4568,12 @@ def train_critic_with_planner4(
             )
             wandb_log(
                 {
-                    "critic_warmup/loss": logged_loss,
-                    "critic_warmup/target_mean": running_tgt_mean.item(),
-                    "critic_warmup/target_std": running_tgt_std.item(),
-                    "critic_warmup/effective_plans": B_eff,
-                },
-                step=k,
+                    wandb_step_metric: wandb_step_offset + k,
+                    f"{wandb_prefix}/loss": logged_loss,
+                    f"{wandb_prefix}/target_mean": running_tgt_mean.item(),
+                    f"{wandb_prefix}/target_std": running_tgt_std.item(),
+                    f"{wandb_prefix}/effective_plans": B_eff,
+                }
             )
             running = 0.0
 

@@ -277,7 +277,8 @@ class OnlineFinetuner():
         self.wandb_run = None
         if self.accelerator.is_main_process:
             self.wandb_run = init_wandb_run(
-                "cube-single-task4-finetune",
+                f"{self.config.dataset_name}-{self.config.specific_dataset}-"
+                f"task{self.config.train_reward_config.task_id}-finetune",
                 {
                     "stage": "finetune",
                     "dataset_name": self.config.dataset_name,
@@ -290,7 +291,20 @@ class OnlineFinetuner():
                     "diffusion_steps": self.config.diffusion_steps,
                     "num_processes": self.accelerator.num_processes,
                 },
+                job_type="finetune",
             )
+            self.wandb_run.define_metric("finetune/step")
+            self.wandb_run.define_metric("finetune/loss", step_metric="finetune/step")
+            self.wandb_run.define_metric("finetune/reward", step_metric="finetune/step")
+            self.wandb_run.define_metric("finetune/objective", step_metric="finetune/step")
+            self.wandb_run.define_metric("finetune/constraint", step_metric="finetune/step")
+            self.wandb_run.define_metric("finetune/alpha", step_metric="finetune/step")
+            self.wandb_run.define_metric("finetune/lambda", step_metric="finetune/step")
+            self.wandb_run.define_metric("finetune/round")
+            self.wandb_run.define_metric("finetune/rollout/*", step_metric="finetune/round")
+            self.wandb_run.define_metric("finetune/timing/*", step_metric="finetune/round")
+            self.wandb_run.define_metric("finetune/critic_step")
+            self.wandb_run.define_metric("finetune/critic/*", step_metric="finetune/critic_step")
 
         self.Initialize_BufferDataset()
         self.set_reward_model(self.device)
@@ -757,6 +771,14 @@ class OnlineFinetuner():
                  print(f"Total Number of Environment Steps: {total_steps}")
                  print(f"Average Success Rate: {avg_success_rate:.2f}")
                  print(f"Average Normalized Score: {avg_score:.2f}")
+                 wandb_log(
+                     {
+                         "finetune/round": step + 1,
+                         "finetune/rollout/success_rate": avg_success_rate,
+                         "finetune/rollout/normalized_score": avg_score,
+                         "finetune/rollout/environment_steps": total_steps,
+                     }
+                 )
             self.accelerator.wait_for_everyone()
 
             if(self.config.offline):
@@ -790,7 +812,10 @@ class OnlineFinetuner():
                                new_step               = ((step+1) * self.config.AMConfig.per_round_steps),
                                task_id                = self.config.train_reward_config.task_id,
                                log_every              = 5,
-                               accelerator            = self.accelerator)
+                               accelerator            = self.accelerator,
+                               wandb_prefix           = "finetune/critic",
+                               wandb_step_metric      = "finetune/critic_step",
+                               wandb_step_offset      = step * self.config.train_critic_config.num_steps)
                 critic_seconds = time.perf_counter() - critic_started
                 print(f"Finetuning round {step+1} completed")
                 print()
@@ -808,12 +833,12 @@ class OnlineFinetuner():
                       )
                       wandb_log(
                           {
-                              "timing/finetune_seconds": am_seconds,
-                              "timing/rollout_seconds": rollout_seconds,
-                              "timing/critic_seconds": critic_seconds,
-                              "timing/round_seconds": round_seconds,
-                          },
-                          step=(step + 1) * self.config.AMConfig.per_round_steps,
+                              "finetune/round": step + 1,
+                              "finetune/timing/finetune_seconds": am_seconds,
+                              "finetune/timing/rollout_seconds": rollout_seconds,
+                              "finetune/timing/critic_seconds": critic_seconds,
+                              "finetune/timing/round_seconds": round_seconds,
+                          }
                       )
                 continue
 
@@ -927,7 +952,10 @@ class OnlineFinetuner():
                                new_step               = ((step+1) * self.config.AMConfig.per_round_steps),
                                task_id                = self.config.train_reward_config.task_id,
                                log_every              = 0,
-                               accelerator            = self.accelerator)
+                               accelerator            = self.accelerator,
+                               wandb_prefix           = "finetune/critic",
+                               wandb_step_metric      = "finetune/critic_step",
+                               wandb_step_offset      = step * self.config.train_critic_config.num_steps)
             self.accelerator.wait_for_everyone()
             #plans = self.get_generated_plans(number_of_generated_plans = self.config.RewardConfig.number_of_generated_plans)
             if self.config.kernel and self.config.update_kernel:

@@ -1,125 +1,115 @@
-import sys
+from __future__ import annotations
+
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-os.chdir(project_root)
-from utils import AlphaSchedulerConfig
-from Finetune_Backbone3 import OnlineFinetuner, FinetuningConfig, Train_Critic_Config, Train_Kernel_Config, Train_Reward_Config
-from adjoint_matching import AdjointMatchingConfig
-from acc_adjoint_matching import Acc_AdjointMatchingConfig
-from traj_reward4 import RewardConfig
 import random
+import shlex
+import sys
+from pathlib import Path
+from typing import Any
+
+import hydra
 import numpy as np
 import torch
-import json
-import os
-torch.backends.cudnn.benchmark = False
-torch.backends.cudnn.deterministic = True
+from hydra.core.hydra_config import HydraConfig
+from omegaconf import DictConfig, OmegaConf
 
-def load_finetuning_args(env_name: str, specific_env: str, base_path: str = None) -> FinetuningConfig:
-   
-    if base_path is None:
-        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    
-    args_file = os.path.join(base_path, "Finetuning", "args", env_name, specific_env, "hyperparameters.json")
-    
-    if not os.path.exists(args_file):
-        raise FileNotFoundError(f"Configuration file not found: {args_file}")
-    
-    with open(args_file, 'r') as f:
-        args = json.load(f)
-    
-    env_details = args.get('env_details', {})
-    pretrained_models = args.get('pretrained_models', {})
-    model_updates = args.get('model_updates', {})
-    finetuning_hyperparams = args.get('finetuning_hyperparameters', {})
-    exploration_hyperparams = args.get('exploration_hyperparameters', {})
-    
-    # Build Acc_AdjointMatchingConfig
-    am_config_dict = args.get('adjoint_matching_config', {})
-    AMConfig = Acc_AdjointMatchingConfig(**am_config_dict)
-    
-    # Build RewardConfig
-    reward_config_dict = args.get('reward_config', {})
-    if 'delta' in reward_config_dict and isinstance(reward_config_dict['delta'], str):
-        delta_str = reward_config_dict['delta']
-        if 'tensor' in delta_str.lower():
-            import re
-            match = re.search(r'([+-]?[0-9]*\.?[0-9]+)', delta_str)
-            if match:
-                reward_config_dict['delta'] = float(match.group(1))
-            else:
-                reward_config_dict['delta'] = None
-    RWConfig = RewardConfig(**reward_config_dict)
-    alpha_config_dict =  args.get('alpha_config', {})
-    AlphaConfig = AlphaSchedulerConfig(**alpha_config_dict)
 
-    
-    # Build Train_Reward_Config
-    reward_training_dict = args.get('reward_training', {})
-    if 'train_goal' in reward_training_dict and reward_training_dict['train_goal'] is not None:
-        reward_training_dict['train_goal'] = np.array(reward_training_dict['train_goal'])
-    if 'rollout_goal' in reward_training_dict and reward_training_dict['rollout_goal'] is not None:
-        reward_training_dict['rollout_goal'] = np.array(reward_training_dict['rollout_goal'])
-    if 'rollout_start_cells' in reward_training_dict and reward_training_dict['rollout_start_cells'] is not None:
-        reward_training_dict['rollout_start_cells'] = np.array(reward_training_dict['rollout_start_cells'])
-    TrainRewardConfig = Train_Reward_Config(**reward_training_dict)
-    
-    # Build Train_Kernel_Config
-    kernel_training_dict = args.get('kernel_training', {})
-    if 'λ_reg' in kernel_training_dict:
-        pass
-    elif 'lambda_reg' in kernel_training_dict:
-        kernel_training_dict['λ_reg'] = kernel_training_dict.pop('lambda_reg')
-    TrainKernelConfig = Train_Kernel_Config(**kernel_training_dict)
-    
-    # Build Train_Critic_Config (handle None when critic=False)
-    critic_training_dict = args.get('critic_training') or {}
-    TrainCriticConfig = Train_Critic_Config(**critic_training_dict)
-    
-    # Use saved critic/kernel flags when available, else infer from critic_training presence
-    use_critic = model_updates.get('critic', args.get('critic_training') is not None)
-    use_kernel = model_updates.get('kernel', False)
-    
-    FTConfig = FinetuningConfig(
-        AMConfig=AMConfig,
-        RewardConfig=RWConfig,
-        AlphaConfig=AlphaConfig,
-        dataset_name=env_details.get('dataset_name', env_name),
-        specific_dataset=env_details.get('specific_dataset', specific_env),
-        planner_checkpoint=pretrained_models.get('planner_checkpoint', 0),
-        reward_model_checkpoint=pretrained_models.get('reward_model_checkpoint', 0),
-        kernel_model_checkpoint=pretrained_models.get('kernel_model_checkpoint', 0),
-        critic_model_checkpoint=pretrained_models.get('critic_model_checkpoint', 0),
-        critic=use_critic,
-        kernel=use_kernel,
-        buffer_size=finetuning_hyperparams.get('buffer_size', 5500),
-        finetune_steps=finetuning_hyperparams.get('finetune_total_steps', 3000),
-        finetune_rounds=finetuning_hyperparams.get('finetune_rounds', 300),
-        diffusion_steps=finetuning_hyperparams.get('diffusion_steps', 50),
-        karras_percent=finetuning_hyperparams.get('karras_percent', 0.05),
-        Loss_Clip_percent=finetuning_hyperparams.get('Loss_Clip_percent', 0.75),
-        finetune_batch_size=finetuning_hyperparams.get('finetune_batch_size', 8),
-        finetune_batch_per_sample=finetuning_hyperparams.get('finetune_batch_per_sample', 3),
-        finetune_lr=finetuning_hyperparams.get('finetune_lr', 2e-5),
-        initial_lam=finetuning_hyperparams.get('initial_lam', 0.05),
-        eta_lam=finetuning_hyperparams.get('eta_lam', 0.5),
-        gradient_accumulate_every=finetuning_hyperparams.get('gradient_accumulate_every', 1),
-        update_lambda_every=finetuning_hyperparams.get('update_lambda_every', 1),
-        reward_scaling_factor=finetuning_hyperparams.get('reward_scaling_factor', 50),
-        MaxEnt=finetuning_hyperparams.get('MaxEnt', False),
-        Entropy_Scaling_Factor=finetuning_hyperparams.get('Entropy_Scaling_Factor', 0.5),
-        rollout_length=exploration_hyperparams.get('rollout_length', 2000),
-        rollout_num_envs=exploration_hyperparams.get('rollout_num_envs', 1),
-        num_rollout_processes=exploration_hyperparams.get('num_rollout_processes'),
-        continual_rollout=exploration_hyperparams.get('continual_rollout', False),
-        train_reward_config=TrainRewardConfig,
-        train_kernel_config=TrainKernelConfig,
-        train_critic_config=TrainCriticConfig
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+os.chdir(REPO_ROOT)
+
+from Finetuning.acc_adjoint_matching import Acc_AdjointMatchingConfig
+from Finetuning.Finetune_Backbone3 import (
+    FinetuningConfig,
+    OnlineFinetuner,
+    Train_Critic_Config,
+    Train_Kernel_Config,
+    Train_Reward_Config,
+)
+from Finetuning.traj_reward4 import RewardConfig
+from Finetuning.utils import AlphaSchedulerConfig
+
+
+def optional_array(value: Any) -> np.ndarray | None:
+    return None if value is None else np.asarray(value, dtype=np.float32)
+
+
+def build_finetuning_config(config: dict[str, Any]) -> FinetuningConfig:
+    """Convert the resolved Hydra tree into the existing training dataclasses."""
+    environment = config["environment"]
+    finetuning = config["finetuning"]
+    if finetuning["finetune_steps"] % finetuning["finetune_rounds"] != 0:
+        raise ValueError("finetuning.finetune_steps must be divisible by finetuning.finetune_rounds")
+
+    alpha_config = AlphaSchedulerConfig(**config["alpha"])
+
+    am_values = dict(config["adjoint_matching"])
+    am_runtime_fields = {
+        name: am_values.pop(name)
+        for name in ("save_freq", "save_model_freq", "log_freq")
+    }
+    am_config = Acc_AdjointMatchingConfig(**am_values)
+    for name, value in am_runtime_fields.items():
+        setattr(am_config, name, value)
+
+    reward_config = RewardConfig(**config["reward"])
+
+    reward_values = dict(config["reward_training"])
+    for name in ("train_goal", "rollout_goal", "rollout_start_cells"):
+        reward_values[name] = optional_array(reward_values[name])
+    reward_values["task_id"] = environment["task_id"]
+    reward_training = Train_Reward_Config(**reward_values)
+
+    kernel_values = dict(config["kernel_training"])
+    kernel_values["λ_reg"] = kernel_values.pop("lambda_reg")
+    kernel_training = Train_Kernel_Config(**kernel_values)
+    critic_training = Train_Critic_Config(**config["critic_training"])
+
+    return FinetuningConfig(
+        AMConfig=am_config,
+        RewardConfig=reward_config,
+        AlphaConfig=alpha_config,
+        dataset_name=environment["dataset_name"],
+        specific_dataset=environment["specific_dataset"],
+        planner_checkpoint=finetuning["planner_checkpoint"],
+        reward_model_checkpoint=finetuning["reward_model_checkpoint"],
+        kernel_model_checkpoint=finetuning["kernel_model_checkpoint"],
+        critic_model_checkpoint=finetuning["critic_model_checkpoint"],
+        train_reward_config=reward_training,
+        train_kernel_config=kernel_training,
+        train_critic_config=critic_training,
+        offline=finetuning["offline"],
+        critic=finetuning["critic"],
+        update_critic=finetuning["update_critic"],
+        kernel=finetuning["kernel"],
+        update_kernel=finetuning["update_kernel"],
+        buffer_size=finetuning["buffer_size"],
+        finetune_buffer_cutoff_length=finetuning["finetune_buffer_cutoff_length"],
+        train_buffer_cutoff_length=finetuning["train_buffer_cutoff_length"],
+        finetune_steps=finetuning["finetune_steps"],
+        finetune_rounds=finetuning["finetune_rounds"],
+        diffusion_steps=finetuning["diffusion_steps"],
+        karras_percent=finetuning["karras_percent"],
+        Loss_Clip_percent=finetuning["loss_clip_percent"],
+        finetune_batch_size=finetuning["finetune_batch_size"],
+        finetune_batch_per_sample=finetuning["finetune_batch_per_sample"],
+        finetune_lr=finetuning["finetune_lr"],
+        initial_lam=finetuning["initial_lam"],
+        eta_lam=finetuning["eta_lam"],
+        gradient_accumulate_every=finetuning["gradient_accumulate_every"],
+        update_lambda_every=finetuning["update_lambda_every"],
+        reward_scaling_factor=finetuning["reward_scaling_factor"],
+        MaxEnt=finetuning["max_ent"],
+        Entropy_Scaling_Factor=finetuning["entropy_scaling_factor"],
+        rollout_length=finetuning["rollout_length"],
+        rollout_num_envs=finetuning["rollout_num_envs"],
+        num_rollout_processes=finetuning["num_rollout_processes"],
+        continual_rollout=finetuning["continual_rollout"],
+        chunk_size=finetuning["chunk_size"],
     )
-    return FTConfig
 
-def set_seed(seed: int):
+
+def set_seed(seed: int) -> None:
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -128,257 +118,40 @@ def set_seed(seed: int):
         torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+    os.environ["PYTHONHASHSEED"] = str(seed)
 
 
+@hydra.main(version_base="1.3", config_path="conf", config_name="cube_single")
+def main(config: DictConfig) -> None:
+    OmegaConf.set_struct(config, True)
+    resolved = OmegaConf.to_container(config, resolve=True)
+    if not isinstance(resolved, dict):
+        raise TypeError("Resolved Hydra configuration must be a mapping")
+    finetuning_config = build_finetuning_config(resolved)
 
-#finetune_lr = 1e-05,
+    if int(os.environ.get("RANK", "0")) == 0:
+        print("Resolved Hydra configuration:")
+        print(OmegaConf.to_yaml(config, resolve=True))
+        print(f"Hydra overrides: {HydraConfig.get().overrides.task}")
+        print("Launch command:")
+        print(" ".join(shlex.quote(value) for value in sys.argv))
+
+    if bool(resolved["run"]["validate_only"]):
+        return
+
+    os.environ.setdefault("WANDB_RUN_GROUP", str(resolved["wandb"]["group"]))
+    set_seed(int(resolved["run"]["seed"]))
+    finetuner = OnlineFinetuner(finetuning_config)
+    if finetuner.wandb_run is not None:
+        finetuner.wandb_run.config.update(
+            {
+                "resolved_hydra_config": resolved,
+                "hydra_overrides": HydraConfig.get().overrides.task,
+            },
+            allow_val_change=False,
+        )
+    finetuner.finetune_planner()
+
 
 if __name__ == "__main__":
-    """
-    FTConfig = load_finetuning_args('pointmaze', 'medium')
-    set_seed(1)
-    OnlineFinetuner = OnlineFinetuner(FTConfig)
-    OnlineFinetuner.finetune_planner()
-    """
-    
-
-    """
-    env_name = 'cube'
-    specific_env = 'double-play'
-    task_id = 4
-    finetune_buffer_cutoff_length = 500
-    train_buffer_cutoff_length = 500
-    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = True)
-    AMConfig = Acc_AdjointMatchingConfig(horizon = 32, backbone_layers = 4, eta = 0.0)
-
-    RWConfig = RewardConfig(
-               beta = 1.0, 
-               min_log_prob = -170.0,
-               quantile = 0.999,
-               number_of_generated_plans = 50,
-               #max_mahalanobis_score = 100.0,
-               critic_gamma = 0.99,
-               explore = False) 
-  
-    TrainRewardConfig = Train_Reward_Config(
-                          hidden_layers = 4,
-                          hidden_dim = 512,
-                          batch_size = 256, 
-                          num_steps = 30000, 
-                          lr = 3e-04,
-                          min_lr = 3e-05,
-                          sigma = 6.0, 
-                          #sigma = None,
-                          target_reward = 800.0, 
-                          train_goal = None,
-                          task_id = task_id)
-      
-    TrainKernelConfig = Train_Kernel_Config(
-                            batch_size = 512, 
-                            num_steps = 5000,
-                            lr = 1e-4,
-                            ensemble_size = 10,
-                            num_hidden_layers = 4,
-                            hidden_dim = 514,
-                            type_kernel = 'mog',
-                            kernel_num_modes = 10,
-                            kernel_noise_floor = 5e-4,
-                            λ_reg = 1e-3)
-    
-    TrainCriticConfig = Train_Critic_Config(
-                            hidden_layers = 4,
-                            hidden_dim = 512,
-                            batch_size = 64,
-                            num_steps = 20,
-                            warm_up_steps = 1000,
-                            warm_up_log_every = 100,
-                            lr = 1e-07,
-                            min_lr = 1e-10,
-                            tau = 0.005,
-                            gamma = 0.99,
-                            lam = 0.95,
-                            data_conservation = True,
-                            momentum = 0.1)
-    
-    FTConfig = FinetuningConfig(
-        AMConfig = AMConfig, 
-        RewardConfig = RWConfig, 
-        AlphaConfig = AlphaConfig,
-        dataset_name = env_name,
-        specific_dataset = specific_env,
-        planner_checkpoint = 0,
-        reward_model_checkpoint = 0,
-        kernel_model_checkpoint = 0,
-        critic_model_checkpoint = 0,
-        offline = True,
-        critic = True,
-        update_critic = True,
-        kernel = True,
-        update_kernel = False,
-        buffer_size = 200000,
-        finetune_buffer_cutoff_length = finetune_buffer_cutoff_length,
-        train_buffer_cutoff_length = train_buffer_cutoff_length,
-        finetune_steps = 90,
-        finetune_rounds = 30,
-        diffusion_steps = 10,
-        karras_percent = 0.1,
-        Loss_Clip_percent = 0.0,
-        finetune_batch_size = 32,
-        finetune_batch_per_sample = 8,
-        finetune_lr = 2e-05,
-        #initial_lam = 0.05,
-        initial_lam = 0.0,
-        eta_lam = 0.5,
-        gradient_accumulate_every = 1,
-        update_lambda_every = 1,
-        reward_scaling_factor = 150,
-        #reward_scaling_factor = 30,
-        MaxEnt = False,
-        Entropy_Scaling_Factor = 0.5,
-        rollout_length = 4000,  # or your desired value
-        rollout_num_envs = 8, 
-        continual_rollout = True,
-        chunk_size = 31,
-        num_rollout_processes = 8,
-        train_reward_config = TrainRewardConfig,
-        train_kernel_config = TrainKernelConfig,
-        train_critic_config = TrainCriticConfig) 
-    set_seed(1)
-    OnlineFinetuner = OnlineFinetuner(FTConfig)
-    OnlineFinetuner.finetune_planner()
-    exit()
-   """
-
-
-
-
-
-    env_name = 'cube'
-    specific_env = 'single-play'
-    task_id = 4
-    finetune_buffer_cutoff_length = 100
-    #finetune_buffer_cutoff_length = 500
-    train_buffer_cutoff_length = 200
-    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = True)
-    AMConfig = Acc_AdjointMatchingConfig(horizon = 32, backbone_layers = 2, eta = 0.0)
-
-    RWConfig = RewardConfig(
-               beta = 1.0, 
-               min_log_prob = -110.0,
-               #min_log_prob = -130.0,
-               quantile = 0.999,
-               number_of_generated_plans = 50,
-               #max_mahalanobis_score = 100.0,
-               gae_lam = 0.95,
-               critic_gamma = 0.99,
-               explore = False) 
-  
-    TrainRewardConfig = Train_Reward_Config(
-                          hidden_layers = 4,
-                          hidden_dim = 512,
-                          batch_size = 256, 
-                          num_steps = 30000, 
-                          lr = 5e-03,
-                          min_lr = 5e-04,
-                          sigma = 4.0,
-                          #sigma = None,
-                          target_reward = 500.0, 
-                          train_goal = None,
-                          task_id = task_id)
-      
-    TrainKernelConfig = Train_Kernel_Config(
-                            batch_size = 512, 
-                            num_steps = 5000,
-                            lr = 1e-4,
-                            ensemble_size = 10,
-                            num_hidden_layers = 4,
-                            hidden_dim = 514,
-                            type_kernel = 'mog',
-                            kernel_num_modes = 10,
-                            kernel_noise_floor = 5e-4,
-                            λ_reg = 1e-3,
-                            oversample = 5)
-    """
-    TrainCriticConfig = Train_Critic_Config(
-                            hidden_layers = 4,
-                            hidden_dim = 512,
-                            batch_size = 256,
-                            num_steps = 20,
-                            lr = 1e-05,
-                            min_lr = 1e-06,
-                            tau = 0.005,
-                            gamma = 0.99,
-                            data_conservation = True,
-                            momentum = 0.1)
-    """
-    TrainCriticConfig = Train_Critic_Config(
-                            hidden_layers = 4,
-                            hidden_dim = 512,
-                            batch_size = 64,
-                            #batch_size = 63,
-                            num_steps = 20,
-                            warm_up_steps = 1000,
-                            warm_up_log_every = 100,
-                            lr = 1e-06,
-                            min_lr = 1e-09,
-                            tau = 0.005,
-                            gamma = 0.99,
-                            lam = None,
-                            data_conservation = True,
-                            momentum = 0.1)
-
-    FTConfig = FinetuningConfig(
-        AMConfig = AMConfig, 
-        RewardConfig = RWConfig, 
-        AlphaConfig = AlphaConfig,
-        dataset_name = env_name,
-        specific_dataset = specific_env,
-        planner_checkpoint = 0,
-        reward_model_checkpoint = 0,
-        kernel_model_checkpoint = 0,
-        critic_model_checkpoint = 0,
-        offline = True,
-        critic = True,
-        update_critic = True,
-        kernel = True,
-        update_kernel = False,
-        buffer_size = 200000,
-        finetune_buffer_cutoff_length = finetune_buffer_cutoff_length,
-        train_buffer_cutoff_length = train_buffer_cutoff_length,
-        finetune_steps = 90,
-        finetune_rounds = 30,
-        diffusion_steps = 10,
-        karras_percent = 0.1,
-        #karras_percent = 1,
-        Loss_Clip_percent = 0.0,
-        #finetune_batch_size = 33,
-        finetune_batch_size = 32,
-        #finetune_batch_size = 16,
-        finetune_batch_per_sample = 8,
-        finetune_lr = 2e-05,
-        initial_lam = 0.05,
-        eta_lam = 0.5,
-        gradient_accumulate_every = 1,
-        update_lambda_every = 1,
-        #reward_scaling_factor = 50,
-        reward_scaling_factor = 150,
-        MaxEnt = False,
-        Entropy_Scaling_Factor = 0.5,
-        rollout_length = 4000,  # or your desired value
-        rollout_num_envs = 8, 
-        continual_rollout = True,
-        chunk_size = 31,
-        num_rollout_processes = 8,
-        train_reward_config = TrainRewardConfig,
-        train_kernel_config = TrainKernelConfig,
-        train_critic_config = TrainCriticConfig) 
-    set_seed(1)
-    OnlineFinetuner = OnlineFinetuner(FTConfig)
-    OnlineFinetuner.finetune_planner()
-    
-   
-
-
-
-
-    
+    main()
