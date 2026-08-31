@@ -704,7 +704,7 @@ if __name__ == "__main__":
                 critic_checkpoint=checkpoint,   # omit or None to use TotalReward only
                 task_id=task_id,
                 lam=0.0,
-                n_candidates=90,
+                n_candidates=50,
             )
     """
     return_value, length = rollout(
