@@ -24,9 +24,9 @@ from typing import Optional, List
 from dataclasses import dataclass
 from typing import List
 from Finetuning.traj_reward5 import TotalReward_Critic, RewardConfig, TotalReward
-#from Finetuning.Raw import Selector, sample_selected_plan
+from Finetuning.Raw import Selector, sample_selected_plan
 
-
+"""
 class Selector:
     def __init__(
         self,
@@ -87,7 +87,7 @@ class Selector:
                 rewards.append(float(reward.detach().cpu()))
 
         return np.asarray(plans[int(np.argmax(rewards))], dtype=np.float32).copy()
-
+"""
 
 def check(env):
     print("Reward type:", getattr(env, 'reward_type', 'Not found'))
@@ -469,19 +469,19 @@ def rollout(env_name,
                      if(selector is None):
                          x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                      else:
-                         """
+                        
                          x = sample_selected_plan(
                                  current_state_norm, model, d_s, d_a, horizon,
                                  steps_T, num_karras, eta, device, selector,
                           )
-                         """
                          
+                         """
                          Plans = [
                                sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                                for _ in range(selector.n_candidates)
                             ]
                          x = selector.select_plan(Plans)
-                         
+                         """
                      for k in range(min(chunk_size, len(x))):
                          Temp_acts.append(x[k, d_s:(d_s+d_a)].copy())
                      for k in range(1, min(chunk_size, len(x))):
@@ -511,7 +511,8 @@ def rollout(env_name,
                         steps_T, num_karras, eta, device, selector,
                     )
                     """
-                    
+                    x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+
                 action = x[0, d_s:(d_s+d_a)].copy()
                 generated_state = x[1, :d_s].copy()
                 action = np.clip(action, -1.0, 1.0)
