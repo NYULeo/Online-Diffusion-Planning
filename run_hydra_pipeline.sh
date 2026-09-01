@@ -39,6 +39,7 @@ require_artifact "$REPO/Finetuning/Critics/cube/single-play/Models/Cube_SinglePl
 require_artifact "$REPO/Finetuning/Critics/cube/single-play/Stats/Cube_SinglePlay_task4_Q_stats_0.pkl"
 
 CUDA_VISIBLE_DEVICES=0,1,2,3 accelerate launch --multi_gpu --num_processes=4 \
+  --num_machines=1 --mixed_precision=bf16 --dynamo_backend=no \
   Finetuning/train_critic_script2.py --config-name "$CONFIG_NAME" \
   2>&1 | tee "$LOG_DIR/5_critic_warmup.log"
 
@@ -52,6 +53,7 @@ export NCCL_BLOCKING_WAIT=1
 export NCCL_ASYNC_ERROR_HANDLING=1
 
 accelerate launch --multi_gpu --num_processes=4 \
+  --num_machines=1 --mixed_precision=bf16 --dynamo_backend=no \
   Finetuning/finetune_script.py --config-name "$CONFIG_NAME" \
   2>&1 | tee output.txt "$LOG_DIR/6_finetune.log"
 require_artifact "$REPO/Finetuning/Planners/cube/single-play/Cube_SinglePlay_task4_Planner_60.pt"

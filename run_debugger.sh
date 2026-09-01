@@ -106,7 +106,9 @@ CUDA_VISIBLE_DEVICES=0 python train_critic_script.py 2>&1 | tee "$LOGDIR/4_criti
 
 #warm up the critic
 stage "5 CRITIC WARMUP"
-CUDA_VISIBLE_DEVICES=0,1,2,3 accelerate launch  --multi_gpu --num_processes=4  train_critic_script2.py 2>&1 | tee "$LOGDIR/5_critic_warmup.log"
+CUDA_VISIBLE_DEVICES=0,1,2,3 accelerate launch --multi_gpu --num_processes=4 \
+  --num_machines=1 --mixed_precision=bf16 --dynamo_backend=no \
+  train_critic_script2.py 2>&1 | tee "$LOGDIR/5_critic_warmup.log"
 
 #finetune
 stage "6 FINETUNE"
@@ -119,7 +121,9 @@ export NCCL_TIMEOUT=1000000
 export NCCL_BLOCKING_WAIT=1
 export NCCL_ASYNC_ERROR_HANDLING=1
 
-accelerate launch --multi_gpu --num_processes=4 finetune_script2.py --config-name cube_single \
+accelerate launch --multi_gpu --num_processes=4 \
+  --num_machines=1 --mixed_precision=bf16 --dynamo_backend=no \
+  finetune_script2.py --config-name cube_single \
   2>&1 | tee output.txt "$LOGDIR/6_finetune.log"
 
 #rollout
