@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-"""
+
 class Critic(nn.Module):
     def __init__(self, obs_dim, hidden_dim=128, hidden_layers=2):
         super().__init__()
@@ -35,12 +35,12 @@ class Critic(nn.Module):
 
     def forward(self, obs):
         return self.net(obs).squeeze(-1)
+
+
+
+
+
 """
-
-
-
-
-
 class Critic(nn.Module):
       def __init__(
           self,
@@ -70,7 +70,7 @@ class Critic(nn.Module):
           if self.positive_output:
               value = F.softplus(value)
           return value
-
+"""
 
 
 

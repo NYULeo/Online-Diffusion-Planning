@@ -11,6 +11,8 @@ import seaborn as sns
 import minari
 import sys
 
+from sympy.calculus.util import continuous_domain
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -39,158 +41,16 @@ import math
 import torch
 import torch.nn.functional as F
 
-def check_increase(rewards):
-    for i in range(1, len(rewards)):
-        if( rewards[i] < rewards[i-1]):
-            return False
-    
-    return True
 
 
-# ---------------------------------------------------------------------------
-# Batched selector rollout — same formulas as Rollout.py / traj_reward5.py
-# Speedup is batching only: one DiT reverse SDE and one predict over N plans.
-# ---------------------------------------------------------------------------
 
-def _flatten_sa(s: torch.Tensor, a: torch.Tensor, s_next: Optional[torch.Tensor] = None):
-    N, T, d_s = s.shape
-    s_f = s.reshape(N * T, d_s)
-    a_f = a.reshape(N * T, a.shape[-1])
-    if s_next is None:
-        return s_f, a_f, N, T
-    return s_f, a_f, s_next.reshape(N * T, d_s), N, T
-
-def _norm_obs_stat(s: torch.Tensor, stat, device) -> torch.Tensor:
-    s_n = stat.norm_obs(s.detach().cpu().numpy())
-    return torch.from_numpy(np.ascontiguousarray(s_n, dtype=np.float32)).to(device)
-
-def _constraint_c(model, s_norm: torch.Tensor, a: torch.Tensor, s_next_norm: torch.Tensor) -> torch.Tensor:
-    """Batched copy of TotalReward / TotalReward_Critic.sigmoid."""
-    if model.config.type_kernel == "robust":
-        total = None
-        for kernel in model.kernels:
-            mu, log_std = kernel(s_norm, a)
-            lp = kernel.log_prob(s_next_norm, mu, log_std)
-            total = lp if total is None else total + lp
-        avg = total / len(model.kernels)
-    else:
-        avg = compute_log_density_mog(model.kernels, s_norm, a, s_next_norm)
-    return F.softplus(model.config.min_log_prob - avg, beta=model.config.beta)
-
-@torch.no_grad()
-def sample_euler_karras_batch(
-    s0: np.ndarray,
-    score_model: torch.nn.Module,
-    d_s: int,
-    d_a: int,
-    horizon: int,
-    num_steps: int = 50,
-    num_karras: int = 5,
-    eta: float = 1.0,
-    n_samples: int = 1,
-    device: Optional[str] = None,
-) -> torch.Tensor:
-    """Same Euler–Karras reverse SDE as sample_euler_karras, batch of n_samples."""
-    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    s0_t = torch.tensor(s0, device=device, dtype=torch.float32)
-    if s0_t.shape[0] != d_s:
-        raise ValueError(f"s0 should have shape ({d_s},), but got {s0_t.shape}")
-
-    B = int(n_samples)
-    dim = d_s + d_a
-
-    t_grid, beta_1, sigma_grid = karras_beta_schedule(num_steps, device=device)
-    beta_2 = cosine_beta(t_grid, s=0.008)
-
-    x = torch.cat(
-        [torch.randn(1, horizon, dim, device=device) * sigma_grid[0] for _ in range(B)],
-        dim=0,
-    )
-    mask = torch.zeros(B, horizon, dim, device=device)
-    mask[:, 0, :d_s] = 1.0
-    y = torch.zeros_like(x)
-    y[:, 0, :d_s] = s0_t
-    x = mask * y + (1 - mask) * x
-
-    for i in range(num_steps):
-        t_now = t_grid[i]
-        t_next = t_grid[i + 1] if i < num_steps - 1 else 0.0
-        dt = (t_next - t_now).item()
-        beta_now = (beta_1[i] if i < num_karras else beta_2[i]).item()
-
-        drift = -0.5 * beta_now * x
-        score = score_model(x, t_now.unsqueeze(0))
-
-        if eta > 0:
-            noise = torch.cat(
-                [torch.randn(1, horizon, dim, device=device) for _ in range(B)],
-                dim=0,
-            )
-            noise_scale = eta * math.sqrt(beta_now * (-dt))
-            x = x + ((drift - beta_now * score) * dt + noise_scale * noise)
-        else:
-            x = x + (drift - beta_now * score) * dt
-
-        x = mask * y + (1 - mask) * x
-        x = clip_actions(x, d_s)
-
-    return x
-
-@torch.no_grad()
-def predict_batch_total_reward(model: TotalReward, x: torch.Tensor, lam: float) -> torch.Tensor:
-    """Vectorized TotalReward.predict. x: (N, H, d_s+d_a) -> scores (N,)"""
-    N, H, _ = x.shape
-    d_s = model.config.d_s
-    i = torch.arange(H - 1, device=x.device, dtype=x.dtype)
-    gamma = model.config.critic_gamma
-
-    s = x[..., :d_s]
-    a = x[..., d_s:]
-    r = model.reward_net(_norm_obs_stat(s, model.reward_stat, x.device), a)
-    total = ((gamma ** i) * r[:, :-1]).sum(dim=-1) / H
-    total = total + ((gamma ** (H - 1)) * r[:, -1]) / H
-
-    s_k = _norm_obs_stat(s, model.kernel_stat, x.device)
-    s_t, a_t, s_tp, _, _ = _flatten_sa(s_k[:, :-1], a[:, :-1], s_k[:, 1:])
-    c = _constraint_c(model, s_t, a_t, s_tp).view(N, H - 1)
-    total = total - lam * (c.sum(dim=-1) / (H - 1))
-    total = total + lam * model.config.delta
-    return total
-
-@torch.no_grad()
-def predict_batch_total_reward_critic(model: TotalReward_Critic, x: torch.Tensor, lam: float) -> torch.Tensor:
-    """Vectorized TotalReward_Critic.predict. x: (N, H, d_s+d_a) -> scores (N,)"""
-    N, H, _ = x.shape
-    d_s, d_c = model.config.d_s, model.config.critic_d_s
-    i = torch.arange(H - 1, device=x.device, dtype=x.dtype)
-    gamma = model.config.critic_gamma
-
-    s = x[..., :d_s]
-    a = x[..., d_s:].clamp(-1.0, 1.0)
-
-    r = model.reward_net(_norm_obs_stat(s, model.reward_stat, x.device)[:, :-1], a[:, :-1])
-    total = (r * ((H - 1 - i) * (gamma ** i))).sum(dim=-1)
-
-    v = symexp(model.critic(_norm_obs_stat(s[..., :d_c], model.critic_stat, x.device)[:, 1:]))
-    total = total + (v * (gamma ** (i + 1))).sum(dim=-1)
-    total = total / (H - 1)
-
-    s_k = _norm_obs_stat(s, model.kernel_stat, x.device)
-    s_t, a_t, s_tp, _, _ = _flatten_sa(s_k[:, :-1], a[:, :-1], s_k[:, 1:])
-    c = _constraint_c(model, s_t, a_t, s_tp).view(N, H - 1)
-    total = total - lam * c.sum(dim=-1)
-    total = total + lam * model.config.delta
-    return total
-
-def predict_batch(model: nn.Module, x: torch.Tensor, lam: float) -> torch.Tensor:
-    if isinstance(model, TotalReward_Critic):
-        return predict_batch_total_reward_critic(model, x, lam)
-    if isinstance(model, TotalReward):
-        return predict_batch_total_reward(model, x, lam)
-    raise TypeError(f"Unsupported selector model: {type(model)}")
 
 class Selector:
-    """Same constructor / select_plan contract as Finetuning.Rollout.Selector."""
+    """Sample N plans in one reverse SDE, score them in one predict, pick argmax.
+
+    critic_checkpoint=None -> TotalReward; else TotalReward_Critic.
+    Critic decode: q_stats (Q_std * v + Q_mean) if present, else symexp(v).
+    """
 
     def __init__(
         self,
@@ -235,6 +95,94 @@ class Selector:
             )
         self.model.eval()
 
+    def _flatten_sa(self, s: torch.Tensor, a: torch.Tensor, s_next: Optional[torch.Tensor] = None):
+        N, T, d_s = s.shape
+        s_f = s.reshape(N * T, d_s)
+        a_f = a.reshape(N * T, a.shape[-1])
+        if s_next is None:
+            return s_f, a_f, N, T
+        return s_f, a_f, s_next.reshape(N * T, d_s), N, T
+
+    def _norm_obs_stat(self, s: torch.Tensor, stat) -> torch.Tensor:
+        s_n = stat.norm_obs(s.detach().cpu().numpy())
+        return torch.from_numpy(np.ascontiguousarray(s_n, dtype=np.float32)).to(s.device)
+
+    def _constraint_c(self, s_norm: torch.Tensor, a: torch.Tensor, s_next_norm: torch.Tensor) -> torch.Tensor:
+        model = self.model
+        if model.config.type_kernel == "robust":
+            total = None
+            for kernel in model.kernels:
+                mu, log_std = kernel(s_norm, a)
+                lp = kernel.log_prob(s_next_norm, mu, log_std)
+                total = lp if total is None else total + lp
+            avg = total / len(model.kernels)
+        else:
+            avg = compute_log_density_mog(model.kernels, s_norm, a, s_next_norm)
+        return F.softplus(model.config.min_log_prob - avg, beta=model.config.beta)
+
+    def _decode_critic_value(self, v_raw: torch.Tensor) -> torch.Tensor:
+        q_stats = getattr(self.model, "q_stats", None)
+        if q_stats is not None:
+            q_std = torch.as_tensor(q_stats.Q_std, device=v_raw.device, dtype=v_raw.dtype)
+            q_mean = torch.as_tensor(q_stats.Q_mean, device=v_raw.device, dtype=v_raw.dtype)
+            return q_std * v_raw + q_mean
+        return symexp(v_raw)
+
+    def _predict_total_reward(self, x: torch.Tensor) -> torch.Tensor:
+        N, H, _ = x.shape
+        d_s = self.model.config.d_s
+        i = torch.arange(H - 1, device=x.device, dtype=x.dtype)
+        gamma = self.model.config.critic_gamma
+        lam = self.lam
+
+        s = x[..., :d_s]
+        a = x[..., d_s:]
+        r = self.model.reward_net(self._norm_obs_stat(s, self.model.reward_stat), a)
+        total = ((gamma ** i) * r[:, :-1]).sum(dim=-1) / H
+        total = total + ((gamma ** (H - 1)) * r[:, -1]) / H
+
+        s_k = self._norm_obs_stat(s, self.model.kernel_stat)
+        s_t, a_t, s_tp, _, _ = self._flatten_sa(s_k[:, :-1], a[:, :-1], s_k[:, 1:])
+        c = self._constraint_c(s_t, a_t, s_tp).view(N, H - 1)
+        total = total - lam * (c.sum(dim=-1) / (H - 1))
+        total = total + lam * self.model.config.delta
+        return total
+
+    def _predict_total_reward_critic(self, x: torch.Tensor) -> torch.Tensor:
+        N, H, _ = x.shape
+        d_s, d_c = self.model.config.d_s, self.model.config.critic_d_s
+        i = torch.arange(H - 1, device=x.device, dtype=x.dtype)
+        gamma = self.model.config.critic_gamma
+        lam = self.lam
+
+        s = x[..., :d_s]
+        a = x[..., d_s:].clamp(-1.0, 1.0)
+
+        r = self.model.reward_net(
+            self._norm_obs_stat(s, self.model.reward_stat)[:, :-1], a[:, :-1]
+        )
+        total = (r * ((H - 1 - i) * (gamma ** i))).sum(dim=-1)
+
+        s_c = self._norm_obs_stat(s[..., :d_c], self.model.critic_stat)[:, 1:]
+        v_raw = self.model.critic(s_c.reshape(N * (H - 1), d_c)).reshape(N, H - 1)
+        v = self._decode_critic_value(v_raw)
+        total = total + (v * (gamma ** (i + 1))).sum(dim=-1)
+        total = total / (H - 1)
+
+        s_k = self._norm_obs_stat(s, self.model.kernel_stat)
+        s_t, a_t, s_tp, _, _ = self._flatten_sa(s_k[:, :-1], a[:, :-1], s_k[:, 1:])
+        c = self._constraint_c(s_t, a_t, s_tp).view(N, H - 1)
+        total = total - lam * c.sum(dim=-1)
+        total = total + lam * self.model.config.delta
+        return total
+
+    def predict_batch(self, x: torch.Tensor) -> torch.Tensor:
+        if isinstance(self.model, TotalReward_Critic):
+            return self._predict_total_reward_critic(x)
+        if isinstance(self.model, TotalReward):
+            return self._predict_total_reward(x)
+        raise TypeError(f"Unsupported selector model: {type(self.model)}")
+
     def select_plan(self, plans: Union[torch.Tensor, List[np.ndarray], np.ndarray]) -> np.ndarray:
         if isinstance(plans, list):
             if len(plans) == 0:
@@ -257,38 +205,95 @@ class Selector:
             raise ValueError("select_plan received an empty plan list")
 
         with torch.no_grad():
-            rewards = predict_batch(self.model, plans, self.lam)
-            rewards_np = [float(v) for v in rewards.detach().cpu()]
-            idx = int(np.argmax(rewards_np))
+            rewards = self.predict_batch(plans)
+            idx = int(torch.argmax(rewards).item())
         return plans[idx].detach().cpu().numpy().astype(np.float32, copy=True)
 
-@torch.no_grad()
-def sample_selected_plan(
-    current_state_norm,
-    model,
-    d_s: int,
-    d_a: int,
-    horizon: int,
-    steps_T: int,
-    num_karras: int,
-    eta: float,
-    device,
-    selector: Selector,
-) -> np.ndarray:
-    """Replacement for the N serial sample_euler_karras + select_plan block."""
-    plans = sample_euler_karras_batch(
+    @torch.no_grad()
+    def sample_batch(
+        self,
+        s0: np.ndarray,
+        score_model: torch.nn.Module,
+        d_s: int,
+        d_a: int,
+        horizon: int,
+        num_steps: int = 50,
+        num_karras: int = 5,
+        eta: float = 1.0,
+        n_samples: Optional[int] = None,
+        device: Optional[str] = None,
+    ) -> torch.Tensor:
+        device = device or self.device
+        s0_t = torch.tensor(s0, device=device, dtype=torch.float32)
+        if s0_t.shape[0] != d_s:
+            raise ValueError(f"s0 should have shape ({d_s},), but got {s0_t.shape}")
+
+        B = int(n_samples if n_samples is not None else self.n_candidates)
+        dim = d_s + d_a
+
+        t_grid, beta_1, sigma_grid = karras_beta_schedule(num_steps, device=device)
+        beta_2 = cosine_beta(t_grid, s=0.008)
+
+        x = torch.cat(
+            [torch.randn(1, horizon, dim, device=device) * sigma_grid[0] for _ in range(B)],
+            dim=0,
+        )
+        mask = torch.zeros(B, horizon, dim, device=device)
+        mask[:, 0, :d_s] = 1.0
+        y = torch.zeros_like(x)
+        y[:, 0, :d_s] = s0_t
+        x = mask * y + (1 - mask) * x
+
+        for i in range(num_steps):
+            t_now = t_grid[i]
+            t_next = t_grid[i + 1] if i < num_steps - 1 else 0.0
+            dt = (t_next - t_now).item()
+            beta_now = (beta_1[i] if i < num_karras else beta_2[i]).item()
+
+            drift = -0.5 * beta_now * x
+            score = score_model(x, t_now.unsqueeze(0))
+
+            if eta > 0:
+                noise = torch.cat(
+                    [torch.randn(1, horizon, dim, device=device) for _ in range(B)],
+                    dim=0,
+                )
+                noise_scale = eta * math.sqrt(beta_now * (-dt))
+                x = x + ((drift - beta_now * score) * dt + noise_scale * noise)
+            else:
+                x = x + (drift - beta_now * score) * dt
+
+            x = mask * y + (1 - mask) * x
+            x = clip_actions(x, d_s)
+
+        return x
+
+    @torch.no_grad()
+    def sample_selected_plan(
+        self,
         current_state_norm,
-        model,
-        d_s,
-        d_a,
-        horizon,
-        num_steps=steps_T,
-        num_karras=num_karras,
-        eta=eta,
-        n_samples=selector.n_candidates,
-        device=device,
-    )
-    return selector.select_plan(plans)
+        score_model,
+        d_s: int,
+        d_a: int,
+        horizon: int,
+        steps_T: int,
+        num_karras: int,
+        eta: float,
+        device=None,
+    ) -> np.ndarray:
+        plans = self.sample_batch(
+            current_state_norm,
+            score_model,
+            d_s,
+            d_a,
+            horizon,
+            num_steps=steps_T,
+            num_karras=num_karras,
+            eta=eta,
+            n_samples=self.n_candidates,
+            device=device or self.device,
+        )
+        return self.select_plan(plans)
 
 
 
@@ -483,6 +488,47 @@ def reward_heatmap(checkpoint: int = 0, show: bool = True):
     return out
 
 if __name__ == "__main__":
-    critic_heatmap(33)
+    critic_heatmap(0)
     #reward_heatmap(0)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"""
+env, dataset, eval_dataset = ogbench.make_env_and_datasets(
+                 "cube-single-play-singletask-task4-v0", render_mode="rgb_array"
+            )
+
+Dict = {}
+
+temp = 0
+for i in range(len(dataset['observations'])):
+     if(dataset['rewards'][i] == 0):
+        if(temp > 0):
+             continue 
+        else:
+             temp = i
+             
+     else:
+         if(dataset['rewards'][i-1] == 0):
+              print(dataset['terminals'][i-1])
+              if( (i - temp) not in Dict.keys()):
+                  Dict[(i - temp)] = 1
+              else:
+                  Dict[(i - temp)] += 1
+              temp = 0
+                   
+"""
+          
+
 

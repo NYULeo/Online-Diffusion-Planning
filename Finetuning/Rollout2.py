@@ -682,7 +682,7 @@ if __name__ == "__main__":
                 lam=0.0,
                 n_candidates=50,
             )
-    """
+
     return_value, length = rollout(
             env_name,
             specific_train_dataset,
@@ -703,7 +703,7 @@ if __name__ == "__main__":
           )
    # print(length)
     exit()
-    """
+    
     total = 0.0
     for i in range(1, 101):
          set_seed(i)

@@ -24,70 +24,9 @@ from typing import Optional, List
 from dataclasses import dataclass
 from typing import List
 from Finetuning.traj_reward5 import TotalReward_Critic, RewardConfig, TotalReward
-from Finetuning.Raw import Selector, sample_selected_plan
+from Finetuning.Raw import Selector
 
-"""
-class Selector:
-    def __init__(
-        self,
-        env_name,
-        specific_env,
-        RConfig: RewardConfig,
-        reward_checkpoint: int,
-        kernel_checkpoint: int,
-        critic_checkpoint: Optional[int] = None,
-        task_id: Optional[int] = None,
-        lam: float = 0.0,
-        n_candidates: int = 30,
-    ):
-        self.env_name = env_name
-        self.specific_env = specific_env
-        self.RConfig = RConfig
-        self.task_id = task_id
-        self.lam = lam
-        self.n_candidates = n_candidates
-        self.device = check_device()
 
-        if critic_checkpoint is not None:
-            self.model = TotalReward_Critic(
-                self.device,
-                RConfig,
-                env_name,
-                specific_env,
-                reward_checkpoint,
-                kernel_checkpoint,
-                critic_checkpoint,
-                task_id,
-            )
-        else:
-            self.model = TotalReward(
-                self.device,
-                RConfig,
-                env_name,
-                specific_env,
-                reward_checkpoint,
-                kernel_checkpoint,
-                task_id,
-            )
-        self.model.eval()
-
-    def select_plan(self, plans: List[np.ndarray]) -> np.ndarray:
-        if len(plans) == 0:
-            raise ValueError("select_plan received an empty plan list")
-
-        rewards = []
-        with torch.no_grad():
-            for plan in plans:
-                if isinstance(plan, torch.Tensor):
-                    plan_tensor = plan.detach().float().to(self.device)
-                else:
-                    plan_np = np.ascontiguousarray(plan, dtype=np.float32)
-                    plan_tensor = torch.from_numpy(plan_np).to(self.device)
-                reward = self.model.predict(plan_tensor, self.lam)
-                rewards.append(float(reward.detach().cpu()))
-
-        return np.asarray(plans[int(np.argmax(rewards))], dtype=np.float32).copy()
-"""
 
 def check(env):
     print("Reward type:", getattr(env, 'reward_type', 'Not found'))
@@ -469,19 +408,11 @@ def rollout(env_name,
                      if(selector is None):
                          x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                      else:
-                        
-                         x = sample_selected_plan(
-                                 current_state_norm, model, d_s, d_a, horizon,
-                                 steps_T, num_karras, eta, device, selector,
-                          )
+                         x = selector.sample_selected_plan(
+                                current_state_norm, model, d_s, d_a, horizon,
+                                steps_T, num_karras, eta, device,
+                            )
                          
-                         """
-                         Plans = [
-                               sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
-                               for _ in range(selector.n_candidates)
-                            ]
-                         x = selector.select_plan(Plans)
-                         """
                      for k in range(min(chunk_size, len(x))):
                          Temp_acts.append(x[k, d_s:(d_s+d_a)].copy())
                      for k in range(1, min(chunk_size, len(x))):
@@ -505,13 +436,11 @@ def rollout(env_name,
                 if(selector is None):
                     x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                 else:
-                    """
-                    x = sample_selected_plan(
-                        current_state_norm, model, d_s, d_a, horizon,
-                        steps_T, num_karras, eta, device, selector,
-                    )
-                    """
-                    x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                    
+                    x = selector.sample_selected_plan(
+                                current_state_norm, model, d_s, d_a, horizon,
+                                steps_T, num_karras, eta, device,
+                            )
 
                 action = x[0, d_s:(d_s+d_a)].copy()
                 generated_state = x[1, :d_s].copy()
@@ -694,8 +623,9 @@ if __name__ == "__main__":
                     num_hidden_layers_critic=4,
                     hidden_dim_critic=512,
             )
-   
-    #set_seed(1)
+    
+    """
+    set_seed(1)
     selector = Selector(
                 env_name,
                 specific_train_dataset,
@@ -707,12 +637,12 @@ if __name__ == "__main__":
                 lam=0.0,
                 n_candidates=50,
             )
-    """
+    
     return_value, length = rollout(
             env_name,
             specific_train_dataset,
             horizon,
-            num_layers=2,
+            num_layers = 2,
             steps_T = 10,
             num_karras = 1,
             eta=0.0,
@@ -729,6 +659,17 @@ if __name__ == "__main__":
    # print(length)
     exit()
     """
+    selector = Selector(
+                env_name,
+                specific_train_dataset,
+                RConfig,
+                reward_checkpoint=0,
+                kernel_checkpoint=0,
+                critic_checkpoint=checkpoint,   # omit or None to use TotalReward only
+                task_id=task_id,
+                lam=0.0,
+                n_candidates=50,
+            )
     total = 0.0
     for i in range(1, 101):
          set_seed(i)
@@ -756,35 +697,7 @@ if __name__ == "__main__":
     print(f"Success Rate: {total / 100 :.4f}")
     exit()
 
-    for i in range(1, 101):
-       set_seed(i)
-       chunk_size_index = 0
-       while(chunk_size_index < len(chunk_size2)):
-           return_value, _ = rollout(
-                  env_name, 
-                  specific_train_dataset, 
-                  horizon, 
-                  num_layers = 2,
-                  steps_T = 10, 
-                  num_karras = 1, 
-                  eta = 0.0, 
-                  episode_length = 3000, 
-                  checkpoint_steps = checkpoint, 
-                  render = False,  
-                  base_seed = 1, 
-                  #goal_cell = np.array([6, 1], dtype = int), 
-                  task_id = task_id,
-                  continual_rollout = True,
-                  chunk_size = chunk_size2[chunk_size_index],
-                  device = device)
-           chunk_size_index += 1
-           if(return_value == 1.0):
-                print(f"chunk_size: {chunk_size2[chunk_size_index-1]}")
-                total_return += 1
-                break
-       
-       print(return_value)
-    print(f"Total return: {total_return / 100 :.4f}")
+    
     
 
 

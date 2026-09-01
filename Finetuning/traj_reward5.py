@@ -698,7 +698,7 @@ class TotalReward_Critic(nn.Module):
             
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward, gradient
-
 """
+
 
 
