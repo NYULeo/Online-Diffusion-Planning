@@ -123,6 +123,7 @@ def set_seed(seed: int) -> None:
 
 @hydra.main(version_base="1.3", config_path="conf", config_name="cube_single")
 def main(config: DictConfig) -> None:
+    os.chdir(REPO_ROOT)
     OmegaConf.set_struct(config, True)
     resolved = OmegaConf.to_container(config, resolve=True)
     if not isinstance(resolved, dict):

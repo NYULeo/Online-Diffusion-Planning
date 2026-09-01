@@ -23,6 +23,7 @@ def optional_array(value):
 
 @hydra.main(version_base="1.3", config_path="../Finetuning/conf", config_name="cube_single")
 def main(config: DictConfig) -> None:
+    os.chdir(REPO_ROOT)
     OmegaConf.set_struct(config, True)
     print(OmegaConf.to_yaml(config, resolve=True))
     if config.run.validate_only:

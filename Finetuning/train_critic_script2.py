@@ -20,6 +20,7 @@ from Pretrain.utils import init_wandb_run, set_seed
 
 @hydra.main(version_base="1.3", config_path="conf", config_name="cube_single")
 def main(config: DictConfig) -> None:
+    os.chdir(REPO_ROOT)
     OmegaConf.set_struct(config, True)
     if int(os.environ.get("RANK", "0")) == 0:
         print(OmegaConf.to_yaml(config, resolve=True))

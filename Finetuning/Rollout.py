@@ -600,6 +600,7 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
 
 @hydra.main(version_base="1.3", config_path="conf", config_name="cube_single")
 def main(config: DictConfig) -> None:
+    os.chdir(project_root)
     OmegaConf.set_struct(config, True)
     print(OmegaConf.to_yaml(config, resolve=True))
     if config.run.validate_only:
