@@ -88,7 +88,8 @@ cd "$REPO/Pretrain"
 
 #pretrain planner
 stage "1 PRETRAIN"
-CUDA_VISIBLE_DEVICES=0 python pretrain_script4.py 2>&1 | tee "$LOGDIR/1_pretrain.log"
+CUDA_VISIBLE_DEVICES=0,1,2,3 python pretrain_script4.py --config-name cube_single \
+  2>&1 | tee "$LOGDIR/1_pretrain.log"
 
 #train reward
 stage "2 REWARD"

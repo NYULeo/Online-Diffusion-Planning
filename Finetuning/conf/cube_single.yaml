@@ -19,6 +19,7 @@ planner_pretrain:
   horizon: 32
   backbone_name: transformer
   backbone_layers: 2
+  data_parallel: true
   num_steps: 1000000
   batch_size: 128
   lr: 0.0002

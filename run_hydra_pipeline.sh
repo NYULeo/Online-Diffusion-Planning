@@ -19,7 +19,7 @@ require_artifact() {
   echo "Artifact OK: $artifact"
 }
 
-CUDA_VISIBLE_DEVICES=0 python Pretrain/pretrain_script4.py \
+CUDA_VISIBLE_DEVICES=0,1,2,3 python Pretrain/pretrain_script4.py \
   --config-name "$CONFIG_NAME" 2>&1 | tee "$LOG_DIR/1_pretrain.log"
 require_artifact "$REPO/Finetuning/Planners/cube/single-play/Cube_SinglePlay_task4_Planner_0.pt"
 

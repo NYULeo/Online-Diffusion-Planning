@@ -45,7 +45,8 @@ class SDETrainer:
         s: float = 0.008,                  # cosine offset
         weight_type: str = 'sigma2',         # {"one", "sigma2", "beta"}
         eps: float = 1e-5,               # clamp for t, ᾱ stability
-        stride: Optional[int] = 1
+        stride: Optional[int] = 1,
+        data_parallel: bool = False,
     ):
         self.device = device
         self.dataset_name = dataset_name
@@ -88,6 +89,15 @@ class SDETrainer:
              + "_checkpoints",
         )
         self.loss_tracker = LossTracker(save_dir="./logs/")
+        self.data_parallel = bool(data_parallel and torch.cuda.device_count() > 1)
+        if self.data_parallel:
+            self.model = torch.nn.DataParallel(self.model)
+            print(f"Planner DataParallel enabled on {torch.cuda.device_count()} GPUs")
+
+    def base_model(self):
+        if isinstance(self.model, torch.nn.DataParallel):
+            return self.model.module
+        return self.model
     
     def save_hyperparameters(self, filepath: Optional[str] = None):
         if filepath is None:
@@ -127,6 +137,7 @@ class SDETrainer:
              'T_max': self.num_steps if hasattr(self.scheduler, 'T_max') else None
         }
     
+        model_for_info = self.base_model()
        # Get model architecture info
         model_info = {
              'backbone_name': self.backbone_name,
@@ -136,16 +147,16 @@ class SDETrainer:
          }
     
         # Add backbone-specific parameters if available
-        if hasattr(self.model, 'in_dim'):
-              model_info['model_in_dim'] = int(self.model.in_dim)
-        if hasattr(self.model, 'emb_dim'):
-              model_info['model_emb_dim'] = int(self.model.emb_dim)
-        if hasattr(self.model, 'd_model'):
-              model_info['model_d_model'] = int(self.model.d_model)
-        if hasattr(self.model, 'n_heads'):
-              model_info['model_n_heads'] = int(self.model.n_heads)
-        if hasattr(self.model, 'depth'):
-              model_info['model_depth'] = int(self.model.depth)
+        if hasattr(model_for_info, 'in_dim'):
+              model_info['model_in_dim'] = int(model_for_info.in_dim)
+        if hasattr(model_for_info, 'emb_dim'):
+              model_info['model_emb_dim'] = int(model_for_info.emb_dim)
+        if hasattr(model_for_info, 'd_model'):
+              model_info['model_d_model'] = int(model_for_info.d_model)
+        if hasattr(model_for_info, 'n_heads'):
+              model_info['model_n_heads'] = int(model_for_info.n_heads)
+        if hasattr(model_for_info, 'depth'):
+              model_info['model_depth'] = int(model_for_info.depth)
     
         # Compile all hyperparameters
         hyperparams = {
@@ -162,6 +173,7 @@ class SDETrainer:
                 'batch_size': self.batch_size,
                 'lr': self.lr,
                 'gradient_accumulate_every': self.gradient_accumulate_every,
+                'data_parallel': self.data_parallel,
                 'optimizer': optimizer_params,
                 'scheduler': scheduler_params,
             },
@@ -201,13 +213,13 @@ class SDETrainer:
               self.model = TemporalUnet(self.horizon, self.Dimension).to(self.device)
               
     def reset_parameters(self):
-        self.ema_model.load_state_dict(self.model.state_dict())
+        self.ema_model.load_state_dict(self.base_model().state_dict())
 
     def step_ema(self):
         if self.step < self.step_start_ema:
             self.reset_parameters()
             return
-        self.ema.update_model_average(self.ema_model, self.model)
+        self.ema.update_model_average(self.ema_model, self.base_model())
     
 
     """

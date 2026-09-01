@@ -51,6 +51,7 @@ def main(config: DictConfig) -> None:
             lr=planner.lr,
             device=device,
             stride=planner.stride,
+            data_parallel=planner.data_parallel,
         )
         trainer.train()
     finally:
