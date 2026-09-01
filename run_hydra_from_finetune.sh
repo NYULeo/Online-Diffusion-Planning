@@ -47,15 +47,11 @@ export NCCL_BLOCKING_WAIT=1
 export NCCL_ASYNC_ERROR_HANDLING=1
 
 echo "======== FINETUNE ========"
-python Finetuning/finetune_script.py --config-name "$CONFIG_NAME" run.validate_only=true
+python Finetuning/finetune_script2.py --config-name "$CONFIG_NAME" run.validate_only=true
 accelerate launch --multi_gpu --num_processes=4 \
   --num_machines=1 --mixed_precision=bf16 --dynamo_backend=no \
-  Finetuning/finetune_script.py --config-name "$CONFIG_NAME" \
+  Finetuning/finetune_script2.py --config-name "$CONFIG_NAME" \
   2>&1 | tee "$LOG_DIR/6_finetune.log"
 require_artifact "$REPO/Finetuning/Planners/cube/single-play/Cube_SinglePlay_task4_Planner_60.pt"
-
-echo "======== ROLLOUT ========"
-CUDA_VISIBLE_DEVICES=0 python Finetuning/Rollout.py \
-  --config-name "$CONFIG_NAME" 2>&1 | tee "$LOG_DIR/7_rollout.log"
 
 echo "Pipeline from finetune completed successfully."

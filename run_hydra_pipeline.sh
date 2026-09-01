@@ -19,16 +19,16 @@ require_artifact() {
   echo "Artifact OK: $artifact"
 }
 
-CUDA_VISIBLE_DEVICES=0 python Pretrain/pretrain_script2.py \
+CUDA_VISIBLE_DEVICES=0 python Pretrain/pretrain_script4.py \
   --config-name "$CONFIG_NAME" 2>&1 | tee "$LOG_DIR/1_pretrain.log"
 require_artifact "$REPO/Finetuning/Planners/cube/single-play/Cube_SinglePlay_task4_Planner_0.pt"
 
-CUDA_VISIBLE_DEVICES=0 python Pretrain/train_reward_script2.py \
+CUDA_VISIBLE_DEVICES=0 python Pretrain/train_reward_script.py \
   --config-name "$CONFIG_NAME" 2>&1 | tee "$LOG_DIR/2_reward.log"
 require_artifact "$REPO/Finetuning/Rewards/cube/single/Models/Cube_Single_Task4_Reward_0.pkl"
 require_artifact "$REPO/Finetuning/Rewards/cube/single/Stats/Cube_Single_Task4_Reward_stats_0.pkl"
 
-CUDA_VISIBLE_DEVICES=1 python Pretrain/train_kernel_script2.py \
+CUDA_VISIBLE_DEVICES=1 python Pretrain/train_kernel_script.py \
   --config-name "$CONFIG_NAME" 2>&1 | tee "$LOG_DIR/3_kernel.log"
 require_artifact "$REPO/Finetuning/Kernels/cube/single/Models/0/Cube_Single_Kernel_0.pkl"
 require_artifact "$REPO/Finetuning/Kernels/cube/single/Stats/Cube_Single_Kernel_stats_0.pkl"
@@ -52,12 +52,9 @@ export NCCL_TIMEOUT=1000000
 export NCCL_BLOCKING_WAIT=1
 export NCCL_ASYNC_ERROR_HANDLING=1
 
-python Finetuning/finetune_script.py --config-name "$CONFIG_NAME" run.validate_only=true
+python Finetuning/finetune_script2.py --config-name "$CONFIG_NAME" run.validate_only=true
 accelerate launch --multi_gpu --num_processes=4 \
   --num_machines=1 --mixed_precision=bf16 --dynamo_backend=no \
-  Finetuning/finetune_script.py --config-name "$CONFIG_NAME" \
+  Finetuning/finetune_script2.py --config-name "$CONFIG_NAME" \
   2>&1 | tee output.txt "$LOG_DIR/6_finetune.log"
 require_artifact "$REPO/Finetuning/Planners/cube/single-play/Cube_SinglePlay_task4_Planner_60.pt"
-
-CUDA_VISIBLE_DEVICES=0 python Finetuning/Rollout.py \
-  --config-name "$CONFIG_NAME" 2>&1 | tee "$LOG_DIR/7_rollout.log"
