@@ -1,4 +1,5 @@
 import os
+import time
 REPO_ROOT = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..")
 )
@@ -290,6 +291,8 @@ class SDETrainer:
               p.requires_grad_(False)
         self.step = 0
         total_loss = 0
+        timing_started = time.perf_counter()
+        timed_steps = 0
         while(self.step < self.num_steps):
             for i in range(self.gradient_accumulate_every):
                 traj, cond = next(dataloader)
@@ -301,6 +304,7 @@ class SDETrainer:
             self.optim.zero_grad()
             self.scheduler.step()
             total_loss += loss.item()
+            timed_steps += 1
             self.loss_tracker.log_loss(self.step, loss.item(), self.optim.param_groups[0]['lr'])
 
             if ((self.step % self.update_ema_every) == 0):
@@ -308,12 +312,20 @@ class SDETrainer:
             
             if ((self.step % self.log_freq) == 0):
                 logged_loss = total_loss / self.log_freq
-                print(f"step {self.step} loss {logged_loss}")
+                elapsed = max(time.perf_counter() - timing_started, 1e-8)
+                steps_per_second = timed_steps / elapsed
+                print(f"step {self.step} loss {logged_loss} steps/s {steps_per_second:.3f}")
                 wandb_log(
-                    {"planner/loss": logged_loss, "planner/lr": self.optim.param_groups[0]['lr']},
+                    {
+                        "planner/loss": logged_loss,
+                        "planner/lr": self.optim.param_groups[0]['lr'],
+                        "planner/steps_per_second": steps_per_second,
+                    },
                     step=self.step,
                 )
                 total_loss = 0
+                timing_started = time.perf_counter()
+                timed_steps = 0
             
             if ((self.step % self.save_freq == 0) and (self.step!=0)):
                 self.save(self.step)

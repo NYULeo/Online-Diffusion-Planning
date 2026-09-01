@@ -27,6 +27,12 @@ def main(config: DictConfig) -> None:
 
     env = config.environment
     planner = config.planner_pretrain
+    actual_effective_batch = planner.batch_size * planner.gradient_accumulate_every
+    if actual_effective_batch != planner.effective_batch_size:
+        raise ValueError(
+            "planner_pretrain.batch_size * gradient_accumulate_every must equal "
+            f"effective_batch_size ({actual_effective_batch} != {planner.effective_batch_size})"
+        )
     set_seed(int(config.run.seed))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     wandb_run = init_wandb_run(
@@ -48,6 +54,7 @@ def main(config: DictConfig) -> None:
             backbone_layers=planner.backbone_layers,
             num_steps=planner.num_steps,
             batch_size=planner.batch_size,
+            gradient_accumulate_every=planner.gradient_accumulate_every,
             lr=planner.lr,
             device=device,
             stride=planner.stride,
