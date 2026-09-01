@@ -659,6 +659,7 @@ if __name__ == "__main__":
    # print(length)
     exit()
     """
+    set_seed(1)
     selector = Selector(
                 env_name,
                 specific_train_dataset,
@@ -671,8 +672,9 @@ if __name__ == "__main__":
                 n_candidates=50,
             )
     total = 0.0
+    
     for i in range(1, 101):
-         set_seed(i)
+         #set_seed(1)
          return_value, length = rollout(
             env_name,
             specific_train_dataset,
@@ -684,7 +686,7 @@ if __name__ == "__main__":
             episode_length=5000,
             checkpoint_steps=checkpoint,
             render=False,
-            base_seed=1,
+            base_seed = 1,
             task_id=task_id,
             continual_rollout=True,
             chunk_size=15,
