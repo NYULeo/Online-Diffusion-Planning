@@ -46,7 +46,13 @@ def build_finetuning_config(config: dict[str, Any]) -> FinetuningConfig:
     am_values = dict(config["adjoint_matching"])
     am_runtime_fields = {
         name: am_values.pop(name)
-        for name in ("save_freq", "save_model_freq", "log_freq")
+        for name in (
+            "step_start_ema",
+            "ema_decay",
+            "save_freq",
+            "save_model_freq",
+            "log_freq",
+        )
     }
     am_config = Acc_AdjointMatchingConfig(**am_values)
     for name, value in am_runtime_fields.items():

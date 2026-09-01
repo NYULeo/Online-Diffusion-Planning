@@ -47,6 +47,7 @@ export NCCL_BLOCKING_WAIT=1
 export NCCL_ASYNC_ERROR_HANDLING=1
 
 echo "======== FINETUNE ========"
+python Finetuning/finetune_script.py --config-name "$CONFIG_NAME" run.validate_only=true
 accelerate launch --multi_gpu --num_processes=4 \
   --num_machines=1 --mixed_precision=bf16 --dynamo_backend=no \
   Finetuning/finetune_script.py --config-name "$CONFIG_NAME" \
