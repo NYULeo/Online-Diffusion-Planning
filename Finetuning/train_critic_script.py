@@ -18,7 +18,6 @@ import pickle
 from scipy.ndimage import gaussian_filter1d
 from Pretrain.Dataset import get_dataset
 import ogbench
-from Finetuning.Rollout import load_success_trajs
 from Finetuning.utils import (
     train_critic_with_reward,
     train_critic_with_planner,
