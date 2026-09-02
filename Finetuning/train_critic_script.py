@@ -136,7 +136,7 @@ if __name__ == '__main__':  # pragma: no cover
               "batch_size", "num_steps", "gamma", "lam", "horizon", "lr", "min_lr", "tau",
               "old_step", "new_step", "momentum", "value_scale", "task_id",
        )
-
+       os.chdir(project_root)
        train_critic_with_reward(
               trajs=trajs,
               **{k: hp[k] for k in trainer_keys},
