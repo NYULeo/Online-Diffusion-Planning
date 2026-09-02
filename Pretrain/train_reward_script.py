@@ -39,7 +39,7 @@ def check_cube_single_goal_reach(trajs, task_id):
 
 
 
-
+"""
 if __name__ == '__main__':
     set_seed(1)
     
@@ -81,8 +81,58 @@ if __name__ == '__main__':
                traj_length = traj_length, 
                save_freq = 30000, 
                num_steps = 30000)
+"""
 
 
+if __name__ == '__main__':
+    import wandb
+
+    set_seed(1)
+
+    dataset_name = 'cube'
+    specific_dataset = 'single'
+    task_id = 4
+    traj_length = None
+    hp = {
+        "dataset_name": dataset_name,
+        "specific_dataset": specific_dataset,
+        "task_id": task_id,
+        "traj_length": traj_length,
+        "hidden_layers": 4,
+        "hidden_dim": 512,
+        "batch_size": 256,
+        "num_steps": 30000,
+        "save_freq": 30000,
+        "lr": 5e-03,
+        "min_lr": 5e-04,
+        "sigma": 4.0,
+        "alpha": None,
+        "target_reward": 500.0,
+    }
+
+    # Initialize wandb
+    wandb.init(
+        entity="kaiwen_hu-uc-berkeley",
+        project="ODP",
+        name=f"{dataset_name}-{specific_dataset}-task{task_id}-reward",
+        config=hp,
+    )
+
+    train_keys = (
+        "dataset_name", "hidden_layers", "hidden_dim", "batch_size",
+        "num_steps", "save_freq", "lr", "min_lr", "sigma", "alpha",
+        "target_reward", "specific_dataset", "task_id", "traj_length",
+    )
+    train_reward(**{k: hp[k] for k in train_keys})
+
+
+    test_keys = (
+        "dataset_name", "hidden_layers", "hidden_dim", "specific_dataset",
+        "sigma", "alpha", "target_reward", "task_id", "traj_length",
+        "save_freq", "num_steps",
+    )
+    test_Model(trajs=None, **{k: hp[k] for k in test_keys})
+    wandb.finish()
 
 
 """
