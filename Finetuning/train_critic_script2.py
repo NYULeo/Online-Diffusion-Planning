@@ -118,6 +118,7 @@ if __name__ == '__main__':  # pragma: no cover
         traj_length = 200
         horizon = 128
         task_id = 4
+        old_step = -1
         step = 0
         hp = {
               "dataset_name": env_name,
@@ -127,7 +128,7 @@ if __name__ == '__main__':  # pragma: no cover
               "horizon": horizon,              # eval only
               "planner_checkpoint": 0,
               "reward_checkpoint": 0,
-              "old_critic_checkpoint": 0,
+              "old_critic_checkpoint": old_step,
               "backbone_layers": 2,
               "hidden_layers": 4,
               "hidden_dim": 512,
