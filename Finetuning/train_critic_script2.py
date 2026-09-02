@@ -365,8 +365,8 @@ if __name__ == '__main__':  # pragma: no cover
               "min_log_prob": -110.0, 
           }
        
-
         accelerator = Accelerator(mixed_precision='bf16')
+        os.chdir(project_root)
         if accelerator.is_main_process:
               wandb.init(
                  entity="kaiwen_hu-uc-berkeley",
