@@ -133,10 +133,10 @@ if __name__ == '__main__':  # pragma: no cover
               "hidden_dim": 512,
               "reward_hidden_layers": 4,
               "reward_hidden_dim": 512,
-              "batch_size": 256,
-              "oversample": 30,
-              "num_steps": 10,
-              "resample_every": 1,
+              "batch_size": 64,
+              "oversample": 20,
+              "num_steps": 100,
+              "resample_every": 2,
               "train_horizon": 32,             # passed as horizon= to the trainer
               "gamma": 0.99,
               "lam": None,
@@ -148,7 +148,7 @@ if __name__ == '__main__':  # pragma: no cover
               "num_karras": 1,
               "eta": 0.0,
               "new_step": step,
-              "log_every": 1,
+              "log_every": 20,
               # kernel
               "kernel_type": "mog",
               "kernel_checkpoint": 0,
