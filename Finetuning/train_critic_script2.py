@@ -192,6 +192,7 @@ if __name__ == '__main__':  # pragma: no cover
          )
 
         train_critic_with_planner7(
+                   trajs = trajs,
                    max_length = traj_length,
                    kernel_config=kernel_config,
                    horizon=hp["train_horizon"],

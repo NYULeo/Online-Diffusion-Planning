@@ -6657,6 +6657,7 @@ def train_critic_with_planner6(
 
 
 def train_critic_with_planner7(
+    trajs: List[TrajectoryDict],
     dataset_name: str,
     specific_dataset: str,
     max_length: int,
@@ -6937,8 +6938,6 @@ def train_critic_with_planner7(
         )
     else:
         if is_main:
-            data = get_dataset(dataset_name, specific_dataset, task_id = task_id)
-            trajs = data.get_trajectories()
             critic_stat = obtain_and_save_critic_stats(
                 trajs, dataset_name, specific_dataset, task_id, step=0
             )
@@ -6988,14 +6987,14 @@ def train_critic_with_planner7(
     running = 0.0
     total_mae = 0.0
     total_bias = 0.0
-    n_resamples = max(1, num_steps // resample_every)
-    increments = max(1, (max_length + n_resamples - 1) // n_resamples)  # ceil
+    #n_resamples = max(1, num_steps // resample_every)
+    #increments = max(1, (max_length + n_resamples - 1) // n_resamples)  # ceil
     for k in range(1, num_steps + 1):
         if (k - 1) % resample_every == 0:
-            resample_idx = (k - 1) // resample_every + 1  
-            traj_length = min(increments * resample_idx, max_length)
-            data = get_dataset(dataset_name, specific_dataset, task_id = task_id, traj_length = traj_length)
-            trajs = data.get_trajectories()
+            
+            #n_resamples = max(1, num_steps // resample_every)
+            #increments = max(1, (max_length + n_resamples - 1) // n_resamples)  # ceil
+        
             s0_pool = np.concatenate(
                     [t['observations'] for t in trajs], axis=0,
             ).astype(np.float32)
