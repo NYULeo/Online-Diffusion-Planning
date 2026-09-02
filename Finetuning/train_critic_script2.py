@@ -193,7 +193,6 @@ if __name__ == '__main__':  # pragma: no cover
 
         train_critic_with_planner7(
                    trajs = trajs,
-                   max_length = traj_length,
                    kernel_config=kernel_config,
                    horizon=hp["train_horizon"],
                    accelerator=accelerator,
@@ -211,7 +210,7 @@ if __name__ == '__main__':  # pragma: no cover
                 critic_checkpoint=hp["new_step"],
                 gamma=hp["gamma"],
                 horizon=hp["horizon"],
-                value_scale=1.0,
+                value_scale=5.0,
                 sigma=4.0,
                 target_reward=500.0,
                 trajs=trajs,

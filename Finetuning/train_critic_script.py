@@ -117,7 +117,7 @@ if __name__ == '__main__':  # pragma: no cover
               "tau": 0.005,
               "old_step": None,
               "new_step": step,
-              "value_scale": 1.0,
+              "value_scale": 5.0,
               "momentum": 0.005,
           }
 

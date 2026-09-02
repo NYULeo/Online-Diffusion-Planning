@@ -2674,8 +2674,6 @@ def check_success_rate(trajs: List[TrajectoryDict]):
     return success / len(trajs)
  
 
-
-
 def check_device():
     if torch.backends.mps.is_available():
         device = torch.device("mps")
@@ -2688,7 +2686,7 @@ def check_device():
         print("⚠️  Falling back to CPU (no GPU acceleration)")
     return device 
 
-      
+    
 def compute_threshold_mahalanobis(kernels, dataloader, quantile):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     all_D2_total = []
@@ -6660,7 +6658,6 @@ def train_critic_with_planner7(
     trajs: List[TrajectoryDict],
     dataset_name: str,
     specific_dataset: str,
-    max_length: int,
     planner_checkpoint: int,
     reward_checkpoint: int,
     old_critic_checkpoint: Optional[int],
@@ -6963,7 +6960,7 @@ def train_critic_with_planner7(
         running_tgt_std = q_stats.Q_std
     """
     
-    #Scale = get_Q_scale(dataset_name, specific_dataset, task_id)
+    Scale = get_Q_scale(dataset_name, specific_dataset, task_id)
     running_tgt_mean = torch.zeros(1, device=device)
     running_tgt_std = torch.ones(1, device=device)
     
@@ -7042,7 +7039,7 @@ def train_critic_with_planner7(
             
               # reward clipping -----------------------------------------------------
               r_hat = torch.clamp(r_hat, 0.0, float('inf'))      # adjust bounds if needed
-              #r_hat = r_hat / Scale.Q_scale                     # or use a running std
+              r_hat = r_hat / Scale.Q_scale                     # or use a running std
         
               plan_targets = torch.zeros(N, device=device)
 
