@@ -6959,6 +6959,10 @@ def train_critic_with_planner7(
         running_tgt_mean = q_stats.Q_mean
         running_tgt_std = q_stats.Q_std
     """
+
+    s0_pool = np.concatenate(
+                    [t['observations'] for t in trajs], axis=0,
+    ).astype(np.float32)
     
     Scale = get_Q_scale(dataset_name, specific_dataset, task_id)
     running_tgt_mean = torch.zeros(1, device=device)
@@ -6992,9 +6996,6 @@ def train_critic_with_planner7(
             #n_resamples = max(1, num_steps // resample_every)
             #increments = max(1, (max_length + n_resamples - 1) // n_resamples)  # ceil
         
-            s0_pool = np.concatenate(
-                    [t['observations'] for t in trajs], axis=0,
-            ).astype(np.float32)
             with torch.no_grad():
               plans, _ = _generate_feasible_plans_parallel(
                 s0_pool=s0_pool,
