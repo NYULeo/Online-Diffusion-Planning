@@ -668,7 +668,7 @@ if __name__ == "__main__":
                     hidden_dim_critic=512,
             )
 
-    #set_seed(1)
+    set_seed(1)
     
     
     selector = Selector(
