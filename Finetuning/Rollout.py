@@ -10,8 +10,16 @@ import mediapy as media
 from Pretrain.Dataset import get_env
 from Pretrain.Planners.Backbone.Dit import DiT1d
 from torch.utils.data import DataLoader
-from Finetuning.utils import cycle
-from Finetuning.utils import get_planner, PlannerDataset, get_current_state, reward_processor, check_device
+from Finetuning.utils import (
+    cycle,
+    get_planner,
+    PlannerDataset,
+    get_current_state,
+    reward_processor,
+    check_device,
+    #set_seed,
+    #configure_precision,
+)
 from Pretrain.Dataset import Planner_Processor, get_dataset
 from Pretrain.Planners.Backbone.Sampler import sample_reverse_sde, sample_euler_karras, sample_euler_karras2
 import pickle
@@ -24,7 +32,68 @@ from typing import Optional, List
 from dataclasses import dataclass
 from typing import List
 from Finetuning.traj_reward5 import TotalReward_Critic, RewardConfig, TotalReward
-from Finetuning.Raw import Selector
+#from Finetuning.Raw import Selector
+
+class Selector:
+    def __init__(
+        self,
+        env_name,
+        specific_env,
+        RConfig: RewardConfig,
+        reward_checkpoint: int,
+        kernel_checkpoint: int,
+        critic_checkpoint: Optional[int] = None,
+        task_id: Optional[int] = None,
+        lam: float = 0.0,
+        n_candidates: int = 30,
+    ):
+        self.env_name = env_name
+        self.specific_env = specific_env
+        self.RConfig = RConfig
+        self.task_id = task_id
+        self.lam = lam
+        self.n_candidates = n_candidates
+        self.device = check_device()
+
+        if critic_checkpoint is not None:
+            self.model = TotalReward_Critic(
+                self.device,
+                RConfig,
+                env_name,
+                specific_env,
+                reward_checkpoint,
+                kernel_checkpoint,
+                critic_checkpoint,
+                task_id,
+            )
+        else:
+            self.model = TotalReward(
+                self.device,
+                RConfig,
+                env_name,
+                specific_env,
+                reward_checkpoint,
+                kernel_checkpoint,
+                task_id,
+            )
+        self.model.eval()
+
+    def select_plan(self, plans: List[np.ndarray]) -> np.ndarray:
+        if len(plans) == 0:
+            raise ValueError("select_plan received an empty plan list")
+
+        rewards = []
+        with torch.no_grad():
+            for plan in plans:
+                if isinstance(plan, torch.Tensor):
+                    plan_tensor = plan.detach().float().to(self.device)
+                else:
+                    plan_np = np.ascontiguousarray(plan, dtype=np.float32)
+                    plan_tensor = torch.from_numpy(plan_np).to(self.device)
+                reward = self.model.predict(plan_tensor, self.lam)
+                rewards.append(float(reward.detach().cpu()))
+
+        return np.asarray(plans[int(np.argmax(rewards))], dtype=np.float32).copy()
 
 
 
@@ -47,36 +116,6 @@ def check(env):
     print(f"Current distance to goal: {dist:.4f}")
     print(f"Reward will be +1 if distance <= 0.5 → Currently: {dist <= 0.5}")
 
-def check_cube_single_goal_reach(trajs, task_id):   
-    goals = {'task_1': np.array( [ 0.0,       -1.0,        0.199599]), 
-         'task_2': np.array([7.50000000e-01, 8.02418254e-18, 1.99598996e-01]),
-         'task_3': np.array([-7.50000000e-01,  1.21832368e-19,  1.99598996e-01]),
-         'task_4': np.array([0.75,     2.0,       0.199599]),
-         'task_5': np.array([ 0.75,     -2.0,        0.199599])}
-    
-    total_dist = 0.0
-    for traj in trajs:
-           position = traj['observations'][-1][19:22]
-           total_dist += np.linalg.norm(position - goals[f"task_{task_id}"])
-    average_dist = total_dist/len(trajs)
-    print(f"Task {task_id} average distance: {average_dist}")
-
-def check_cube_double_goal_reach(trajs, task_id):   
-    goals = {   'task_1': [np.array([0.00000000e+00, 4.40762988e-19, 1.99598996e-01]),  np.array([0.0,   1.0,   0.199599])], 
-                'task_2': [np.array([-0.75,      1.0,        0.199599]),  np.array([0.75,     1.0,       0.199599])],
-                'task_3': [np.array([0.0,       -2.0,        0.199599]),  np.array([0.0,      2.0,       0.199599])],
-                'task_4': [np.array([0.0,        1.0,        0.199599]),  np.array([0.0,       -1.0,        0.199599])],
-                'task_5': [np.array([0.00000000e+00,  -3.99397428e-18,   1.99213779e-01]),  np.array([0.00000000e+00,   9.37726514e-18,   5.99039293e-01])]     }
-    total_dist = 0.0
-    for traj in trajs:
-           position_1 = traj['observations'][-1][19:22]
-           position_2 = traj['observations'][-1][28:31]
-           dist_1 = np.linalg.norm(position_1 - goals[f"task_{task_id}"][0])
-           dist_2 = np.linalg.norm(position_2 - goals[f"task_{task_id}"][1])
-           total_dist += dist_1 + dist_2
-    average_dist = total_dist/len(trajs)
-    print(f"Task {task_id} average distance: {average_dist}")
-
 def get_normalized_score(score, min_score,  max_score):
     return (100 * ((score - min_score) / (max_score - min_score)))
 
@@ -88,9 +127,6 @@ class Kernel_Config:
     type_kernel: str = 'robust' or 'mog'
     kernel_num_modes: Optional[int] = 8
     kernel_noise_floor: Optional[float] = 1e-4
-
-def feasibility_check(generated_state, new_state):
-    return np.linalg.norm(generated_state - new_state)
 
 def get_success_trajs(trajs):
     success_trajs = []
@@ -122,166 +158,6 @@ def render(dataset_name, specific_dataset, traj, goal_cell, start_cell):
      media.write_video("demo2.mp4", frames, fps=50)
      env.close()
 
-def test_rollout_fit_for_model(traj, dataset_name=None, specific_dataset=None, 
-                                reward_checkpoint=0, kernel_checkpoint=0, 
-                                critic_checkpoint=0, device=None):
-    """
-    Calculate average log probability, average reward, and average critic value 
-    for a trajectory using the reward, kernel, and critic models.
-    
-    Args:
-        traj: Trajectory dictionary with 'observations', 'actions', and 'rewards'
-        dataset_name: Name of the dataset (e.g., 'kitchen', 'pointmaze')
-        specific_dataset: Specific dataset variant (e.g., 'partial', 'medium')
-        reward_checkpoint: Checkpoint step for reward model
-        kernel_checkpoint: Checkpoint step for kernel model
-        critic_checkpoint: Checkpoint step for critic model
-        device: torch device (defaults to cuda if available, else cpu)
-    
-    Returns:
-        dict: {
-            'avg_log_prob': float,    # Average log probability from kernel model
-            'avg_reward': float,      # Average reward from reward model
-            'avg_critic': float       # Average critic value from critic model
-        }
-    """
-    if device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
-    if dataset_name is None or specific_dataset is None:
-        raise ValueError("dataset_name and specific_dataset must be provided")
-    
-    # Load reward model and stats
-    from Finetuning.utils import (get_reward_model, get_reward_stats, get_kernel, 
-                                   get_kernel_stats, get_critic_model, get_critic_stats)
-    from Pretrain.Rewards.nets import SimpleReward
-    from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel
-    from Pretrain.Critic.nets import Critic
-    from Pretrain.Dataset import get_env
-    
-    reward_state_dict, obs_dim, act_dim = get_reward_model(dataset_name, specific_dataset, reward_checkpoint)
-    reward_net = SimpleReward(obs_dim, act_dim).to(device)
-    reward_net.load_state_dict(reward_state_dict)
-    reward_net.eval()
-    reward_stats = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint)
-    
-    # Load kernel models and stats
-    kernel_state_dicts, _, _ = get_kernel(dataset_name, specific_dataset, kernel_checkpoint)
-    kernels = []
-    for kernel_state_dict in kernel_state_dicts:
-        kernel_net = RobustTransitionKernel(obs_dim, act_dim).to(device)
-        kernel_net.load_state_dict(kernel_state_dict)
-        kernel_net.eval()
-        kernels.append(kernel_net)
-    kernel_stats = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
-    
-    # Load critic model and stats
-    critic_state_dict, critic_obs_dim = get_critic_model(dataset_name, specific_dataset, critic_checkpoint)
-    critic_net = Critic(critic_obs_dim).to(device)
-    critic_net.load_state_dict(critic_state_dict)
-    critic_net.eval()
-    critic_stats = get_critic_stats(dataset_name, specific_dataset, critic_checkpoint)
-    
-    observations = traj['observations']
-    actions = traj['actions']
-    
-    # Calculate average log probability, average reward, and average critic value
-    total_log_prob = 0.0
-    total_reward = 0.0
-    total_critic = 0.0
-    num_transitions = len(actions)
-    num_states = len(observations)
-    
-    with torch.no_grad():
-        for t in range(num_transitions):
-            # Get state, action, and next state
-            s = observations[t]
-            a = actions[t]
-            
-            # Compute reward
-            s_norm_reward = reward_stats.norm_obs(s)
-            s_tensor = torch.tensor(s_norm_reward, dtype=torch.float32, device=device).unsqueeze(0)
-            a_tensor = torch.tensor(a, dtype=torch.float32, device=device).unsqueeze(0)
-            r = reward_net(s_tensor, a_tensor)
-            total_reward += r.item()
-            
-            # Compute critic value for current state
-            # For pointmaze, critic uses only first 2 dimensions
-            """
-            if dataset_name == 'pointmaze':
-                s_critic = s[:2]
-            else:
-                s_critic = s
-            """
-            s_critic = s
-            s_norm_critic = critic_stats.norm_obs(s_critic)
-            s_critic_tensor = torch.tensor(s_norm_critic, dtype=torch.float32, device=device).unsqueeze(0)
-            v = critic_net(s_critic_tensor)
-            total_critic += v.item()
-            
-            # Skip if we don't have next state for log prob calculation
-            if t >= len(observations) - 1:
-                continue
-            
-            s_next = observations[t + 1]
-            
-            # Compute log probability using kernel ensemble
-            s_norm_kernel = kernel_stats.norm_obs(s)
-            s_next_norm_kernel = kernel_stats.norm_obs(s_next)
-            
-            s_tensor = torch.tensor(s_norm_kernel, dtype=torch.float32, device=device).unsqueeze(0)
-            a_tensor = torch.tensor(a, dtype=torch.float32, device=device).unsqueeze(0)
-            s_next_tensor = torch.tensor(s_next_norm_kernel, dtype=torch.float32, device=device).unsqueeze(0)
-            
-            # Average log prob across ensemble
-            ensemble_log_probs = []
-            for kernel in kernels:
-                mu, log_std = kernel(s_tensor, a_tensor)
-                lp = kernel.log_prob(s_next_tensor, mu, log_std)
-                ensemble_log_probs.append(lp.item())
-            
-            avg_log_prob_transition = np.mean(ensemble_log_probs)
-            total_log_prob += avg_log_prob_transition
-        
-        # Compute critic value for the last state (if not already computed)
-        if num_states > num_transitions:
-            s_final = observations[num_states - 1]
-            """
-            if dataset_name == 'pointmaze':
-                s_final_critic = s_final[:2]
-            else:
-                s_final_critic = s_final
-            """
-            s_final_critic = s_final
-            s_final_norm_critic = critic_stats.norm_obs(s_final_critic)
-            s_final_critic_tensor = torch.tensor(s_final_norm_critic, dtype=torch.float32, device=device).unsqueeze(0)
-            v_final = critic_net(s_final_critic_tensor)
-            total_critic += v_final.item()
-    
-    # Calculate averages
-    # For log prob, we have num_transitions-1 transitions (last step has no next state)
-    num_transitions_for_log_prob = num_transitions - 1 if num_transitions > 0 else 0
-    avg_log_prob = total_log_prob / num_transitions_for_log_prob if num_transitions_for_log_prob > 0 else 0.0
-    avg_reward = total_reward / num_transitions if num_transitions > 0 else 0.0
-    avg_critic = total_critic / num_states if num_states > 0 else 0.0
-    
-    return {
-        'avg_log_prob': avg_log_prob,
-        'avg_reward': avg_reward,
-        'avg_critic': avg_critic
-    }
-"""
-def set_seed(seed: int):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-    torch.use_deterministic_algorithms(True, warn_only=True)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-"""
 def set_seed(seed=0):
     # Python random
     random.seed(seed)
@@ -297,25 +173,6 @@ def set_seed(seed=0):
     # Set environment variable for additional reproducibility
     os.environ['PYTHONHASHSEED'] = str(seed)
 
-def save_trajs(trajs, env_name, specific_env, step):
-    os.makedirs(f'./Finetuning/Rollouts/{env_name}/{specific_env}/', exist_ok=True)
-    save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info_{str(step)}.pkl'
-    with open(save_path, 'wb') as f:
-         pickle.dump(trajs, f)
-    print(f"trajectories saved")
-
-def save_success_trajs_for_reward(trajs, env_name, specific_env, task_id, step):
-    save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{task_id}/trajs_task{task_id}_success_{step}.pkl'
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    with open(save_path, 'wb') as f:
-        pickle.dump(trajs, f)
-    print("trajectories saved")
-
-def load_success_trajs(env_name, specific_env, task_id, step):
-    save_path = f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{task_id}/trajs_task{task_id}_success_{step}.pkl'
-    with open(save_path, 'rb') as f:
-        trajs = pickle.load(f)
-    return trajs
 
 def rollout(env_name, 
             specific_env, 
@@ -374,13 +231,13 @@ def rollout(env_name,
      
      
      #reset
+     
      if(env_name == 'cube'):
          s0, info = env.reset(seed = base_seed, options = dict( task_id=task_id))
          #s0, info = env.reset(seed = base_seed)
          #s0, info = env.reset()
      elif(env_name == 'ogpointmaze'):
          s0, info = env.reset(seed = base_seed, options = dict( task_id=task_id))
-
      elif(goal_cell is not None and start_cell is not None):
          s0 = env.reset(seed = base_seed, options = {"goal_cell": goal_cell, "reset_cell": start_cell})
          #s0, info = env.reset( options = {"goal_cell": goal_cell, "reset_cell": start_cell})
@@ -388,7 +245,8 @@ def rollout(env_name,
          s0 = env.reset(seed = base_seed, options = {"goal_cell": goal_cell})
      else:
          s0 = env.reset(seed = base_seed)
-        #s0, info = env.reset()
+     
+     #s0, info = env.reset()
      
      
      current_state = get_current_state(s0[0], env_name)
@@ -408,10 +266,17 @@ def rollout(env_name,
                      if(selector is None):
                          x = sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
                      else:
+                         """
                          x = selector.sample_selected_plan(
                                 current_state_norm, model, d_s, d_a, horizon,
                                 steps_T, num_karras, eta, device,
                             )
+                         """
+                         Plans = [
+                               sample_euler_karras(current_state_norm, model, d_s, d_a, horizon, steps_T, num_karras, eta, device)
+                               for _ in range(selector.n_candidates)
+                            ]
+                         x = selector.select_plan(Plans)
                          
                      for k in range(min(chunk_size, len(x))):
                          Temp_acts.append(x[k, d_s:(d_s+d_a)].copy())
@@ -451,8 +316,6 @@ def rollout(env_name,
            
            
            current_state = get_current_state(obs.copy(), env_name)
-           if(generated_state is not None):
-                violation_scores.append(feasibility_check(generated_state, current_state.copy()))
            observations.append(current_state.copy())
            actions.append(action.copy())
            rewards.append(reward)
@@ -603,8 +466,8 @@ if __name__ == "__main__":
     checkpoint = 90
     total_reward = 0.0
     device = check_device()
+    #configure_precision()
     print(f"Using device {device}")
-    chunk_size2 = [5,6,7,8,9,10,11]
     total_return = 0.0
     
     RConfig = RewardConfig(
@@ -659,7 +522,7 @@ if __name__ == "__main__":
    # print(length)
     exit()
     """
-    set_seed(1)
+    #set_seed(1)
     selector = Selector(
                 env_name,
                 specific_train_dataset,
@@ -672,9 +535,9 @@ if __name__ == "__main__":
                 n_candidates=50,
             )
     total = 0.0
-    
+    set_seed(1)
     for i in range(1, 101):
-         #set_seed(1)
+         #set_seed(i)
          return_value, length = rollout(
             env_name,
             specific_train_dataset,
@@ -686,7 +549,7 @@ if __name__ == "__main__":
             episode_length=5000,
             checkpoint_steps=checkpoint,
             render=False,
-            base_seed = 1,
+            base_seed = i,
             task_id=task_id,
             continual_rollout=True,
             chunk_size=15,

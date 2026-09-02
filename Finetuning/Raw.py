@@ -46,12 +46,7 @@ import torch.nn.functional as F
 
 
 class Selector:
-    """Sample N plans in one reverse SDE, score them in one predict, pick argmax.
-
-    critic_checkpoint=None -> TotalReward; else TotalReward_Critic.
-    Critic decode: q_stats (Q_std * v + Q_mean) if present, else symexp(v).
-    """
-
+   
     def __init__(
         self,
         env_name,
@@ -297,6 +292,7 @@ class Selector:
 
 
 
+
 import pickle
 import torch
 from Pretrain.Critic.nets import Critic
@@ -488,12 +484,8 @@ def reward_heatmap(checkpoint: int = 0, show: bool = True):
     return out
 
 if __name__ == "__main__":
-    critic_heatmap(0)
+    critic_heatmap(21)
     #reward_heatmap(0)
-
-
-
-
 
 
 

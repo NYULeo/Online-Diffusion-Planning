@@ -495,8 +495,22 @@ class OnlineFinetuner():
                  drop_last=False,
           )
          s0_batch = next(iter(loader))  # torch.Tensor, shape (N, d_s) if enough data
-          # Optional safety: trim/pad logic if dataset is smaller than N
+         
+         """
+         self._s0_loader = getattr(self, "_s0_loader", None)
+         if self._s0_loader is None:
+             self._s0_loader = cycle(DataLoader(
+                   self.PlannerDataset,
+                   batch_size=number_of_generated_plans,
+                   shuffle=True,          # new permutation each epoch
+                   drop_last=True,
+                   generator=torch.Generator().manual_seed(self.config.seed + self.step),
+          ))
+         s0_batch = next(self._s0_loader)
+         """
+         # Optional safety: trim/pad logic if dataset is smaller than N
          s0_batch = s0_batch[:number_of_generated_plans]
+         
 
           #    Split s0 list across processes
          with self.accelerator.split_between_processes(s0_batch) as local_s0_batch:

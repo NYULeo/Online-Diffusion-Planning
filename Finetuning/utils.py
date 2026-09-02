@@ -2673,6 +2673,9 @@ def check_success_rate(trajs: List[TrajectoryDict]):
             success += 1
     return success / len(trajs)
  
+
+
+
 def check_device():
     if torch.backends.mps.is_available():
         device = torch.device("mps")
@@ -2684,6 +2687,7 @@ def check_device():
         device = torch.device("cpu")
         print("⚠️  Falling back to CPU (no GPU acceleration)")
     return device 
+
       
 def compute_threshold_mahalanobis(kernels, dataloader, quantile):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -6237,7 +6241,13 @@ def train_critic_with_planner6(
 
         # 1. Sample batch_size starting states (same on every rank)
         if accelerator.is_main_process:
+            """
             rng = np.random.RandomState(42)
+            s0_indices = rng.randint(0, len(s0_pool), size=batch_size)
+            selected_s0 = s0_pool[s0_indices]
+            """
+            # unique draw each call, still reproducible
+            rng = np.random.RandomState(self.global_step + 10007 * rank)
             s0_indices = rng.randint(0, len(s0_pool), size=batch_size)
             selected_s0 = s0_pool[s0_indices]
         else:
@@ -6780,6 +6790,7 @@ def train_critic_with_planner7(
         num_karras: int,
         eta: float,
         batch_size: int,
+        training_step: int,
         device: torch.device,
         accelerator,
     ):
@@ -6788,7 +6799,13 @@ def train_critic_with_planner7(
 
         # 1. Sample batch_size starting states (same on every rank)
         if accelerator.is_main_process:
+            """
             rng = np.random.RandomState(42)
+            s0_indices = rng.randint(0, len(s0_pool), size=batch_size)
+            selected_s0 = s0_pool[s0_indices]
+            """
+            # unique draw each call, still reproducible
+            rng = np.random.RandomState(training_step + 10007)
             s0_indices = rng.randint(0, len(s0_pool), size=batch_size)
             selected_s0 = s0_pool[s0_indices]
         else:
@@ -7002,6 +7019,7 @@ def train_critic_with_planner7(
                 num_karras=num_karras,
                 eta=eta,
                 batch_size=batch_size,
+                training_step = k,
                 device=device,
                 accelerator=accelerator,
               )
@@ -7200,3 +7218,52 @@ def train_critic_with_planner7(
     return running_tgt_mean.item(), running_tgt_std.item()
 
 
+"""
+import os
+import random
+import numpy as np
+import torch
+
+def check_device():
+    
+    forced = os.environ.get("EVAL_DEVICE", "").strip().lower()
+    if forced in ("cpu", "cuda", "mps"):
+        if forced == "cuda" and not torch.cuda.is_available():
+            raise RuntimeError("EVAL_DEVICE=cuda but CUDA is not available")
+        if forced == "mps" and not (
+            hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+        ):
+            raise RuntimeError("EVAL_DEVICE=mps but MPS is not available")
+        device = torch.device(forced)
+        print(f"Using device {device} (EVAL_DEVICE)")
+        return device
+
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+    print(f"Using device {device}")
+    return device
+
+def configure_precision():
+    torch.set_default_dtype(torch.float32)
+    torch.set_float32_matmul_precision("highest")
+    if torch.cuda.is_available():
+        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cudnn.allow_tf32 = False
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+def set_seed(seed: int):
+    random.seed(seed)
+    np.random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    if hasattr(torch, "mps") and hasattr(torch.mps, "manual_seed"):
+        if torch.backends.mps.is_available():
+            torch.mps.manual_seed(seed)
+"""
