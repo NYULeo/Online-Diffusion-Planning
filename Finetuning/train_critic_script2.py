@@ -35,7 +35,7 @@ import random
 import wandb
 
 
-
+"""
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'cube'
@@ -109,8 +109,115 @@ if __name__ == '__main__':  # pragma: no cover
             trajs = trajs,
             task_id = task_id)
 
+"""
 
+if __name__ == '__main__':  # pragma: no cover
+        set_seed(1)
+        env_name = 'cube'
+        specific_env = 'single-play'
+        traj_length = 200
+        horizon = 128
+        task_id = 4
+        step = 0
+        hp = {
+              "dataset_name": env_name,
+              "specific_dataset": specific_env,
+              "task_id": task_id,
+              "traj_length": traj_length,
+              "horizon": horizon,              # eval only
+              "planner_checkpoint": 0,
+              "reward_checkpoint": 0,
+              "old_critic_checkpoint": 0,
+              "backbone_layers": 2,
+              "hidden_layers": 4,
+              "hidden_dim": 512,
+              "reward_hidden_layers": 4,
+              "reward_hidden_dim": 512,
+              "batch_size": 256,
+              "oversample": 30,
+              "num_steps": 10,
+              "resample_every": 1,
+              "train_horizon": 32,             # passed as horizon= to the trainer
+              "gamma": 0.99,
+              "lam": None,
+              "rho": 0.2,
+              "lr": 1e-04,
+              "min_lr": 1e-05,
+              "tau": 0.005,
+              "steps_T": 10,
+              "num_karras": 1,
+              "eta": 0.0,
+              "new_step": step,
+              "log_every": 1,
+              # kernel
+              "kernel_type": "mog",
+              "kernel_checkpoint": 0,
+              "kernel_hidden_layers": 4,
+              "kernel_hidden_dim": 514,
+              "num_modes": 10,
+              "noise_floor": 5e-4,
+              "min_log_prob": -110.0,
+          }
 
+        accelerator = Accelerator(mixed_precision='bf16')
+        os.chdir(project_root)
+        if accelerator.is_main_process:
+              wandb.init(
+                 entity="kaiwen_hu-uc-berkeley",
+                 project="ODP",
+                 name=f"{env_name}-{specific_env}-task{task_id}-critic_2",
+                 config=hp,
+               )
+
+        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
+        trajs = data.get_trajectories()
+
+        kernel_config = KernelConfig(
+                   checkpoint=hp["kernel_checkpoint"],
+                   type_kernel=hp["kernel_type"],
+                   num_hidden_layers=hp["kernel_hidden_layers"],
+                   hidden_dim=hp["kernel_hidden_dim"],
+                   num_modes=hp["num_modes"],
+                   noise_floor=hp["noise_floor"],
+                   min_log_prob=hp["min_log_prob"],
+                   oversample=hp["oversample"],
+        )
+
+        trainer_keys = (
+              "dataset_name", "specific_dataset", "planner_checkpoint", "reward_checkpoint",
+              "old_critic_checkpoint", "backbone_layers", "hidden_layers", "hidden_dim",
+              "reward_hidden_layers", "reward_hidden_dim", "batch_size", "num_steps",
+              "resample_every", "gamma", "lam", "rho", "lr", "min_lr", "tau",
+              "steps_T", "num_karras", "eta", "new_step", "task_id", "log_every",
+         )
+
+        train_critic_with_planner7(
+                   max_length = traj_length,
+                   kernel_config=kernel_config,
+                   horizon=hp["train_horizon"],
+                   accelerator=accelerator,
+                   **{k: hp[k] for k in trainer_keys},
+        )
+        accelerator.wait_for_everyone()
+
+        trajs = data.get_trajectories()
+        test_critic(
+                dataset_name=hp["dataset_name"],
+                specific_dataset=hp["specific_dataset"],
+                hidden_layers=hp["hidden_layers"],
+                hidden_dim=hp["hidden_dim"],
+                checkpoint_step=hp["new_step"],
+                critic_checkpoint=hp["new_step"],
+                gamma=hp["gamma"],
+                horizon=hp["horizon"],
+                value_scale=1.0,
+                sigma=4.0,
+                target_reward=500.0,
+                trajs=trajs,
+                task_id=hp["task_id"],
+        )
+        if accelerator.is_main_process:
+           wandb.finish()
 
 """
 if __name__ == '__main__':  # pragma: no cover
