@@ -324,6 +324,8 @@ if __name__ == "__main__":
                             tau = 0.005,
                             gamma = 0.99,
                             lam = None,
+                            resample_every = 1,
+                            log_every = 5,
                             data_conservation = True,
                             momentum = 0.1)
 
