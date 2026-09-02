@@ -34,7 +34,7 @@ from accelerate import Accelerator
 import random 
 import wandb
 
-"""
+
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
       
@@ -44,7 +44,7 @@ if __name__ == '__main__':  # pragma: no cover
        traj_length = 200
        horizon = 128
        task_id = 4
-       step = 0
+       step = -1
        data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
        trajs = data.get_trajectories()
        
@@ -88,7 +88,7 @@ if __name__ == '__main__':  # pragma: no cover
             target_reward = 500.0, 
             trajs = trajs,
             task_id = task_id)
-"""
+
 
 
 """
@@ -153,7 +153,7 @@ if __name__ == '__main__':  # pragma: no cover
     
     
 
-
+"""
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'antmaze'
@@ -225,7 +225,7 @@ if __name__ == '__main__':  # pragma: no cover
        )
        wandb.finish()
 
-
+"""
 
 
 """

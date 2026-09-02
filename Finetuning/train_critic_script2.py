@@ -35,7 +35,7 @@ import random
 import wandb
 
 
-"""
+
 if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'cube'
@@ -57,10 +57,10 @@ if __name__ == '__main__':  # pragma: no cover
                 noise_floor = 5e-4,
                 min_log_prob = -110.0,
                 #min_log_prob = -130.0,
-                oversample = 5,
+                oversample = 30,
         )
        
-       mean, std = train_critic_with_planner6(
+       mean, std = train_critic_with_planner7(
                                trajs                  = trajs,
                                dataset_name           = env_name,
                                specific_dataset       = specific_env,
@@ -73,12 +73,13 @@ if __name__ == '__main__':  # pragma: no cover
                                kernel_config          = kernel_config,
                                reward_hidden_layers   = 4,
                                reward_hidden_dim      = 512,
-                               batch_size             = 64,
-                               num_steps              = 100,
+                               batch_size             = 256,
+                               num_steps              = 10,
+                               resample_every         = 1,
                                horizon                = 32,
                                gamma                  = 0.99,
                                lam                    = None,
-                               rho                    = 1.0,
+                               rho                    = 0.2,
                                lr                     = 1e-04,
                                min_lr                 = 1e-05,
                                tau                    = 0.005,
@@ -87,7 +88,7 @@ if __name__ == '__main__':  # pragma: no cover
                                eta                    = 0.0,
                                new_step               = 0,
                                task_id                = task_id,
-                               log_every              = 20,
+                               log_every              = 1,
                                accelerator            = accelerator) 
       
        accelerator.wait_for_everyone()
@@ -108,7 +109,7 @@ if __name__ == '__main__':  # pragma: no cover
             trajs = trajs,
             task_id = task_id)
 
-"""
+
 
 
 """
@@ -316,7 +317,7 @@ if __name__ == '__main__':  # pragma: no cover
 
 """
 
-
+"""
 if __name__ == '__main__':  # pragma: no cover
         set_seed(1)
         env_name = 'antmaze'
@@ -425,6 +426,6 @@ if __name__ == '__main__':  # pragma: no cover
         if accelerator.is_main_process:
            wandb.finish()
 
-
+"""
 
 
