@@ -6801,8 +6801,8 @@ def train_critic_with_planner7(
         if accelerator.is_main_process:
             
             # unique draw each call, still reproducible
-            #rng = np.random.RandomState(training_step + 10007)
-            rng = np.random.RandomState(42)
+            rng = np.random.RandomState(training_step + 10007)
+            #rng = np.random.RandomState(42)
             s0_indices = rng.randint(0, len(s0_pool), size=batch_size)
             selected_s0 = s0_pool[s0_indices]
         else:
