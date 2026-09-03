@@ -13,7 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 os.chdir(REPO_ROOT)
 
-from Finetuning.utils import KernelConfig, test_critic, train_critic_with_planner4
+from Finetuning.utils import KernelConfig, test_critic, train_critic_with_planner7
 from Pretrain.Dataset import get_dataset
 from Pretrain.utils import init_wandb_run, set_seed
 
@@ -64,7 +64,7 @@ def main(config: DictConfig) -> None:
         min_log_prob=kernel.min_log_prob,
         oversample=kernel.oversample,
     )
-    train_critic_with_planner4(
+    train_critic_with_planner7(
         trajs=trajectories,
         dataset_name=env.dataset_name,
         specific_dataset=env.specific_dataset,
@@ -79,9 +79,11 @@ def main(config: DictConfig) -> None:
         reward_hidden_dim=warmup.reward_hidden_dim,
         batch_size=warmup.batch_size,
         num_steps=warmup.num_steps,
+        resample_every=warmup.resample_every,
         horizon=warmup.horizon,
         gamma=warmup.gamma,
         lam=warmup.lam,
+        rho=warmup.rho,
         lr=warmup.lr,
         min_lr=warmup.min_lr,
         tau=warmup.tau,
@@ -101,10 +103,10 @@ def main(config: DictConfig) -> None:
         hidden_layers=warmup.hidden_layers,
         hidden_dim=warmup.hidden_dim,
         checkpoint_step=warmup.new_step,
-        mean=None,
-        std=None,
+        critic_checkpoint=warmup.new_step,
         gamma=warmup.gamma,
         horizon=warmup.test_horizon,
+        value_scale=config.critic_pretrain.value_scale,
         sigma=warmup.test_sigma,
         target_reward=warmup.test_target_reward,
         trajs=data.get_trajectories(),

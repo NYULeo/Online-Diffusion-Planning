@@ -1,6 +1,6 @@
 # ODP Cube-Single：从数据到 rollout 的直观说明
 
-适用代码：`hkw@f32aab4`，基线 `Debugger`。前六节是首次阅读主线，最后两节留作 debug 索引。核心思路是：**planner 先模仿离线轨迹；reward 判断计划是否有用；kernel 判断计划是否像真实动力学；critic 补上 32 步以后的价值；finetune 再把 planner 推向“高价值且可行”的计划。**
+适用代码：`hkw`（采用 main 的 symlog critic/planner7 语义）。前六节是首次阅读主线，最后两节留作 debug 索引。核心思路是：**planner 先模仿离线轨迹；reward 判断计划是否有用；kernel 判断计划是否像真实动力学；critic 补上 32 步以后的价值；finetune 再把 planner 推向“高价值且可行”的计划。**
 
 ```text
 OGBench trajectory: observations[T,28], actions[T,5], rewards[T]
@@ -50,13 +50,13 @@ OGBench trajectory: observations[T,28], actions[T,5], rewards[T]
 ### 初训
 
 - **数据：**task4 `single-play` 每条轨迹最后 200 步，再切成 `(states[128,28], predicted_rewards[128])`。
-- **reward 来源：**不是环境原始 reward，而是 reward model 预测，随后 clip 到 `[-20,20]` 并除以 5。
-- **怎么训练：**从一段 reward 加旧 target critic 的未来估计构造第一个状态的 value target；MLP 输入一个状态、输出一个标量，以 Smooth-L1 拟合。target critic 用 Polyak 慢更新。
-- **归一化：**value target 被运行 mean/std 标准化，所以 critic 输出可正可负且通常接近零均值、单位方差。真正用于 finetune 的值是 `Q_std × V + Q_mean`。
+- **reward 来源：**不是环境原始 reward，而是 reward model 预测，随后 clip 到 `[0,+∞)` 并除以 `Q_scale=5`。
+- **怎么训练：**先用 `symexp` 把旧 target critic 解码到 value 空间，再构造 GAE value target；训练目标经过 `symlog`，MLP 以 Smooth-L1 拟合。target critic 用 Polyak 慢更新。
+- **解码：**critic 输出是 symlog value；finetune 使用 `Q_scale × symexp(V)` 恢复到 reward 尺度。
 
 ### Planner warmup 与每轮更新
 
-从离线状态出发，planner 每个状态尝试生成多条 `[32,33]` 计划；kernel 保留全程可行的计划；reward model 计算多种 horizon 的 return，末端由 critic bootstrap；同一初态的计划 target 取平均，再训练 critic。finetune 每轮结束后用新 planner 再做 20 个 critic steps，因此 planner 和 critic 交替改进。
+从离线状态出发，planner7 为每个状态生成多条 `[32,33]` 计划；kernel 保留全程可行的计划。它计算多个 horizon return，并用 `mean-rho×std` 得到保守 target，再 clamp 非负、symlog 后训练 critic。finetune 每轮结束后用新 planner 再做 20 个 critic steps。
 
 ## 5. Finetune：把“会模仿”变成“会选择高价值计划”
 
@@ -68,7 +68,7 @@ OGBench trajectory: observations[T,28], actions[T,5], rewards[T]
 4. Adjoint/JVP 把这个终点梯度沿反向扩散过程传播。
 5. 更新新 planner，使其去噪 vector field 朝这些高价值方向移动，同时以旧 planner 作为参考；保存 EMA。
 
-配置为 30 rounds×3 steps，checkpoint 依次为 3、6、…、90。`offline=True` 表示每轮 rollout 只用于监控，产生的环境轨迹**不会**加入 reward/kernel/planner 训练；reward 与 kernel 固定，critic 每轮更新。
+配置为 30 rounds×3 steps，checkpoint 依次为 3、6、…、90。old planner 固定为初始 checkpoint 0，new planner 跨轮持续训练，不再每轮从上一轮 EMA 重置。`offline=True` 表示每轮 rollout 只用于监控，产生的环境轨迹**不会**加入 reward/kernel/planner 训练；reward 与 kernel 固定，critic 每轮更新。
 
 ## 6. Rollout：planner 到底能不能控制真实环境
 
@@ -83,15 +83,15 @@ OGBench trajectory: observations[T,28], actions[T,5], rewards[T]
 |---|---|
 | planner loss 正常，但生成轨迹一开始就异常 | planner stats、task4 checkpoint、首状态条件、action 范围、sampler schedule |
 | model reward 上升，但真实 success 下降 | reward extrapolation、kernel threshold、constraint/lambda、terminal critic 是否主导 |
-| critic mean≈0、std≈1，或单个输出为负 | 通常是 target normalization 的预期；再检查配套 Q mean/std 是否来自同一 checkpoint |
+| critic 输出难以直接解释 | 先 `symexp`，需要原 reward 尺度时再乘 `Q_scale`；不要按旧 Q mean/std 解码 |
 | 第 1–2 round 与旧版本不同 | 初态顺序/RNG、BF16 batched forward/JVP、reward range、lambda 和 critic checkpoint |
 | finetune 指标好，但最终 Rollout2 明显不同 | checkpoint 81 vs 最终 90、chunk 31 vs 3–6、环境 seed 和重试规则 |
-| W&B 缺点或横轴错乱 | 当前 AM、critic、timing 共用且回退 `_step`；每轮 3 steps 又小于 `log_freq=10` |
+| W&B 曲线横轴异常 | 检查各 namespace 的 custom step，不要混用 W&B 全局 `_step` |
 
 ## 当前已确认的语义风险
 
 1. planner objective 对 31 个 constraint 求和，lambda 更新却用 constraint 均值，尺度不一致。
-2. critic bootstrap 中原尺度 reward 与标准化 critic 输出直接相加，单位不一致。
-3. 配置写 warmup 1000 steps、LR `1e-6→1e-9`；独立脚本实际为 100、`1e-4→1e-5`。
-4. critic plan generation 每步重新创建 `RandomState(42)`，总是选择同一批初始状态。
-5. W&B step 回退且没有记录每轮后两个 AM steps；当前曲线不足以完整验证训练。
+2. `Q_scale` 当前不是 checkpoint-specific；改变 value scale 后旧 critic 可能被错误解码。
+3. planner7 在没有足够可行计划时的 fail-closed 路径不完整。
+4. Adjoint loss 跳过早期 diffusion steps，却仍按全部 steps 作分母，loss 尺度会随跳过数量改变。
+5. 去掉 `reward_std` 后，adjoint 大小更依赖 reward model 和 `reward_scaling_factor` 的绝对尺度。

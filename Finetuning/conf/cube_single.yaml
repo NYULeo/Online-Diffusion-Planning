@@ -60,7 +60,8 @@ kernel_pretrain:
 critic_pretrain:
   traj_length: 200
   horizon: 128
-  new_step: 0
+  new_step: -1
+  value_scale: 5.0
   reward_hidden_layers: 4
   reward_hidden_dim: 512
   reward_checkpoint: 0
@@ -84,17 +85,19 @@ critic_warmup:
   mixed_precision: bf16
   planner_checkpoint: 0
   reward_checkpoint: 0
-  old_critic_checkpoint: 0
+  old_critic_checkpoint: -1
   backbone_layers: 2
   hidden_layers: 4
   hidden_dim: 512
   reward_hidden_layers: 4
   reward_hidden_dim: 512
-  batch_size: 64
+  batch_size: 256
   num_steps: 100
+  resample_every: 2
   horizon: 32
   gamma: 0.99
   lam: null
+  rho: 1.0
   lr: 0.0001
   min_lr: 0.00001
   tau: 0.005
@@ -111,7 +114,7 @@ critic_warmup:
     num_modes: 10
     noise_floor: 0.0005
     min_log_prob: -110.0
-    oversample: 5
+    oversample: 20
   test_sigma: 4.0
   test_target_reward: 500.0
 
@@ -183,13 +186,14 @@ kernel_training:
   kernel_num_modes: 10
   kernel_noise_floor: 0.0005
   lambda_reg: 0.001
-  oversample: 5
+  oversample: 10
 
 critic_training:
   hidden_layers: 4
   hidden_dim: 512
   batch_size: 64
   num_steps: 20
+  log_every: 5
   warm_up_steps: 1000
   warm_up_log_every: 100
   lr: 0.000001
@@ -197,6 +201,8 @@ critic_training:
   tau: 0.005
   gamma: 0.99
   lam: null
+  rho: 1.0
+  resample_every: 1
   data_conservation: true
   momentum: 0.1
 

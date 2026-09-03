@@ -37,15 +37,16 @@ require_artifact "$REPO/Finetuning/Kernels/cube/single/Stats/Cube_Single_Kernel_
 echo "======== CRITIC ========"
 CUDA_VISIBLE_DEVICES=0 python Finetuning/train_critic_script.py \
   --config-name "$CONFIG_NAME" 2>&1 | tee "$LOG_DIR/4_critic.log"
-require_artifact "$REPO/Finetuning/Critics/cube/single-play/Models/Cube_SinglePlay_task4_Critic_0.pkl"
+require_artifact "$REPO/Finetuning/Critics/cube/single-play/Models/Cube_SinglePlay_task4_Critic_-1.pkl"
 require_artifact "$REPO/Finetuning/Critics/cube/single-play/Stats/Cube_SinglePlay_task4_Critic_stats_0.pkl"
-require_artifact "$REPO/Finetuning/Critics/cube/single-play/Stats/Cube_SinglePlay_task4_Q_stats_0.pkl"
+require_artifact "$REPO/Finetuning/Critics/cube/single-play/Stats/Cube_SinglePlay_task4_Q_scale.pkl"
 
 echo "======== CRITIC WARMUP ========"
 CUDA_VISIBLE_DEVICES=0,1,2,3 accelerate launch --multi_gpu --num_processes=4 \
   --num_machines=1 --mixed_precision=bf16 --dynamo_backend=no \
   Finetuning/train_critic_script2.py --config-name "$CONFIG_NAME" \
   2>&1 | tee "$LOG_DIR/5_critic_warmup.log"
+require_artifact "$REPO/Finetuning/Critics/cube/single-play/Models/Cube_SinglePlay_task4_Critic_0.pkl"
 
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 export TORCH_DISTRIBUTED_BACKEND=gloo

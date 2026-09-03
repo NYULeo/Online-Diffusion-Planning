@@ -5,7 +5,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 from dataclasses import dataclass
 from gymnasium.vector import AsyncVectorEnv
-from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs, check_Critic, get_kernel, get_new_critic_stats, load_success_trajs, KernelConfig, train_critic_with_planner2, train_critic_with_planner4, train_critic_with_planner5
+from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs, check_Critic, get_kernel, get_new_critic_stats, load_success_trajs, KernelConfig, train_critic_with_planner2, train_critic_with_planner4, train_critic_with_planner5, train_critic_with_planner7
 #from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
 #from Finetuning.traj_reward3 import RewardConfig, TotalReward, TotalReward_Critic
 from Finetuning.traj_reward4 import RewardConfig, TotalReward, TotalReward_Critic
@@ -73,13 +73,16 @@ class Train_Critic_Config:
     hidden_dim: int = 128
     batch_size: int = 256
     num_steps: int = 3000
+    log_every: int = 5
     warm_up_steps: int = 1000
     warm_up_log_every: int = 100
     lr: float = 5e-05
     min_lr: float = 1e-05
+    rho: float = 1.0
     tau: float = 0.005
     gamma: float = 1.0
     lam: Optional[float] = None
+    resample_every: int = 4
     data_conservation: bool = False
     momentum: float = 0.005
 
@@ -704,7 +707,7 @@ class OnlineFinetuner():
 
             #self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
             am_started = time.perf_counter()
-            self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1, old_planner_checkpoint = (step * self.config.AMConfig.per_round_steps))
+            self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
             self.accelerator.wait_for_everyone()
 
 
@@ -785,7 +788,7 @@ class OnlineFinetuner():
                 critic_started = time.perf_counter()
                 if self.config.critic and self.config.update_critic:
                       print(f"Starting Critic Training with Planner")
-                      train_critic_with_planner4(
+                      train_critic_with_planner7(
                                trajs                  = self.Base_Critic_Buffer,
                                dataset_name           = self.config.dataset_name,
                                specific_dataset       = self.config.specific_dataset,
@@ -800,9 +803,11 @@ class OnlineFinetuner():
                                reward_hidden_dim      = self.config.train_reward_config.hidden_dim,
                                batch_size             = self.config.train_critic_config.batch_size,
                                num_steps              = self.config.train_critic_config.num_steps,
+                               resample_every         = self.config.train_critic_config.resample_every,
                                horizon                = self.config.AMConfig.horizon,
                                gamma                  = self.config.train_critic_config.gamma,
                                lam                    = self.config.train_critic_config.lam,
+                               rho                    = self.config.train_critic_config.rho,
                                lr                     = self.config.train_critic_config.lr,
                                min_lr                 = self.config.train_critic_config.min_lr,
                                tau                    = self.config.train_critic_config.tau,
@@ -811,7 +816,7 @@ class OnlineFinetuner():
                                eta                    = self.config.AMConfig.eta,
                                new_step               = ((step+1) * self.config.AMConfig.per_round_steps),
                                task_id                = self.config.train_reward_config.task_id,
-                               log_every              = 5,
+                               log_every              = self.config.train_critic_config.log_every,
                                accelerator            = self.accelerator,
                                wandb_prefix           = "finetune/critic",
                                wandb_step_metric      = "finetune/critic_step",
@@ -925,7 +930,7 @@ class OnlineFinetuner():
                 #save_trajs(critic_buffer, self.config.dataset_name, self.config.specific_dataset, ((step+1) * self.config.AMConfig.per_round_steps))
                 if self.config.kernel and self.config.update_kernel:
                         self.kernel_config.checkpoint = self.config.kernel_model_checkpoint
-                train_critic_with_planner4(
+                train_critic_with_planner7(
                                trajs                  = critic_buffer,
                                dataset_name           = self.config.dataset_name,
                                specific_dataset       = self.config.specific_dataset,
@@ -940,9 +945,11 @@ class OnlineFinetuner():
                                reward_hidden_dim      = self.config.train_reward_config.hidden_dim,
                                batch_size             = self.config.train_critic_config.batch_size,
                                num_steps              = self.config.train_critic_config.num_steps,
+                               resample_every         = self.config.train_critic_config.resample_every,
                                horizon                = self.config.AMConfig.horizon,
                                gamma                  = self.config.train_critic_config.gamma,
                                lam                    = self.config.train_critic_config.lam,
+                               rho                    = self.config.train_critic_config.rho,
                                lr                     = self.config.train_critic_config.lr,
                                min_lr                 = self.config.train_critic_config.min_lr,
                                tau                    = self.config.train_critic_config.tau,
@@ -951,7 +958,7 @@ class OnlineFinetuner():
                                eta                    = self.config.AMConfig.eta,
                                new_step               = ((step+1) * self.config.AMConfig.per_round_steps),
                                task_id                = self.config.train_reward_config.task_id,
-                               log_every              = 0,
+                               log_every              = self.config.train_critic_config.log_every,
                                accelerator            = self.accelerator,
                                wandb_prefix           = "finetune/critic",
                                wandb_step_metric      = "finetune/critic_step",

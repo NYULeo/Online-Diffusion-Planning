@@ -65,6 +65,7 @@ def main(config: DictConfig) -> None:
             old_step=critic.old_step,
             new_step=critic.new_step,
             momentum=critic.momentum,
+            value_scale=critic.value_scale,
             task_id=env.task_id,
         )
         test_critic(
@@ -72,11 +73,11 @@ def main(config: DictConfig) -> None:
             specific_dataset=env.specific_dataset,
             hidden_layers=critic.critic_hidden_layers,
             hidden_dim=critic.critic_hidden_dim,
-            checkpoint_step=critic.new_step,
-            mean=None,
-            std=None,
+            checkpoint_step=critic.reward_checkpoint,
+            critic_checkpoint=critic.new_step,
             gamma=critic.gamma,
             horizon=critic.horizon,
+            value_scale=critic.value_scale,
             sigma=critic.test_sigma,
             target_reward=critic.test_target_reward,
             trajs=data.get_trajectories(),

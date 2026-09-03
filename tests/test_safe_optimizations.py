@@ -7,6 +7,7 @@ import types
 
 from Finetuning.acc_adjoint_matching import Acc_AdjointMatchingFineTuner
 from Finetuning.traj_reward4 import TotalReward_Critic, _normalization_tensors
+from Finetuning.utils import symexp, symlog
 from Pretrain.utils import SAStats
 
 
@@ -16,6 +17,10 @@ class SafeOptimizationTest(unittest.TestCase):
         module.eval()
         for parameter in module.parameters():
             parameter.requires_grad_(False)
+
+    def test_symlog_symexp_round_trip(self):
+        values = torch.tensor([-100.0, -1.0, 0.0, 1.0, 100.0])
+        self.assertTrue(torch.allclose(symexp(symlog(values)), values, atol=1e-5))
     def test_device_normalization_matches_existing_numpy_path(self):
         stats = SAStats()
         stats.obs_mean = np.array([1.0, -2.0, 0.5], dtype=np.float32)
@@ -132,7 +137,7 @@ class SafeOptimizationTest(unittest.TestCase):
             sigma = torch.sqrt(-2 * k_value)
             value = ((new_v - old_v) * (2 / sigma) + sigma * adjoint).square().mean()
             if index <= tuner.config.num_Loss_Clip_steps:
-                value = torch.minimum(value, torch.tensor(14.4))
+                continue
             scalar += value
         self.assertTrue(torch.allclose(vectorized, scalar / 4, atol=1e-6))
 
@@ -209,7 +214,7 @@ class SafeOptimizationTest(unittest.TestCase):
         model.critic_obs_std = torch.tensor([1.1, 0.9])
         model.reward_net = RewardNet()
         model.critic = Critic()
-        model.q_stats = types.SimpleNamespace(Q_mean=0.6, Q_std=1.7)
+        model.q_scale = types.SimpleNamespace(Q_scale=1.7)
         model.sigmoid = lambda state, action, next_state: (
             (next_state - state).square().sum(dim=-1)
             + 0.2 * action.square().sum(dim=-1)
@@ -251,13 +256,16 @@ class SafeOptimizationTest(unittest.TestCase):
             scalar_total += discount * reward.squeeze(0) - lam * constraint.squeeze(0)
 
         final_state = model.critic_processor(plan[-1, :2]).unsqueeze(0).requires_grad_(True)
-        value = model.critic(final_state)
+        value = symexp(model.critic(final_state))
         value_grad = torch.autograd.grad(value, final_state, torch.ones_like(value))[0].squeeze(0)
         final_discount = model.config.critic_gamma ** (horizon - 1)
-        scalar_gradient[-1, :2] += final_discount * model.q_stats.Q_std * value_grad / model.critic_obs_std
-        scalar_total += final_discount * (
-            model.q_stats.Q_std * value.squeeze(0) + model.q_stats.Q_mean
-        ) + lam * model.config.delta
+        scalar_gradient[-1, :2] += (
+            final_discount * model.q_scale.Q_scale * value_grad / model.critic_obs_std
+        )
+        scalar_total += (
+            final_discount * model.q_scale.Q_scale * value.squeeze(0)
+            + lam * model.config.delta
+        )
         scalar_constraint = scalar_constraint / (horizon - 1) - model.config.delta
 
         vector_constraint = model.get_c(plan)

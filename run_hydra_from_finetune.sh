@@ -35,7 +35,7 @@ done
 require_artifact "$REPO/Finetuning/Kernels/cube/single/Stats/Cube_Single_Kernel_stats_0.pkl"
 require_artifact "$REPO/Finetuning/Critics/cube/single-play/Models/Cube_SinglePlay_task4_Critic_0.pkl"
 require_artifact "$REPO/Finetuning/Critics/cube/single-play/Stats/Cube_SinglePlay_task4_Critic_stats_0.pkl"
-require_artifact "$REPO/Finetuning/Critics/cube/single-play/Stats/Cube_SinglePlay_task4_Q_stats_0.pkl"
+require_artifact "$REPO/Finetuning/Critics/cube/single-play/Stats/Cube_SinglePlay_task4_Q_scale.pkl"
 
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 export TORCH_DISTRIBUTED_BACKEND=gloo

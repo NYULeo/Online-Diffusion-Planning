@@ -512,12 +512,10 @@ class Acc_AdjointMatchingFineTuner:
             EntGrad = torch.zeros_like(gradient).detach().unsqueeze(0).to(self.device)
 
 
-        if(reward_std == 0.0):
-            reward_std = 1.0
         #current_lr = self.optimizer.param_groups[0]['lr']
         alpha = self.alpha_scheduler.get_alpha()
         #a0 =  (-1 * ((self.config.reward_scaling_factor/alpha)/reward_std) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * (-1) * EntGrad)
-        a0 =  (-1 * ((self.config.reward_scaling_factor/alpha/reward_std)) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * (-1) * EntGrad)
+        a0 =  (-1 * ((self.config.reward_scaling_factor/alpha)) * gradient).detach().unsqueeze(0).to(self.device) + (self.config.Entropy_Scaling_Factor * (-1) * EntGrad)
         #print(f"gradient norm: {gradient.norm().item()}")
         #max_norm = 5.0
         #a0 =   a0 * torch.clamp(max_norm / torch.norm(a0), max=1.0)
@@ -564,8 +562,6 @@ class Acc_AdjointMatchingFineTuner:
         terminal_adjoints = []
         rewards = []
 
-        if reward_std == 0.0:
-            reward_std = 1.0
         alpha = self.alpha_scheduler.get_alpha()
 
         for terminal_state in reversed_states[:, 0]:
@@ -579,7 +575,7 @@ class Acc_AdjointMatchingFineTuner:
             else:
                 entropy_gradient = torch.zeros_like(gradient)
             terminal_adjoint = (
-                -1 * (self.config.reward_scaling_factor / alpha / reward_std) * gradient
+                -1 * (self.config.reward_scaling_factor / alpha) * gradient
                 - self.config.Entropy_Scaling_Factor * entropy_gradient
             ).detach()
             terminal_adjoints.append(terminal_adjoint)
@@ -692,12 +688,7 @@ class Acc_AdjointMatchingFineTuner:
         losses = ((v_new - v_old) * (2 / sigma) + sigma * adjoint).square().mean(dim=(1, 2))
 
         clip_count = min(self.config.num_Loss_Clip_steps + 1, step_count)
-        if clip_count > 0:
-            cap = losses.new_tensor((self.config.reward_scaling_factor**2) * 1.6)
-            losses = torch.cat(
-                [torch.minimum(losses[:clip_count], cap), losses[clip_count:]]
-            )
-        return losses.mean()
+        return losses[clip_count:].sum() / step_count
 
     def adjoint_matching_loss_batch(
         self,
@@ -726,13 +717,7 @@ class Acc_AdjointMatchingFineTuner:
         ).square().mean(dim=(1, 2)).reshape(trajectory_count, step_count)
 
         clip_count = min(self.config.num_Loss_Clip_steps + 1, step_count)
-        if clip_count > 0:
-            cap = losses.new_tensor((self.config.reward_scaling_factor**2) * 1.6)
-            losses = torch.cat(
-                [torch.minimum(losses[:, :clip_count], cap), losses[:, clip_count:]],
-                dim=1,
-            )
-        return losses.mean()
+        return losses[:, clip_count:].sum() / (trajectory_count * step_count)
 
     def step(self, s0_batch: torch.Tensor, reward_model: Union[TotalReward, TotalReward_Critic]) -> Tuple[float, float, float]:
         # 1. Split batch across processes

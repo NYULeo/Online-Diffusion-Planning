@@ -10,7 +10,7 @@ from Pretrain.Rewards.nets import SimpleReward
 from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel, MoGTransitionKernel
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_log_density, compute_log_density_mog
 from Pretrain.Critic.nets import Critic
-from Finetuning.utils import get_reward_model, get_kernel, get_reward_stats, get_kernel_stats, get_critic_model, get_critic_stats, get_Q_stats
+from Finetuning.utils import get_reward_model, get_kernel, get_reward_stats, get_kernel_stats, get_critic_model, get_critic_stats, get_Q_scale, symexp
 from typing import Optional
 from torch.nn import functional as F
 from dataclasses import dataclass
@@ -318,7 +318,7 @@ class TotalReward_Critic(nn.Module):
         self.reward_stat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint, task_id)
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
         self.critic_stat = get_critic_stats(dataset_name, specific_dataset, task_id, 0)
-        self.q_stats = get_Q_stats(dataset_name, specific_dataset, task_id, critic_checkpoint)
+        self.q_scale = get_Q_scale(dataset_name, specific_dataset, task_id)
         self.reward_obs_mean, self.reward_obs_std = _normalization_tensors(
             self.reward_stat, self.config.device
         )
@@ -401,8 +401,10 @@ class TotalReward_Critic(nn.Module):
 
         final_s_critic = x[H-1][:self.config.critic_d_s]
         final_s_norm_critic = self.critic_processor(final_s_critic).unsqueeze(0).requires_grad_(False)
-        v = self.critic(final_s_norm_critic)
-        total_reward +=   ( (self.config.critic_gamma**(H-1)) *  (  (self.q_stats.Q_std * v.squeeze(0)) + self.q_stats.Q_mean  ))
+        v = symexp(self.critic(final_s_norm_critic))
+        total_reward += (
+            (self.config.critic_gamma**(H-1)) * self.q_scale.Q_scale * v.squeeze(0)
+        )
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward
 
@@ -452,7 +454,7 @@ class TotalReward_Critic(nn.Module):
 
         final_s_critic = x[H-1][:self.config.critic_d_s]
         final_s_norm_critic = self.critic_processor(final_s_critic).unsqueeze(0).requires_grad_(True)
-        v = self.critic(final_s_norm_critic)
+        v = symexp(self.critic(final_s_norm_critic))
         grads = torch.autograd.grad(
                 outputs = v,
                 inputs = (final_s_norm_critic),
@@ -462,8 +464,10 @@ class TotalReward_Critic(nn.Module):
             )
         v_s = grads[0].squeeze(0) / self.critic_obs_std
         gradient[H-1, :self.config.critic_d_s] += (
-            (self.config.critic_gamma**(H-1)) * self.q_stats.Q_std * v_s
+            (self.config.critic_gamma**(H-1)) * self.q_scale.Q_scale * v_s
         )
-        total_reward +=   ((self.config.critic_gamma**(H-1)) * (  (self.q_stats.Q_std * v.squeeze(0)) + self.q_stats.Q_mean  )  )
+        total_reward += (
+            (self.config.critic_gamma**(H-1)) * self.q_scale.Q_scale * v.squeeze(0)
+        )
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward, gradient
