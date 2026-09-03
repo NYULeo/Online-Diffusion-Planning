@@ -83,6 +83,8 @@ class Train_Critic_Config:
     gamma: float = 1.0
     lam: Optional[float] = None
     resample_every: int = 4
+    vectorized_sampling: bool = True
+    plan_chunk_size: int = 256
     data_conservation: bool = False
     momentum: float = 0.005
 
@@ -804,6 +806,8 @@ class OnlineFinetuner():
                                batch_size             = self.config.train_critic_config.batch_size,
                                num_steps              = self.config.train_critic_config.num_steps,
                                resample_every         = self.config.train_critic_config.resample_every,
+                               vectorized_sampling    = self.config.train_critic_config.vectorized_sampling,
+                               plan_chunk_size        = self.config.train_critic_config.plan_chunk_size,
                                horizon                = self.config.AMConfig.horizon,
                                gamma                  = self.config.train_critic_config.gamma,
                                lam                    = self.config.train_critic_config.lam,
@@ -946,6 +950,8 @@ class OnlineFinetuner():
                                batch_size             = self.config.train_critic_config.batch_size,
                                num_steps              = self.config.train_critic_config.num_steps,
                                resample_every         = self.config.train_critic_config.resample_every,
+                               vectorized_sampling    = self.config.train_critic_config.vectorized_sampling,
+                               plan_chunk_size        = self.config.train_critic_config.plan_chunk_size,
                                horizon                = self.config.AMConfig.horizon,
                                gamma                  = self.config.train_critic_config.gamma,
                                lam                    = self.config.train_critic_config.lam,

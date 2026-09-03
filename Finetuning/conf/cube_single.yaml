@@ -94,6 +94,8 @@ critic_warmup:
   batch_size: 256
   num_steps: 100
   resample_every: 2
+  vectorized_sampling: true
+  plan_chunk_size: 256
   horizon: 32
   gamma: 0.99
   lam: null
@@ -203,6 +205,8 @@ critic_training:
   lam: null
   rho: 1.0
   resample_every: 1
+  vectorized_sampling: true
+  plan_chunk_size: 256
   data_conservation: true
   momentum: 0.1
 

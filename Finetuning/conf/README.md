@@ -24,6 +24,8 @@ The pipeline creates one W&B group per launch and one run per stage. Metrics are
 
 The Cube Single critic uses the main-branch symlog representation: initial critic checkpoint `-1`, planner7 warmup checkpoint `0`, and `Q_scale × symexp(V)` decoding. Debugger-era `Q_mean/Q_std` critics are not compatible; rerun critic, warmup, and finetune after switching representations.
 
+Planner7 candidate generation and kernel filtering are vectorized in GPU chunks. Restore the scalar main-branch path for debugging with `critic_warmup.vectorized_sampling=false` (warmup) or `critic_training.vectorized_sampling=false` (per-round critic updates).
+
 The planner profile uses a four-GPU effective batch of 256 (`batch_size=256`, `gradient_accumulate_every=1`). Restore the original single-GPU execution without changing code:
 
 ```bash

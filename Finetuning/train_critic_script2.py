@@ -80,6 +80,8 @@ def main(config: DictConfig) -> None:
         batch_size=warmup.batch_size,
         num_steps=warmup.num_steps,
         resample_every=warmup.resample_every,
+        vectorized_sampling=warmup.vectorized_sampling,
+        plan_chunk_size=warmup.plan_chunk_size,
         horizon=warmup.horizon,
         gamma=warmup.gamma,
         lam=warmup.lam,
