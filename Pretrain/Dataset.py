@@ -306,10 +306,12 @@ class OGPointmazeDataset_Singletask:
         rewards = reward_processor(self.dataset['rewards'].copy(), 'ogpointmaze')
         for i in range(N):
             # End of a natural episode (terminal or dataset end)
-            if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
-                     obs_slice = self.dataset["observations"][last_start : i].copy()
+            #if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
+            if self.dataset['terminals'][i] == 1:
+                     obs_slice = self.dataset["observations"][last_start : i+1].copy()
                      act_slice = self.dataset["actions"][last_start : i].copy()
-                     rews = rewards[last_start+1: i+1].copy()
+                     rews = rewards[last_start: i].copy()
+                     masks = self.dataset['masks'][last_start : i].copy()
                      
             
                      L = len(obs_slice)
@@ -335,7 +337,8 @@ class OGPointmazeDataset_Singletask:
                      trajectory = {
                            "observations": obs_slice[index:],
                            "actions": act_slice[index:],
-                           "rewards":  rews[index:]
+                           "rewards":  rews[index:],
+                           'masks': masks[index:]
                      }
                          
                      trajectories.append(trajectory)
@@ -439,10 +442,12 @@ class AntmazeDataset_Singletask:
         rewards = reward_processor(self.dataset['rewards'].copy(), 'antmaze')
         for i in range(N):
             # End of a natural episode (terminal or dataset end)
-            if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
-                     obs_slice = self.dataset["observations"][last_start : i].copy()
+            #if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
+            if self.dataset['terminals'][i] == 1:
+                     obs_slice = self.dataset["observations"][last_start : i+1].copy()
                      act_slice = self.dataset["actions"][last_start : i].copy()
-                     rews = rewards[last_start+1: i+1].copy()
+                     rews = rewards[last_start: i].copy()
+                     masks = self.dataset['masks'][last_start : i].copy()
                      
             
                      L = len(obs_slice)
@@ -468,7 +473,8 @@ class AntmazeDataset_Singletask:
                      trajectory = {
                            "observations": obs_slice[index:],
                            "actions": act_slice[index:],
-                           "rewards":  rews[index:]
+                           "rewards":  rews[index:],
+                           'masks': masks[index:]
                      }
                          
                      trajectories.append(trajectory)
@@ -572,10 +578,12 @@ class HumanoidmazeDataset_Singletask:
         rewards = reward_processor(self.dataset['rewards'].copy(), 'humanoidmaze')
         for i in range(N):
             # End of a natural episode (terminal or dataset end)
-            if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
-                     obs_slice = self.dataset["observations"][last_start : i].copy()
+            #if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
+            if self.dataset['terminals'][i] == 1:
+                     obs_slice = self.dataset["observations"][last_start : i+1].copy()
                      act_slice = self.dataset["actions"][last_start : i].copy()
-                     rews = rewards[last_start+1: i+1].copy()
+                     rews = rewards[last_start: i].copy()
+                     masks = self.dataset['masks'][last_start : i].copy()
                      
             
                      L = len(obs_slice)
@@ -601,7 +609,8 @@ class HumanoidmazeDataset_Singletask:
                      trajectory = {
                            "observations": obs_slice[index:],
                            "actions": act_slice[index:],
-                           "rewards":  rews[index:]
+                           "rewards":  rews[index:],
+                           "masks": masks[index:]
                      }
                          
                      trajectories.append(trajectory)
@@ -728,10 +737,12 @@ class CubeDataset_Singletask:
         #rewards =  reward_processor_2(self.dataset['rewards'].copy())
         for i in range(N):
             # End of a natural episode (terminal or dataset end)
-            if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
-                     obs_slice = self.dataset["observations"][last_start : i].copy()
+            #if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
+            if self.dataset['terminals'][i] == 1:
+                     obs_slice = self.dataset["observations"][last_start : i+1].copy()
                      act_slice = self.dataset["actions"][last_start : i].copy()
-                     rews = rewards[last_start+1: i+1].copy()
+                     rews = rewards[last_start: i].copy()
+                     masks = self.dataset['masks'][last_start : i].copy()
                      
             
                      L = len(obs_slice)
@@ -758,7 +769,8 @@ class CubeDataset_Singletask:
                            "observations": obs_slice[index:],
                            "actions": act_slice[index:],
                            #"rewards":  reward_processor_2(rews[index:].copy())
-                           "rewards":  rews[index:]
+                           "rewards":  rews[index:],
+                           "masks": masks[index:]
                      }
                          
                      trajectories.append(trajectory)
@@ -851,10 +863,12 @@ class SceneDataset_Singletask:
         rewards = reward_processor(self.dataset["rewards"].copy(), "scene")
         for i in range(N):
             # End of a natural episode (terminal or success)
-            if self.dataset["terminals"][i] == 1 or self.dataset["rewards"][i] == 0:
-                obs_slice = self.dataset["observations"][last_start:i].copy()
+            #if self.dataset["terminals"][i] == 1 or self.dataset["rewards"][i] == 0:
+            if self.dataset["terminals"][i] == 1 :
+                obs_slice = self.dataset["observations"][last_start:i+1].copy()
                 act_slice = self.dataset["actions"][last_start:i].copy()
-                rews = rewards[last_start + 1 : i + 1].copy()
+                rews = rewards[last_start : i].copy()
+                masks = self.dataset['masks'][last_start : i].copy()
 
                 L = len(obs_slice)
                 if self.traj_length is not None:
@@ -874,6 +888,7 @@ class SceneDataset_Singletask:
                     "observations": obs_slice[index:],
                     "actions": act_slice[index:],
                     "rewards": rews[index:],
+                    "masks": masks[index:]
                 }
                 trajectories.append(trajectory)
                 last_start = i + 1
@@ -977,10 +992,12 @@ class PuzzleDataset_Singletask:
         rewards = reward_processor(self.dataset["rewards"].copy(), "puzzle")
         for i in range(N):
             # End of a natural episode (terminal or success)
-            if self.dataset["terminals"][i] == 1 or self.dataset["rewards"][i] == 0:
-                obs_slice = self.dataset["observations"][last_start:i].copy()
+            #if self.dataset["terminals"][i] == 1 or self.dataset["rewards"][i] == 0:
+            if self.dataset["terminals"][i] == 1:
+                obs_slice = self.dataset["observations"][last_start:i+1].copy()
                 act_slice = self.dataset["actions"][last_start:i].copy()
-                rews = rewards[last_start + 1 : i + 1].copy()
+                rews = rewards[last_start : i].copy()
+                masks = self.dataset['masks'][last_start : i].copy()
 
                 L = len(obs_slice)
                 if self.traj_length is not None:
@@ -1000,6 +1017,7 @@ class PuzzleDataset_Singletask:
                     "observations": obs_slice[index:],
                     "actions": act_slice[index:],
                     "rewards": rews[index:],
+                    "masks": masks[index:]
                 }
                 trajectories.append(trajectory)
                 last_start = i + 1

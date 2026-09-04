@@ -1799,9 +1799,11 @@ def traj_cutoff(trajs, length):
              index_obs = L - (length + 1)
              index_acts = L - length
              index_rews = L - length
+             index_masks = L - length
              traj['observations'] = traj['observations'][index_obs:]
              traj['actions'] = traj['actions'][index_acts:]
              traj['rewards'] = traj['rewards'][index_rews:]
+             traj['masks'] = traj['masks'][index_masks:]
         new_trajs.append(traj)
     return new_trajs
 
@@ -2290,6 +2292,7 @@ def rollout_parallel2(
         observations = [[] for _ in range(num_envs)]
         acts = [[] for _ in range(num_envs)]
         rewards = [[] for _ in range(num_envs)]
+        masks = [[] for _ in range(num_envs)]
         Temp_acts = [[] for _ in range(num_envs)]
         for env_idx in range(num_envs):
             observations[env_idx].append(current_states[env_idx].copy())
@@ -2329,8 +2332,9 @@ def rollout_parallel2(
                observations[env_idx].append(obs_vec['observation'][env_idx].copy())
                acts[env_idx].append(actions[env_idx].copy())
                rewards[env_idx].append(rewards_vec[env_idx])
+               success = bool(info_vec["success"][env_idx])
+               masks[env_idx].append(0.0 if success else 1.0)
                all_rewards[env_idx] += rewards_vec[env_idx]
-             
                current_states[env_idx] = obs_vec['observation'][env_idx].copy()
              
                if terminated_vec[env_idx] or truncated_vec[env_idx]:
@@ -2353,7 +2357,8 @@ def rollout_parallel2(
                    trajs.append({
                       'observations': np.asarray(observations[env_idx].copy()),
                       'actions': np.asarray(acts[env_idx].copy()),
-                      'rewards': np.asarray(rewards[env_idx].copy())
+                      'rewards': np.asarray(rewards[env_idx].copy()),
+                      'masks': np.asarray(masks[env_idx], dtype=np.float32),
          }) 
      else:
         opt =  {"task_id": task_id}
@@ -2371,6 +2376,7 @@ def rollout_parallel2(
         done_envs = [False for _ in range(num_envs)]
         observations = [[] for _ in range(num_envs)]
         acts = [[] for _ in range(num_envs)]
+        masks = [[] for _ in range(num_envs)]
         rewards = [[] for _ in range(num_envs)]
         Temp_acts = [[] for _ in range(num_envs)]
         for env_idx in range(num_envs):
@@ -2412,6 +2418,8 @@ def rollout_parallel2(
                observations[env_idx].append(obs_batch[env_idx].copy())
                acts[env_idx].append(actions[env_idx].copy())
                rewards[env_idx].append(rewards_vec[env_idx])
+               success = bool(info_vec["success"][env_idx])
+               masks[env_idx].append(0.0 if success else 1.0)
                all_rewards[env_idx] += rewards_vec[env_idx]
                current_states[env_idx] = obs_batch[env_idx].copy()
              
@@ -2438,7 +2446,8 @@ def rollout_parallel2(
                    trajs.append({
                       'observations': np.asarray(observations[env_idx].copy()),
                       'actions': np.asarray(acts[env_idx].copy()),
-                      'rewards': np.asarray(reward_processor(rewards[env_idx].copy(), env_name))
+                      'rewards': np.asarray(reward_processor(rewards[env_idx].copy(), env_name)),
+                      'masks': np.asarray(masks[env_idx], dtype=np.float32),
         })     
      
 

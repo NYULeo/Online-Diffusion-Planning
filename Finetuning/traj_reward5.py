@@ -10,7 +10,7 @@ from Pretrain.Rewards.nets import SimpleReward
 from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel, MoGTransitionKernel
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_log_density, compute_log_density_mog
 from Pretrain.Critic.nets import Critic
-from Finetuning.utils import get_reward_model, get_kernel, get_reward_stats, get_kernel_stats, get_critic_model, get_critic_stats, get_Q_stats, symexp
+from Finetuning.utils import get_reward_model, get_kernel, get_reward_stats, get_kernel_stats, get_critic_model, get_critic_stats, get_Q_stats, symexp, get_Q_scale
 from typing import Optional
 from torch.nn import functional as F
 from dataclasses import dataclass
@@ -248,7 +248,7 @@ class TotalReward(nn.Module):
         return total_reward, gradient
 
 
-
+"""
 class TotalReward_Critic(nn.Module):
     def __init__(self, device, config: RewardConfig, dataset_name: str, specific_dataset: str, reward_checkpoint: int, kernel_checkpoint: int, critic_checkpoint: int, task_id: Optional[int] = None):
         super().__init__()
@@ -471,11 +471,11 @@ class TotalReward_Critic(nn.Module):
             
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward, gradient
-
-
-
-
 """
+
+
+
+
 class TotalReward_Critic(nn.Module):
     def __init__(self, device, config: RewardConfig, dataset_name: str, specific_dataset: str, reward_checkpoint: int, kernel_checkpoint: int, critic_checkpoint: int, task_id: Optional[int] = None):
         super().__init__()
@@ -517,6 +517,7 @@ class TotalReward_Critic(nn.Module):
         self.kernel_stat = get_kernel_stats(dataset_name, specific_dataset, kernel_checkpoint)
         self.critic_stat = get_critic_stats(dataset_name, specific_dataset, task_id, 0)
         #self.q_stats = get_Q_stats(dataset_name, specific_dataset, task_id, critic_checkpoint)
+        self.Q_scale = get_Q_scale(dataset_name, specific_dataset, task_id)
        
 
         self.config.d_s = obs_dim
@@ -607,7 +608,8 @@ class TotalReward_Critic(nn.Module):
             final_s_critic = x[i][:self.config.critic_d_s]
             final_s_norm_critic = self.critic_processor(final_s_critic).unsqueeze(0).requires_grad_(True)
             v = symexp(self.critic(final_s_norm_critic))
-            total_reward +=   ((self.config.critic_gamma**(i)) * (  ( v.squeeze(0))  )  )
+            total_reward +=   ((self.config.critic_gamma**(i)) * (  ( self.Q_scale.Q_scale * v.squeeze(0))  )  )
+            #total_reward +=   ((self.config.critic_gamma**(i)) * (  ( v.squeeze(0))  )  )
         
         total_reward = total_reward * (1/(H-1))
 
@@ -698,7 +700,7 @@ class TotalReward_Critic(nn.Module):
             
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward, gradient
-"""
+
 
 
 

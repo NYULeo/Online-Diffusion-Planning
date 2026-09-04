@@ -20,7 +20,7 @@ if __name__ == '__main__':  # pragma: no cover
          task_id,
          horizon, 
          backbone_name = 'transformer',
-         backbone_layers = 2,
+         backbone_layers = 4,
          num_steps = 1000000, 
          batch_size = 128,
          lr = 2e-4,
