@@ -2687,7 +2687,6 @@ def check_success_rate(trajs: List[TrajectoryDict]):
             success += 1
     return success / len(trajs)
  
-
 def check_device():
     if torch.backends.mps.is_available():
         device = torch.device("mps")
@@ -2700,7 +2699,6 @@ def check_device():
         print("⚠️  Falling back to CPU (no GPU acceleration)")
     return device 
 
-    
 def compute_threshold_mahalanobis(kernels, dataloader, quantile):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     all_D2_total = []
@@ -3017,8 +3015,13 @@ class CriticDataset_Reward(Dataset):
         for traj in trajs:
             obs = traj['observations'] 
             acts = traj['actions']   
+            masks = traj.get('masks', None)
             T_traj = min(len(obs), len(acts))
-            
+            if masks is None:
+                  masks = np.ones(T_traj, dtype=np.float32)
+            else:
+                  masks = np.asarray(masks[:T_traj], dtype=np.float32)
+
             if T_traj < horizon:
                 continue
             
@@ -3036,8 +3039,11 @@ class CriticDataset_Reward(Dataset):
             
             for t in range(len(obs) - horizon):
                  obs_chunk = self.stats.norm_obs(obs[t : t + horizon]).astype(np.float32)
-                 rews_chunk = rews[t: min(t+horizon, len(rews))]
-                 transitions.append((obs_chunk, rews_chunk))
+                 #rews_chunk = rews[t: min(t+horizon, len(rews))]
+                 #transitions.append((obs_chunk, rews_chunk))
+                 rews_chunk = rews[t : t + horizon]
+                 mask_chunk = masks[t : t + horizon]
+                 transitions.append((obs_chunk, rews_chunk, mask_chunk))
 
         self.transitions = transitions
         self.save_stats(dataset_name, specific_dataset, task_id, new_step)
@@ -3053,11 +3059,13 @@ class CriticDataset_Reward(Dataset):
         print(f"saved stats to {savepath}")
 
     def __getitem__(self, idx):
-        obs_chunk, rews_chunk = self.transitions[idx]
+        obs_chunk, rews_chunk, mask_chunk = self.transitions[idx]
         return (
             torch.tensor(obs_chunk, dtype = torch.float32),
-            torch.tensor(rews_chunk, dtype = torch.float32)
+            torch.tensor(rews_chunk, dtype = torch.float32),
+            torch.tensor(mask_chunk, dtype=torch.float32),
         )
+
     def __len__(self):
         return len(self.transitions)
 
@@ -3165,34 +3173,19 @@ class Critic_Buffer_Reward():
 
     def obtain_training_data(self, target_critic: nn.Module, batch, tgt_mean: torch.Tensor, tgt_std: torch.Tensor, device: str):
         
-        obs_chunks, rews_chunks = batch
+        obs_chunks, rews_chunks, mask_chunks = batch
         obs_chunks = obs_chunks.to(device)
         rews_chunks = rews_chunks.to(device)
+        mask_chunks = mask_chunks.to(device)
+        m = mask_chunks[:, :-1]   # (B, T-1), same time index as r_t
         B, T = obs_chunks.shape[0], obs_chunks.shape[1]
         
-
         with torch.no_grad():
-            values = target_critic(obs_chunks)            # (B, T)
-
-            deltas = (
-                  rews_chunks[:, :-1]
-                  + self.gamma * values[:, 1:]
-                   - values[:, :-1]
-              )                                             # (B, T-1)
-
-            advantages = torch.zeros(B, T - 1, device=device)
-            last_adv = torch.zeros(B, device=device)
-            for t in reversed(range(T - 1)):
-                last_adv = deltas[:, t] + self.gamma * self.lam * last_adv
-                advantages[:, t] = last_adv
-
-            #value_targets = values[:, 0] + advantages[:, 0]   # (B,)
-            with torch.no_grad():
                  values = target_critic(obs_chunks)                      # (B, T)
                  values = symexp(values)
                  deltas = (
                        rews_chunks[:, :-1]
-                       + self.gamma * values[:, 1:]
+                       + self.gamma * m * values[:, 1:]
                        - values[:, :-1]
                  )                                                       # (B, T-1)
 
@@ -3200,7 +3193,7 @@ class Critic_Buffer_Reward():
                  advantages = torch.zeros_like(deltas)
                  last_adv = torch.zeros(B, device=device)
                  for t in reversed(range(deltas.shape[1])):
-                     last_adv = deltas[:, t] + self.gamma * self.lam * last_adv
+                     last_adv = deltas[:, t] + self.gamma * self.lam * m[:, t] * last_adv
                      advantages[:, t] = last_adv
 
                  # === ADD NORMALIZATION HERE ===
