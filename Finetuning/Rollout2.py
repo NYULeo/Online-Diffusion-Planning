@@ -644,7 +644,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 6
+    checkpoint = 0
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -687,17 +687,17 @@ if __name__ == "__main__":
             env_name,
             specific_train_dataset,
             horizon,
-            num_layers=2,
+            num_layers=4,
             steps_T=10,
             num_karras=1,
             eta=0.0,
             episode_length=5000,
             checkpoint_steps=checkpoint,
             render=True,
-            base_seed=16,
+            base_seed=1,
             task_id=task_id,
             continual_rollout=True,
-            chunk_size=7,
+            chunk_size=8,
             device=device,
             #selector=selector,
     )

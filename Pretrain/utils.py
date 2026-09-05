@@ -9,6 +9,14 @@ import os
 import pickle
 
 
+def wandb_log(metrics: dict, step: Optional[int] = None) -> None:
+    """Log only when the current process owns an initialized W&B run."""
+    import wandb
+
+    if wandb.run is not None:
+        wandb.log(metrics, step=step)
+
+
 def cycle(dl):
     while True:
         for data in dl:

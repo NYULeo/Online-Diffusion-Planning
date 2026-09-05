@@ -11,7 +11,7 @@ import torch
 import os
 import pickle
 from torch.utils.data import Dataset
-from Pretrain.utils import SAStats
+from Pretrain.utils import SAStats, wandb_log
 from scipy.ndimage import gaussian_filter1d
 from typing import TypedDict, List, Union
 from typing import Optional
@@ -29,7 +29,11 @@ from Pretrain.Transition_Kernel.Kernel_Net import MoGTransitionKernel, RobustTra
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_total_mahalanobis_score, compute_log_density_mog, compute_log_density, compute_total_mahalanobis_score_mog
 from Pretrain.Dataset import get_env, get_dataset, Planner_Processor
 from gymnasium.vector import AsyncVectorEnv
-from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
+from Pretrain.Planners.Backbone.Sampler import (
+    karras_beta_schedule as planner_karras_beta_schedule,
+    sample_euler_karras,
+)
+from Pretrain.Planners.Backbone.utils import cosine_beta as planner_cosine_beta
 from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Critic.nets import Critic
 from Pretrain.Dataset import get_dataset
@@ -37,6 +41,7 @@ import json
 import torch.nn as nn
 import random
 import torch.distributed as dist
+import time
 import wandb
 
 
@@ -6679,6 +6684,8 @@ def train_critic_with_planner7(
     batch_size: int = 64,
     num_steps: int = 100,
     resample_every: int = 10,
+    vectorized_sampling: bool = True,
+    plan_chunk_size: int = 256,
     horizon: int = 32,
     gamma: float = 0.99,
     lam: Optional[float] = None,
@@ -6693,6 +6700,9 @@ def train_critic_with_planner7(
     task_id: Optional[int] = None,
     log_every: int = 0,
     accelerator=None,
+    wandb_prefix: str = "critic_warmup",
+    wandb_step_metric: str = "critic_warmup_step",
+    wandb_step_offset: int = 0,
 ):
     from accelerate import Accelerator
     import math
@@ -6781,6 +6791,115 @@ def train_critic_with_planner7(
         return bool((avg_lp > kernel_config.min_log_prob).all().item())
 
     @torch.no_grad()
+    def sample_plans_batched(
+        normalized_s0: torch.Tensor,
+        planner: nn.Module,
+        obs_dim: int,
+        act_dim: int,
+        horizon: int,
+        steps_T: int,
+        num_karras: int,
+        eta: float,
+        oversample: int,
+        chunk_size: int,
+        device: torch.device,
+    ) -> torch.Tensor:
+        """Generate the same per-state candidate set with batched DiT forwards."""
+        conditions = normalized_s0.repeat_interleave(oversample, dim=0)
+        candidate_count = conditions.shape[0]
+        dimension = obs_dim + act_dim
+        t_grid, beta_1, sigma_grid = planner_karras_beta_schedule(
+            steps_T, device=device
+        )
+        beta_2 = planner_cosine_beta(t_grid, s=0.008)
+
+        # Preserve scalar sampler initial-noise call order. Warmup uses eta=0,
+        # so there are no per-step stochastic draws to interleave by candidate.
+        initial_noise = torch.cat(
+            [
+                torch.randn(1, horizon, dimension, device=device)
+                for _ in range(candidate_count)
+            ],
+            dim=0,
+        )
+
+        generated = []
+        for start in range(0, candidate_count, chunk_size):
+            stop = min(start + chunk_size, candidate_count)
+            cond = conditions[start:stop]
+            x = initial_noise[start:stop] * sigma_grid[0]
+            current_batch = x.shape[0]
+            mask = torch.zeros_like(x)
+            mask[:, 0, :obs_dim] = 1.0
+            conditioned = torch.zeros_like(x)
+            conditioned[:, 0, :obs_dim] = cond
+            x = mask * conditioned + (1 - mask) * x
+
+            for diffusion_step in range(steps_T):
+                t_now = t_grid[diffusion_step]
+                t_next = (
+                    t_grid[diffusion_step + 1]
+                    if diffusion_step < steps_T - 1
+                    else 0.0
+                )
+                dt = (t_next - t_now).item()
+                beta_now = (
+                    beta_1[diffusion_step].item()
+                    if diffusion_step < num_karras
+                    else beta_2[diffusion_step].item()
+                )
+                drift = -0.5 * beta_now * x
+                score = planner(x, t_now.expand(current_batch))
+                if eta > 0:
+                    noise = torch.randn_like(x)
+                    noise_scale = eta * math.sqrt(beta_now * (-dt))
+                    x = x + (drift - beta_now * score) * dt + noise_scale * noise
+                else:
+                    x = x + (drift - beta_now * score) * dt
+                x = mask * conditioned + (1 - mask) * x
+                x[..., obs_dim:] = torch.clamp(x[..., obs_dim:], -1.0, 1.0)
+            generated.append(x)
+
+        return torch.cat(generated, dim=0)
+
+    @torch.no_grad()
+    def batched_feasible_mask(
+        plans: torch.Tensor,
+        kernels: List[nn.Module],
+        planner_mean: torch.Tensor,
+        planner_std: torch.Tensor,
+        k_mean: torch.Tensor,
+        k_std: torch.Tensor,
+        kernel_config: KernelConfig,
+        obs_dim: int,
+    ) -> torch.Tensor:
+        """Evaluate every transition of every candidate without per-plan sync."""
+        state_raw = plans[..., :obs_dim] * planner_std + planner_mean
+        state_kernel = (state_raw - k_mean) / k_std
+        state = state_kernel[:, :-1].reshape(-1, obs_dim)
+        next_state = state_kernel[:, 1:].reshape(-1, obs_dim)
+        action = torch.clamp(plans[:, :-1, obs_dim:], -1.0, 1.0).reshape(
+            state.shape[0], -1
+        )
+
+        if kernel_config.type_kernel == 'robust':
+            average_log_prob = torch.zeros(state.shape[0], device=plans.device)
+            for kernel in kernels:
+                mu, log_std = kernel(state, action)
+                average_log_prob += kernel.log_prob(next_state, mu, log_std)
+            average_log_prob /= len(kernels)
+        else:
+            average_log_prob = compute_log_density_mog(
+                kernels, state, action, next_state
+            )
+
+        transition_count = plans.shape[1] - 1
+        return (
+            average_log_prob.view(plans.shape[0], transition_count)
+            > kernel_config.min_log_prob
+        ).all(dim=1)
+
+    @torch.no_grad()
     def _generate_feasible_plans_parallel(
         s0_pool: np.ndarray,
         planner: nn.Module,
@@ -6799,15 +6918,17 @@ def train_critic_with_planner7(
         eta: float,
         batch_size: int,
         training_step: int,
+        vectorized_sampling: bool,
+        plan_chunk_size: int,
         device: torch.device,
         accelerator,
     ):
-        
+
         oversample = kernel_config.oversample
 
         # 1. Sample batch_size starting states (same on every rank)
         if accelerator.is_main_process:
-            
+
             # unique draw each call, still reproducible
             rng = np.random.RandomState(training_step + 10007)
             #rng = np.random.RandomState(42)
@@ -6827,38 +6948,66 @@ def train_critic_with_planner7(
         )[accelerator.process_index]
         local_s0 = selected_s0[local_s0_indices]
 
-        # 3. For each local s0, generate `oversample` plans
         local_accepted = []
+        if vectorized_sampling:
+            normalized_s0 = torch.as_tensor(
+                np.stack([planner_proc.preprocess(state) for state in local_s0]),
+                dtype=torch.float32,
+                device=device,
+            )
+            local_plans = sample_plans_batched(
+                normalized_s0=normalized_s0,
+                planner=planner,
+                obs_dim=obs_dim,
+                act_dim=act_dim,
+                horizon=horizon,
+                steps_T=steps_T,
+                num_karras=num_karras,
+                eta=eta,
+                oversample=oversample,
+                chunk_size=plan_chunk_size,
+                device=device,
+            )
+            feasible = batched_feasible_mask(
+                plans=local_plans,
+                kernels=kernels,
+                planner_mean=planner_mean,
+                planner_std=planner_std,
+                k_mean=k_mean,
+                k_std=k_std,
+                kernel_config=kernel_config,
+                obs_dim=obs_dim,
+            )
+            local_accepted.extend(local_plans[feasible].cpu().unbind(0))
+        else:
+            for s0_raw in local_s0:
+                s0_p = planner_proc.preprocess(s0_raw)
+                accepted_for_this_s0 = []
 
-        for s0_raw in local_s0:
-            s0_p = planner_proc.preprocess(s0_raw)
-            accepted_for_this_s0 = []
+                for _ in range(oversample):
+                    x = sample_euler_karras(
+                        s0_p, planner, obs_dim, act_dim, horizon,
+                        num_steps=steps_T, num_karras=num_karras,
+                        eta=eta, device=device,
+                    )
+                    x_t = torch.from_numpy(x).float().to(device)
 
-            for _ in range(oversample):
-                x = sample_euler_karras(
-                    s0_p, planner, obs_dim, act_dim, horizon,
-                    num_steps=steps_T, num_karras=num_karras,
-                    eta=eta, device=device,
-                )
-                x_t = torch.from_numpy(x).float().to(device)
+                    s_planner = x_t[..., :obs_dim]
+                    a_raw = torch.clamp(x_t[..., obs_dim:], -1.0, 1.0)
+                    s_raw_pl = s_planner * planner_std + planner_mean
 
-                s_planner = x_t[..., :obs_dim]
-                a_raw = x_t[..., obs_dim:]
-                a_raw = torch.clamp(a_raw, -1.0, 1.0)
-                s_raw_pl = s_planner * planner_std + planner_mean
+                    if is_plan_feasible(
+                        s_raw_plan=s_raw_pl,
+                        a_raw_plan=a_raw,
+                        kernels=kernels,
+                        k_mean=k_mean,
+                        k_std=k_std,
+                        kernel_config=kernel_config,
+                        device=device,
+                    ):
+                        accepted_for_this_s0.append(x_t.cpu())
 
-                if is_plan_feasible(
-                    s_raw_plan=s_raw_pl,
-                    a_raw_plan=a_raw,
-                    kernels=kernels,
-                    k_mean=k_mean,
-                    k_std=k_std,
-                    kernel_config=kernel_config,
-                    device=device,
-                ):
-                    accepted_for_this_s0.append(x_t.cpu())
-
-            local_accepted.extend(accepted_for_this_s0)
+                local_accepted.extend(accepted_for_this_s0)
 
         # 4. Collect from all GPUs
         if accelerator.num_processes > 1:
@@ -6868,7 +7017,8 @@ def train_critic_with_planner7(
             all_accepted_lists = [local_accepted]
 
         all_plans = [p for sublist in all_accepted_lists for p in sublist]
-
+        if not all_plans:
+            raise RuntimeError("planner7 found no kernel-feasible plans")
         plans = torch.stack(all_plans).to(device)
         return plans, None
 
@@ -6963,7 +7113,7 @@ def train_critic_with_planner7(
         running_tgt_mean = torch.zeros(1, device=device)
         running_tgt_std = torch.ones(1, device=device)
     else:
-        
+
         q_stats = get_Q_stats(dataset_name, specific_dataset, task_id, old_critic_checkpoint)
         running_tgt_mean = q_stats.Q_mean
         running_tgt_std = q_stats.Q_std
@@ -6972,11 +7122,11 @@ def train_critic_with_planner7(
     s0_pool = np.concatenate(
                     [t['observations'] for t in trajs], axis=0,
     ).astype(np.float32)
-    
+
     Scale = get_Q_scale(dataset_name, specific_dataset, task_id)
     running_tgt_mean = torch.zeros(1, device=device)
     running_tgt_std = torch.ones(1, device=device)
-    
+
     alpha = 0.99
 
     # optim
@@ -6997,15 +7147,17 @@ def train_critic_with_planner7(
     running = 0.0
     total_mae = 0.0
     total_bias = 0.0
+    sampling_seconds = 0.0
     #n_resamples = max(1, num_steps // resample_every)
     #increments = max(1, (max_length + n_resamples - 1) // n_resamples)  # ceil
     for k in range(1, num_steps + 1):
         if (k - 1) % resample_every == 0:
-            
+
             #n_resamples = max(1, num_steps // resample_every)
             #increments = max(1, (max_length + n_resamples - 1) // n_resamples)  # ceil
-        
+
             with torch.no_grad():
+              sampling_started = time.perf_counter()
               plans, _ = _generate_feasible_plans_parallel(
                 s0_pool=s0_pool,
                 planner=planner,
@@ -7024,9 +7176,12 @@ def train_critic_with_planner7(
                 eta=eta,
                 batch_size=batch_size,
                 training_step = k,
+                vectorized_sampling=vectorized_sampling,
+                plan_chunk_size=plan_chunk_size,
                 device=device,
                 accelerator=accelerator,
               )
+              sampling_seconds = time.perf_counter() - sampling_started
 
               B_eff = plans.shape[0]
               if B_eff < max(8, batch_size // 4):
@@ -7046,11 +7201,11 @@ def train_critic_with_planner7(
                 actions[:, :n].reshape(N * n, -1),
               ).reshape(N, n)  # (N, n)
 
-            
+
               # reward clipping -----------------------------------------------------
               r_hat = torch.clamp(r_hat, 0.0, float('inf'))      # adjust bounds if needed
               r_hat = r_hat / Scale.Q_scale                     # or use a running std
-        
+
               plan_targets = torch.zeros(N, device=device)
 
               if lam is not None:
@@ -7111,23 +7266,23 @@ def train_critic_with_planner7(
               averaged_targets.index_add_(0, inverse_indices, plan_targets)
               counts.index_add_(0, inverse_indices, torch.ones_like(plan_targets))
               averaged_targets = averaged_targets / counts.clamp(min=1.0)
-              
+
               averaged_targets = averaged_targets.detach()
               averaged_targets  = averaged_targets.clamp(0.0, float('inf'))
               averaged_targets = symlog(averaged_targets)
-              
+
               # running normalization
               batch_mean = averaged_targets.mean()
               batch_std = averaged_targets.std(unbiased=False) + 1e-8
               running_tgt_mean = alpha * running_tgt_mean + (1 - alpha) * batch_mean
               running_tgt_std = alpha * running_tgt_std + (1 - alpha) * batch_std
               #normalized_target = (averaged_targets - running_tgt_mean) / running_tgt_std
-            
+
 
               # critic input
               s0_critic = (unique_s0 - c_mean) / c_std
               s0_critic = s0_critic.detach()
-        
+
         # gradient step
         v_pred = critic(s0_critic)
         with torch.no_grad():
@@ -7138,7 +7293,7 @@ def train_critic_with_planner7(
         #loss = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
         loss = F.smooth_l1_loss(v_pred, averaged_targets, beta=1.0)
         #loss = F.mse_loss(v_pred, averaged_targets)
-        
+
 
 
         optimizer.zero_grad()
@@ -7162,29 +7317,19 @@ def train_critic_with_planner7(
             avg_loss = running / log_every
             avg_mae = total_mae / log_every
             avg_bias = total_bias / log_every
-            """
-            wandb.log({ "loss": avg_loss, 
-                        "pred_mean": pred_mean.item(),
-                        "pred_std": pred_std.item(),
-                        "tgt_mean": averaged_targets.mean().item(),
-                        "tgt_std": averaged_targets.std().item(),
-                        "tgt_min": averaged_targets.min().item(),
-                        'tgt_max': averaged_targets.max().item(),
-                        "bias": avg_bias,
-                        "mae": avg_mae,
-                        "step": k})     
-            """
-            wandb.log({
-                    "critic/loss": avg_loss,
-                    "critic/pred_mean": pred_mean.item(),
-                    "critic/pred_std": pred_std.item(),
-                    "critic/tgt_mean": averaged_targets.mean().item(),
-                    "critic/tgt_std": averaged_targets.std().item(),
-                    "critic/tgt_min": averaged_targets.min().item(),
-                    "critic/tgt_max": averaged_targets.max().item(),
-                    "critic/bias": avg_bias,
-                    "critic/mae": avg_mae,
-                    "critic/step": k,
+            wandb_log({
+                    wandb_step_metric: wandb_step_offset + k,
+                    f"{wandb_prefix}/loss": avg_loss,
+                    f"{wandb_prefix}/pred_mean": pred_mean.item(),
+                    f"{wandb_prefix}/pred_std": pred_std.item(),
+                    f"{wandb_prefix}/target_mean": averaged_targets.mean().item(),
+                    f"{wandb_prefix}/target_std": averaged_targets.std().item(),
+                    f"{wandb_prefix}/target_min": averaged_targets.min().item(),
+                    f"{wandb_prefix}/target_max": averaged_targets.max().item(),
+                    f"{wandb_prefix}/bias": avg_bias,
+                    f"{wandb_prefix}/mae": avg_mae,
+                    f"{wandb_prefix}/sampling_seconds": sampling_seconds,
+                    f"{wandb_prefix}/plans_per_second": B_eff / max(sampling_seconds, 1e-8),
             })
             print(
                 f" step {k:>6}/{num_steps} "
@@ -7198,6 +7343,7 @@ def train_critic_with_planner7(
                 f"tgt_max={averaged_targets.max().item():.3f}  "
                 f"bias={avg_bias:.3f}  "
                 f"mae={avg_mae:.3f}"
+                f"  sampling={sampling_seconds:.2f}s"
             )
             running = 0.0
             total_bias = 0.0
@@ -7210,7 +7356,7 @@ def train_critic_with_planner7(
         target_critic.load_state_dict(unwrapped_critic.state_dict())
         target_critic.eval()
         save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
-         
+
         """
         q_stats = Q_Stats()
         q_stats.Q_mean = running_tgt_mean.item()
@@ -7220,7 +7366,6 @@ def train_critic_with_planner7(
         print("critic saved.")
 
     return running_tgt_mean.item(), running_tgt_std.item()
-
 
 """
 import os

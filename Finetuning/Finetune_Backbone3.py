@@ -78,6 +78,8 @@ class Train_Critic_Config:
     gamma: float = 1.0
     lam: Optional[float] = None
     resample_every: int = 4
+    vectorized_sampling: bool = True
+    plan_chunk_size: int = 256
     data_conservation: bool = False
     momentum: float = 0.005
 
@@ -781,6 +783,8 @@ class OnlineFinetuner():
                                batch_size             = self.config.train_critic_config.batch_size,
                                num_steps              = self.config.train_critic_config.num_steps,
                                resample_every         = self.config.train_critic_config.resample_every,
+                               vectorized_sampling    = self.config.train_critic_config.vectorized_sampling,
+                               plan_chunk_size        = self.config.train_critic_config.plan_chunk_size,
                                horizon                = self.config.AMConfig.horizon,
                                gamma                  = self.config.train_critic_config.gamma,
                                lam                    = self.config.train_critic_config.lam,
@@ -794,7 +798,10 @@ class OnlineFinetuner():
                                new_step               = ((step+1) * self.config.AMConfig.per_round_steps),
                                task_id                = self.config.train_reward_config.task_id,
                                log_every              = self.config.train_critic_config.log_every,
-                               accelerator            = self.accelerator)
+                               accelerator            = self.accelerator,
+                               wandb_prefix           = "finetune/critic",
+                               wandb_step_metric      = "finetune/critic_step",
+                               wandb_step_offset      = step * self.config.train_critic_config.num_steps)
                 print(f"Finetuning round {step+1} completed")
                 print()
                 self.accelerator.wait_for_everyone()
@@ -903,6 +910,8 @@ class OnlineFinetuner():
                                batch_size             = self.config.train_critic_config.batch_size,
                                num_steps              = self.config.train_critic_config.num_steps,
                                resample_every         = self.config.train_critic_config.resample_every,
+                               vectorized_sampling    = self.config.train_critic_config.vectorized_sampling,
+                               plan_chunk_size        = self.config.train_critic_config.plan_chunk_size,
                                horizon                = self.config.AMConfig.horizon,
                                gamma                  = self.config.train_critic_config.gamma,
                                lam                    = self.config.train_critic_config.lam,
@@ -916,7 +925,10 @@ class OnlineFinetuner():
                                new_step               = ((step+1) * self.config.AMConfig.per_round_steps),
                                task_id                = self.config.train_reward_config.task_id,
                                log_every              = self.config.train_critic_config.log_every,
-                               accelerator            = self.accelerator)                       
+                               accelerator            = self.accelerator,
+                               wandb_prefix           = "finetune/critic",
+                               wandb_step_metric      = "finetune/critic_step",
+                               wandb_step_offset      = step * self.config.train_critic_config.num_steps) 
             self.accelerator.wait_for_everyone()
             #plans = self.get_generated_plans(number_of_generated_plans = self.config.RewardConfig.number_of_generated_plans)
             if self.config.kernel and self.config.update_kernel:
