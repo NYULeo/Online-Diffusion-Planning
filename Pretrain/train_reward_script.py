@@ -101,13 +101,13 @@ if __name__ == '__main__':
         "hidden_layers": 4,
         "hidden_dim": 512,
         "batch_size": 256,
-        "num_steps": 50000,
-        "save_freq": 50000,
+        "num_steps": 20000,
+        "save_freq": 20000,
         "lr": 5e-03,
         "min_lr": 5e-05,
         "sigma": 3.0,
         "alpha": None,
-        "target_reward": 200.0,
+        "target_reward": 50.0,
     }
 
     # Initialize wandb
