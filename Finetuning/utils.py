@@ -7486,7 +7486,7 @@ def train_critic_with_planner7(
     
     # === NEW === train resets; seeds 10000+ disjoint from eval 0..999
     def _train_reset_pool(dataset_name, specific_dataset, task_id, n=256):
-        env, _, _ = get_env(dataset_name, specific_dataset, task_id)
+        env, _, _ = get_env(dataset_name, specific_dataset, task_id=task_id)
         rows = []
         for i in range(n):
             ob, _ = env.reset(
@@ -7497,7 +7497,7 @@ def train_critic_with_planner7(
         return np.stack(rows, axis=0)
 
     # ------------------------------------------------------------------ setup
-    _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+    _, obs_dim, act_dim = get_env(dataset_name, specific_dataset, task_id=task_id)
 
     # critic
     critic = Critic(obs_dim, hidden_dim, hidden_layers)
@@ -7828,5 +7828,8 @@ def train_critic_with_planner7(
         print("critic saved.")
 
     return running_tgt_mean.item(), running_tgt_std.item()
+
+
+
 
 
