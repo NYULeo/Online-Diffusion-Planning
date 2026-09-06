@@ -725,11 +725,6 @@ class CubeDataset_Singletask:
         self.dataset_id = name_to_id[name]
         
 
-        self.env, _, _ = ogbench.make_env_and_datasets(
-               self.dataset_id, 
-               env_only=True
-        )
-
         _, self.dataset, self.eval_dataset = ogbench.make_env_and_datasets(
                  self.dataset_id, render_mode="rgb_array"
             )
@@ -791,8 +786,8 @@ class CubeDataset_Singletask:
         return int(self.dataset["actions"].shape[-1])
 
     def get_env(self, render_mode: str = "rgb_array"):
-        #env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
-        return self.env
+        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
+        return env
 
 class SceneDataset:
     def __init__(self, name: str):
