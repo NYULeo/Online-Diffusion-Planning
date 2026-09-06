@@ -21,7 +21,7 @@ def main():
 
     planner_checkpoint = 0
     reward_checkpoint = 0
-    critic_checkpoint = -1
+    critic_checkpoint = 0
 
     data = get_dataset(dataset_name, specific_dataset, task_id=task_id)
     trajs = data.get_trajectories()
