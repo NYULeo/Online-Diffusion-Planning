@@ -116,7 +116,7 @@ if __name__ == '__main__':  # pragma: no cover
         env_name = 'cube'
         specific_env = 'single-play'
         traj_length = 200
-        horizon = 128
+        horizon = 200
         task_id = 4
         old_step = -1
         step = 0
@@ -211,9 +211,9 @@ if __name__ == '__main__':  # pragma: no cover
                 critic_checkpoint=hp["new_step"],
                 gamma=hp["gamma"],
                 horizon=hp["horizon"],
-                value_scale=5.0,
-                sigma=4.0,
-                target_reward=500.0,
+                value_scale=1.0,
+                sigma=3.0,
+                target_reward=50.0,
                 trajs=trajs,
                 task_id=hp["task_id"],
         )
