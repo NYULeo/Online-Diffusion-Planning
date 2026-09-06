@@ -17,7 +17,8 @@ def main():
     horizon = 32
     reward_checkpoint = 0
     data = get_dataset(dataset_name, specific_dataset, task_id=task_id)
-    trajs = data.get_trajectories()
+    trajs = data.get_trajectories(suffix_length = horizon)
+
           
     if accelerator.is_main_process:
         wandb.init(
