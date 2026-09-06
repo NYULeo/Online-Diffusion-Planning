@@ -911,6 +911,7 @@ def reward_heatmap(checkpoint: int = 0, show: bool = True):
 
 
 
+
 """
 if __name__ == "__main__":
     critic_heatmap(0)
