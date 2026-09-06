@@ -129,7 +129,7 @@ if __name__ == '__main__':  # pragma: no cover
               "planner_checkpoint": 0,
               "reward_checkpoint": 0,
               "old_critic_checkpoint": old_step,
-              "backbone_layers": 2,
+              "backbone_layers": 4,
               "hidden_layers": 4,
               "hidden_dim": 512,
               "reward_hidden_layers": 4,
