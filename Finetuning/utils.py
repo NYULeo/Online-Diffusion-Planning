@@ -1439,11 +1439,14 @@ class CriticDataset(Dataset):
                 rews = self.boost_signal(target_reward, rews)
             if(sigma is not None):
                 rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate = 200/sigma)
-            if len(obs) < horizon:
+            usable_length = min(len(obs), len(rews))
+            if usable_length < horizon:
                 continue
-            for t in range(len(obs) - horizon):
+            # A sequence whose length exactly equals the horizon contains one
+            # valid window. Include the final possible window as well.
+            for t in range(usable_length - horizon + 1):
                  obs_chunk = self.stats.norm_obs(obs[t : t + horizon]).astype(np.float32)
-                 rews_chunk = rews[t: min(t+horizon, len(rews))]
+                 rews_chunk = rews[t : t + horizon]
                  transitions.append((obs_chunk, rews_chunk))
 
         self.transitions = transitions
@@ -1692,6 +1695,7 @@ class Critic_Test_Dataset(Dataset):
         self.gamma = gamma
 
         transitions = []
+        usable_lengths = []
         for traj in trajs:
             obs = traj['observations']
             rews = traj['rewards'].copy()
@@ -1701,12 +1705,17 @@ class Critic_Test_Dataset(Dataset):
             if sigma is not None:
                 rews = gaussian_filter1d(rews, sigma, mode="nearest", truncate=200/sigma)
 
-            for t in range(len(obs) - horizon):
+            usable_length = min(len(obs), len(rews))
+            usable_lengths.append(usable_length)
+            # Include the one valid window when usable_length == horizon.
+            for t in range(max(0, usable_length - horizon + 1)):
                 obs_t = self.stats.norm_obs(obs[t])
                 rews_chunk = rews[t : t + horizon]
                 transitions.append((obs_t, rews_chunk))
 
         self.transitions = transitions
+        self.num_trajectories = len(usable_lengths)
+        self.max_usable_length = max(usable_lengths, default=0)
         print(f"Test dataset created: {len(self.transitions)} samples")
 
     def boost_signal(self, target_reward, rews):
@@ -1744,6 +1753,14 @@ def test_critic(dataset_name: str,
         dataset_name, specific_dataset, stats_step, trajs,
         sigma, task_id, target_reward, horizon, gamma
     )
+    if len(dataset) == 0:
+        raise ValueError(
+            "Critic test dataset has no valid windows: "
+            f"horizon={horizon}, trajectories={dataset.num_trajectories}, "
+            f"max_usable_length={dataset.max_usable_length}. "
+            "Check the trajectory segmentation or choose a test horizon no larger "
+            "than the available aligned observation/reward length."
+        )
     dataloader = DataLoader(dataset, batch_size=256, shuffle=False, drop_last=False)
 
     # Load model
@@ -3023,12 +3040,23 @@ class CriticDataset_Reward(Dataset):
                 rews = np.clip(rews, 0.0, float('inf'))
                 rews = rews / value_scale
 
-            for t in range(len(obs) - horizon):
+            # Include the final valid window, including the exact-horizon case.
+            for t in range(T_traj - horizon + 1):
                  obs_chunk = self.stats.norm_obs(obs[t : t + horizon]).astype(np.float32)
-                 rews_chunk = rews[t: min(t+horizon, len(rews))]
+                 rews_chunk = rews[t : t + horizon]
                  transitions.append((obs_chunk, rews_chunk))
 
         self.transitions = transitions
+        if not self.transitions:
+            max_usable_length = max(
+                (min(len(traj['observations']), len(traj['actions'])) for traj in trajs),
+                default=0,
+            )
+            raise ValueError(
+                "Critic reward dataset has no valid windows: "
+                f"horizon={horizon}, trajectories={len(trajs)}, "
+                f"max_usable_length={max_usable_length}."
+            )
         self.save_stats(dataset_name, specific_dataset, task_id, new_step)
 
     def save_stats(self, dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):

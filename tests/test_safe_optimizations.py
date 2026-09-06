@@ -5,10 +5,16 @@ import numpy as np
 import torch
 from torch.autograd.functional import jvp
 import types
+from unittest.mock import patch
 
 from Finetuning.acc_adjoint_matching import Acc_AdjointMatchingFineTuner
 from Finetuning.traj_reward4 import TotalReward_Critic, _normalization_tensors
-from Finetuning.utils import _compact_tensor_rows_for_object_gather, symexp, symlog
+from Finetuning.utils import (
+    Critic_Test_Dataset,
+    _compact_tensor_rows_for_object_gather,
+    symexp,
+    symlog,
+)
 from Pretrain.utils import SAStats
 
 
@@ -30,6 +36,28 @@ class SafeOptimizationTest(unittest.TestCase):
         raw_size = plans.numel() * plans.element_size()
         self.assertLess(serialized_size, raw_size * 3)
         self.assertTrue(torch.equal(torch.stack(compact), plans))
+
+    def test_critic_test_dataset_includes_exact_horizon_window(self):
+        stats = SAStats()
+        stats.obs_mean = np.zeros(2, dtype=np.float32)
+        stats.obs_std = np.ones(2, dtype=np.float32)
+        trajectory = {
+            "observations": np.arange(8, dtype=np.float32).reshape(4, 2),
+            "actions": np.zeros((4, 1), dtype=np.float32),
+            "rewards": np.ones(4, dtype=np.float32),
+        }
+        with patch("Finetuning.utils.get_critic_stats", return_value=stats):
+            dataset = Critic_Test_Dataset(
+                "cube",
+                "single-play",
+                0,
+                [trajectory],
+                horizon=4,
+            )
+        self.assertEqual(len(dataset), 1)
+        _, rewards = dataset[0]
+        self.assertEqual(tuple(rewards.shape), (4,))
+
     def test_device_normalization_matches_existing_numpy_path(self):
         stats = SAStats()
         stats.obs_mean = np.array([1.0, -2.0, 0.5], dtype=np.float32)
