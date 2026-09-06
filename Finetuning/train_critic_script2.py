@@ -117,6 +117,7 @@ if __name__ == '__main__':  # pragma: no cover
         specific_env = 'single-play'
         traj_length = None
         horizon = 200
+        train_horizon = 32
         task_id = 4
         old_step = -1
         step = 0
@@ -138,7 +139,7 @@ if __name__ == '__main__':  # pragma: no cover
               "oversample": 30,
               "num_steps": 100,
               "resample_every": 1,
-              "train_horizon": 32,             # passed as horizon= to the trainer
+              "train_horizon": train_horizon,             # passed as horizon= to the trainer
               "gamma": 0.99,
               "lam": None,
               "rho": 0.0,
@@ -171,7 +172,7 @@ if __name__ == '__main__':  # pragma: no cover
                )
 
         data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
-        trajs = data.get_trajectories()
+        trajs = data.get_trajectories(suffix_length = train_horizon)
 
         kernel_config = KernelConfig(
                    checkpoint=hp["kernel_checkpoint"],

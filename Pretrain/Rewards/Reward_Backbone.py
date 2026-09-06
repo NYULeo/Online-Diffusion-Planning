@@ -71,6 +71,7 @@ class TrajectoryDict(TypedDict):
     observations: np.ndarray
     actions: np.ndarray  
     rewards: np.ndarray
+    masks: np.ndarray
 
 def divide_trajs(trajs):
     success_trajs = []

@@ -25,6 +25,7 @@ class TrajectoryDict(TypedDict):
     observations: np.ndarray
     actions: np.ndarray  
     rewards: np.ndarray
+    masks: np.ndarray
 
 """
 def determine_stride(dataset_name, specific_dataset):
@@ -34,6 +35,13 @@ def determine_stride(dataset_name, specific_dataset):
           return False
 """
 
+def drop_the_suffix(trajs, suffix_length: int):
+    for traj in trajs:
+        traj['observations'] = traj['observations'][:-suffix_length]
+        traj['actions'] = traj['actions'][:-suffix_length]
+        traj['rewards'] = traj['rewards'][:-suffix_length]
+        traj['masks'] = traj['masks'][:-suffix_length]
+    return trajs
 
 
 #-------------------------------------------------------------------------------------#
@@ -298,7 +306,7 @@ class OGPointmazeDataset_Singletask:
         return trajectories
     """
 
-    def get_trajectories(self) -> List[Dict[str, np.ndarray]]:
+    def get_trajectories(self, suffix_length: Optional[int] = None) -> List[Dict[str, np.ndarray]]:
        
         trajectories = []
         last_start = 0
@@ -344,6 +352,9 @@ class OGPointmazeDataset_Singletask:
                      trajectories.append(trajectory)
                      last_start = i + 1
 
+        if suffix_length is not None:
+             trajectories = drop_the_suffix(trajectories, suffix_length)
+    
         return trajectories
 
     def get_state_dim(self) -> int:
@@ -435,7 +446,7 @@ class AntmazeDataset_Singletask:
                  self.dataset_id, render_mode="rgb_array"
             )
  
-    def get_trajectories(self) -> List[Dict[str, np.ndarray]]:
+    def get_trajectories(self, suffix_length: Optional[int] = None) -> List[Dict[str, np.ndarray]]:
         trajectories = []
         last_start = 0
         N = len(self.dataset["observations"])
@@ -479,6 +490,9 @@ class AntmazeDataset_Singletask:
                          
                      trajectories.append(trajectory)
                      last_start = i + 1
+
+        if suffix_length is not None:
+             trajectories = drop_the_suffix(trajectories, suffix_length)
 
         return trajectories
 
@@ -571,7 +585,7 @@ class HumanoidmazeDataset_Singletask:
                  self.dataset_id, render_mode="rgb_array"
             )
  
-    def get_trajectories(self) -> List[Dict[str, np.ndarray]]:
+    def get_trajectories(self, suffix_length: Optional[int] = None) -> List[Dict[str, np.ndarray]]:
         trajectories = []
         last_start = 0
         N = len(self.dataset["observations"])
@@ -615,6 +629,9 @@ class HumanoidmazeDataset_Singletask:
                          
                      trajectories.append(trajectory)
                      last_start = i + 1
+
+        if suffix_length is not None:
+             trajectories = drop_the_suffix(trajectories, suffix_length)
 
         return trajectories
 
@@ -729,7 +746,7 @@ class CubeDataset_Singletask:
                  self.dataset_id, render_mode="rgb_array"
             )
 
-    def get_trajectories(self) -> List[Dict[str, np.ndarray]]:
+    def get_trajectories(self, suffix_length: Optional[int] = None) -> List[Dict[str, np.ndarray]]:
        
         trajectories = []
         last_start = 0
@@ -776,6 +793,9 @@ class CubeDataset_Singletask:
                          
                      trajectories.append(trajectory)
                      last_start = i + 1
+        
+        if suffix_length is not None:
+             trajectories = drop_the_suffix(trajectories, suffix_length)
 
         return trajectories
 
@@ -857,7 +877,7 @@ class SceneDataset_Singletask:
             self.dataset_id, render_mode="rgb_array"
         )
 
-    def get_trajectories(self) -> List[Dict[str, np.ndarray]]:
+    def get_trajectories(self, suffix_length: Optional[int] = None) -> List[Dict[str, np.ndarray]]:
         trajectories = []
         last_start = 0
         N = len(self.dataset["observations"])
@@ -893,6 +913,9 @@ class SceneDataset_Singletask:
                 }
                 trajectories.append(trajectory)
                 last_start = i + 1
+        
+        if suffix_length is not None:
+             trajectories = drop_the_suffix(trajectories, suffix_length)
 
         return trajectories
 
@@ -986,7 +1009,7 @@ class PuzzleDataset_Singletask:
             self.dataset_id, render_mode="rgb_array"
         )
 
-    def get_trajectories(self) -> List[Dict[str, np.ndarray]]:
+    def get_trajectories(self, suffix_length: Optional[int] = None) -> List[Dict[str, np.ndarray]]:
         trajectories = []
         last_start = 0
         N = len(self.dataset["observations"])
@@ -1022,6 +1045,9 @@ class PuzzleDataset_Singletask:
                 }
                 trajectories.append(trajectory)
                 last_start = i + 1
+        
+        if suffix_length is not None:
+             trajectories = drop_the_suffix(trajectories, suffix_length)
 
         return trajectories
 

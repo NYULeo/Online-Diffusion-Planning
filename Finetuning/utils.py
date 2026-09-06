@@ -59,6 +59,7 @@ class TrajectoryDict(TypedDict):
     observations: np.ndarray
     actions: np.ndarray  
     rewards: np.ndarray
+    masks: np.ndarray
 
 class Q_Stats:
     Q_mean: float
