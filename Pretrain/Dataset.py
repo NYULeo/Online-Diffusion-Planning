@@ -723,8 +723,14 @@ class CubeDataset_Singletask:
             raise ValueError(f"Invalid dataset name: {name}")
 
         self.dataset_id = name_to_id[name]
+        
 
-        self.env, self.dataset, self.eval_dataset = ogbench.make_env_and_datasets(
+        self.env, _, _ = ogbench.make_env_and_datasets(
+               self.dataset_id, 
+               env_only=True
+        )
+
+        _, self.dataset, self.eval_dataset = ogbench.make_env_and_datasets(
                  self.dataset_id, render_mode="rgb_array"
             )
 
@@ -785,8 +791,8 @@ class CubeDataset_Singletask:
         return int(self.dataset["actions"].shape[-1])
 
     def get_env(self, render_mode: str = "rgb_array"):
-        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, env_only=True, render_mode=render_mode)
-        return env
+        #env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
+        return self.env
 
 class SceneDataset:
     def __init__(self, name: str):
