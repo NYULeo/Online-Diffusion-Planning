@@ -142,7 +142,7 @@ if __name__ == '__main__':  # pragma: no cover
               "train_horizon": train_horizon,             # passed as horizon= to the trainer
               "gamma": 0.99,
               "lam": None,
-              "rho": 0.5,
+              "rho": 0.0,
               "lr": 1e-05,
               "min_lr": 1e-06,
               "tau": 0.005,
