@@ -59,7 +59,7 @@ from Pretrain.Transition_Kernel.Kernel_Backbone import (
 import math
 import torch
 import torch.nn.functional as F
-
+from Pretrain.utils import wandb_log
 
 
 
@@ -708,6 +708,13 @@ def probe_multi_horizon_bellman(
         print(f"E[R^31 / R^1]       = {stats['E_R31_over_R1']:.4f}")
         print(f"median(R^31 / R^1)  = {stats['median_R31_over_R1']:.4f}")
         print(f"E[R^31] / E[R^1]    = {stats['E_R31_div_E_R1']:.4f}")
+        wandb_log({
+                "checkpoint": critic_checkpoint,
+                "mean_std_K": stats["mean_std_K"],
+                "mean_R_mean": stats["mean_R_mean"],
+                "E[R^31 / R^1]": stats["E_R31_over_R1"],
+                "E[R^31] / E[R^1]": stats["E_R31_div_E_R1"],
+         })
 
     accelerator.wait_for_everyone()
     #return stats, (R.cpu() if is_main else None)

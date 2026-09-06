@@ -6,6 +6,7 @@ os.chdir(project_root)
 from Pretrain.Dataset import get_dataset
 from Finetuning.Raw import probe_multi_horizon_bellman  # paste the probe into utils.py first
 from accelerate import Accelerator
+import wandb
 
 def main():
     accelerator = Accelerator()
@@ -18,8 +19,17 @@ def main():
     data = get_dataset(dataset_name, specific_dataset, task_id=task_id)
     trajs = data.get_trajectories()
           
-    checkpoint = 0
-    while checkpoint <= 33:
+    if accelerator.is_main_process:
+        wandb.init(
+            entity="kaiwen_hu-uc-berkeley",
+            project="ODP",
+            name=f"{dataset_name}-{specific_dataset}-task{task_id}-bellman_prob",
+        )
+        wandb.define_metric("bellman_prob/checkpoint")
+        wandb.define_metric("bellman_prob/*", step_metric="bellman_prob/checkpoint")
+   
+    checkpoint = 3
+    while checkpoint <= 63:
           planner_checkpoint = checkpoint
           critic_checkpoint = checkpoint
           if accelerator.is_main_process:
@@ -32,7 +42,7 @@ def main():
                   planner_checkpoint=planner_checkpoint,
                   reward_checkpoint=reward_checkpoint,
                   critic_checkpoint=critic_checkpoint,
-                  backbone_layers=4,
+                  backbone_layers=2,
                   hidden_layers=4,
                   hidden_dim=512,
                   reward_hidden_layers=4,
