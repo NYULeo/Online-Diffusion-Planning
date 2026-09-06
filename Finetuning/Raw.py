@@ -386,7 +386,7 @@ def probe_multi_horizon_bellman(
     for p in critic.parameters():
         p.requires_grad_(False)
     critic_stat = get_critic_stats(
-        dataset_name, specific_dataset, task_id=task_id, step=critic_checkpoint
+        dataset_name, specific_dataset, task_id=task_id, step=0
     )
     c_mean = torch.as_tensor(critic_stat.obs_mean, device=device, dtype=torch.float32)
     c_std = torch.as_tensor(
