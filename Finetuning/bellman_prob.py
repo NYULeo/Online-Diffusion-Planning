@@ -30,7 +30,7 @@ def main():
         wandb.define_metric("bellman_prob/*", step_metric="bellman_prob/checkpoint")
    
     checkpoint = 3
-    while checkpoint <= 63:
+    while checkpoint <= 90:
           planner_checkpoint = checkpoint
           critic_checkpoint = checkpoint
           if accelerator.is_main_process:
