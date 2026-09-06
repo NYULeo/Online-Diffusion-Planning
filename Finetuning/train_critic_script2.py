@@ -141,7 +141,7 @@ if __name__ == '__main__':  # pragma: no cover
               "train_horizon": 32,             # passed as horizon= to the trainer
               "gamma": 0.99,
               "lam": None,
-              "rho": 0.3,
+              "rho": 0.0,
               "lr": 1e-04,
               "min_lr": 1e-05,
               "tau": 0.005,
@@ -200,7 +200,8 @@ if __name__ == '__main__':  # pragma: no cover
                    **{k: hp[k] for k in trainer_keys},
         )
         accelerator.wait_for_everyone()
-
+        
+        """
         trajs = data.get_trajectories()
         test_critic(
                 dataset_name=hp["dataset_name"],
@@ -217,6 +218,7 @@ if __name__ == '__main__':  # pragma: no cover
                 trajs=trajs,
                 task_id=hp["task_id"],
         )
+        """
         if accelerator.is_main_process:
            wandb.finish()
 
