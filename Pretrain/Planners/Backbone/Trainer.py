@@ -299,7 +299,7 @@ class SDETrainer:
                 loss = self.Loss(traj.to(self.device), cond.to(self.device))
                 loss = loss / self.gradient_accumulate_every
                 loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+            gradient_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
             self.optim.step()
             self.optim.zero_grad()
             self.scheduler.step()
@@ -320,6 +320,8 @@ class SDETrainer:
                         "planner/loss": logged_loss,
                         "planner/lr": self.optim.param_groups[0]['lr'],
                         "planner/steps_per_second": steps_per_second,
+                        "planner/gradient_norm": float(gradient_norm.detach().item()),
+                        **self.last_score_diagnostics,
                     },
                     step=self.step,
                 )
@@ -431,4 +433,24 @@ class SDETrainer:
         mse = diff.pow(2).sum(dim = (1,2)) 
         loss = (lam * mse).mean()
         loss = loss/((H*D) - self.state_dim)
+        with torch.no_grad():
+            active = (1 - mask).bool()
+            active_pred = pred[active].float()
+            active_target = target[active].float()
+            score_error = active_pred - active_target
+            target_rms = active_target.square().mean().sqrt().clamp_min(1e-8)
+            cosine = F.cosine_similarity(
+                (pred * (1 - mask)).reshape(B, -1).float(),
+                (target * (1 - mask)).reshape(B, -1).float(),
+                dim=1,
+                eps=1e-8,
+            ).mean()
+            self.last_score_diagnostics = {
+                "planner/score_normalized_rmse": float(
+                    (score_error.square().mean().sqrt() / target_rms).item()
+                ),
+                "planner/score_cosine_similarity": float(cosine.item()),
+                "planner/score_pred_std": float(active_pred.std(unbiased=False).item()),
+                "planner/score_target_std": float(active_target.std(unbiased=False).item()),
+            }
         return loss

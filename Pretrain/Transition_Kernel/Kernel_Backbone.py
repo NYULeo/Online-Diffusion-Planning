@@ -698,6 +698,9 @@ def train_mog_kernel(
 
     step = 0
     total_loss = 0.0
+    total_nll = 0.0
+    total_regularization = 0.0
+    total_member_spread = 0.0
 
     for step in tqdm(range(1, num_steps + 1), desc="Training MoG Kernel"):
         s, a, s_next = next(loader)
@@ -706,10 +709,12 @@ def train_mog_kernel(
         s_next = s_next.to(device)
 
         losses = []
+        nll_values = []
+        regularization_values = []
 
         for m in ensemble:
             mu, log_std, weights = m(s, a)
-            loss = m.mog_nll(s_next, mu, log_std, weights)
+            nll = m.mog_nll(s_next, mu, log_std, weights)
 
             # === Optional: disagreement regularization ===
             # Average over modes for disagreement calculation
@@ -719,8 +724,11 @@ def train_mog_kernel(
             var = torch.exp(2 * log_std) + m.noise_floor
             penalty = (disagreement / (var.mean(dim=1) + 1e-6)).mean()
 
-            loss = loss + λ_reg * penalty
+            regularization = λ_reg * penalty
+            loss = nll + regularization
             losses.append(loss)
+            nll_values.append(nll.detach())
+            regularization_values.append(regularization.detach())
 
         # Backprop
         for m, opt, loss in zip(ensemble, optimizers, losses):
@@ -732,12 +740,28 @@ def train_mog_kernel(
         # Logging
         avg_loss = sum(loss.item() for loss in losses) / ensemble_size
         total_loss += avg_loss
+        total_nll += torch.stack(nll_values).mean().item()
+        total_regularization += torch.stack(regularization_values).mean().item()
+        total_member_spread += torch.stack([loss.detach() for loss in losses]).std(
+            unbiased=False
+        ).item()
 
         if step % 100 == 0:
             logged_loss = total_loss / 100
             print(f"Step {step:6d} | Avg Loss: {logged_loss:.6f}")
-            wandb_log({"kernel/loss": logged_loss}, step=step)
+            wandb_log(
+                {
+                    "kernel/loss": logged_loss,
+                    "kernel/train/nll": total_nll / 100,
+                    "kernel/train/regularization": total_regularization / 100,
+                    "kernel/train/member_loss_spread": total_member_spread / 100,
+                },
+                step=step,
+            )
             total_loss = 0.0
+            total_nll = 0.0
+            total_regularization = 0.0
+            total_member_spread = 0.0
 
         # Save checkpoints
         if step % save_freq == 0 or step == num_steps:
@@ -970,6 +994,7 @@ def test_kernel_mog(dataset_name, specific_dataset: str = None, task_id: Optiona
         # Compute log-probs over dataset
         all_D2_total = []
         all_log_density = []
+        all_corrupted_log_density = []
         #all_D_total = []
         count = 0
         #worst = (None, float("inf"), None)  # (idx, log_prob, (s, a, s_next))
@@ -982,10 +1007,19 @@ def test_kernel_mog(dataset_name, specific_dataset: str = None, task_id: Optiona
             with torch.no_grad():
                 D2_total = compute_total_mahalanobis_score_mog(ensemble, s, a, s_next)
                 log_density = compute_log_density_mog(ensemble, s, a, s_next)
+                if s_next.shape[0] > 1:
+                    corrupted_log_density = compute_log_density_mog(
+                        ensemble, s, a, torch.roll(s_next, shifts=1, dims=0)
+                    )
+                else:
+                    corrupted_log_density = log_density
             D2 = D2_total.detach().cpu().numpy()
             log_density = log_density.detach().cpu().numpy()
             all_D2_total.extend(D2)
             all_log_density.extend(log_density)
+            all_corrupted_log_density.extend(
+                corrupted_log_density.detach().cpu().numpy()
+            )
             count += 1
 
         print('Mahalanobis Distance')
@@ -1015,6 +1049,35 @@ def test_kernel_mog(dataset_name, specific_dataset: str = None, task_id: Optiona
         print(f"max_log_density = {max_log_density:.4f}")
         print(f"std_log_density = {std_log_density:.4f}")
         print(f"τ ({(1-quantile)*100:.0f}th percentile) : {tau:.4f}")
+        corrupted_log_density = np.asarray(all_corrupted_log_density)
+        id_acceptance = float((all_log_density > tau).mean())
+        corrupted_acceptance = float((corrupted_log_density > tau).mean())
+        sorted_corrupted = np.sort(corrupted_log_density)
+        lower = np.searchsorted(sorted_corrupted, all_log_density, side="left")
+        upper = np.searchsorted(sorted_corrupted, all_log_density, side="right")
+        density_auc = float(
+            np.mean((lower + 0.5 * (upper - lower)) / max(len(sorted_corrupted), 1))
+        )
+        wandb_log(
+            {
+                "kernel/eval/mahalanobis_mean": mean_D2_total,
+                "kernel/eval/mahalanobis_std": std_D2_total,
+                "kernel/eval/mahalanobis_p99": float(
+                    np.quantile(all_D2_total, quantile)
+                ),
+                "kernel/eval/log_density_mean": mean_log_density,
+                "kernel/eval/log_density_std": std_log_density,
+                "kernel/eval/log_density_threshold": tau,
+                "kernel/eval/id_acceptance": id_acceptance,
+                "kernel/eval/corrupted_acceptance": corrupted_acceptance,
+                "kernel/eval/corrupted_rejection": 1.0 - corrupted_acceptance,
+                "kernel/eval/density_separation": float(
+                    all_log_density.mean() - corrupted_log_density.mean()
+                ),
+                "kernel/eval/density_auc": density_auc,
+            },
+            step=step,
+        )
         step += save_freq
 
 

@@ -19,9 +19,9 @@ import torch
 import torch.optim as optim
 import numpy as np
 try:
-    from Pretrain.utils import set_seed, SAStats, ema_smooth, cycle, check_device, wandb_log
+    from Pretrain.utils import set_seed, SAStats, ema_smooth, cycle, check_device, regression_diagnostics, wandb_log
 except ModuleNotFoundError:
-    from utils import set_seed, SAStats, ema_smooth, cycle, check_device, wandb_log
+    from utils import set_seed, SAStats, ema_smooth, cycle, check_device, regression_diagnostics, wandb_log
 import torch.nn as nn
 import pickle
 try:
@@ -525,7 +525,7 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
          return trajs, name, obs_dim, act_dim
     else:
          raise ValueError(f"Invalid dataset name: {dataset_name}")
-         
+
 def reward_filter_goals(trajs: List[TrajectoryDict], goal) -> List[TrajectoryDict]:
     def reward_filter2(traj: TrajectoryDict, goal) -> List[TrajectoryDict]:
         last_step = 1
@@ -679,8 +679,16 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
            if step % 2000 == 0:
               avg_loss = total_loss / 2000
               print(f"Step {step}, loss {avg_loss:.4f}")
+              diagnostics = regression_diagnostics(pred, r)
               wandb_log(
-                  {"reward/loss": avg_loss, "reward/lr": scheduler.get_last_lr()[0]},
+                  {
+                      "reward/loss": avg_loss,
+                      "reward/lr": scheduler.get_last_lr()[0],
+                      **{
+                          f"reward/train/{name}": value
+                          for name, value in diagnostics.items()
+                      },
+                  },
                   step=step,
               )
               total_loss = 0
@@ -1104,6 +1112,7 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
     num = save_freq
     while num <= num_steps:
          Rewards = []
+         Targets = []
          state_dict = load_model(dataset_name, specific_dataset, task_id, num)
          reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
          #reward_net = DeepScaledReward(obs_dim, act_dim).to(device)
@@ -1125,6 +1134,7 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
              total_mean_loss += loss.item()
              total_reward += pred.mean().item()
              Rewards.extend(pred.detach().cpu().numpy())
+             Targets.extend(r.detach().cpu().numpy())
              
          avg_mean_loss = total_mean_loss / len(dataloader)
          avg_reward = total_reward / len(dataloader)
@@ -1139,7 +1149,21 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
          print(f'std_reward: {std_R:.4f}')
          print(f"max_reward: {max_R:.4f}")
          print(f"min_reward: {min_R:.4f}")
-        
+         diagnostics = regression_diagnostics(
+             torch.as_tensor(np.asarray(Rewards)),
+             torch.as_tensor(np.asarray(Targets)),
+         )
+         wandb_log(
+             {
+                 "reward/eval/loss": avg_mean_loss,
+                 **{
+                     f"reward/eval/{name}": value
+                     for name, value in diagnostics.items()
+                 },
+             },
+             step=num,
+         )
+
          num += save_freq
 
 def get_pretrained_reward(dataset_name, checkpoints, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):

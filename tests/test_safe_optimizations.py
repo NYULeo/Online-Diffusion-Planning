@@ -8,14 +8,14 @@ import types
 from unittest.mock import patch
 
 from Finetuning.acc_adjoint_matching import Acc_AdjointMatchingFineTuner
-from Finetuning.traj_reward4 import TotalReward_Critic, _normalization_tensors
+from Finetuning.traj_reward4 import TotalReward, TotalReward_Critic, _normalization_tensors
 from Finetuning.utils import (
     Critic_Test_Dataset,
     _compact_tensor_rows_for_object_gather,
     symexp,
     symlog,
 )
-from Pretrain.utils import SAStats
+from Pretrain.utils import SAStats, regression_diagnostics
 
 
 class SafeOptimizationTest(unittest.TestCase):
@@ -28,6 +28,16 @@ class SafeOptimizationTest(unittest.TestCase):
     def test_symlog_symexp_round_trip(self):
         values = torch.tensor([-100.0, -1.0, 0.0, 1.0, 100.0])
         self.assertTrue(torch.allclose(symexp(symlog(values)), values, atol=1e-5))
+
+    def test_regression_diagnostics_have_expected_direction(self):
+        target = torch.tensor([0.0, 1.0, 2.0, 3.0])
+        perfect = regression_diagnostics(target, target)
+        collapsed = regression_diagnostics(torch.zeros_like(target), target)
+        self.assertEqual(perfect["mae"], 0.0)
+        self.assertEqual(perfect["normalized_mae"], 0.0)
+        self.assertAlmostEqual(perfect["correlation"], 1.0, places=6)
+        self.assertGreater(collapsed["normalized_mae"], perfect["normalized_mae"])
+        self.assertLess(collapsed["std_ratio"], perfect["std_ratio"])
 
     def test_object_gather_rows_do_not_retain_full_backing_storage(self):
         plans = torch.randn(64, 8, 5)
@@ -308,10 +318,62 @@ class SafeOptimizationTest(unittest.TestCase):
         vector_constraint = model.get_c(plan)
         vector_prediction = model.predict(plan, lam)
         vector_total, vector_gradient = model(plan, lam)
+        components = model.diagnostic_components_batch(plan, lam)
         self.assertTrue(torch.allclose(vector_constraint, scalar_constraint, atol=1e-6))
         self.assertTrue(torch.allclose(vector_prediction, scalar_total, atol=1e-6))
         self.assertTrue(torch.allclose(vector_total, scalar_total, atol=1e-6))
         self.assertTrue(torch.allclose(vector_gradient, scalar_gradient, atol=1e-6))
+        self.assertTrue(
+            torch.allclose(
+                components["compositional_reward"].squeeze(0),
+                vector_prediction,
+                atol=1e-6,
+            )
+        )
+        self.assertTrue(
+            torch.allclose(
+                components["base_reward"],
+                components["immediate_reward"] + components["terminal_value"],
+                atol=1e-6,
+            )
+        )
+
+    def test_reward_only_diagnostics_match_predict(self):
+        class RewardNet(torch.nn.Module):
+            def forward(self, state, action):
+                return state.sum(dim=-1) + 0.2 * action.sum(dim=-1)
+
+        model = TotalReward.__new__(TotalReward)
+        torch.nn.Module.__init__(model)
+        model.config = types.SimpleNamespace(
+            d_s=2,
+            d_a=1,
+            critic_gamma=0.9,
+            delta=torch.tensor(0.2),
+            device=torch.device("cpu"),
+        )
+        model.reward_obs_mean = torch.zeros(2)
+        model.reward_obs_std = torch.ones(2)
+        model.kernel_obs_mean = torch.zeros(2)
+        model.kernel_obs_std = torch.ones(2)
+        model.reward_net = RewardNet()
+        model.sigmoid = lambda state, action, next_state: (
+            (next_state - state).square().sum(dim=-1)
+            + 0.1 * action.square().sum(dim=-1)
+        )
+        plan = torch.tensor(
+            [[0.1, 0.2, 0.3], [0.2, 0.4, -0.1], [0.5, 0.1, 0.2]],
+            dtype=torch.float32,
+        )
+        prediction = model.predict(plan, 0.4)
+        diagnostics = model.diagnostic_components_batch(plan, 0.4)
+        self.assertTrue(
+            torch.allclose(
+                diagnostics["compositional_reward"].squeeze(0),
+                prediction,
+                atol=1e-6,
+            )
+        )
 
 
 if __name__ == "__main__":

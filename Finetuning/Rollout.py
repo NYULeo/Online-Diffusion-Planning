@@ -492,6 +492,13 @@ def rollout(env_name,
      #print(get_normalized_score([traj], expert_score))
      if(render):
           media.write_video("demo.mp4", frames, fps=50) #save the video
+     wandb_log(
+         {
+             "rollout/episode_return": float(np.asarray(rewards).sum()),
+             "rollout/episode_length": len(observations),
+             "rollout/success": float(info["success"]),
+         }
+     )
      """
      with open('Generated_trajectory.pkl', 'wb') as f:
                 pickle.dump(traj_info, f)

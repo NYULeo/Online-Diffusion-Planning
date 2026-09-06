@@ -201,6 +201,56 @@ class TotalReward(nn.Module):
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward
 
+    @torch.no_grad()
+    def diagnostic_components_batch(self, plans: torch.Tensor, lam: float, critic_override=None):
+        """Return batched objective components without changing the training path."""
+        if plans.dim() == 2:
+            plans = plans.unsqueeze(0)
+        batch_size, horizon, _ = plans.shape
+        states = plans[..., :self.config.d_s]
+        actions = plans[..., self.config.d_s:]
+        reward_states = self.reward_processor(states).reshape(-1, self.config.d_s)
+        rewards = self.reward_net(
+            reward_states, actions.reshape(-1, self.config.d_a)
+        ).reshape(batch_size, horizon)
+        discounts = plans.new_tensor(self.config.critic_gamma).pow(
+            torch.arange(horizon, device=plans.device)
+        )
+        immediate_reward = (discounts * rewards).sum(dim=1) / horizon
+
+        kernel_states = self.kernel_processor(states[:, :-1]).reshape(
+            -1, self.config.d_s
+        )
+        kernel_next_states = self.kernel_processor(states[:, 1:]).reshape(
+            -1, self.config.d_s
+        )
+        constraints = self.sigmoid(
+            kernel_states,
+            actions[:, :-1].reshape(-1, self.config.d_a),
+            kernel_next_states,
+        ).reshape(batch_size, horizon - 1)
+        constraint_mean = constraints.mean(dim=1)
+        centered_constraint = constraint_mean - self.config.delta
+        applied_penalty = lam * centered_constraint
+        terminal_value = torch.zeros_like(immediate_reward)
+        compositional_reward = immediate_reward - applied_penalty
+        return {
+            "immediate_reward": immediate_reward,
+            "terminal_value": terminal_value,
+            "base_reward": immediate_reward,
+            "constraint_mean": constraint_mean,
+            "constraint_centered": centered_constraint,
+            "constraint_penalty_applied": applied_penalty,
+            "compositional_reward": compositional_reward,
+            "paper_compositional_reward": compositional_reward,
+        }
+
+    @torch.no_grad()
+    def diagnostic_terminal_value_batch(self, plans: torch.Tensor, critic_override=None):
+        if plans.dim() == 2:
+            plans = plans.unsqueeze(0)
+        return torch.zeros(plans.shape[0], device=plans.device, dtype=plans.dtype)
+
     def forward(self, x: torch.Tensor, lam: float):
         H, D = x.shape
         total_reward = torch.tensor(0.0, device=self.config.device, requires_grad = False)
@@ -407,6 +457,75 @@ class TotalReward_Critic(nn.Module):
         )
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward
+
+    @torch.no_grad()
+    def diagnostic_terminal_value_batch(self, plans: torch.Tensor, critic_override=None):
+        if plans.dim() == 2:
+            plans = plans.unsqueeze(0)
+        horizon = plans.shape[1]
+        critic_model = self.critic if critic_override is None else critic_override
+        final_states = self.critic_processor(
+            plans[:, -1, :self.config.critic_d_s]
+        )
+        values = symexp(critic_model(final_states))
+        return (
+            (self.config.critic_gamma ** (horizon - 1))
+            * self.q_scale.Q_scale
+            * values
+        )
+
+    @torch.no_grad()
+    def diagnostic_components_batch(self, plans: torch.Tensor, lam: float, critic_override=None):
+        """Expose the exact live objective and the report-normalized variant."""
+        if plans.dim() == 2:
+            plans = plans.unsqueeze(0)
+        batch_size, horizon, _ = plans.shape
+        states = plans[..., :self.config.d_s]
+        actions = torch.clamp(plans[..., self.config.d_s:], -1.0, 1.0)
+
+        reward_states = self.reward_processor(states[:, :-1]).reshape(
+            -1, self.config.d_s
+        )
+        rewards = self.reward_net(
+            reward_states, actions[:, :-1].reshape(-1, self.config.d_a)
+        ).reshape(batch_size, horizon - 1)
+        discounts = plans.new_tensor(self.config.critic_gamma).pow(
+            torch.arange(horizon - 1, device=plans.device)
+        )
+        immediate_reward = (discounts * rewards).sum(dim=1)
+        terminal_value = self.diagnostic_terminal_value_batch(
+            plans, critic_override=critic_override
+        )
+
+        kernel_states = self.kernel_processor(states[:, :-1]).reshape(
+            -1, self.config.d_s
+        )
+        kernel_next_states = self.kernel_processor(states[:, 1:]).reshape(
+            -1, self.config.d_s
+        )
+        constraints = self.sigmoid(
+            kernel_states,
+            actions[:, :-1].reshape(-1, self.config.d_a),
+            kernel_next_states,
+        ).reshape(batch_size, horizon - 1)
+        constraint_mean = constraints.mean(dim=1)
+        centered_constraint = constraint_mean - self.config.delta
+
+        # Exact penalty used by predict()/forward(): sum(c_t) - delta.
+        applied_penalty = lam * (constraints.sum(dim=1) - self.config.delta)
+        # Report.pdf defines the constraint with mean(c_t) - delta.
+        paper_penalty = lam * centered_constraint
+        base_reward = immediate_reward + terminal_value
+        return {
+            "immediate_reward": immediate_reward,
+            "terminal_value": terminal_value,
+            "base_reward": base_reward,
+            "constraint_mean": constraint_mean,
+            "constraint_centered": centered_constraint,
+            "constraint_penalty_applied": applied_penalty,
+            "compositional_reward": base_reward - applied_penalty,
+            "paper_compositional_reward": base_reward - paper_penalty,
+        }
 
     def forward(self, x: torch.Tensor, lam: float):
         H, D = x.shape

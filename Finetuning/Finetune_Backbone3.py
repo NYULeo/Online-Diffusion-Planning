@@ -305,6 +305,8 @@ class OnlineFinetuner():
             self.wandb_run.define_metric("finetune/constraint", step_metric="finetune/step")
             self.wandb_run.define_metric("finetune/alpha", step_metric="finetune/step")
             self.wandb_run.define_metric("finetune/lambda", step_metric="finetune/step")
+            self.wandb_run.define_metric("finetune/components/*", step_metric="finetune/step")
+            self.wandb_run.define_metric("finetune/frozen/*", step_metric="finetune/step")
             self.wandb_run.define_metric("finetune/round")
             self.wandb_run.define_metric("finetune/rollout/*", step_metric="finetune/round")
             self.wandb_run.define_metric("finetune/timing/*", step_metric="finetune/round")
@@ -313,6 +315,11 @@ class OnlineFinetuner():
 
         self.Initialize_BufferDataset()
         self.set_reward_model(self.device)
+        self.frozen_diagnostic_critic = None
+        if isinstance(self.reward_model, TotalReward_Critic):
+            self.frozen_diagnostic_critic = copy.deepcopy(self.reward_model.critic).eval()
+            for parameter in self.frozen_diagnostic_critic.parameters():
+                parameter.requires_grad_(False)
         self.AMFineTuner = Acc_AdjointMatchingFineTuner(
                    self.accelerator,
                    self.config.planner_checkpoint,
@@ -709,7 +716,12 @@ class OnlineFinetuner():
 
             #self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
             am_started = time.perf_counter()
-            self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
+            self.AMFineTuner.finetune_planner(
+                dataloader,
+                self.reward_model,
+                step + 1,
+                diagnostic_critic=self.frozen_diagnostic_critic,
+            )
             self.accelerator.wait_for_everyone()
 
 
@@ -765,6 +777,18 @@ class OnlineFinetuner():
             gathered_scores = self.accelerator.gather_for_metrics(torch.tensor([score], device=self.device, dtype = torch.float32),  use_gather_object=False)
             gathered_success_rates = self.accelerator.gather_for_metrics(torch.tensor([success_rate], device=self.device, dtype = torch.float32), use_gather_object=False)
             gathered_steps = self.accelerator.gather_for_metrics(torch.tensor([total_steps], device=self.device, dtype = torch.int64),  use_gather_object=False)
+            local_rollout_totals = torch.tensor(
+                [
+                    len(trajs),
+                    sum(float(np.asarray(traj["rewards"]).sum()) for traj in trajs),
+                    sum(len(traj["actions"]) for traj in trajs),
+                ],
+                device=self.device,
+                dtype=torch.float64,
+            )
+            gathered_rollout_totals = self.accelerator.gather_for_metrics(
+                local_rollout_totals.unsqueeze(0), use_gather_object=False
+            )
             if self.accelerator.is_main_process:
                  total_steps = gathered_steps.int().sum().item()
                  num_rollout = (num_rollout_procs if num_rollout_procs is not None
@@ -773,6 +797,10 @@ class OnlineFinetuner():
                  rollout_success_rates = gathered_success_rates.float()[:num_rollout]
                  avg_score = rollout_scores.float().mean().item()
                  avg_success_rate = rollout_success_rates.float().mean().item()
+                 rollout_totals = gathered_rollout_totals[:num_rollout].sum(dim=0)
+                 episode_count = max(float(rollout_totals[0].item()), 1.0)
+                 avg_episode_return = float(rollout_totals[1].item() / episode_count)
+                 avg_episode_length = float(rollout_totals[2].item() / episode_count)
                  print(f"Total Number of Environment Steps: {total_steps}")
                  print(f"Average Success Rate: {avg_success_rate:.2f}")
                  print(f"Average Normalized Score: {avg_score:.2f}")
@@ -782,6 +810,8 @@ class OnlineFinetuner():
                          "finetune/rollout/success_rate": avg_success_rate,
                          "finetune/rollout/normalized_score": avg_score,
                          "finetune/rollout/environment_steps": total_steps,
+                         "finetune/rollout/episode_return": avg_episode_return,
+                         "finetune/rollout/episode_length": avg_episode_length,
                      }
                  )
             self.accelerator.wait_for_everyone()

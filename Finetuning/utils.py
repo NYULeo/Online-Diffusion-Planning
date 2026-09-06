@@ -11,7 +11,7 @@ import torch
 import os
 import pickle
 from torch.utils.data import Dataset
-from Pretrain.utils import SAStats, wandb_log
+from Pretrain.utils import SAStats, regression_diagnostics, wandb_log
 from scipy.ndimage import gaussian_filter1d
 from typing import TypedDict, List, Union
 from typing import Optional
@@ -1745,7 +1745,10 @@ def test_critic(dataset_name: str,
                 sigma: Optional[float] = None,
                 target_reward: float = 10.0,      # ← must match reward model
                 trajs: List[TrajectoryDict] = None,
-                task_id: Optional[int] = None):
+                task_id: Optional[int] = None,
+                wandb_prefix: str = "critic/eval",
+                wandb_step_metric: Optional[str] = None,
+                wandb_step_value: Optional[int] = None):
     device = check_device()
 
     stats_step = 0 if critic_checkpoint == -1 else critic_checkpoint
@@ -1779,7 +1782,9 @@ def test_critic(dataset_name: str,
             s = s.to(device)
             rews_chunk = rews_chunk.to(device)
 
-            pred = symexp(model(s).squeeze(-1))
+            # Critic training divides reward targets by value_scale. Decode the
+            # prediction back to the reward units used by this evaluator.
+            pred = value_scale * symexp(model(s).squeeze(-1))
 
             # Compute raw n-step return
             gamma_pow = torch.tensor([gamma ** i for i in range(horizon)], device=device, dtype=torch.float32)
@@ -1796,6 +1801,20 @@ def test_critic(dataset_name: str,
 
     avg_loss = total_loss / len(dataset)
     mae = np.mean(np.abs(np.array(all_preds) - np.array(all_targets)))
+    diagnostics = regression_diagnostics(
+        torch.as_tensor(np.asarray(all_preds)),
+        torch.as_tensor(np.asarray(all_targets)),
+    )
+    wandb_metrics = {
+        f"{wandb_prefix}/loss": avg_loss,
+        **{
+            f"{wandb_prefix}/{name}": value
+            for name, value in diagnostics.items()
+        },
+    }
+    if wandb_step_metric is not None and wandb_step_value is not None:
+        wandb_metrics[wandb_step_metric] = wandb_step_value
+    wandb_log(wandb_metrics)
 
     print(f"Test Results (Checkpoint {checkpoint_step}):")
     print(f"  Smooth L1 Loss : {avg_loss:.4f}")
@@ -3316,7 +3335,8 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
            #s, target_value = buffer.obtain_training_data(target_critic, batch_size, tgt_mean, tgt_std, device)
            s = s.to(device)
            target_value = target_value.to(device)
-           target_value = symlog(target_value)
+           raw_target_value = target_value
+           target_value = symlog(raw_target_value)
 
            # Predicted Q-values
            q_pred = critic(s)
@@ -3333,7 +3353,23 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
            if(k % 1000 == 0):
                 logged_loss = total_loss / 1000
                 print(f"Critic Training step {k} loss: {logged_loss}")
-                wandb_log({"critic/loss": logged_loss}, step=k)
+                diagnostics = regression_diagnostics(
+                    symexp(q_pred.detach()), raw_target_value.detach()
+                )
+                wandb_log(
+                    {
+                        "critic/loss": logged_loss,
+                        "critic/train/loss_symlog": logged_loss,
+                        "critic/train/lr": scheduler.get_last_lr()[0],
+                        "critic/train/running_target_mean": tgt_mean.item(),
+                        "critic/train/running_target_std": tgt_std.item(),
+                        **{
+                            f"critic/train/decoded_{name}": value
+                            for name, value in diagnostics.items()
+                        },
+                    },
+                    step=k,
+                )
                 total_loss = 0.0
 
            # Soft update target network
@@ -4589,6 +4625,9 @@ def train_critic_with_planner7(
     running = 0.0
     total_mae = 0.0
     total_bias = 0.0
+    total_normalized_mae = 0.0
+    total_normalized_bias = 0.0
+    total_std_ratio = 0.0
     sampling_seconds = 0.0
     #n_resamples = max(1, num_steps // resample_every)
     #increments = max(1, (max_length + n_resamples - 1) // n_resamples)  # ceil
@@ -4647,6 +4686,8 @@ def train_critic_with_planner7(
               # reward clipping -----------------------------------------------------
               r_hat = torch.clamp(r_hat, 0.0, float('inf'))      # adjust bounds if needed
               r_hat = r_hat / Scale.Q_scale                     # or use a running std
+              reward_hat_mean = r_hat.mean()
+              reward_hat_std = r_hat.std(unbiased=False)
 
               plan_targets = torch.zeros(N, device=device)
 
@@ -4668,6 +4709,8 @@ def train_critic_with_planner7(
                       w *= lam
 
                   plan_targets = plan_targets / max(weight_sum, 1e-8)
+                  return_mean_metric = plan_targets.mean()
+                  return_std_metric = torch.zeros((), device=device)
 
               else:
                   # Conservative multi-horizon target:
@@ -4692,6 +4735,8 @@ def train_critic_with_planner7(
                   R_mean = R.mean(dim=1)          # (N,)
                   R_std = R.std(dim=1, unbiased=False).clamp(min=0.0)  # (N,)
                   plan_targets = R_mean - rho * R_std
+                  return_mean_metric = R_mean.mean()
+                  return_std_metric = R_std.mean()
 
               # ----- average targets per unique s0 -----
               s0_raw = s_raw[:, 0]
@@ -4710,8 +4755,14 @@ def train_critic_with_planner7(
               averaged_targets = averaged_targets / counts.clamp(min=1.0)
 
               averaged_targets = averaged_targets.detach()
+              raw_target_mean = averaged_targets.mean()
+              target_clipped_fraction = (averaged_targets < 0).float().mean()
               averaged_targets  = averaged_targets.clamp(0.0, float('inf'))
               averaged_targets = symlog(averaged_targets)
+              feasible_plan_fraction = B_eff / max(
+                  batch_size * kernel_config.oversample, 1
+              )
+              state_coverage = U / max(batch_size, 1)
 
               # running normalization
               batch_mean = averaged_targets.mean()
@@ -4732,6 +4783,10 @@ def train_critic_with_planner7(
             pred_std = v_pred.detach().std(unbiased=False)
             bias = (v_pred - averaged_targets).mean()
             mae = (v_pred - averaged_targets).abs().mean()
+            target_std_for_metrics = averaged_targets.std(unbiased=False).clamp_min(1e-8)
+            normalized_mae = mae / target_std_for_metrics
+            normalized_bias = bias.abs() / target_std_for_metrics
+            std_ratio = pred_std / target_std_for_metrics
         #loss = F.smooth_l1_loss(v_pred, normalized_target, beta=1.0)
         loss = F.smooth_l1_loss(v_pred, averaged_targets, beta=1.0)
         #loss = F.mse_loss(v_pred, averaged_targets)
@@ -4754,11 +4809,17 @@ def train_critic_with_planner7(
         running += loss.item()
         total_mae += mae.item()
         total_bias += bias.item()
+        total_normalized_mae += normalized_mae.item()
+        total_normalized_bias += normalized_bias.item()
+        total_std_ratio += std_ratio.item()
 
         if log_every > 0 and k % log_every == 0 and is_main:
             avg_loss = running / log_every
             avg_mae = total_mae / log_every
             avg_bias = total_bias / log_every
+            avg_normalized_mae = total_normalized_mae / log_every
+            avg_normalized_bias = total_normalized_bias / log_every
+            avg_std_ratio = total_std_ratio / log_every
             wandb_log({
                     wandb_step_metric: wandb_step_offset + k,
                     f"{wandb_prefix}/loss": avg_loss,
@@ -4770,6 +4831,22 @@ def train_critic_with_planner7(
                     f"{wandb_prefix}/target_max": averaged_targets.max().item(),
                     f"{wandb_prefix}/bias": avg_bias,
                     f"{wandb_prefix}/mae": avg_mae,
+                    f"{wandb_prefix}/normalized_mae": avg_normalized_mae,
+                    f"{wandb_prefix}/normalized_bias": avg_normalized_bias,
+                    f"{wandb_prefix}/std_ratio": avg_std_ratio,
+                    f"{wandb_prefix}/feasible_plans": B_eff,
+                    f"{wandb_prefix}/unique_start_states": U,
+                    f"{wandb_prefix}/feasible_plan_fraction": feasible_plan_fraction,
+                    f"{wandb_prefix}/state_coverage": state_coverage,
+                    f"{wandb_prefix}/reward_hat_mean": reward_hat_mean.item(),
+                    f"{wandb_prefix}/reward_hat_std": reward_hat_std.item(),
+                    f"{wandb_prefix}/multi_horizon_return_mean": return_mean_metric.item(),
+                    f"{wandb_prefix}/multi_horizon_uncertainty": return_std_metric.item(),
+                    f"{wandb_prefix}/conservative_gap": (
+                        rho * return_std_metric.item() if lam is None else 0.0
+                    ),
+                    f"{wandb_prefix}/raw_target_mean": raw_target_mean.item(),
+                    f"{wandb_prefix}/target_clipped_fraction": target_clipped_fraction.item(),
                     f"{wandb_prefix}/sampling_seconds": sampling_seconds,
                     f"{wandb_prefix}/plans_per_second": B_eff / max(sampling_seconds, 1e-8),
             })
@@ -4790,6 +4867,9 @@ def train_critic_with_planner7(
             running = 0.0
             total_bias = 0.0
             total_mae = 0.0
+            total_normalized_mae = 0.0
+            total_normalized_bias = 0.0
+            total_std_ratio = 0.0
 
     # final save
     accelerator.wait_for_everyone()

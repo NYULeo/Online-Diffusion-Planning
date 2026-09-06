@@ -113,6 +113,9 @@ def main(config: DictConfig) -> None:
         target_reward=warmup.test_target_reward,
         trajs=data.get_trajectories(),
         task_id=env.task_id,
+        wandb_prefix="critic_warmup/eval",
+        wandb_step_metric="critic_warmup_step",
+        wandb_step_value=warmup.num_steps,
     )
     if wandb_run is not None:
         wandb_run.finish()
