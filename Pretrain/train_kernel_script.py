@@ -21,7 +21,7 @@ if __name__ == '__main__':  # pragma: no cover
          batch_size = 512,
          lr = 1e-4,
          num_steps = 5000,
-         save_freq = 1000,
+         save_freq = 5000,
          ensemble_size = 10,
          num_modes = 10,
          num_hidden_layers = 4,
