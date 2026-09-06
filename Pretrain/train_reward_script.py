@@ -30,7 +30,7 @@ def main(config: DictConfig) -> None:
         return
 
     env = config.environment
-    reward = config.reward_pretrain
+    reward = config.scripts.train_reward_script
     set_seed(int(config.run.seed))
     wandb_run = init_wandb_run(
         f"{env.dataset_name}-{env.specific_dataset}-task{env.task_id}-reward",

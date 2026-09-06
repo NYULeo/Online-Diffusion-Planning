@@ -25,7 +25,7 @@ def main(config: DictConfig) -> None:
         return
 
     env = config.environment
-    kernel = config.kernel_pretrain
+    kernel = config.scripts.train_kernel_script
     set_seed(int(config.run.seed))
     wandb_run = init_wandb_run(
         f"{env.dataset_name}-{env.specific_dataset}-task{env.task_id}-kernel",

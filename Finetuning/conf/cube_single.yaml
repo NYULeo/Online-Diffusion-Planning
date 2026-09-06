@@ -3,6 +3,7 @@ defaults:
   - override hydra/hydra_logging: disabled
   - _self_
 
+# Shared by every pipeline stage.
 run:
   seed: 1
   validate_only: false
@@ -15,234 +16,245 @@ environment:
   specific_dataset: single-play
   task_id: 4
 
-planner_pretrain:
-  horizon: 32
-  backbone_name: transformer
-  backbone_layers: 2
-  data_parallel: true
-  num_steps: 1000000
-  batch_size: 256
-  gradient_accumulate_every: 1
-  effective_batch_size: 256
-  lr: 0.0002
-  stride: 1
+# Each block below belongs to exactly one executable stage. The script name is
+# the key so similarly named parameters cannot be confused across stages.
+scripts:
+  # Pretrain/pretrain_script4.py (also supported by pretrain_script2.py)
+  pretrain_script4:
+    horizon: 32
+    backbone_name: transformer
+    backbone_layers: 2
+    data_parallel: true
+    num_steps: 1000000
+    batch_size: 256
+    gradient_accumulate_every: 1
+    effective_batch_size: 256
+    lr: 0.0002
+    stride: 1
 
-reward_pretrain:
-  specific_dataset: single
-  hidden_layers: 4
-  hidden_dim: 512
-  batch_size: 256
-  num_steps: 30000
-  save_freq: 30000
-  lr: 0.005
-  min_lr: 0.0005
-  sigma: 4.0
-  alpha: null
-  target_reward: 500.0
-  train_goal: null
-  traj_length: null
+  # Pretrain/train_reward_script.py (also supported by train_reward_script2.py)
+  train_reward_script:
+    specific_dataset: single
+    hidden_layers: 4
+    hidden_dim: 512
+    batch_size: 256
+    num_steps: 30000
+    save_freq: 30000
+    lr: 0.005
+    min_lr: 0.0005
+    sigma: 4.0
+    alpha: null
+    target_reward: 500.0
+    train_goal: null
+    traj_length: null
 
-kernel_pretrain:
-  specific_dataset: single
-  task_id: null
-  batch_size: 512
-  lr: 0.0001
-  num_steps: 5000
-  save_freq: 1000
-  ensemble_size: 10
-  num_modes: 10
-  num_hidden_layers: 4
-  hidden_dim: 514
-  lambda_reg: 0.001
-  noise_floor: 0.0005
-  test_quantile: 0.99
-
-critic_pretrain:
-  traj_length: 200
-  horizon: 128
-  new_step: -1
-  value_scale: 5.0
-  reward_hidden_layers: 4
-  reward_hidden_dim: 512
-  reward_checkpoint: 0
-  critic_hidden_layers: 4
-  critic_hidden_dim: 512
-  batch_size: 256
-  num_steps: 10000
-  gamma: 0.99
-  lam: 0.95
-  lr: 0.0001
-  min_lr: 0.00001
-  tau: 0.005
-  old_step: null
-  momentum: 0.005
-  test_sigma: 4.0
-  test_target_reward: 500.0
-
-critic_warmup:
-  traj_length: 200
-  test_horizon: 128
-  mixed_precision: bf16
-  planner_checkpoint: 0
-  reward_checkpoint: 0
-  old_critic_checkpoint: -1
-  backbone_layers: 2
-  hidden_layers: 4
-  hidden_dim: 512
-  reward_hidden_layers: 4
-  reward_hidden_dim: 512
-  batch_size: 256
-  num_steps: 100
-  resample_every: 2
-  vectorized_sampling: true
-  plan_chunk_size: 256
-  horizon: 32
-  gamma: 0.99
-  lam: null
-  rho: 1.0
-  lr: 0.0001
-  min_lr: 0.00001
-  tau: 0.005
-  diffusion_steps: 10
-  num_karras: 1
-  eta: 0.0
-  new_step: 0
-  log_every: 20
-  kernel:
-    checkpoint: 0
-    type_kernel: mog
+  # Pretrain/train_kernel_script.py (also supported by train_kernel_script2.py)
+  train_kernel_script:
+    specific_dataset: single
+    task_id: null
+    batch_size: 512
+    lr: 0.0001
+    num_steps: 5000
+    save_freq: 1000
+    ensemble_size: 10
+    num_modes: 10
     num_hidden_layers: 4
     hidden_dim: 514
-    num_modes: 10
+    lambda_reg: 0.001
     noise_floor: 0.0005
-    min_log_prob: -110.0
-    oversample: 20
-  test_sigma: 4.0
-  test_target_reward: 500.0
+    test_quantile: 0.99
 
-rollout:
-  horizon: 32
-  num_layers: 2
-  diffusion_steps: 10
-  num_karras: 1
-  eta: 0.0
-  episode_length: 3000
-  checkpoint: 60
-  render: true
-  base_seed: 1
-  continual_rollout: true
-  chunk_size: 10
+  # Finetuning/train_critic_script.py: initial reward-based critic.
+  train_critic_script:
+    traj_length: 200
+    horizon: 128
+    new_step: -1
+    value_scale: 5.0
+    reward_hidden_layers: 4
+    reward_hidden_dim: 512
+    reward_checkpoint: 0
+    critic_hidden_layers: 4
+    critic_hidden_dim: 512
+    batch_size: 256
+    num_steps: 10000
+    gamma: 0.99
+    lam: 0.95
+    lr: 0.0001
+    min_lr: 0.00001
+    tau: 0.005
+    old_step: null
+    momentum: 0.005
+    test_sigma: 4.0
+    test_target_reward: 500.0
 
-alpha:
-  alpha_start: 1.0
-  alpha_end: 0.1
-  total_steps: 300
-  decay: true
+  # Finetuning/train_critic_script2.py: planner-based critic warmup.
+  train_critic_script2:
+    traj_length: 200
+    test_horizon: 128
+    mixed_precision: bf16
+    planner_checkpoint: 0
+    reward_checkpoint: 0
+    old_critic_checkpoint: -1
+    backbone_layers: 2
+    hidden_layers: 4
+    hidden_dim: 512
+    reward_hidden_layers: 4
+    reward_hidden_dim: 512
+    batch_size: 256
+    num_steps: 100
+    resample_every: 2
+    vectorized_sampling: true
+    plan_chunk_size: 256
+    horizon: 32
+    gamma: 0.99
+    lam: null
+    rho: 1.0
+    lr: 0.0001
+    min_lr: 0.00001
+    tau: 0.005
+    diffusion_steps: 10
+    num_karras: 1
+    eta: 0.0
+    new_step: 0
+    log_every: 20
+    kernel:
+      checkpoint: 0
+      type_kernel: mog
+      num_hidden_layers: 4
+      hidden_dim: 514
+      num_modes: 10
+      noise_floor: 0.0005
+      min_log_prob: -110.0
+      oversample: 20
+    test_sigma: 4.0
+    test_target_reward: 500.0
 
-adjoint_matching:
-  horizon: 32
-  backbone_name: transformer
-  backbone_layers: 2
-  eta: 0.0
-  s: 0.008
-  sigma_min: 0.01
-  sigma_max: 30.0
-  step_start_ema: 50
-  ema_decay: 0.99
-  save_freq: 10
-  save_model_freq: 50
-  log_freq: 10
+  # Finetuning/finetune_script2.py (finetune_script.py is an alias).
+  finetune_script2:
+    alpha_scheduler:
+      alpha_start: 1.0
+      alpha_end: 0.1
+      total_steps: 300
+      decay: true
 
-reward:
-  beta: 1.0
-  min_log_prob: -110.0
-  quantile: 0.999
-  number_of_generated_plans: 50
-  explore: false
-  gamma: 0.8
-  gae_lam: 0.95
-  critic_gamma: 0.99
+    adjoint_matching:
+      horizon: 32
+      backbone_name: transformer
+      backbone_layers: 2
+      eta: 0.0
+      s: 0.008
+      sigma_min: 0.01
+      sigma_max: 30.0
+      step_start_ema: 50
+      ema_decay: 0.99
+      save_freq: 10
+      save_model_freq: 50
+      log_freq: 10
 
-reward_training:
-  hidden_layers: 4
-  hidden_dim: 512
-  ensemble_size: null
-  batch_size: 256
-  num_steps: 30000
-  lr: 0.005
-  min_lr: 0.0005
-  sigma: 4.0
-  target_reward: 500.0
-  train_goal: null
-  rollout_goal: null
-  rollout_start_cells: null
+    reward_objective:
+      beta: 1.0
+      min_log_prob: -110.0
+      quantile: 0.999
+      number_of_generated_plans: 50
+      explore: false
+      gamma: 0.8
+      gae_lam: 0.95
+      critic_gamma: 0.99
 
-kernel_training:
-  batch_size: 512
-  num_steps: 5000
-  lr: 0.0001
-  ensemble_size: 10
-  num_hidden_layers: 4
-  hidden_dim: 514
-  type_kernel: mog
-  kernel_num_modes: 10
-  kernel_noise_floor: 0.0005
-  lambda_reg: 0.001
-  oversample: 10
+    reward_model:
+      hidden_layers: 4
+      hidden_dim: 512
+      ensemble_size: null
+      batch_size: 256
+      num_steps: 30000
+      lr: 0.005
+      min_lr: 0.0005
+      sigma: 4.0
+      target_reward: 500.0
+      train_goal: null
+      rollout_goal: null
+      rollout_start_cells: null
 
-critic_training:
-  hidden_layers: 4
-  hidden_dim: 512
-  batch_size: 64
-  num_steps: 20
-  log_every: 5
-  warm_up_steps: 1000
-  warm_up_log_every: 100
-  lr: 0.000001
-  min_lr: 0.000000001
-  tau: 0.005
-  gamma: 0.99
-  lam: null
-  rho: 1.0
-  resample_every: 1
-  vectorized_sampling: true
-  plan_chunk_size: 256
-  data_conservation: true
-  momentum: 0.1
+    kernel_model:
+      batch_size: 512
+      num_steps: 5000
+      lr: 0.0001
+      ensemble_size: 10
+      num_hidden_layers: 4
+      hidden_dim: 514
+      type_kernel: mog
+      kernel_num_modes: 10
+      kernel_noise_floor: 0.0005
+      lambda_reg: 0.001
+      oversample: 10
 
-finetuning:
-  planner_checkpoint: 0
-  reward_model_checkpoint: 0
-  kernel_model_checkpoint: 0
-  critic_model_checkpoint: 0
-  offline: true
-  critic: true
-  update_critic: true
-  kernel: true
-  update_kernel: false
-  buffer_size: 200000
-  finetune_buffer_cutoff_length: 100
-  train_buffer_cutoff_length: 200
-  finetune_steps: 90
-  finetune_rounds: 30
-  diffusion_steps: 10
-  karras_percent: 0.1
-  loss_clip_percent: 0.0
-  finetune_batch_size: 32
-  finetune_batch_per_sample: 8
-  finetune_lr: 0.00002
-  initial_lam: 0.05
-  eta_lam: 0.5
-  gradient_accumulate_every: 1
-  update_lambda_every: 1
-  reward_scaling_factor: 150
-  max_ent: false
-  entropy_scaling_factor: 0.5
-  rollout_length: 4000
-  rollout_num_envs: 8
-  num_rollout_processes: 8
-  continual_rollout: true
-  chunk_size: 31
+    critic_update:
+      hidden_layers: 4
+      hidden_dim: 512
+      batch_size: 64
+      num_steps: 20
+      log_every: 5
+      warm_up_steps: 1000
+      warm_up_log_every: 100
+      lr: 0.000001
+      min_lr: 0.000000001
+      tau: 0.005
+      gamma: 0.99
+      lam: null
+      rho: 1.0
+      resample_every: 1
+      vectorized_sampling: true
+      plan_chunk_size: 256
+      data_conservation: true
+      momentum: 0.1
+
+    settings:
+      planner_checkpoint: 0
+      reward_model_checkpoint: 0
+      kernel_model_checkpoint: 0
+      critic_model_checkpoint: 0
+      offline: true
+      critic: true
+      update_critic: true
+      kernel: true
+      update_kernel: false
+      buffer_size: 200000
+      finetune_buffer_cutoff_length: 100
+      train_buffer_cutoff_length: 200
+      finetune_steps: 90
+      finetune_rounds: 30
+      diffusion_steps: 10
+      karras_percent: 0.1
+      loss_clip_percent: 0.0
+      finetune_batch_size: 32
+      finetune_batch_per_sample: 8
+      finetune_lr: 0.00002
+      initial_lam: 0.05
+      eta_lam: 0.5
+      gradient_accumulate_every: 1
+      update_lambda_every: 1
+      reward_scaling_factor: 150
+      max_ent: false
+      entropy_scaling_factor: 0.5
+      rollout_length: 4000
+      rollout_num_envs: 8
+      num_rollout_processes: 8
+      continual_rollout: true
+      chunk_size: 31
+
+  # Finetuning/Rollout.py: standalone final evaluation.
+  rollout:
+    horizon: 32
+    num_layers: 2
+    diffusion_steps: 10
+    num_karras: 1
+    eta: 0.0
+    episode_length: 3000
+    checkpoint: 60
+    render: true
+    base_seed: 1
+    continual_rollout: true
+    chunk_size: 10
 
 hydra:
   run:

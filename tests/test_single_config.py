@@ -19,20 +19,44 @@ class SingleConfigTest(unittest.TestCase):
         self.assertEqual(env.dataset_name, "cube")
         self.assertEqual(env.specific_dataset, "single-play")
         self.assertEqual(env.task_id, 4)
-        self.assertEqual(self.config.finetuning.finetune_buffer_cutoff_length, 100)
-        self.assertEqual(self.config.finetuning.train_buffer_cutoff_length, 200)
+        settings = self.config.scripts.finetune_script2.settings
+        self.assertEqual(settings.finetune_buffer_cutoff_length, 100)
+        self.assertEqual(settings.train_buffer_cutoff_length, 200)
+
+    def test_configuration_is_grouped_by_entrypoint(self):
+        expected_scripts = {
+            "pretrain_script4",
+            "train_reward_script",
+            "train_kernel_script",
+            "train_critic_script",
+            "train_critic_script2",
+            "finetune_script2",
+            "rollout",
+        }
+        self.assertEqual(set(self.config.scripts.keys()), expected_scripts)
+        for legacy_name in (
+            "planner_pretrain",
+            "reward_pretrain",
+            "kernel_pretrain",
+            "critic_pretrain",
+            "critic_warmup",
+            "critic_training",
+            "finetuning",
+        ):
+            self.assertNotIn(legacy_name, self.config)
 
     def test_symlog_critic_pipeline(self):
-        self.assertEqual(self.config.critic_pretrain.new_step, -1)
-        self.assertEqual(self.config.critic_pretrain.value_scale, 5.0)
-        self.assertEqual(self.config.critic_warmup.old_critic_checkpoint, -1)
-        self.assertEqual(self.config.critic_warmup.kernel.oversample, 20)
-        self.assertEqual(self.config.kernel_training.oversample, 10)
-        self.assertEqual(self.config.critic_training.rho, 1.0)
-        self.assertEqual(self.config.critic_training.resample_every, 1)
+        scripts = self.config.scripts
+        self.assertEqual(scripts.train_critic_script.new_step, -1)
+        self.assertEqual(scripts.train_critic_script.value_scale, 5.0)
+        self.assertEqual(scripts.train_critic_script2.old_critic_checkpoint, -1)
+        self.assertEqual(scripts.train_critic_script2.kernel.oversample, 20)
+        self.assertEqual(scripts.finetune_script2.kernel_model.oversample, 10)
+        self.assertEqual(scripts.finetune_script2.critic_update.rho, 1.0)
+        self.assertEqual(scripts.finetune_script2.critic_update.resample_every, 1)
 
     def test_finetuning_parameters_are_preserved(self):
-        config = self.config.finetuning
+        config = self.config.scripts.finetune_script2.settings
         expected = {
             "offline": True,
             "critic": True,

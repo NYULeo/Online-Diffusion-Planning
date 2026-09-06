@@ -28,7 +28,7 @@ def main(config: DictConfig) -> None:
         return
 
     env = config.environment
-    warmup = config.critic_warmup
+    warmup = config.scripts.train_critic_script2
     set_seed(int(config.run.seed))
     data = get_dataset(
         env.dataset_name,
@@ -108,7 +108,7 @@ def main(config: DictConfig) -> None:
         critic_checkpoint=warmup.new_step,
         gamma=warmup.gamma,
         horizon=warmup.test_horizon,
-        value_scale=config.critic_pretrain.value_scale,
+        value_scale=config.scripts.train_critic_script.value_scale,
         sigma=warmup.test_sigma,
         target_reward=warmup.test_target_reward,
         trajs=data.get_trajectories(),

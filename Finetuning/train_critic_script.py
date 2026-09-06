@@ -26,7 +26,7 @@ def main(config: DictConfig) -> None:
         return
 
     env = config.environment
-    critic = config.critic_pretrain
+    critic = config.scripts.train_critic_script
     set_seed(int(config.run.seed))
     data = get_dataset(
         env.dataset_name,

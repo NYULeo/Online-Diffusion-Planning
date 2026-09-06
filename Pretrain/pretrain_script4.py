@@ -26,7 +26,7 @@ def main(config: DictConfig) -> None:
         return
 
     env = config.environment
-    planner = config.planner_pretrain
+    planner = config.scripts.pretrain_script4
     actual_effective_batch = planner.batch_size * planner.gradient_accumulate_every
     if actual_effective_batch != planner.effective_batch_size:
         raise ValueError(

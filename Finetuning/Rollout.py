@@ -607,7 +607,7 @@ def main(config: DictConfig) -> None:
         return
 
     env = config.environment
-    rollout_config = config.rollout
+    rollout_config = config.scripts.rollout
     set_seed(int(config.run.seed))
     device = check_device()
     print(f"Using device {device}")

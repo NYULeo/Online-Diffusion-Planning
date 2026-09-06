@@ -37,13 +37,17 @@ def optional_array(value: Any) -> np.ndarray | None:
 def build_finetuning_config(config: dict[str, Any]) -> FinetuningConfig:
     """Convert the resolved Hydra tree into the existing training dataclasses."""
     environment = config["environment"]
-    finetuning = config["finetuning"]
+    stage = config["scripts"]["finetune_script2"]
+    finetuning = stage["settings"]
     if finetuning["finetune_steps"] % finetuning["finetune_rounds"] != 0:
-        raise ValueError("finetuning.finetune_steps must be divisible by finetuning.finetune_rounds")
+        raise ValueError(
+            "scripts.finetune_script2.settings.finetune_steps must be divisible by "
+            "scripts.finetune_script2.settings.finetune_rounds"
+        )
 
-    alpha_config = AlphaSchedulerConfig(**config["alpha"])
+    alpha_config = AlphaSchedulerConfig(**stage["alpha_scheduler"])
 
-    am_values = dict(config["adjoint_matching"])
+    am_values = dict(stage["adjoint_matching"])
     am_runtime_fields = {
         name: am_values.pop(name)
         for name in (
@@ -58,18 +62,18 @@ def build_finetuning_config(config: dict[str, Any]) -> FinetuningConfig:
     for name, value in am_runtime_fields.items():
         setattr(am_config, name, value)
 
-    reward_config = RewardConfig(**config["reward"])
+    reward_config = RewardConfig(**stage["reward_objective"])
 
-    reward_values = dict(config["reward_training"])
+    reward_values = dict(stage["reward_model"])
     for name in ("train_goal", "rollout_goal", "rollout_start_cells"):
         reward_values[name] = optional_array(reward_values[name])
     reward_values["task_id"] = environment["task_id"]
     reward_training = Train_Reward_Config(**reward_values)
 
-    kernel_values = dict(config["kernel_training"])
+    kernel_values = dict(stage["kernel_model"])
     kernel_values["λ_reg"] = kernel_values.pop("lambda_reg")
     kernel_training = Train_Kernel_Config(**kernel_values)
-    critic_training = Train_Critic_Config(**config["critic_training"])
+    critic_training = Train_Critic_Config(**stage["critic_update"])
 
     return FinetuningConfig(
         AMConfig=am_config,
