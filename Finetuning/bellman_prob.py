@@ -19,7 +19,7 @@ def main():
     trajs = data.get_trajectories()
           
     checkpoint = 0
-    while checkpoint <= 0:
+    while checkpoint <= 33:
           planner_checkpoint = checkpoint
           critic_checkpoint = checkpoint
           if accelerator.is_main_process:
@@ -38,7 +38,7 @@ def main():
                   reward_hidden_layers=4,
                   reward_hidden_dim=512,
                   batch_size=256,
-                  oversample=20,
+                  oversample=30,
                   horizon=horizon,
                   gamma=0.99,
                   steps_T=10,
