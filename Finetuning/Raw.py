@@ -480,6 +480,7 @@ def probe_multi_horizon_bellman(
 
 """
 
+
 @torch.no_grad()
 def probe_multi_horizon_bellman(
     trajs,
@@ -565,7 +566,7 @@ def probe_multi_horizon_bellman(
     for p in critic.parameters():
         p.requires_grad_(False)
     critic_stat = get_critic_stats(
-        dataset_name, specific_dataset, task_id=task_id, step=0,
+        dataset_name, specific_dataset, task_id=task_id, step=critic_checkpoint,
     )
     c_mean = torch.as_tensor(critic_stat.obs_mean, device=device, dtype=torch.float32)
     c_std = torch.as_tensor(
@@ -611,7 +612,6 @@ def probe_multi_horizon_bellman(
     )[accelerator.process_index]
     local_s0 = s0[local_idx]
 
-    # --- batched Karras (same SDE as planner7) ---
     norm_s0 = torch.as_tensor(
         np.stack([planner_proc.preprocess(s) for s in local_s0]),
         dtype=torch.float32,
@@ -638,9 +638,7 @@ def probe_multi_horizon_bellman(
             t_now = t_grid[i]
             t_next = t_grid[i + 1] if i < steps_T - 1 else 0.0
             dt = (t_next - t_now).item()
-            beta_now = (
-                beta_1[i].item() if i < num_karras else beta_2[i].item()
-            )
+            beta_now = beta_1[i].item() if i < num_karras else beta_2[i].item()
             drift = -0.5 * beta_now * x
             score = planner(x, t_now.expand(B))
             if eta > 0:
@@ -677,49 +675,43 @@ def probe_multi_horizon_bellman(
             for K in range(1, n + 1)
         ],
         dim=1,
-    )  # (M_loc, n)
+    )
 
-    # gather variable-size R
     if accelerator.num_processes > 1:
         gathered = [None] * accelerator.num_processes
         dist.all_gather_object(gathered, R_loc.cpu())
-        R = torch.cat(gathered, dim=0) if is_main else R_loc
+        R = torch.cat(gathered, dim=0) if is_main else None
     else:
         R = R_loc
 
     stats = None
     if is_main:
         R = R.to(device)
-        mean_K = R.mean(0)
-        std_plans = R.std(0, unbiased=False)
-        std_K = R.std(1, unbiased=False)
-        mean_R = R.mean(1)
+        std_K = R.std(dim=1, unbiased=False)
+        mean_R = R.mean(dim=1)
+        R1 = R[:, 0]
+        RN = R[:, -1]
+        ratio = RN / R1.clamp(min=1e-8)
         stats = {
             "n_plans": int(R.shape[0]),
-            "K": list(range(1, n + 1)),
-            "mean_R_per_K": mean_K.cpu().tolist(),
-            "std_R_over_plans_per_K": std_plans.cpu().tolist(),
             "mean_std_K": float(std_K.mean()),
-            "median_std_K": float(std_K.median()),
-            "p90_std_K": float(std_K.quantile(0.90)),
             "mean_R_mean": float(mean_R.mean()),
-            "mean_R_std": float(mean_R.std(unbiased=False)),
-            "R_min": float(R.min()),
-            "R_max": float(R.max()),
+            "E_R31_over_R1": float(ratio.mean()),
+            "median_R31_over_R1": float(ratio.median()),
+            "E_R31": float(RN.mean()),
+            "E_R1": float(R1.mean()),
+            "E_R31_div_E_R1": float((RN.mean() / R1.mean().clamp(min=1e-8)).item()),
         }
         print("=== multi-horizon Bellman probe ===")
-        print(
-            f"plans={stats['n_plans']}  mean_K std(R^K)={stats['mean_std_K']:.4f}  "
-            f"p90 std_K={stats['p90_std_K']:.4f}"
-        )
-        for K, m, s in zip(
-            stats["K"], stats["mean_R_per_K"], stats["std_R_over_plans_per_K"]
-        ):
-            print(f"  K={K:02d}  E[R^K]={m:.4f}  std_τ(R^K)={s:.4f}")
+        print(f"plans={stats['n_plans']}")
+        print(f"mean_std_K          = {stats['mean_std_K']:.4f}")
+        print(f"mean_R_mean         = {stats['mean_R_mean']:.4f}")
+        print(f"E[R^31 / R^1]       = {stats['E_R31_over_R1']:.4f}")
+        print(f"median(R^31 / R^1)  = {stats['median_R31_over_R1']:.4f}")
+        print(f"E[R^31] / E[R^1]    = {stats['E_R31_div_E_R1']:.4f}")
 
     accelerator.wait_for_everyone()
     return stats, (R.cpu() if is_main else None)
-
 
 import pickle
 import torch

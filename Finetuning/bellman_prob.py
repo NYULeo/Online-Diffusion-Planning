@@ -14,50 +14,43 @@ def main():
     specific_dataset = "single-play"
     task_id = 4
     horizon = 32
-
-    planner_checkpoint = 0
     reward_checkpoint = 0
-    critic_checkpoint = 0
-
     data = get_dataset(dataset_name, specific_dataset, task_id=task_id)
     trajs = data.get_trajectories()
-
-    stats, R = probe_multi_horizon_bellman(
-        trajs=trajs,
-        dataset_name=dataset_name,
-        specific_dataset=specific_dataset,
-        planner_checkpoint=planner_checkpoint,
-        reward_checkpoint=reward_checkpoint,
-        critic_checkpoint=critic_checkpoint,
-        backbone_layers=4,
-        hidden_layers=4,
-        hidden_dim=512,
-        reward_hidden_layers=4,
-        reward_hidden_dim=512,
-        batch_size=256,
-        oversample=20,
-        horizon=horizon,
-        gamma=0.99,
-        steps_T=10,
-        num_karras=1,
-        eta=0.0,
-        task_id=task_id,
-        mix_reset=True,
-        n_reset=64,
-        accelerator=accelerator,
-    )
-    
-
-    """
-    out = os.path.join(
-        project_root, "Finetuning", "logs",
-        f"bellman_probe_{dataset_name}_{specific_dataset}_task{task_id}.pt",
-    )
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    import torch
-    torch.save({"stats": stats, "R": R}, out)
-    print("saved", out)
-    """
+          
+    checkpoint = 0
+    while checkpoint <= 0:
+          planner_checkpoint = checkpoint
+          critic_checkpoint = checkpoint
+          print("-----------------------------------------------")
+          print(f"checkpoint: {checkpoint}")
+          stats, R = probe_multi_horizon_bellman(
+                  trajs=trajs,
+                  dataset_name=dataset_name,
+                  specific_dataset=specific_dataset,
+                  planner_checkpoint=planner_checkpoint,
+                  reward_checkpoint=reward_checkpoint,
+                  critic_checkpoint=critic_checkpoint,
+                  backbone_layers=4,
+                  hidden_layers=4,
+                  hidden_dim=512,
+                  reward_hidden_layers=4,
+                  reward_hidden_dim=512,
+                  batch_size=256,
+                  oversample=20,
+                  horizon=horizon,
+                  gamma=0.99,
+                  steps_T=10,
+                  num_karras=1,
+                  eta=0.0,
+                  task_id=task_id,
+                  mix_reset=True,
+                  n_reset=64,
+                  accelerator=accelerator,
+             )
+          print(stats)
+          print(R)
+          checkpoint += 3
 
 
 if __name__ == "__main__":
