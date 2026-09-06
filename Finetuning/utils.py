@@ -1822,6 +1822,7 @@ def get_success_trajs(trajs):
             success_trajs.append(traj)
     return success_trajs
 
+"""
 class PlannerDataset(Dataset):
     def __init__(self, trajs: List[TrajectoryDict], horizon: int, dataset_name: str, specific_dataset: str, task_id: Optional[int] = None, cutoff_length: Optional[int] = None):
         self.trajs = copy.deepcopy(trajs)
@@ -1841,6 +1842,70 @@ class PlannerDataset(Dataset):
     def __len__(self):
         return len(self.conditions)
    
+    def __getitem__(self, idx):
+        return self.conditions[idx]
+"""
+class PlannerDataset(Dataset):
+    def __init__(
+        self,
+        trajs: List[TrajectoryDict],
+        horizon: int,
+        dataset_name: str,
+        specific_dataset: str,
+        task_id: Optional[int] = None,
+        cutoff_length: Optional[int] = None,
+        n_reset: int = 256,
+        reset_seed0: int = 10_000,
+        mix_reset: bool = True,
+    ):
+        self.trajs = copy.deepcopy(trajs)
+        if cutoff_length is not None:
+            self.trajs = traj_cutoff(self.trajs, cutoff_length)
+
+        print(
+            f"total steps for Finetuning: "
+            f"{np.sum([len(traj['observations']) for traj in self.trajs])}"
+        )
+
+        self.conditions = []
+        self.horizon = horizon
+        self.task_id = task_id
+        self.planner_processor = Planner_Processor(
+            dataset_name, specific_dataset, task_id
+        )
+
+        # play occupancy (normalized s0)
+        for traj in self.trajs:
+            obs = traj["observations"]
+            for t in range(len(obs)):
+                s_norm = self.planner_processor.preprocess(obs[t])
+                self.conditions.append(
+                    torch.tensor(s_norm, dtype=torch.float32)
+                )
+
+        n_play = len(self.conditions)
+
+        # train resets: same reset law as eval, seeds disjoint from 0..999
+        if mix_reset and n_reset > 0:
+            env, _, _ = get_env(dataset_name, specific_dataset, task_id = task_id)
+            reset_conds = []
+            for i in range(n_reset):
+                ob, _ = env.reset(
+                    seed=reset_seed0 + i,
+                    options=dict(task_id=task_id),
+                )
+                s_norm = self.planner_processor.preprocess(
+                    np.asarray(ob, dtype=np.float32)
+                )
+                reset_conds.append(
+                    torch.tensor(s_norm, dtype=torch.float32)
+                )
+            repeat = max(1, n_play // max(n_reset, 1))
+            self.conditions.extend(reset_conds * repeat)
+
+    def __len__(self):
+        return len(self.conditions)
+
     def __getitem__(self, idx):
         return self.conditions[idx]
 

@@ -493,7 +493,7 @@ class OnlineFinetuner():
          loader = DataLoader(
                  self.PlannerDataset,
                  batch_size=number_of_generated_plans,
-                 shuffle=False,
+                 shuffle=True,
                  drop_last=False,
           )
          s0_batch = next(iter(loader))  # torch.Tensor, shape (N, d_s) if enough data

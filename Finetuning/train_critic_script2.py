@@ -30,6 +30,7 @@ from Finetuning.utils import (
     KernelConfig,
 )
 from Pretrain.utils import set_seed
+from Finetuning.Raw import probe_multi_horizon_bellman
 from accelerate import Accelerator
 import random 
 import wandb
@@ -160,7 +161,6 @@ if __name__ == '__main__':  # pragma: no cover
               "noise_floor": 5e-4,
               "min_log_prob": -110.0,
           }
-
         accelerator = Accelerator(mixed_precision='bf16')
         os.chdir(project_root)
         if accelerator.is_main_process:
@@ -170,10 +170,8 @@ if __name__ == '__main__':  # pragma: no cover
                  name=f"{env_name}-{specific_env}-task{task_id}-critic_2",
                  config=hp,
                )
-
         data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
         trajs = data.get_trajectories(suffix_length = train_horizon)
-
         kernel_config = KernelConfig(
                    checkpoint=hp["kernel_checkpoint"],
                    type_kernel=hp["kernel_type"],
@@ -183,8 +181,7 @@ if __name__ == '__main__':  # pragma: no cover
                    noise_floor=hp["noise_floor"],
                    min_log_prob=hp["min_log_prob"],
                    oversample=hp["oversample"],
-        )
-
+            )
         trainer_keys = (
               "dataset_name", "specific_dataset", "planner_checkpoint", "reward_checkpoint",
               "old_critic_checkpoint", "backbone_layers", "hidden_layers", "hidden_dim",
@@ -193,15 +190,84 @@ if __name__ == '__main__':  # pragma: no cover
               "steps_T", "num_karras", "eta", "new_step", "task_id", "log_every",
          )
 
+        
+        
+        probe_kwargs = dict(
+                trajs=trajs,
+                dataset_name=hp["dataset_name"],
+                specific_dataset=hp["specific_dataset"],
+                planner_checkpoint=hp["planner_checkpoint"],
+                reward_checkpoint=hp["reward_checkpoint"],
+                backbone_layers=hp["backbone_layers"],
+                hidden_layers=hp["hidden_layers"],
+                hidden_dim=hp["hidden_dim"],
+                reward_hidden_layers=hp["reward_hidden_layers"],
+                reward_hidden_dim=hp["reward_hidden_dim"],
+                batch_size=64,
+                oversample=8,
+                horizon=hp["train_horizon"],
+                gamma=hp["gamma"],
+                steps_T=hp["steps_T"],
+                num_karras=hp["num_karras"],
+                eta=hp["eta"],
+                task_id=hp["task_id"],
+                mix_reset=True,
+                n_reset=64,
+                device=accelerator.device,
+          )
+        if accelerator.is_main_process:
+             print("=== probe BEFORE train (critic ckpt -1) ===")
+             stats_before, _ = probe_multi_horizon_bellman(
+                     critic_checkpoint=-1,
+                     **probe_kwargs,
+             )
+             wandb.log({
+                "probe_before/mean_std_K": stats_before["mean_std_K"],
+                "probe_before/median_std_K": stats_before["median_std_K"],
+                "probe_before/p90_std_K": stats_before["p90_std_K"],
+                "probe_before/mean_R_mean": stats_before["mean_R_mean"],
+                "probe_before/mean_R_std": stats_before["mean_R_std"],
+                "probe_before/R_min": stats_before["R_min"],
+                "probe_before/R_max": stats_before["R_max"],
+            })
+            
+
+
+        accelerator.wait_for_everyone()
         train_critic_with_planner7(
                    trajs = trajs,
                    kernel_config=kernel_config,
                    horizon=hp["train_horizon"],
                    accelerator=accelerator,
                    **{k: hp[k] for k in trainer_keys},
-        )
+            )
         accelerator.wait_for_everyone()
         
+
+
+        
+        if accelerator.is_main_process:
+             print("=== probe AFTER train (critic ckpt 0) ===")
+             stats_after, _ = probe_multi_horizon_bellman(
+                     critic_checkpoint=0,
+                     **probe_kwargs,
+             )
+             wandb.log({
+                "probe_after/mean_std_K": stats_after["mean_std_K"],
+                "probe_after/median_std_K": stats_after["median_std_K"],
+                "probe_after/p90_std_K": stats_after["p90_std_K"],
+                "probe_after/mean_R_mean": stats_after["mean_R_mean"],
+                "probe_after/mean_R_std": stats_after["mean_R_std"],
+                "probe_after/R_min": stats_after["R_min"],
+                "probe_after/R_max": stats_after["R_max"],
+            })
+
+
+
+
+
+
+
         """
         trajs = data.get_trajectories()
         test_critic(

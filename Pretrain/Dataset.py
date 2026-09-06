@@ -20,6 +20,7 @@ except ModuleNotFoundError:
 import os
 from typing import Optional, List, Dict, TypedDict
 import numpy as np
+import copy
 
 class TrajectoryDict(TypedDict):
     observations: np.ndarray
@@ -36,12 +37,13 @@ def determine_stride(dataset_name, specific_dataset):
 """
 
 def drop_the_suffix(trajs, suffix_length: int):
-    for traj in trajs:
+    trajs_new = copy.deepcopy(trajs)
+    for traj in trajs_new:
         traj['observations'] = traj['observations'][:-suffix_length]
         traj['actions'] = traj['actions'][:-suffix_length]
         traj['rewards'] = traj['rewards'][:-suffix_length]
         traj['masks'] = traj['masks'][:-suffix_length]
-    return trajs
+    return trajs_new
 
 
 #-------------------------------------------------------------------------------------#

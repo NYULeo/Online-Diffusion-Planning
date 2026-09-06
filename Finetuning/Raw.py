@@ -10,9 +10,10 @@ import numpy as np
 import seaborn as sns
 import minari
 import sys
-
+import numpy as np
+import torch
+from typing import Optional
 from sympy.calculus.util import continuous_domain
-
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -21,12 +22,23 @@ import gymnasium as gym
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
 from Pretrain.utils import ema_smooth
-from Pretrain.Dataset import get_dataset
+from Pretrain.Dataset import get_dataset, get_env, Planner_Processor
+from Pretrain.Planners.Backbone.Dit import DiT1d
 import ogbench
-from Finetuning.utils import reward_processor, check_device, symexp
+from Finetuning.utils import (
+    check_device,
+    reward_processor,
+    get_planner,
+    get_reward_model,
+    get_reward_stats,
+    get_critic_model,
+    get_critic_stats,
+    symexp,
+)
 from typing import Optional, List, Union
 from torch.utils.data import Dataset
 import torch.nn as nn
+from Pretrain.Rewards.nets import SimpleReward
 from Pretrain.Planners.Backbone.Sampler import (
     sample_euler_karras,
     clip_actions,
@@ -291,6 +303,182 @@ class Selector:
 
 
 
+@torch.no_grad()
+def probe_multi_horizon_bellman(
+    trajs,
+    dataset_name: str,
+    specific_dataset: str,
+    planner_checkpoint: int,
+    reward_checkpoint: int,
+    critic_checkpoint: int,
+    backbone_layers: int,
+    hidden_layers: int,
+    hidden_dim: int,
+    reward_hidden_layers: int = 1,
+    reward_hidden_dim: int = 128,
+    batch_size: int = 64,
+    oversample: int = 8,
+    horizon: int = 32,
+    gamma: float = 0.99,
+    steps_T: int = 10,
+    num_karras: int = 1,
+    eta: float = 0.0,
+    task_id: Optional[int] = None,
+    mix_reset: bool = True,
+    n_reset: int = 64,
+    device: Optional[torch.device] = None,
+):
+    """
+    Sample τ ~ π(·|s), compute
+        R^K = sum_{t=0}^{K-1} γ^t r̂_t + γ^K symexp(V(s_K)),  K = 1..n
+    Report mean/std of R^K over plans and mean_τ std_K(R^K).
+
+    Consistent backup  ⇒  std_K(R) small, mean_K R similar across K.
+    """
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+
+    planner = DiT1d(
+        in_dim=(obs_dim + act_dim), emb_dim=128, d_model=256,
+        n_heads=256 // 64, depth=backbone_layers, timestep_emb_type="fourier",
+    )
+    planner.load_state_dict(
+        get_planner(dataset_name, specific_dataset, planner_checkpoint, task_id)
+    )
+    planner.eval().to(device)
+    for p in planner.parameters():
+        p.requires_grad_(False)
+
+    planner_proc = Planner_Processor(dataset_name, specific_dataset, task_id)
+    planner_mean = torch.as_tensor(
+        planner_proc.stats.obs_mean, device=device, dtype=torch.float32
+    )
+    planner_std = torch.as_tensor(
+        np.maximum(planner_proc.stats.obs_std, 1e-3), device=device, dtype=torch.float32
+    )
+
+    reward_state, _, _ = get_reward_model(
+        dataset_name, specific_dataset, reward_checkpoint, task_id
+    )
+    reward_net = SimpleReward(
+        obs_dim, act_dim, reward_hidden_dim, reward_hidden_layers
+    ).to(device)
+    reward_net.load_state_dict(reward_state)
+    reward_net.eval()
+    for p in reward_net.parameters():
+        p.requires_grad_(False)
+    reward_stat = get_reward_stats(
+        dataset_name, specific_dataset, reward_checkpoint, task_id
+    )
+    r_mean = torch.as_tensor(reward_stat.obs_mean, device=device, dtype=torch.float32)
+    r_std = torch.as_tensor(
+        np.maximum(reward_stat.obs_std, 1e-3), device=device, dtype=torch.float32
+    )
+
+    critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
+    critic_state, _ = get_critic_model(
+        dataset_name, specific_dataset, task_id=task_id, step=critic_checkpoint
+    )
+    critic.load_state_dict(critic_state)
+    critic.eval()
+    for p in critic.parameters():
+        p.requires_grad_(False)
+    critic_stat = get_critic_stats(
+        dataset_name, specific_dataset, task_id=task_id, step=critic_checkpoint
+    )
+    c_mean = torch.as_tensor(critic_stat.obs_mean, device=device, dtype=torch.float32)
+    c_std = torch.as_tensor(
+        np.maximum(critic_stat.obs_std, 1e-3), device=device, dtype=torch.float32
+    )
+
+    play_pool = np.concatenate(
+        [t["observations"] for t in trajs], axis=0
+    ).astype(np.float32)
+
+    if mix_reset and task_id is not None:
+        env, _, _ = get_env(dataset_name, specific_dataset, task_id=task_id)
+        rows = []
+        for i in range(n_reset):
+            ob, _ = env.reset(seed=10_000 + i, options=dict(task_id=task_id))
+            rows.append(np.asarray(ob, dtype=np.float32))
+        reset_pool = np.stack(rows, 0)
+        n_r = batch_size // 2
+        s0 = np.concatenate(
+            [
+                play_pool[np.random.randint(0, len(play_pool), batch_size - n_r)],
+                reset_pool[np.random.randint(0, len(reset_pool), n_r)],
+            ],
+            0,
+        )
+    else:
+        s0 = play_pool[np.random.randint(0, len(play_pool), batch_size)]
+
+    plans = []
+    for s in s0:
+        s_p = planner_proc.preprocess(s)
+        for _ in range(oversample):
+            x = sample_euler_karras(
+                s_p, planner, obs_dim, act_dim, horizon,
+                num_steps=steps_T, num_karras=num_karras, eta=eta, device=device,
+            )
+            plans.append(torch.from_numpy(np.asarray(x)).float())
+    plans = torch.stack(plans, 0).to(device)          # (M, H, ds+da)
+
+    s_raw = plans[..., :obs_dim] * planner_std + planner_mean
+    actions = torch.clamp(plans[..., obs_dim:], -1.0, 1.0)
+    M, H, _ = s_raw.shape
+    n = H - 1                                         # K = 1 .. n
+
+    s_for_r = (s_raw[:, :n] - r_mean) / r_std
+    r_hat = reward_net(
+        s_for_r.reshape(M * n, -1),
+        actions[:, :n].reshape(M * n, -1),
+    ).reshape(M, n)                                   # raw r̂, no clamp / Q_scale
+
+    gamma_pow = torch.tensor(
+        [gamma ** t for t in range(n)], device=device, dtype=torch.float32
+    )
+    s_norm_c = (s_raw - c_mean) / c_std
+    V = symexp(critic(s_norm_c.reshape(M * H, -1)).reshape(M, H))
+
+    R = []
+    for K in range(1, n + 1):
+        disc = (gamma_pow[:K].unsqueeze(0) * r_hat[:, :K]).sum(dim=1)
+        RK = disc + (gamma ** K) * V[:, K]
+        R.append(RK)
+    R = torch.stack(R, dim=1)                         # (M, n)  columns = K=1..n
+
+    mean_K = R.mean(dim=0)                            # (n,)
+    std_over_plans = R.std(dim=0, unbiased=False)     # (n,)
+    std_over_K = R.std(dim=1, unbiased=False)         # (M,)  planner7's R_std
+    mean_R = R.mean(dim=1)
+
+    stats = {
+        "n_plans": int(M),
+        "K": list(range(1, n + 1)),
+        "mean_R_per_K": mean_K.cpu().tolist(),
+        "std_R_over_plans_per_K": std_over_plans.cpu().tolist(),
+        "mean_std_K": float(std_over_K.mean()),
+        "median_std_K": float(std_over_K.median()),
+        "p90_std_K": float(std_over_K.quantile(0.90)),
+        "mean_R_mean": float(mean_R.mean()),
+        "mean_R_std": float(mean_R.std(unbiased=False)),
+        "R_min": float(R.min()),
+        "R_max": float(R.max()),
+    }
+
+    print("=== multi-horizon Bellman probe ===")
+    print(f"plans={M}  mean_K std(R^K)={stats['mean_std_K']:.4f}  "
+          f"p90 std_K={stats['p90_std_K']:.4f}")
+    for K, m, s in zip(stats["K"], stats["mean_R_per_K"], stats["std_R_over_plans_per_K"]):
+        print(f"  K={K:02d}  E[R^K]={m:.4f}  std_τ(R^K)={s:.4f}")
+
+    return stats, R.cpu()
+
+
+
 
 import pickle
 import torch
@@ -482,10 +670,13 @@ def reward_heatmap(checkpoint: int = 0, show: bool = True):
         plt.close(fig)
     return out
 
+
+
+"""
 if __name__ == "__main__":
     critic_heatmap(0)
     #reward_heatmap(0)
-
+"""
 
 
 
