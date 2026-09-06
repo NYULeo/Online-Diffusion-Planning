@@ -10,7 +10,7 @@ sys.path.append(project_root)
 os.chdir(project_root)
 
 from Pretrain.Dataset import get_dataset
-from Finetuning.utils import probe_multi_horizon_bellman  # paste the probe into utils.py first
+from Finetuning.Raw import probe_multi_horizon_bellman  # paste the probe into utils.py first
 
 
 def main():
@@ -38,8 +38,8 @@ def main():
         hidden_dim=512,
         reward_hidden_layers=4,
         reward_hidden_dim=512,
-        batch_size=64,
-        oversample=8,
+        batch_size=256,
+        oversample=20,
         horizon=horizon,
         gamma=0.99,
         steps_T=10,
