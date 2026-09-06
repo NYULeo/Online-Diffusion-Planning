@@ -6868,7 +6868,8 @@ def train_critic_with_planner7(
     s0_pool = np.concatenate(
                     [t['observations'] for t in trajs], axis=0,
     ).astype(np.float32)
-
+    
+    """
     extra = []
     env, _, _ = ogbench.make_env_and_datasets(
           f"{specific_dataset}-singletask-task{task_id}-v0",  # use your real id
@@ -6878,6 +6879,7 @@ def train_critic_with_planner7(
            ob, _ = env.reset(seed=k, options=dict(task_id=task_id))
            extra.extend([np.asarray(ob, np.float32)] * 2000)
     s0_pool = np.concatenate([s0_pool, np.stack(extra)], 0)
+    """
 
     Scale = get_Q_scale(dataset_name, specific_dataset, task_id)
     running_tgt_mean = torch.zeros(1, device=device)
