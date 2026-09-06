@@ -9,6 +9,7 @@ from accelerate import Accelerator
 
 def main():
     accelerator = Accelerator()
+    os.chdir(project_root)
     dataset_name = "cube"
     specific_dataset = "single-play"
     task_id = 4
