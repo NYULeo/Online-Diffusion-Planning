@@ -257,10 +257,11 @@ if __name__ == "__main__":
     specific_env = 'single-play'
     task_id = 4
     finetune_buffer_cutoff_length = None
-    #finetune_buffer_cutoff_length = 800
     train_buffer_cutoff_length = None
+    planner_horizon = 32
+    finetune_suffix_cut_length = planner_horizon
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = True)
-    AMConfig = Acc_AdjointMatchingConfig(horizon = 32, backbone_layers = 2, eta = 0.0)
+    AMConfig = Acc_AdjointMatchingConfig(horizon =  planner_horizon, backbone_layers = 4, eta = 0.0)
 
     RWConfig = RewardConfig(
                beta = 1.0, 
@@ -280,9 +281,9 @@ if __name__ == "__main__":
                           num_steps = 30000, 
                           lr = 5e-03,
                           min_lr = 5e-04,
-                          sigma = 4.0, 
+                          sigma = 3.0, 
                           #sigma = None,
-                          target_reward = 500.0, 
+                          target_reward = 50.0, 
                           train_goal = None,
                           task_id = task_id)
       
@@ -297,7 +298,7 @@ if __name__ == "__main__":
                             kernel_num_modes = 10,
                             kernel_noise_floor = 5e-4,
                             λ_reg = 1e-3,
-                            oversample = 10)
+                            oversample = 20)
     """
     TrainCriticConfig = Train_Critic_Config(
                             hidden_layers = 4,
@@ -314,7 +315,7 @@ if __name__ == "__main__":
     TrainCriticConfig = Train_Critic_Config(
                             hidden_layers = 4,
                             hidden_dim = 512,
-                            batch_size = 64,
+                            batch_size = 256,
                             #batch_size = 63,
                             num_steps = 20,
                             warm_up_steps = 1000,
@@ -325,6 +326,7 @@ if __name__ == "__main__":
                             gamma = 0.99,
                             lam = None,
                             resample_every = 1,
+                            rho = 0.0,
                             log_every = 5,
                             data_conservation = True,
                             momentum = 0.1)

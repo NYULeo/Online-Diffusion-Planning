@@ -696,24 +696,24 @@ def probe_multi_horizon_bellman(
             "n_plans": int(R.shape[0]),
             "mean_std_K": float(std_K.mean()),
             "mean_R_mean": float(mean_R.mean()),
-            "E_R31_over_R1": float(ratio.mean()),
-            "median_R31_over_R1": float(ratio.median()),
-            "E_R31": float(RN.mean()),
+            "E_RN_over_R1": float(ratio.mean()),
+            "median_RN_over_R1": float(ratio.median()),
+            "E_RN": float(RN.mean()),
             "E_R1": float(R1.mean()),
-            "E_R31_div_E_R1": float((RN.mean() / R1.mean().clamp(min=1e-8)).item()),
+            "E_RN_div_E_R1": float((RN.mean() / R1.mean().clamp(min=1e-8)).item()),
         }
         print(f"plans={stats['n_plans']}")
         print(f"mean_std_K          = {stats['mean_std_K']:.4f}")
         print(f"mean_R_mean         = {stats['mean_R_mean']:.4f}")
-        print(f"E[R^31 / R^1]       = {stats['E_R31_over_R1']:.4f}")
-        print(f"median(R^31 / R^1)  = {stats['median_R31_over_R1']:.4f}")
-        print(f"E[R^31] / E[R^1]    = {stats['E_R31_div_E_R1']:.4f}")
+        print(f"E[R^N / R^1]       = {stats['E_RN_over_R1']:.4f}")
+        print(f"median(R^N / R^1)  = {stats['median_RN_over_R1']:.4f}")
+        print(f"E[R^N] / E[R^1]    = {stats['E_RN_div_E_R1']:.4f}")
         wandb_log({
                 "checkpoint": critic_checkpoint,
                 "mean_std_K": stats["mean_std_K"],
                 "mean_R_mean": stats["mean_R_mean"],
-                "E[R^31 / R^1]": stats["E_R31_over_R1"],
-                "E[R^31] / E[R^1]": stats["E_R31_div_E_R1"],
+                "E[R^N / R^1]": stats["E_RN_over_R1"],
+                "E[R^N] / E[R^1]": stats["E_RN_div_E_R1"],
          })
 
     accelerator.wait_for_everyone()
