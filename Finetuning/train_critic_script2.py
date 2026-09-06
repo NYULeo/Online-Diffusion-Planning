@@ -135,7 +135,7 @@ if __name__ == '__main__':  # pragma: no cover
               "reward_hidden_layers": 4,
               "reward_hidden_dim": 512,
               "batch_size": 256,
-              "oversample": 20,
+              "oversample": 30,
               "num_steps": 100,
               "resample_every": 1,
               "train_horizon": 32,             # passed as horizon= to the trainer
@@ -143,7 +143,7 @@ if __name__ == '__main__':  # pragma: no cover
               "lam": None,
               "rho": 0.0,
               "lr": 1e-05,
-              "min_lr": 1e-07,
+              "min_lr": 1e-08,
               "tau": 0.005,
               "steps_T": 10,
               "num_karras": 1,
