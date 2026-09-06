@@ -1,17 +1,11 @@
-
-
-#!/usr/bin/env python3
-"""Probe multi-horizon R^K consistency. Single GPU/CPU. Repo root cwd."""
 import os
 import sys
-
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
 os.chdir(project_root)
-
 from Pretrain.Dataset import get_dataset
 from Finetuning.Raw import probe_multi_horizon_bellman  # paste the probe into utils.py first
-
+from accelerate import Accelerator
 
 def main():
     dataset_name = "cube"

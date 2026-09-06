@@ -18,6 +18,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 from collections import deque
+import torch.distributed as dist
+from accelerate import Accelerator
 import gymnasium as gym
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
@@ -25,14 +27,19 @@ from Pretrain.utils import ema_smooth
 from Pretrain.Dataset import get_dataset, get_env, Planner_Processor
 from Pretrain.Planners.Backbone.Dit import DiT1d
 import ogbench
-from Finetuning.utils import (
-    check_device,
-    reward_processor,
+from Finetuning.utils import (  
+    DiT1d,
+    Critic,
+    SimpleReward,
+    Planner_Processor,
     get_planner,
     get_reward_model,
     get_reward_stats,
     get_critic_model,
     get_critic_stats,
+    sample_euler_karras,
+    planner_karras_beta_schedule,
+    planner_cosine_beta,
     symexp,
 )
 from typing import Optional, List, Union
@@ -302,7 +309,7 @@ class Selector:
         return self.select_plan(plans)
 
 
-
+"""
 @torch.no_grad()
 def probe_multi_horizon_bellman(
     trajs,
@@ -328,13 +335,7 @@ def probe_multi_horizon_bellman(
     n_reset: int = 64,
     device: Optional[torch.device] = None,
 ):
-    """
-    Sample τ ~ π(·|s), compute
-        R^K = sum_{t=0}^{K-1} γ^t r̂_t + γ^K symexp(V(s_K)),  K = 1..n
-    Report mean/std of R^K over plans and mean_τ std_K(R^K).
-
-    Consistent backup  ⇒  std_K(R) small, mean_K R similar across K.
-    """
+    
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -477,7 +478,247 @@ def probe_multi_horizon_bellman(
 
     return stats, R.cpu()
 
+"""
 
+@torch.no_grad()
+def probe_multi_horizon_bellman(
+    trajs,
+    dataset_name: str,
+    specific_dataset: str,
+    planner_checkpoint: int,
+    reward_checkpoint: int,
+    critic_checkpoint: int,
+    backbone_layers: int,
+    hidden_layers: int,
+    hidden_dim: int,
+    reward_hidden_layers: int = 1,
+    reward_hidden_dim: int = 128,
+    batch_size: int = 64,
+    oversample: int = 8,
+    horizon: int = 32,
+    gamma: float = 0.99,
+    steps_T: int = 10,
+    num_karras: int = 1,
+    eta: float = 0.0,
+    task_id: Optional[int] = None,
+    mix_reset: bool = True,
+    n_reset: int = 64,
+    plan_chunk_size: int = 256,
+    accelerator=None,
+):
+    from accelerate import Accelerator
+    import math
+    import torch.distributed as dist
+
+    if accelerator is None:
+        accelerator = Accelerator()
+
+    device = accelerator.device
+    is_main = accelerator.is_main_process
+
+    _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+
+    planner = DiT1d(
+        in_dim=(obs_dim + act_dim), emb_dim=128, d_model=256,
+        n_heads=256 // 64, depth=backbone_layers, timestep_emb_type="fourier",
+    )
+    planner.load_state_dict(
+        get_planner(dataset_name, specific_dataset, planner_checkpoint, task_id)
+    )
+    planner.eval()
+    for p in planner.parameters():
+        p.requires_grad_(False)
+    planner = planner.to(device)
+
+    planner_proc = Planner_Processor(dataset_name, specific_dataset, task_id)
+    planner_mean = torch.as_tensor(
+        planner_proc.stats.obs_mean, device=device, dtype=torch.float32
+    )
+    planner_std = torch.as_tensor(
+        np.maximum(planner_proc.stats.obs_std, 1e-3), device=device, dtype=torch.float32
+    )
+
+    reward_state, _, _ = get_reward_model(
+        dataset_name, specific_dataset, reward_checkpoint, task_id
+    )
+    reward_net = SimpleReward(
+        obs_dim, act_dim, reward_hidden_dim, reward_hidden_layers
+    ).to(device)
+    reward_net.load_state_dict(reward_state)
+    reward_net.eval()
+    for p in reward_net.parameters():
+        p.requires_grad_(False)
+    reward_stat = get_reward_stats(
+        dataset_name, specific_dataset, reward_checkpoint, task_id
+    )
+    r_mean = torch.as_tensor(reward_stat.obs_mean, device=device, dtype=torch.float32)
+    r_std = torch.as_tensor(
+        np.maximum(reward_stat.obs_std, 1e-3), device=device, dtype=torch.float32
+    )
+
+    critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
+    critic_state, _ = get_critic_model(
+        dataset_name, specific_dataset, task_id=task_id, step=critic_checkpoint,
+    )
+    critic.load_state_dict(critic_state)
+    critic.eval()
+    for p in critic.parameters():
+        p.requires_grad_(False)
+    critic_stat = get_critic_stats(
+        dataset_name, specific_dataset, task_id=task_id, step=0,
+    )
+    c_mean = torch.as_tensor(critic_stat.obs_mean, device=device, dtype=torch.float32)
+    c_std = torch.as_tensor(
+        np.maximum(critic_stat.obs_std, 1e-3), device=device, dtype=torch.float32
+    )
+
+    play_pool = np.concatenate(
+        [t["observations"] for t in trajs], axis=0
+    ).astype(np.float32)
+
+    if is_main:
+        rng = np.random.RandomState(0)
+        if mix_reset and task_id is not None:
+            env, _, _ = get_env(dataset_name, specific_dataset, task_id=task_id)
+            rows = [
+                np.asarray(
+                    env.reset(seed=10_000 + i, options=dict(task_id=task_id))[0],
+                    dtype=np.float32,
+                )
+                for i in range(n_reset)
+            ]
+            reset_pool = np.stack(rows, 0)
+            n_r = batch_size // 2
+            s0 = np.concatenate(
+                [
+                    play_pool[rng.randint(0, len(play_pool), size=batch_size - n_r)],
+                    reset_pool[rng.randint(0, len(reset_pool), size=n_r)],
+                ],
+                0,
+            )
+        else:
+            s0 = play_pool[rng.randint(0, len(play_pool), size=batch_size)]
+    else:
+        s0 = np.empty((batch_size, play_pool.shape[1]), dtype=np.float32)
+
+    s0_t = torch.from_numpy(s0).to(device)
+    if accelerator.num_processes > 1:
+        dist.broadcast(s0_t, src=0)
+    s0 = s0_t.cpu().numpy()
+
+    local_idx = np.array_split(
+        np.arange(batch_size), accelerator.num_processes
+    )[accelerator.process_index]
+    local_s0 = s0[local_idx]
+
+    # --- batched Karras (same SDE as planner7) ---
+    norm_s0 = torch.as_tensor(
+        np.stack([planner_proc.preprocess(s) for s in local_s0]),
+        dtype=torch.float32,
+        device=device,
+    )
+    conditions = norm_s0.repeat_interleave(oversample, dim=0)
+    M_loc = conditions.shape[0]
+    dim = obs_dim + act_dim
+    t_grid, beta_1, sigma_grid = planner_karras_beta_schedule(steps_T, device=device)
+    beta_2 = planner_cosine_beta(t_grid, s=0.008)
+
+    chunks = []
+    for start in range(0, M_loc, plan_chunk_size):
+        stop = min(start + plan_chunk_size, M_loc)
+        cond = conditions[start:stop]
+        B = cond.shape[0]
+        x = torch.randn(B, horizon, dim, device=device) * sigma_grid[0]
+        mask = torch.zeros_like(x)
+        mask[:, 0, :obs_dim] = 1.0
+        cond_x = torch.zeros_like(x)
+        cond_x[:, 0, :obs_dim] = cond
+        x = mask * cond_x + (1 - mask) * x
+        for i in range(steps_T):
+            t_now = t_grid[i]
+            t_next = t_grid[i + 1] if i < steps_T - 1 else 0.0
+            dt = (t_next - t_now).item()
+            beta_now = (
+                beta_1[i].item() if i < num_karras else beta_2[i].item()
+            )
+            drift = -0.5 * beta_now * x
+            score = planner(x, t_now.expand(B))
+            if eta > 0:
+                ns = eta * math.sqrt(beta_now * (-dt))
+                x = x + (drift - beta_now * score) * dt + ns * torch.randn_like(x)
+            else:
+                x = x + (drift - beta_now * score) * dt
+            x = mask * cond_x + (1 - mask) * x
+            x[..., obs_dim:] = torch.clamp(x[..., obs_dim:], -1.0, 1.0)
+        chunks.append(x)
+    local_plans = torch.cat(chunks, dim=0)
+
+    s_raw = local_plans[..., :obs_dim] * planner_std + planner_mean
+    actions = torch.clamp(local_plans[..., obs_dim:], -1.0, 1.0)
+    M, H, _ = s_raw.shape
+    n = H - 1
+
+    r_hat = reward_net(
+        ((s_raw[:, :n] - r_mean) / r_std).reshape(M * n, -1),
+        actions[:, :n].reshape(M * n, -1),
+    ).reshape(M, n)
+
+    gamma_pow = torch.tensor(
+        [gamma ** t for t in range(n)], device=device, dtype=torch.float32
+    )
+    V = symexp(
+        critic(((s_raw - c_mean) / c_std).reshape(M * H, -1)).reshape(M, H)
+    )
+
+    R_loc = torch.stack(
+        [
+            (gamma_pow[:K].unsqueeze(0) * r_hat[:, :K]).sum(1)
+            + (gamma ** K) * V[:, K]
+            for K in range(1, n + 1)
+        ],
+        dim=1,
+    )  # (M_loc, n)
+
+    # gather variable-size R
+    if accelerator.num_processes > 1:
+        gathered = [None] * accelerator.num_processes
+        dist.all_gather_object(gathered, R_loc.cpu())
+        R = torch.cat(gathered, dim=0) if is_main else R_loc
+    else:
+        R = R_loc
+
+    stats = None
+    if is_main:
+        R = R.to(device)
+        mean_K = R.mean(0)
+        std_plans = R.std(0, unbiased=False)
+        std_K = R.std(1, unbiased=False)
+        mean_R = R.mean(1)
+        stats = {
+            "n_plans": int(R.shape[0]),
+            "K": list(range(1, n + 1)),
+            "mean_R_per_K": mean_K.cpu().tolist(),
+            "std_R_over_plans_per_K": std_plans.cpu().tolist(),
+            "mean_std_K": float(std_K.mean()),
+            "median_std_K": float(std_K.median()),
+            "p90_std_K": float(std_K.quantile(0.90)),
+            "mean_R_mean": float(mean_R.mean()),
+            "mean_R_std": float(mean_R.std(unbiased=False)),
+            "R_min": float(R.min()),
+            "R_max": float(R.max()),
+        }
+        print("=== multi-horizon Bellman probe ===")
+        print(
+            f"plans={stats['n_plans']}  mean_K std(R^K)={stats['mean_std_K']:.4f}  "
+            f"p90 std_K={stats['p90_std_K']:.4f}"
+        )
+        for K, m, s in zip(
+            stats["K"], stats["mean_R_per_K"], stats["std_R_over_plans_per_K"]
+        ):
+            print(f"  K={K:02d}  E[R^K]={m:.4f}  std_τ(R^K)={s:.4f}")
+
+    accelerator.wait_for_everyone()
+    return stats, (R.cpu() if is_main else None)
 
 
 import pickle
