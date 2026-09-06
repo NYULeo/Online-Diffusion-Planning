@@ -218,7 +218,7 @@ class OGPointmazeDataset:
         return int(self.dataset["actions"].shape[-1])
 
     def get_env(self, render_mode: str = "rgb_array"):
-        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
+        env = ogbench.make_env_and_datasets(self.dataset_id, env_only=True, render_mode=render_mode)
         return env
 
 class OGPointmazeDataset_Singletask:
@@ -366,7 +366,7 @@ class OGPointmazeDataset_Singletask:
         return int(self.dataset["actions"].shape[-1])
 
     def get_env(self, render_mode: str = "rgb_array"):
-        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode = render_mode)
+        env = ogbench.make_env_and_datasets(self.dataset_id, env_only=True, render_mode=render_mode)
         return env
 
 class AntmazeDataset:
@@ -423,7 +423,7 @@ class AntmazeDataset:
         return int(self.dataset["actions"].shape[-1])
 
     def get_env(self, render_mode: str = "rgb_array"):
-        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
+        env = ogbench.make_env_and_datasets(self.dataset_id, env_only=True, render_mode=render_mode)
         return env
 
 class AntmazeDataset_Singletask:
@@ -505,7 +505,7 @@ class AntmazeDataset_Singletask:
         return int(self.dataset["actions"].shape[-1])
 
     def get_env(self, render_mode: str = "rgb_array"):
-        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode = render_mode)
+        env = ogbench.make_env_and_datasets(self.dataset_id, env_only=True, render_mode=render_mode)
         return env
 
 class HumanoidmazeDataset:
@@ -562,7 +562,7 @@ class HumanoidmazeDataset:
         return int(self.dataset["actions"].shape[-1])
 
     def get_env(self, render_mode: str = "rgb_array"):
-        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
+        env = ogbench.make_env_and_datasets(self.dataset_id, env_only=True, render_mode=render_mode)
         return env
 
 class HumanoidmazeDataset_Singletask:
@@ -644,7 +644,7 @@ class HumanoidmazeDataset_Singletask:
         return int(self.dataset["actions"].shape[-1])
 
     def get_env(self, render_mode: str = "rgb_array"):
-        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode = render_mode)
+        env = ogbench.make_env_and_datasets(self.dataset_id, env_only=True, render_mode=render_mode)
         return env
 
 class CubeDataset:
@@ -718,7 +718,7 @@ class CubeDataset:
         return int(self.dataset["actions"].shape[-1])
 
     def get_env(self, render_mode: str = "rgb_array"):
-        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
+        env = ogbench.make_env_and_datasets(self.dataset_id, env_only=True, render_mode=render_mode)
         return env
 
 class CubeDataset_Singletask:
@@ -857,7 +857,7 @@ class SceneDataset:
         return int(self.dataset["actions"].shape[-1])
 
     def get_env(self, render_mode: str = "rgb_array"):
-        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
+        env = ogbench.make_env_and_datasets(self.dataset_id, env_only=True, render_mode=render_mode)
         return env
 
 class SceneDataset_Singletask:
@@ -928,7 +928,7 @@ class SceneDataset_Singletask:
         return int(self.dataset["actions"].shape[-1])
 
     def get_env(self, render_mode: str = "rgb_array"):
-        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
+        env = ogbench.make_env_and_datasets(self.dataset_id, env_only=True, render_mode=render_mode)
         return env
 
 class PuzzleDataset:
@@ -983,7 +983,7 @@ class PuzzleDataset:
         return int(self.dataset["actions"].shape[-1])
 
     def get_env(self, render_mode: str = "rgb_array"):
-        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
+        env = ogbench.make_env_and_datasets(self.dataset_id, env_only=True, render_mode=render_mode)
         return env
 
 class PuzzleDataset_Singletask:
@@ -1060,7 +1060,7 @@ class PuzzleDataset_Singletask:
         return int(self.dataset["actions"].shape[-1])
 
     def get_env(self, render_mode: str = "rgb_array"):
-        env, _, _ = ogbench.make_env_and_datasets(self.dataset_id, render_mode=render_mode)
+        env = ogbench.make_env_and_datasets(self.dataset_id, env_only=True, render_mode=render_mode)
         return env
 
 

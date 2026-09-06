@@ -105,6 +105,7 @@ class FinetuningConfig():
     buffer_size: int = 100000
     finetune_buffer_cutoff_length: Optional[int] = None
     train_buffer_cutoff_length: Optional[int] = None
+    finetune_suffix_cut_length: Optional[int] = None
     finetune_steps: int = 1000000
     finetune_rounds: int = 10
     diffusion_steps: int = 30
@@ -303,41 +304,26 @@ class OnlineFinetuner():
              self.Base_Critic_Buffer = None
 
         if(self.config.train_reward_config.task_id is not None):
-            dataset_reward = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = None)
-            trajs_reward = dataset_reward.get_trajectories()
-            dataset_kernel = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id)
-            trajs_kernel = dataset_kernel.get_trajectories()
-            self.Finetune_Buffer.extend(trajs_reward)
+            dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = None)
+            trajs_reward = dataset.get_trajectories()
+            trajs_finetune = dataset.get_trajectories(suffix_length = self.config.finetune_suffix_cut_length)
+            #dataset_kernel = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id)
+            #trajs_kernel = dataset_kernel.get_trajectories()
+            self.Finetune_Buffer.extend(trajs_finetune)
             self.Train_Buffer.extend(trajs_reward)
-            self.Train_Kernel_Buffer.extend(trajs_kernel)
+            self.Train_Kernel_Buffer.extend(trajs_reward)
             if(self.Base_Critic_Buffer is not None):
-                dataset_critic = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = self.config.train_buffer_cutoff_length)
-                trajs_critic = dataset_critic.get_trajectories()
-                #success_trajs = load_success_trajs(self.config.dataset_name, self.config.specific_dataset, self.config.train_reward_config.task_id, step = 0)
-                #self.Base_Critic_Buffer.extend(success_trajs)
-                self.Base_Critic_Buffer.extend(trajs_critic)
+                self.Base_Critic_Buffer.extend(trajs_finetune)
 
-        elif(self.config.train_reward_config.train_goal is not None):
-            dataset_reward = get_dataset(self.config.dataset_name, self.config.specific_dataset, goal = self.config.train_reward_config.train_goal, mode = 'reward')
-            trajs_reward = dataset_reward.get_trajectories()
-            dataset_kernel = get_dataset(self.config.dataset_name, self.config.specific_dataset)
-            trajs_kernel = dataset_kernel.get_trajectories()
-            dataset_critic = get_dataset(self.config.dataset_name, self.config.specific_dataset, goal = self.config.train_reward_config.train_goal, mode = 'critic')
-            trajs_critic = dataset_critic.get_trajectories()
-            self.Finetune_Buffer.extend(trajs_reward)
-            self.Train_Buffer.extend(trajs_reward)
-            self.Train_Kernel_Buffer.extend(trajs_kernel)
-            if(self.Base_Critic_Buffer is not None):
-                self.Base_Critic_Buffer.extend(trajs_critic)
-                #self.Base_Critic_Buffer.extend(trajs_reward)
         else:
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
-            trajs = dataset.get_trajectories()
-            self.Finetune_Buffer.extend(trajs)
-            self.Train_Buffer.extend(trajs)
-            self.Train_Kernel_Buffer.extend(trajs)
+            trajs_reward = dataset.get_trajectories()
+            trajs_finetune = dataset.get_trajectories(suffix_length = self.config.finetune_suffix_cut_length)
+            self.Finetune_Buffer.extend(trajs_finetune)
+            self.Train_Buffer.extend(trajs_reward)
+            self.Train_Kernel_Buffer.extend(trajs_reward)
             if(self.Base_Critic_Buffer is not None):
-                self.Base_Critic_Buffer.extend(trajs)
+                 self.Base_Critic_Buffer.extend(trajs_finetune)
 
         self.PlannerDataset = PlannerDataset(
                    self.Finetune_Buffer, 
