@@ -52,6 +52,11 @@ def symexp(z):
     return torch.sign(z) * torch.expm1(z.abs())
 
 
+def _compact_tensor_rows_for_object_gather(tensor: torch.Tensor) -> List[torch.Tensor]:
+    """Detach rows from shared backing storage before object serialization."""
+    return [row.clone() for row in tensor.detach().cpu().unbind(0)]
+
+
 
 
 class TrajectoryDict(TypedDict):
@@ -4382,7 +4387,12 @@ def train_critic_with_planner7(
                 kernel_config=kernel_config,
                 obs_dim=obs_dim,
             )
-            local_accepted.extend(local_plans[feasible].cpu().unbind(0))
+            # Each unbound tensor is otherwise a view of the full accepted-plan
+            # storage. Pickling those views for all_gather_object serializes the
+            # full backing storage once per plan (several GiB instead of MiB).
+            local_accepted.extend(
+                _compact_tensor_rows_for_object_gather(local_plans[feasible])
+            )
         else:
             for s0_raw in local_s0:
                 s0_p = planner_proc.preprocess(s0_raw)

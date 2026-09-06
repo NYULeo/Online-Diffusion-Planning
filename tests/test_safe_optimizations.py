@@ -1,4 +1,5 @@
 import unittest
+import pickle
 
 import numpy as np
 import torch
@@ -7,7 +8,7 @@ import types
 
 from Finetuning.acc_adjoint_matching import Acc_AdjointMatchingFineTuner
 from Finetuning.traj_reward4 import TotalReward_Critic, _normalization_tensors
-from Finetuning.utils import symexp, symlog
+from Finetuning.utils import _compact_tensor_rows_for_object_gather, symexp, symlog
 from Pretrain.utils import SAStats
 
 
@@ -21,6 +22,14 @@ class SafeOptimizationTest(unittest.TestCase):
     def test_symlog_symexp_round_trip(self):
         values = torch.tensor([-100.0, -1.0, 0.0, 1.0, 100.0])
         self.assertTrue(torch.allclose(symexp(symlog(values)), values, atol=1e-5))
+
+    def test_object_gather_rows_do_not_retain_full_backing_storage(self):
+        plans = torch.randn(64, 8, 5)
+        compact = _compact_tensor_rows_for_object_gather(plans)
+        serialized_size = len(pickle.dumps(compact, protocol=pickle.HIGHEST_PROTOCOL))
+        raw_size = plans.numel() * plans.element_size()
+        self.assertLess(serialized_size, raw_size * 3)
+        self.assertTrue(torch.equal(torch.stack(compact), plans))
     def test_device_normalization_matches_existing_numpy_path(self):
         stats = SAStats()
         stats.obs_mean = np.array([1.0, -2.0, 0.5], dtype=np.float32)
