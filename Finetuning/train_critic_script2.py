@@ -143,7 +143,7 @@ if __name__ == '__main__':  # pragma: no cover
               "lam": None,
               "rho": 0.0,
               "lr": 1e-05,
-              "min_lr": 1e-06,
+              "min_lr": 1e-05,
               "tau": 0.005,
               "steps_T": 10,
               "num_karras": 1,
