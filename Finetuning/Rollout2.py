@@ -644,7 +644,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 0
+    checkpoint = 21
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -680,7 +680,7 @@ if __name__ == "__main__":
                 critic_checkpoint=checkpoint,   # omit or None to use TotalReward only
                 task_id=task_id,
                 lam=0.0,
-                n_candidates=10,
+                n_candidates=20,
             )
     """
     return_value, length = rollout(
@@ -694,7 +694,7 @@ if __name__ == "__main__":
             episode_length=5000,
             checkpoint_steps=checkpoint,
             render=True,
-            base_seed=1,
+            base_seed=222,
             task_id=task_id,
             continual_rollout=True,
             chunk_size=8,
