@@ -30,7 +30,6 @@ from Finetuning.utils import (
     KernelConfig,
 )
 from Pretrain.utils import set_seed
-from Finetuning.Raw import probe_multi_horizon_bellman
 from accelerate import Accelerator
 import random 
 import wandb
@@ -192,47 +191,6 @@ if __name__ == '__main__':  # pragma: no cover
 
         
         
-        probe_kwargs = dict(
-                trajs=trajs,
-                dataset_name=hp["dataset_name"],
-                specific_dataset=hp["specific_dataset"],
-                planner_checkpoint=hp["planner_checkpoint"],
-                reward_checkpoint=hp["reward_checkpoint"],
-                backbone_layers=hp["backbone_layers"],
-                hidden_layers=hp["hidden_layers"],
-                hidden_dim=hp["hidden_dim"],
-                reward_hidden_layers=hp["reward_hidden_layers"],
-                reward_hidden_dim=hp["reward_hidden_dim"],
-                batch_size=64,
-                oversample=8,
-                horizon=hp["train_horizon"],
-                gamma=hp["gamma"],
-                steps_T=hp["steps_T"],
-                num_karras=hp["num_karras"],
-                eta=hp["eta"],
-                task_id=hp["task_id"],
-                mix_reset=True,
-                n_reset=64,
-                device=accelerator.device,
-          )
-        if accelerator.is_main_process:
-             print("=== probe BEFORE train (critic ckpt -1) ===")
-             stats_before, _ = probe_multi_horizon_bellman(
-                     critic_checkpoint=-1,
-                     **probe_kwargs,
-             )
-             wandb.log({
-                "probe_before/mean_std_K": stats_before["mean_std_K"],
-                "probe_before/median_std_K": stats_before["median_std_K"],
-                "probe_before/p90_std_K": stats_before["p90_std_K"],
-                "probe_before/mean_R_mean": stats_before["mean_R_mean"],
-                "probe_before/mean_R_std": stats_before["mean_R_std"],
-                "probe_before/R_min": stats_before["R_min"],
-                "probe_before/R_max": stats_before["R_max"],
-            })
-            
-
-
         accelerator.wait_for_everyone()
         train_critic_with_planner7(
                    trajs = trajs,
@@ -243,29 +201,6 @@ if __name__ == '__main__':  # pragma: no cover
             )
         accelerator.wait_for_everyone()
         
-
-
-        
-        if accelerator.is_main_process:
-             print("=== probe AFTER train (critic ckpt 0) ===")
-             stats_after, _ = probe_multi_horizon_bellman(
-                     critic_checkpoint=0,
-                     **probe_kwargs,
-             )
-             wandb.log({
-                "probe_after/mean_std_K": stats_after["mean_std_K"],
-                "probe_after/median_std_K": stats_after["median_std_K"],
-                "probe_after/p90_std_K": stats_after["p90_std_K"],
-                "probe_after/mean_R_mean": stats_after["mean_R_mean"],
-                "probe_after/mean_R_std": stats_after["mean_R_std"],
-                "probe_after/R_min": stats_after["R_min"],
-                "probe_after/R_max": stats_after["R_max"],
-            })
-
-
-
-
-
 
 
         """
