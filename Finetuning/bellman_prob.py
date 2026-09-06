@@ -22,9 +22,10 @@ def main():
     while checkpoint <= 0:
           planner_checkpoint = checkpoint
           critic_checkpoint = checkpoint
-          print("-----------------------------------------------")
-          print(f"checkpoint: {checkpoint}")
-          stats, R = probe_multi_horizon_bellman(
+          if accelerator.is_main_process:
+              print("-----------------------------------------------")
+              print(f"checkpoint: {checkpoint}")
+          probe_multi_horizon_bellman(
                   trajs=trajs,
                   dataset_name=dataset_name,
                   specific_dataset=specific_dataset,
@@ -48,8 +49,8 @@ def main():
                   n_reset=64,
                   accelerator=accelerator,
              )
-          print(stats)
-          print(R)
+          #print(stats)
+          #print(R)
           checkpoint += 3
 
 

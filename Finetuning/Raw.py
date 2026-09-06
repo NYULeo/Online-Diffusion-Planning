@@ -702,7 +702,6 @@ def probe_multi_horizon_bellman(
             "E_R1": float(R1.mean()),
             "E_R31_div_E_R1": float((RN.mean() / R1.mean().clamp(min=1e-8)).item()),
         }
-        print("=== multi-horizon Bellman probe ===")
         print(f"plans={stats['n_plans']}")
         print(f"mean_std_K          = {stats['mean_std_K']:.4f}")
         print(f"mean_R_mean         = {stats['mean_R_mean']:.4f}")
@@ -711,7 +710,7 @@ def probe_multi_horizon_bellman(
         print(f"E[R^31] / E[R^1]    = {stats['E_R31_div_E_R1']:.4f}")
 
     accelerator.wait_for_everyone()
-    return stats, (R.cpu() if is_main else None)
+    #return stats, (R.cpu() if is_main else None)
 
 import pickle
 import torch
