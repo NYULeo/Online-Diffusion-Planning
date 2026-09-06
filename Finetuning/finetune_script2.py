@@ -265,7 +265,7 @@ if __name__ == "__main__":
 
     RWConfig = RewardConfig(
                beta = 1.0, 
-               min_log_prob = -130.0,
+               min_log_prob = -150.0,
                #min_log_prob = -130.0,
                quantile = 0.999,
                number_of_generated_plans = 50,
@@ -360,7 +360,7 @@ if __name__ == "__main__":
         #finetune_batch_size = 16,
         finetune_batch_per_sample = 8,
         finetune_lr = 2e-05,
-        initial_lam = 2.0,
+        initial_lam = 0.1,
         eta_lam = 0.5,
         gradient_accumulate_every = 1,
         update_lambda_every = 1,
