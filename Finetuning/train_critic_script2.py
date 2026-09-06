@@ -137,7 +137,7 @@ if __name__ == '__main__':  # pragma: no cover
               "batch_size": 256,
               "oversample": 20,
               "num_steps": 100,
-              "resample_every": 2,
+              "resample_every": 1,
               "train_horizon": 32,             # passed as horizon= to the trainer
               "gamma": 0.99,
               "lam": None,
