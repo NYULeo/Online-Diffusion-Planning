@@ -1,5 +1,7 @@
 import sys
 import os
+
+from torch._inductor.ir import NoneLayout
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
@@ -140,7 +142,7 @@ if __name__ == "__main__":
     planner_horizon = 32
     finetune_buffer_cutoff_length = 100
     train_buffer_cutoff_length = None
-    finetune_suffix_cut_length = planner_horizon
+    finetune_suffix_cut_length = None
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = False)
     AMConfig = Acc_AdjointMatchingConfig(horizon =  planner_horizon, backbone_layers = 4, eta = 0.0)
 
