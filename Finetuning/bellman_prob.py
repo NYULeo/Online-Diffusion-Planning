@@ -36,6 +36,7 @@ def main():
           if accelerator.is_main_process:
               print("-----------------------------------------------")
               print(f"checkpoint: {checkpoint}")
+          """
           probe_multi_horizon_bellman(
                   trajs=trajs,
                   dataset_name=dataset_name,
@@ -59,6 +60,32 @@ def main():
                   mix_reset=True,
                   n_reset=64,
                   accelerator=accelerator,
+             )
+          """
+          probe_multi_horizon_bellman(
+                trajs=trajs,
+                dataset_name=dataset_name,
+                specific_dataset=specific_dataset,
+                planner_checkpoint=planner_checkpoint,
+                reward_checkpoint=reward_checkpoint,
+                critic_checkpoint=critic_checkpoint,
+                backbone_layers=4,
+                hidden_layers=4,
+                hidden_dim=512,
+                reward_hidden_layers=4,
+                reward_hidden_dim=512,
+                n_s0=256,              # was batch_size
+                n_plans_per_s0=30,     # was oversample
+                horizon=horizon,
+                gamma=0.99,
+                steps_T=10,
+                num_karras=1,
+                eta=0.0,
+                task_id=task_id,
+                mix_reset=True,
+                n_reset=64,
+                plan_chunk_size=256,
+                accelerator=accelerator,
              )
           #print(stats)
           #print(R)

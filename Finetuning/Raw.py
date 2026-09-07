@@ -480,7 +480,7 @@ def probe_multi_horizon_bellman(
 
 """
 
-
+"""
 @torch.no_grad()
 def probe_multi_horizon_bellman(
     trajs,
@@ -718,6 +718,245 @@ def probe_multi_horizon_bellman(
 
     accelerator.wait_for_everyone()
     #return stats, (R.cpu() if is_main else None)
+
+"""
+
+@torch.no_grad()
+def probe_multi_horizon_bellman(
+    trajs,
+    dataset_name: str,
+    specific_dataset: str,
+    planner_checkpoint: int,
+    reward_checkpoint: int,
+    critic_checkpoint: int,
+    backbone_layers: int,
+    hidden_layers: int,
+    hidden_dim: int,
+    reward_hidden_layers: int = 1,
+    reward_hidden_dim: int = 128,
+    n_s0: int = 64,
+    n_plans_per_s0: int = 16,
+    horizon: int = 32,
+    gamma: float = 0.99,
+    steps_T: int = 10,
+    num_karras: int = 1,
+    eta: float = 0.0,
+    task_id: Optional[int] = None,
+    mix_reset: bool = True,
+    n_reset: int = 64,
+    plan_chunk_size: int = 256,
+    eps: float = 1e-8,
+    accelerator=None,
+):
+    from accelerate import Accelerator
+    import math
+    import torch.distributed as dist
+
+    if accelerator is None:
+        accelerator = Accelerator()
+    device = accelerator.device
+    is_main = accelerator.is_main_process
+    L = n_plans_per_s0
+
+    _, d_s, d_a = get_env(dataset_name, specific_dataset)
+
+    planner = DiT1d(
+        in_dim=(d_s + d_a), emb_dim=128, d_model=256,
+        n_heads=256 // 64, depth=backbone_layers, timestep_emb_type="fourier",
+    )
+    planner.load_state_dict(
+        get_planner(dataset_name, specific_dataset, planner_checkpoint, task_id)
+    )
+    planner.eval()
+    for p in planner.parameters():
+        p.requires_grad_(False)
+    planner = planner.to(device)
+
+    planner_proc = Planner_Processor(dataset_name, specific_dataset, task_id)
+    planner_mean = torch.as_tensor(
+        planner_proc.stats.obs_mean, device=device, dtype=torch.float32
+    )
+    planner_std = torch.as_tensor(
+        np.maximum(planner_proc.stats.obs_std, 1e-3), device=device, dtype=torch.float32
+    )
+
+    reward_state, _, _ = get_reward_model(
+        dataset_name, specific_dataset, reward_checkpoint, task_id
+    )
+    reward_net = SimpleReward(
+        d_s, d_a, reward_hidden_dim, reward_hidden_layers
+    ).to(device)
+    reward_net.load_state_dict(reward_state)
+    reward_net.eval()
+    for p in reward_net.parameters():
+        p.requires_grad_(False)
+    reward_stat = get_reward_stats(
+        dataset_name, specific_dataset, reward_checkpoint, task_id
+    )
+    r_mean = torch.as_tensor(reward_stat.obs_mean, device=device, dtype=torch.float32)
+    r_std = torch.as_tensor(
+        np.maximum(reward_stat.obs_std, 1e-3), device=device, dtype=torch.float32
+    )
+
+    critic = Critic(d_s, hidden_dim, hidden_layers).to(device)
+    critic_state, _ = get_critic_model(
+        dataset_name, specific_dataset, task_id=task_id, step=critic_checkpoint
+    )
+    critic.load_state_dict(critic_state)
+    critic.eval()
+    for p in critic.parameters():
+        p.requires_grad_(False)
+    critic_stat = get_critic_stats(
+        dataset_name, specific_dataset, task_id=task_id, step=0
+    )
+    c_mean = torch.as_tensor(critic_stat.obs_mean, device=device, dtype=torch.float32)
+    c_std = torch.as_tensor(
+        np.maximum(critic_stat.obs_std, 1e-3), device=device, dtype=torch.float32
+    )
+
+    play = np.concatenate([t["observations"] for t in trajs], 0).astype(np.float32)
+    if is_main:
+        rng = np.random.RandomState(0)
+        if mix_reset and task_id is not None:
+            env, _, _ = get_env(dataset_name, specific_dataset, task_id=task_id)
+            reset = np.stack(
+                [
+                    np.asarray(
+                        env.reset(seed=10_000 + i, options=dict(task_id=task_id))[0],
+                        dtype=np.float32,
+                    )
+                    for i in range(n_reset)
+                ],
+                0,
+            )
+            n_r = n_s0 // 2
+            s0 = np.concatenate(
+                [
+                    play[rng.randint(0, len(play), size=n_s0 - n_r)],
+                    reset[rng.randint(0, len(reset), size=n_r)],
+                ],
+                0,
+            )
+        else:
+            s0 = play[rng.randint(0, len(play), size=n_s0)]
+    else:
+        s0 = np.empty((n_s0, play.shape[1]), dtype=np.float32)
+
+    s0_t = torch.from_numpy(s0).to(device)
+    if accelerator.num_processes > 1:
+        dist.broadcast(s0_t, src=0)
+    s0 = s0_t.cpu().numpy()
+
+    local_idx = np.array_split(np.arange(n_s0), accelerator.num_processes)[
+        accelerator.process_index
+    ]
+    local_s0 = s0[local_idx]
+    M_loc = int(local_s0.shape[0])
+
+    if M_loc == 0:
+        R_s_loc = torch.zeros(0, horizon - 2, device="cpu")
+    else:
+        s0_norm = torch.as_tensor(
+            np.stack([planner_proc.preprocess(s) for s in local_s0]),
+            dtype=torch.float32, device=device,
+        )
+        cond = s0_norm.repeat_interleave(L, dim=0)
+        dim = d_s + d_a
+        t_grid, beta_1, sigma_grid = planner_karras_beta_schedule(steps_T, device=device)
+        beta_2 = planner_cosine_beta(t_grid, s=0.008)
+        chunks = []
+        for start in range(0, cond.shape[0], plan_chunk_size):
+            c = cond[start : start + plan_chunk_size]
+            b = c.shape[0]
+            x = torch.randn(b, horizon, dim, device=device) * sigma_grid[0]
+            mask = torch.zeros_like(x)
+            mask[:, 0, :d_s] = 1.0
+            cond_x = torch.zeros_like(x)
+            cond_x[:, 0, :d_s] = c
+            x = mask * cond_x + (1.0 - mask) * x
+            for i in range(steps_T):
+                t_now = t_grid[i]
+                t_next = t_grid[i + 1] if i < steps_T - 1 else 0.0
+                dt = (t_next - t_now).item()
+                beta_now = beta_1[i].item() if i < num_karras else beta_2[i].item()
+                drift = -0.5 * beta_now * x
+                score = planner(x, t_now.expand(b))
+                if eta > 0:
+                    ns = eta * math.sqrt(beta_now * (-dt))
+                    x = x + (drift - beta_now * score) * dt + ns * torch.randn_like(x)
+                else:
+                    x = x + (drift - beta_now * score) * dt
+                x = mask * cond_x + (1.0 - mask) * x
+                x[..., d_s:] = torch.clamp(x[..., d_s:], -1.0, 1.0)
+            chunks.append(x)
+        plans = torch.cat(chunks, dim=0)
+
+        s_raw = plans[..., :d_s] * planner_std + planner_mean
+        actions = torch.clamp(plans[..., d_s:], -1.0, 1.0)
+        P, H, _ = s_raw.shape
+        n = H - 1
+        r_hat = reward_net(
+            ((s_raw[:, :n] - r_mean) / r_std).reshape(P * n, -1),
+            actions[:, :n].reshape(P * n, -1),
+        ).reshape(P, n)
+        V = symexp(
+            critic(((s_raw - c_mean) / c_std).reshape(P * H, -1)).reshape(P, H)
+        )
+        gpow = torch.tensor(
+            [gamma ** t for t in range(n)], device=device, dtype=torch.float32
+        )
+        cuts = []
+        for K in range(2, n + 1):
+            disc = (gpow[: K - 1].unsqueeze(0) * r_hat[:, : K - 1]).sum(1)
+            cuts.append(disc + (gamma ** (K - 1)) * V[:, K])
+        R_tau = torch.stack(cuts, dim=1).view(M_loc, L, -1)
+        R_s_loc = R_tau.mean(dim=1).cpu()  # (M_loc, nK)  E_τ first
+
+    if accelerator.num_processes > 1:
+        gathered = [None] * accelerator.num_processes
+        dist.all_gather_object(gathered, R_s_loc)
+        R_s = torch.cat(gathered, dim=0) if is_main else None
+    else:
+        R_s = R_s_loc
+
+    stats = None
+    if is_main:
+        R_s = R_s.to(device)
+        m_s = R_s.mean(dim=1)
+        std_s = R_s.std(dim=1, unbiased=False)
+        R2, RN = R_s[:, 0], R_s[:, -1]
+        ratio_s = RN / R2.clamp(min=eps)
+        M = int(R_s.shape[0])
+        stats = {
+            "n_s0": M,
+            "n_plans_per_s0": L,
+            "mean_of_RK": float(m_s.mean()),
+            "mean_of_STD": float(std_s.mean()),
+            "ratio": float(ratio_s.mean()),
+            "se_mean_of_RK": float(m_s.std(unbiased=True) / math.sqrt(M)),
+            "se_mean_of_STD": float(std_s.std(unbiased=True) / math.sqrt(M)),
+            "se_ratio": float(ratio_s.std(unbiased=True) / math.sqrt(M)),
+            "median_ratio": float(ratio_s.median()),
+            "E_RN_div_E_R2": float((RN.mean() / R2.mean().clamp(min=eps)).item()),
+          
+        }
+        print("=== slide 4.1–4.3 (E_τ per s, then s) ===")
+        print(f"M={M}  L={L}")
+        print(f"mean_of_RK         = {stats['mean_of_RK']:.4f}  se={stats['se_mean_of_RK']:.4f}")
+        print(f"mean_of_STD        = {stats['mean_of_STD']:.4f}  se={stats['se_mean_of_STD']:.4f}")
+        print(f"E[R^N(s)/R^2(s)]   = {stats['ratio']:.4f}  se={stats['se_ratio']:.4f}")
+        wandb_log({
+                "checkpoint": critic_checkpoint,
+                "mean_of_RK": stats["mean_of_RK"],
+                "mean_of_STD": stats["mean_of_STD"],
+                "E[R^N(s)/R^2(s)]": stats["E[R^N(s)/R^2(s)]"],
+         })
+
+    accelerator.wait_for_everyone()
+    return stats
+
+
+
 
 import pickle
 import torch
