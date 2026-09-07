@@ -925,20 +925,27 @@ def probe_multi_horizon_bellman(
         m_s = R_s.mean(dim=1)
         std_s = R_s.std(dim=1, unbiased=False)
         R1, RNm1 = R_s[:, 0], R_s[:, -1]  # R^(1), R^(n-1)
-        ratio_s = RNm1 / R1.clamp(min=eps)
+        denom = R1.sign().clamp(min=0) * 2 - 1  # +1 if R1>=0, -1 if R1<0
+        denom = denom * R1.abs().clamp(min=eps)
+        ratio_s = RNm1 / denom
+        ok = R1.abs() > eps
         M = int(R_s.shape[0])
+        ratio_ok = ratio_s[ok]
         stats = {
-              "n_s0": M,
-              "n_plans_per_s0": L,
-              "mean_of_RK": float(m_s.mean()),
-              "mean_of_STD": float(std_s.mean()),
-              "ratio": float(ratio_s.mean()),
-              "se_mean_of_RK": float(m_s.std(unbiased=True) / math.sqrt(M)),
-              "se_mean_of_STD": float(std_s.std(unbiased=True) / math.sqrt(M)),
-              "se_ratio": float(ratio_s.std(unbiased=True) / math.sqrt(M)),
-              "median_ratio": float(ratio_s.median()),
-              "E_RNm1_div_E_R1": float((RNm1.mean() / R1.mean().clamp(min=eps)).item()),
-          }
+               "n_s0": M,
+               "n_plans_per_s0": L,
+               "mean_of_RK": float(m_s.mean()),
+               "mean_of_STD": float(std_s.mean()),
+               "ratio": float(ratio_ok.mean()) if ok.any() else float("nan"),
+               "se_mean_of_RK": float(m_s.std(unbiased=True) / math.sqrt(M)),
+               "se_mean_of_STD": float(std_s.std(unbiased=True) / math.sqrt(M)),
+               "se_ratio": float(ratio_ok.std(unbiased=True) / math.sqrt(int(ok.sum().clamp(min=1)))) if ok.any() else float("nan"),
+               "median_ratio": float(ratio_ok.median()) if ok.any() else float("nan"),
+               "n_ratio": int(ok.sum().item()),
+               "E_RNm1_div_E_R1": float(
+                  (RNm1.mean() / (R1.mean().sign() * R1.mean().abs().clamp(min=eps))).item()
+                ),
+         }
         print("=== slide 4.1–4.3 (E_τ per s, then s) ===")
         print(f"M={M}  L={L}")
         print(f"mean_of_RK         = {stats['mean_of_RK']:.4f}  se={stats['se_mean_of_RK']:.4f}")
