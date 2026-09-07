@@ -143,7 +143,7 @@ if __name__ == "__main__":
     finetune_buffer_cutoff_length = 100
     train_buffer_cutoff_length = None
     finetune_suffix_cut_length = None
-    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = False)
+    AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = True)
     AMConfig = Acc_AdjointMatchingConfig(horizon =  planner_horizon, backbone_layers = 4, eta = 0.0)
 
     RWConfig = RewardConfig(

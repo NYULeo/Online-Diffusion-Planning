@@ -578,7 +578,7 @@ class Acc_AdjointMatchingFineTuner:
             else:
                 entropy_gradient = torch.zeros_like(gradient)
             terminal_adjoint = (
-                -1 * (self.config.reward_scaling_factor / alpha) * gradient
+                -1 * (self.config.reward_scaling_factor / alpha / reward_std) * gradient
                 - self.config.Entropy_Scaling_Factor * entropy_gradient
             ).detach()
             terminal_adjoints.append(terminal_adjoint)
