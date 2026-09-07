@@ -949,7 +949,7 @@ def probe_multi_horizon_bellman(
                 "checkpoint": critic_checkpoint,
                 "mean_of_RK": stats["mean_of_RK"],
                 "mean_of_STD": stats["mean_of_STD"],
-                "E[R^N(s)/R^2(s)]": stats["E[R^N(s)/R^2(s)]"],
+                "ratio": stats["ratio"],
          })
 
     accelerator.wait_for_everyone()
