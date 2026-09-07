@@ -757,8 +757,8 @@ class CubeDataset_Singletask:
         #rewards =  reward_processor_2(self.dataset['rewards'].copy())
         for i in range(N):
             # End of a natural episode (terminal or dataset end)
-            if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
-            #if self.dataset['terminals'][i] == 1:
+            #if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
+            if self.dataset['terminals'][i] == 1:
                      obs_slice = self.dataset["observations"][last_start : i+1].copy()
                      act_slice = self.dataset["actions"][last_start : i].copy()
                      rews = rewards[last_start: i].copy()
