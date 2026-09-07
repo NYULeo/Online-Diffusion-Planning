@@ -644,7 +644,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 9
+    checkpoint = 0
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -697,10 +697,11 @@ if __name__ == "__main__":
             base_seed=1,
             task_id=task_id,
             continual_rollout=True,
-            chunk_size=5,
+            chunk_size=15,
             device=device,
             #selector=selector,
     )
+    print(length)
     exit()
     
     total = 0.0
