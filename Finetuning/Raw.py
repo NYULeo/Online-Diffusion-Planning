@@ -924,33 +924,32 @@ def probe_multi_horizon_bellman(
         R_s = R_s.to(device)
         m_s = R_s.mean(dim=1)
         std_s = R_s.std(dim=1, unbiased=False)
-        R2, RN = R_s[:, 0], R_s[:, -1]
-        ratio_s = RN / R2.clamp(min=eps)
+        R1, RNm1 = R_s[:, 0], R_s[:, -1]  # R^(1), R^(n-1)
+        ratio_s = RNm1 / R1.clamp(min=eps)
         M = int(R_s.shape[0])
         stats = {
-            "n_s0": M,
-            "n_plans_per_s0": L,
-            "mean_of_RK": float(m_s.mean()),
-            "mean_of_STD": float(std_s.mean()),
-            "ratio": float(ratio_s.mean()),
-            "se_mean_of_RK": float(m_s.std(unbiased=True) / math.sqrt(M)),
-            "se_mean_of_STD": float(std_s.std(unbiased=True) / math.sqrt(M)),
-            "se_ratio": float(ratio_s.std(unbiased=True) / math.sqrt(M)),
-            "median_ratio": float(ratio_s.median()),
-            "E_RN_div_E_R2": float((RN.mean() / R2.mean().clamp(min=eps)).item()),
-          
-        }
+              "n_s0": M,
+              "n_plans_per_s0": L,
+              "mean_of_RK": float(m_s.mean()),
+              "mean_of_STD": float(std_s.mean()),
+              "ratio": float(ratio_s.mean()),
+              "se_mean_of_RK": float(m_s.std(unbiased=True) / math.sqrt(M)),
+              "se_mean_of_STD": float(std_s.std(unbiased=True) / math.sqrt(M)),
+              "se_ratio": float(ratio_s.std(unbiased=True) / math.sqrt(M)),
+              "median_ratio": float(ratio_s.median()),
+              "E_RNm1_div_E_R1": float((RNm1.mean() / R1.mean().clamp(min=eps)).item()),
+          }
         print("=== slide 4.1–4.3 (E_τ per s, then s) ===")
         print(f"M={M}  L={L}")
         print(f"mean_of_RK         = {stats['mean_of_RK']:.4f}  se={stats['se_mean_of_RK']:.4f}")
         print(f"mean_of_STD        = {stats['mean_of_STD']:.4f}  se={stats['se_mean_of_STD']:.4f}")
         print(f"ratio              = {stats['ratio']:.4f}  se={stats['se_ratio']:.4f}")
         wandb_log({
-                "checkpoint": critic_checkpoint,
-                "mean_of_RK": stats["mean_of_RK"],
-                "mean_of_STD": stats["mean_of_STD"],
-                "ratio": stats["ratio"],
-         })
+                 "checkpoint": critic_checkpoint,
+                 "mean_of_RK": stats["mean_of_RK"],
+                 "mean_of_STD": stats["mean_of_STD"],
+                 "ratio": stats["ratio"],
+        })
 
     accelerator.wait_for_everyone()
     return stats

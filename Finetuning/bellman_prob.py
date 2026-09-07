@@ -82,7 +82,7 @@ def main():
                 num_karras=1,
                 eta=0.0,
                 task_id=task_id,
-                mix_reset=True,
+                mix_reset=False,
                 n_reset=256,
                 plan_chunk_size=256,
                 accelerator=accelerator,
