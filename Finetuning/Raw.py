@@ -906,9 +906,9 @@ def probe_multi_horizon_bellman(
             [gamma ** t for t in range(n)], device=device, dtype=torch.float32
         )
         cuts = []
-        for K in range(2, n + 1):
-            disc = (gpow[: K - 1].unsqueeze(0) * r_hat[:, : K - 1]).sum(1)
-            cuts.append(disc + (gamma ** (K - 1)) * V[:, K])
+        for K in range(1, n):  # R^(L) = sum_{t=0}^{L-1} γ^t r_t + γ^L V(s_L)
+               disc = (gpow[:K].unsqueeze(0) * r_hat[:, :K]).sum(1)
+               cuts.append(disc + (gamma ** K) * V[:, K])
         R_tau = torch.stack(cuts, dim=1).view(M_loc, L, -1)
         R_s_loc = R_tau.mean(dim=1).cpu()  # (M_loc, nK)  E_τ first
 
