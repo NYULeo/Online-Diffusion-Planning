@@ -43,7 +43,7 @@ def main():
                   planner_checkpoint=planner_checkpoint,
                   reward_checkpoint=reward_checkpoint,
                   critic_checkpoint=critic_checkpoint,
-                  backbone_layers=2,
+                  backbone_layers=4,
                   hidden_layers=4,
                   hidden_dim=512,
                   reward_hidden_layers=4,
