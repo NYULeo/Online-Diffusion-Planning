@@ -74,8 +74,8 @@ def main():
                 hidden_dim=512,
                 reward_hidden_layers=4,
                 reward_hidden_dim=512,
-                n_s0=256,              # was batch_size
-                n_plans_per_s0=30,     # was oversample
+                n_s0=514,              # was batch_size
+                n_plans_per_s0=50,     # was oversample
                 horizon=horizon,
                 gamma=0.99,
                 steps_T=10,
@@ -83,7 +83,7 @@ def main():
                 eta=0.0,
                 task_id=task_id,
                 mix_reset=True,
-                n_reset=64,
+                n_reset=256,
                 plan_chunk_size=256,
                 accelerator=accelerator,
              )
