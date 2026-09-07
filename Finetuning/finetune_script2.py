@@ -138,7 +138,7 @@ if __name__ == "__main__":
     specific_env = 'single-play'
     task_id = 4
     planner_horizon = 32
-    finetune_buffer_cutoff_length = None
+    finetune_buffer_cutoff_length = 100
     train_buffer_cutoff_length = None
     finetune_suffix_cut_length = planner_horizon
     AlphaConfig = AlphaSchedulerConfig(alpha_start = 1.0, alpha_end = 0.1, total_steps = 300, decay = False)
