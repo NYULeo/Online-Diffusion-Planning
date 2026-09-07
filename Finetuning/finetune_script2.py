@@ -179,14 +179,14 @@ if __name__ == "__main__":
                             kernel_num_modes = 10,
                             kernel_noise_floor = 5e-4,
                             λ_reg = 1e-3,
-                            oversample = 50)
+                            oversample = 30)
     
     TrainCriticConfig = Train_Critic_Config(
                             mix_reset = False,
                             n_reset = 256,
                             hidden_layers = 4,
                             hidden_dim = 512,
-                            batch_size = 512,
+                            batch_size = 256,
                             #batch_size = 63,
                             num_steps = 20,
                             warm_up_steps = 1000,
