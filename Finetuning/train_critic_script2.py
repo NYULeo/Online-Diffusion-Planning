@@ -135,8 +135,8 @@ if __name__ == '__main__':  # pragma: no cover
               "hidden_dim": 512,
               "reward_hidden_layers": 4,
               "reward_hidden_dim": 512,
-              "batch_size": 256,
-              "oversample": 30,
+              "batch_size": 512,
+              "oversample": 50,
               "num_steps": 100,
               "resample_every": 1,
               "train_horizon": train_horizon,             # passed as horizon= to the trainer
@@ -151,6 +151,8 @@ if __name__ == '__main__':  # pragma: no cover
               "eta": 0.0,
               "new_step": step,
               "log_every": 20,
+              "mix_reset": False,
+              'n_reset': 256,
               # kernel
               "kernel_type": "mog",
               "kernel_checkpoint": 0,
@@ -186,7 +188,7 @@ if __name__ == '__main__':  # pragma: no cover
               "old_critic_checkpoint", "backbone_layers", "hidden_layers", "hidden_dim",
               "reward_hidden_layers", "reward_hidden_dim", "batch_size", "num_steps",
               "resample_every", "gamma", "lam", "rho", "lr", "min_lr", "tau",
-              "steps_T", "num_karras", "eta", "new_step", "task_id", "log_every",
+              "steps_T", "num_karras", "eta", "new_step", "task_id", "log_every", "mix_reset",
          )
 
         

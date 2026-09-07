@@ -1822,7 +1822,6 @@ def get_success_trajs(trajs):
             success_trajs.append(traj)
     return success_trajs
 
-"""
 class PlannerDataset(Dataset):
     def __init__(self, trajs: List[TrajectoryDict], horizon: int, dataset_name: str, specific_dataset: str, task_id: Optional[int] = None, cutoff_length: Optional[int] = None):
         self.trajs = copy.deepcopy(trajs)
@@ -1844,6 +1843,7 @@ class PlannerDataset(Dataset):
    
     def __getitem__(self, idx):
         return self.conditions[idx]
+
 """
 class PlannerDataset(Dataset):
     def __init__(
@@ -1908,7 +1908,7 @@ class PlannerDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.conditions[idx]
-
+"""
 def cycle(dl):
     while True:
         for data in dl:
@@ -7212,6 +7212,8 @@ def train_critic_with_planner7(
     eta: float = 0.0,
     new_step: int = 0,
     task_id: Optional[int] = None,
+    mix_reset: bool = False,
+    n_reset: int = 256,
     log_every: int = 0,
     accelerator=None,
     wandb_prefix: str = "critic_warmup",
@@ -7442,17 +7444,18 @@ def train_critic_with_planner7(
 
         if accelerator.is_main_process:
             rng = np.random.RandomState(training_step + 10007)
-            # === CHANGED === 50/50 play vs train-resets (not eval seeds)
-            n_reset = batch_size // 2
-            n_play = batch_size - n_reset
-            selected_s0 = np.concatenate(
-                [
-                    play_pool[rng.randint(0, len(play_pool), size=n_play)],
-                    reset_pool[rng.randint(0, len(reset_pool), size=n_reset)],
-                ],
-                axis=0,
-            )
-            rng.shuffle(selected_s0)
+            if mix_reset:
+                n_r = batch_size // 2
+                selected_s0 = np.concatenate(
+                  [
+                      play_pool[rng.randint(0, len(play_pool), size=batch_size - n_r)],
+                      reset_pool[rng.randint(0, len(reset_pool), size=n_r)],
+                  ],
+                    axis=0,
+             )
+                rng.shuffle(selected_s0)
+            else:
+                selected_s0 = play_pool[rng.randint(0, len(play_pool), size=batch_size)]
         else:
             selected_s0 = np.empty((batch_size, play_pool.shape[1]), dtype=np.float32)
 
@@ -7652,7 +7655,10 @@ def train_critic_with_planner7(
     play_pool = np.concatenate(
             [t['observations'] for t in trajs], axis=0,
     ).astype(np.float32)
-    reset_pool = _train_reset_pool(dataset_name, specific_dataset, task_id)
+    reset_pool = (
+            _train_reset_pool(dataset_name, specific_dataset, task_id, n=n_reset)
+            if mix_reset else None
+    )
    
 
     Scale = get_Q_scale(dataset_name, specific_dataset, task_id)

@@ -74,7 +74,7 @@ def main():
                 hidden_dim=512,
                 reward_hidden_layers=4,
                 reward_hidden_dim=512,
-                n_s0=514,              # was batch_size
+                n_s0=512,              # was batch_size
                 n_plans_per_s0=50,     # was oversample
                 horizon=horizon,
                 gamma=0.99,

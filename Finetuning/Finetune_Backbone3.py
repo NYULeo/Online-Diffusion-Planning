@@ -18,6 +18,7 @@ from utils import TrajectoryDict, rollout_parallel, get_planner, rollout_paralle
 from Pretrain.Dataset import get_env
 from torch.utils.data import DataLoader, DistributedSampler
 from accelerate.utils import broadcast
+from Finetuning.Raw import probe_multi_horizon_bellman
 import torch
 import copy
 import os
@@ -82,6 +83,8 @@ class Train_Critic_Config:
     plan_chunk_size: int = 256
     data_conservation: bool = False
     momentum: float = 0.005
+    mix_reset: bool = False
+    n_reset: int = 256
 
 @dataclass
 class FinetuningConfig():
@@ -783,6 +786,8 @@ class OnlineFinetuner():
                                eta                    = self.config.AMConfig.eta,
                                new_step               = ((step+1) * self.config.AMConfig.per_round_steps),
                                task_id                = self.config.train_reward_config.task_id,
+                               mix_reset              = self.config.train_critic_config.mix_reset,
+                               n_reset                = self.config.train_critic_config.n_reset,
                                log_every              = self.config.train_critic_config.log_every,
                                accelerator            = self.accelerator,
                                wandb_prefix           = "finetune/critic",
@@ -790,10 +795,39 @@ class OnlineFinetuner():
                                wandb_step_offset      = step * self.config.train_critic_config.num_steps)
                 print(f"Finetuning round {step+1} completed")
                 print()
-                self.accelerator.wait_for_everyone()
                 if self.config.critic and self.config.update_critic:
                       self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
                 self.set_reward_model(self.device)
+                self.accelerator.wait_for_everyone()
+                if self.config.critic:
+                     if self.accelerator.is_main_process:
+                           print(f"calculating bellman metrics")
+                     self.accelerator.wait_for_everyone()
+                     probe_multi_horizon_bellman(
+                         trajs=self.Base_Critic_Buffer,
+                         dataset_name=self.config.dataset_name,
+                         specific_dataset=self.config.specific_dataset,
+                         planner_checkpoint=((step+1) * self.config.AMConfig.per_round_steps),
+                         reward_checkpoint=self.config.reward_model_checkpoint,
+                         critic_checkpoint=self.config.critic_model_checkpoint,
+                         backbone_layers=self.config.AMConfig.backbone_layers,
+                         hidden_layers=self.config.train_critic_config.hidden_layers,
+                         hidden_dim=self.config.train_critic_config.hidden_dim,
+                         reward_hidden_layers=self.config.train_reward_config.hidden_layers,
+                         reward_hidden_dim=self.config.train_reward_config.hidden_dim,
+                         n_s0  =  self.config.train_critic_config.batch_size,
+                         n_plans_per_s0=self.config.train_kernel_config.oversample,
+                         horizon=self.config.AMConfig.horizon,
+                         gamma=self.config.train_critic_config.gamma,
+                         steps_T=self.config.diffusion_steps,
+                         num_karras=self.config.AMConfig.num_karras,
+                         eta=self.config.AMConfig.eta,
+                         task_id=self.config.train_reward_config.task_id,
+                         mix_reset=self.config.train_critic_config.mix_reset,
+                         n_reset=self.config.train_critic_config.n_reset,
+                         plan_chunk_size=self.config.train_critic_config.plan_chunk_size,
+                         accelerator=self.accelerator,
+                       )
                 self.accelerator.wait_for_everyone()
                 continue
 
