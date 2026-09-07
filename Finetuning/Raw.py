@@ -944,7 +944,7 @@ def probe_multi_horizon_bellman(
         print(f"M={M}  L={L}")
         print(f"mean_of_RK         = {stats['mean_of_RK']:.4f}  se={stats['se_mean_of_RK']:.4f}")
         print(f"mean_of_STD        = {stats['mean_of_STD']:.4f}  se={stats['se_mean_of_STD']:.4f}")
-        print(f"E[R^N(s)/R^2(s)]   = {stats['ratio']:.4f}  se={stats['se_ratio']:.4f}")
+        print(f"ratio              = {stats['ratio']:.4f}  se={stats['se_ratio']:.4f}")
         wandb_log({
                 "checkpoint": critic_checkpoint,
                 "mean_of_RK": stats["mean_of_RK"],
