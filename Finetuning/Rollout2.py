@@ -644,7 +644,7 @@ if __name__ == "__main__":
     env_name = 'cube'
     specific_train_dataset = 'single-play'
     task_id = 4
-    checkpoint = 21
+    checkpoint = 9
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
@@ -670,7 +670,7 @@ if __name__ == "__main__":
 
     set_seed(1)
     
-    
+    """
     selector = Selector(
                 env_name,
                 specific_train_dataset,
@@ -682,7 +682,7 @@ if __name__ == "__main__":
                 lam=0.0,
                 n_candidates=10,
             )
-    
+    """
     return_value, length = rollout(
             env_name,
             specific_train_dataset,
@@ -694,12 +694,12 @@ if __name__ == "__main__":
             episode_length=5000,
             checkpoint_steps=checkpoint,
             render=True,
-            base_seed=2,
+            base_seed=1,
             task_id=task_id,
             continual_rollout=True,
-            chunk_size=8,
+            chunk_size=5,
             device=device,
-            selector=selector,
+            #selector=selector,
     )
     exit()
     

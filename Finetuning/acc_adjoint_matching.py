@@ -566,6 +566,9 @@ class Acc_AdjointMatchingFineTuner:
 
         for terminal_state in reversed_states[:, 0]:
             reward, gradient = reward_model(terminal_state, self.Lam.get_lam())
+            if gradient.norm().item() == 0.0:
+                  print(f"reward gradient is 0: {gradient.norm().item()}")
+                  print(f"reward: {reward}")
             if self.config.MaxEnt:
                 score = self.old_score_net(
                     terminal_state.unsqueeze(0),
