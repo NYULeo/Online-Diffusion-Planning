@@ -670,7 +670,7 @@ if __name__ == "__main__":
 
     set_seed(1)
     
-    """
+    
     selector = Selector(
                 env_name,
                 specific_train_dataset,
@@ -680,9 +680,9 @@ if __name__ == "__main__":
                 critic_checkpoint=checkpoint,   # omit or None to use TotalReward only
                 task_id=task_id,
                 lam=0.0,
-                n_candidates=20,
+                n_candidates=10,
             )
-    """
+    
     return_value, length = rollout(
             env_name,
             specific_train_dataset,
@@ -694,12 +694,12 @@ if __name__ == "__main__":
             episode_length=5000,
             checkpoint_steps=checkpoint,
             render=True,
-            base_seed=222,
+            base_seed=2,
             task_id=task_id,
             continual_rollout=True,
             chunk_size=8,
             device=device,
-            #selector=selector,
+            selector=selector,
     )
     exit()
     

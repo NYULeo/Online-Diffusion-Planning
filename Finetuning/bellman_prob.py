@@ -29,7 +29,7 @@ def main():
         wandb.define_metric("bellman_prob/checkpoint")
         wandb.define_metric("bellman_prob/*", step_metric="bellman_prob/checkpoint")
    
-    checkpoint = 3
+    checkpoint = 0
     while checkpoint <= 90:
           planner_checkpoint = checkpoint
           critic_checkpoint = checkpoint

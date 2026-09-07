@@ -105,9 +105,9 @@ if __name__ == '__main__':
         "save_freq": 30000,
         "lr": 5e-03,
         "min_lr": 5e-05,
-        "sigma": 3.0,
+        "sigma": 0.0,
         "alpha": None,
-        "target_reward": 50.0,
+        "target_reward": 500.0,
     }
 
     # Initialize wandb
