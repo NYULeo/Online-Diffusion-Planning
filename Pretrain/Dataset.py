@@ -2,6 +2,7 @@ from optparse import Option
 from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PRETRAIN_DIR = PROJECT_ROOT / "Pretrain"
+from OpenGL.GL import suffix
 import numpy as np
 import minari
 #import mediapy as media
@@ -779,11 +780,11 @@ class CubeDataset_Singletask:
                             index =  0
                      
 
-                     if self.dataset['terminals'][i] == 1:
-                           obs_slice = obs_slice[:-suffix_length]
-                           act_slice = act_slice[:-suffix_length]
-                           rews = rews[:-suffix_length]
-                           masks = masks[:-suffix_length]
+                     if self.dataset['terminals'][i] == 1 and suffix_length is not None:
+                           obs_slice = obs_slice[:-suffix_length].copy()
+                           act_slice = act_slice[:-suffix_length].copy()
+                           rews = rews[:-suffix_length].copy()
+                           masks = masks[:-suffix_length].copy()
 
                            
                           
