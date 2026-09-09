@@ -759,13 +759,18 @@ class CubeDataset_Singletask:
             # End of a natural episode (terminal or dataset end)
             if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
             #if self.dataset['terminals'][i] == 1:
+                     """
                      obs_slice = self.dataset["observations"][last_start : i+1].copy()
-                     act_slice = self.dataset["actions"][last_start : i].copy()
-                     rews = rewards[last_start: i].copy()
-                     masks = self.dataset['masks'][last_start : i].copy()
+                     act_slice = self.dataset["actions"][last_start : i+1].copy()
+                     rews = rewards[last_start: i+1].copy()
+                     """
+                     obs_slice = self.dataset["observations"][last_start : i+1].copy()
+                     act_slice = self.dataset["actions"][last_start : i+1].copy()
+                     rews = rewards[last_start: i+1].copy()
+                     masks = self.dataset['masks'][last_start : i+1].copy()
                      
             
-                     L = len(obs_slice)
+                     L = len(obs_slice)  
                      if(self.traj_length is not None):
                            index = L - self.traj_length
                            if(index < 0):
@@ -774,10 +779,11 @@ class CubeDataset_Singletask:
                             index =  0
                 
                      
-                     if len(act_slice) < 3:
+                     """
+                     if len(act_slice) < 10:
                           last_start = i + 1
                           continue
-
+                     """
                      """
                      if(self.mode == 'reward'):
                         if(sum(rews) == 0):
