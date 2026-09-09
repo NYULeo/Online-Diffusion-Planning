@@ -172,6 +172,7 @@ if __name__ == '__main__':  # pragma: no cover
                  config=hp,
                )
         data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
+        #trajs = data.get_trajectories(suffix_length = train_horizon)
         trajs = data.get_trajectories(suffix_length = train_horizon)
         kernel_config = KernelConfig(
                    checkpoint=hp["kernel_checkpoint"],
@@ -205,7 +206,7 @@ if __name__ == '__main__':  # pragma: no cover
         
 
 
-        """
+    
         trajs = data.get_trajectories()
         test_critic(
                 dataset_name=hp["dataset_name"],
@@ -216,13 +217,13 @@ if __name__ == '__main__':  # pragma: no cover
                 critic_checkpoint=hp["new_step"],
                 gamma=hp["gamma"],
                 horizon=hp["horizon"],
-                value_scale=1.0,
-                sigma=3.0,
-                target_reward=50.0,
+                value_scale=5.0,
+                sigma=4.0,
+                target_reward=500.0,
                 trajs=trajs,
                 task_id=hp["task_id"],
         )
-        """
+    
         if accelerator.is_main_process:
            wandb.finish()
 
