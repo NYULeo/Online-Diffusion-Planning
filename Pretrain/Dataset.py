@@ -777,8 +777,24 @@ class CubeDataset_Singletask:
                                 index = 0
                      else:
                             index =  0
-                
                      
+
+                     if self.dataset['terminals'][i] == 1:
+                           obs_slice = obs_slice[:-suffix_length].copy()
+                           act_slice = act_slice[:-suffix_length].copy()
+                           rews = rews[:-suffix_length].copy()
+                           masks = masks[:-suffix_length].copy()
+
+                           
+                          
+
+
+
+
+
+
+
+
                      """
                      if len(act_slice) < 10:
                           last_start = i + 1
@@ -802,9 +818,10 @@ class CubeDataset_Singletask:
                      trajectories.append(trajectory)
                      last_start = i + 1
         
+        """
         if suffix_length is not None:
              trajectories = drop_the_suffix(trajectories, suffix_length)
-
+        """
         return trajectories
 
     def get_state_dim(self) -> int:
