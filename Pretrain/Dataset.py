@@ -2,7 +2,6 @@ from optparse import Option
 from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PRETRAIN_DIR = PROJECT_ROOT / "Pretrain"
-from OpenGL.GL import suffix
 import numpy as np
 import minari
 #import mediapy as media
