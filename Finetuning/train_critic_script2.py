@@ -173,7 +173,7 @@ if __name__ == '__main__':  # pragma: no cover
                )
         data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
         #trajs = data.get_trajectories(suffix_length = train_horizon)
-        trajs = data.get_trajectories(suffix_length = train_horizon)
+        trajs = data.get_trajectories()
         kernel_config = KernelConfig(
                    checkpoint=hp["kernel_checkpoint"],
                    type_kernel=hp["kernel_type"],
