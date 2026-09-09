@@ -780,10 +780,10 @@ class CubeDataset_Singletask:
                      
 
                      if self.dataset['terminals'][i] == 1:
-                           obs_slice = obs_slice[:-suffix_length].copy()
-                           act_slice = act_slice[:-suffix_length].copy()
-                           rews = rews[:-suffix_length].copy()
-                           masks = masks[:-suffix_length].copy()
+                           obs_slice = obs_slice[:-suffix_length]
+                           act_slice = act_slice[:-suffix_length]
+                           rews = rews[:-suffix_length]
+                           masks = masks[:-suffix_length]
 
                            
                           
