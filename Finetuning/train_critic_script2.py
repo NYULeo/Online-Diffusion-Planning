@@ -217,9 +217,9 @@ if __name__ == '__main__':  # pragma: no cover
                 critic_checkpoint=hp["new_step"],
                 gamma=hp["gamma"],
                 horizon=hp["horizon"],
-                value_scale=5.0,
+                value_scale=1.0,
                 sigma=4.0,
-                target_reward=500.0,
+                target_reward=50.0,
                 trajs=trajs,
                 task_id=hp["task_id"],
         )
