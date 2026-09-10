@@ -117,7 +117,7 @@ if __name__ == '__main__':  # pragma: no cover
               "tau": 0.005,
               "old_step": None,
               "new_step": step,
-              "value_scale": 5.0,
+              "value_scale": 1.0,
               "momentum": 0.005,
           }
 
@@ -154,7 +154,7 @@ if __name__ == '__main__':  # pragma: no cover
             horizon=hp["horizon"],
             value_scale=hp["value_scale"],
             sigma=4.0,
-            target_reward=500.0,
+            target_reward=50.0,
             trajs=trajs,
             task_id=hp["task_id"],
        )
