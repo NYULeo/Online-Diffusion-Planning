@@ -1,81 +1,184 @@
-from __future__ import annotations
-
-import os
 import sys
-from pathlib import Path
-
-import hydra
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from Rewards.Reward_Backbone import train_reward, test_Model, train_reward_pos_weight, train_reward_ensemble, test_Model_ensemble
+from Pretrain.utils import set_seed
 import numpy as np
-from omegaconf import DictConfig, OmegaConf
+import pickle
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT))
-os.chdir(REPO_ROOT)
 
-from Pretrain.Rewards.Reward_Backbone import test_Model, train_reward
-from Pretrain.utils import init_wandb_run, set_seed
+def check_trajs_exit(env_name, specific_env, task_id, step):
+    from pathlib import Path
+    if(task_id is not None):
+         path = Path(f'./Finetuning/Rollouts/{env_name}/{specific_env}/task_{task_id}/Generated_trajs_Info_{step}.pkl')
+    else:
+         path = Path(f'./Finetuning/Rollouts/{env_name}/{specific_env}/Generated_trajs_Info_{step}.pkl')
+    if not path.exists():
+        print(f"trajs not found")
+        return None
+    else:
+        with path.open('rb') as f:
+             trajs = pickle.load(f)
+        return trajs
+
+def check_cube_single_goal_reach(trajs, task_id):   
+    goals = {'task_1': np.array( [ 0.0,       -1.0,        0.199599]), 
+         'task_2': np.array([7.50000000e-01, 8.02418254e-18, 1.99598996e-01]),
+         'task_3': np.array([-7.50000000e-01,  1.21832368e-19,  1.99598996e-01]),
+         'task_4': np.array([0.75,     2.0,       0.199599]),
+         'task_5': np.array([ 0.75,     -2.0,        0.199599])}
+    
+    total_dist = 0.0
+    for traj in trajs:
+           position = traj['observations'][-1][19:22]
+           total_dist += np.linalg.norm(position - goals[f"task_{task_id}"])
+    average_dist = total_dist/len(trajs)
+    print(f"Task {task_id} average distance: {average_dist}")
 
 
-def optional_array(value):
-    return None if value is None else np.asarray(value, dtype=np.float32)
 
+if __name__ == '__main__':
+    import wandb
+    
+    set_seed(1)
 
-@hydra.main(version_base="1.3", config_path="../Finetuning/conf", config_name="cube_single")
-def main(config: DictConfig) -> None:
-    os.chdir(REPO_ROOT)
-    OmegaConf.set_struct(config, True)
-    print(OmegaConf.to_yaml(config, resolve=True))
-    if config.run.validate_only:
-        return
+    dataset_name = 'antmaze'
+    specific_dataset = 'large'
+    task_id = 4
+    traj_length = None
+    hp = {
+        "dataset_name": dataset_name,
+        "specific_dataset": specific_dataset,
+        "task_id": task_id,
+        "traj_length": traj_length,
+        "hidden_layers": 4,
+        "hidden_dim": 512,
+        "batch_size": 256,
+        "num_steps": 40000,
+        "save_freq": 40000,
+        "lr": 5e-05,
+        "min_lr": 5e-08,
+        "sigma": 3.0,
+        "alpha": None,
+        "target_reward": 200.0,
+    }
 
-    env = config.environment
-    reward = config.scripts.train_reward_script
-    set_seed(int(config.run.seed))
-    wandb_run = init_wandb_run(
-        f"{env.dataset_name}-{env.specific_dataset}-task{env.task_id}-reward",
-        {
-            "stage": "reward",
-            "resolved_hydra_config": OmegaConf.to_container(config, resolve=True),
-        },
-        group=config.wandb.group,
-        job_type="reward",
+    # Initialize wandb
+    wandb.init(
+        entity="kaiwen_hu-uc-berkeley",
+        project="ODP",
+        name=f"{dataset_name}-{specific_dataset}-task{task_id}-reward",
+        config=hp,
     )
-    try:
-        train_reward(
-            dataset_name=env.dataset_name,
-            hidden_layers=reward.hidden_layers,
-            hidden_dim=reward.hidden_dim,
-            batch_size=reward.batch_size,
-            num_steps=reward.num_steps,
-            save_freq=reward.save_freq,
-            lr=reward.lr,
-            min_lr=reward.min_lr,
-            sigma=reward.sigma,
-            alpha=reward.alpha,
-            target_reward=reward.target_reward,
-            specific_dataset=reward.specific_dataset,
-            task_id=env.task_id,
-            goal=optional_array(reward.train_goal),
-            traj_length=reward.traj_length,
-        )
-        test_Model(
-            env.dataset_name,
-            hidden_layers=reward.hidden_layers,
-            hidden_dim=reward.hidden_dim,
-            specific_dataset=reward.specific_dataset,
-            trajs=None,
-            sigma=reward.sigma,
-            alpha=reward.alpha,
-            target_reward=reward.target_reward,
-            task_id=env.task_id,
-            traj_length=reward.traj_length,
-            save_freq=reward.save_freq,
-            num_steps=reward.num_steps,
-        )
-    finally:
-        wandb_run.finish()
+
+    train_keys = (
+        "dataset_name", "hidden_layers", "hidden_dim", "batch_size",
+        "num_steps", "save_freq", "lr", "min_lr", "sigma", "alpha",
+        "target_reward", "specific_dataset", "task_id", "traj_length",
+    )
+    train_reward(**{k: hp[k] for k in train_keys})
 
 
-if __name__ == "__main__":
-    main()
+    test_keys = (
+        "dataset_name", "hidden_layers", "hidden_dim", "specific_dataset",
+        "sigma", "alpha", "target_reward", "task_id", "traj_length",
+        "save_freq", "num_steps",
+    )
+    test_Model(trajs=None, **{k: hp[k] for k in test_keys})
+    wandb.finish()
+
+
+"""
+if __name__ == '__main__':
+    set_seed(1)
+    
+    dataset_name = 'antmaze'
+    specific_dataset = 'large'
+    task_id = 4
+    traj_length = None
+    
+   
+    
+    train_reward(dataset_name = dataset_name, 
+                 hidden_layers = 4, 
+                 hidden_dim = 512, 
+                 batch_size = 4000, 
+                 num_steps = 40000, 
+                 save_freq = 40000, 
+                 lr = 5e-05, 
+                 min_lr = 5e-09, 
+                 sigma  = 6.0,
+                 #sigma = None,
+                 alpha = None, 
+                 target_reward = 2000.0,
+                 #target_reward = None,
+                 specific_dataset = specific_dataset, 
+                 task_id = task_id, 
+                 traj_length = traj_length)
+    
+       
+
+  
+    test_Model(dataset_name, 
+               hidden_layers = 4, 
+               hidden_dim = 512, 
+               specific_dataset = specific_dataset, 
+               trajs = None, 
+               sigma = 6.0, 
+               #sigma = None,
+               alpha = None, 
+               target_reward = 2000.0, 
+               #target_reward = None, 
+               task_id = task_id,
+               traj_length = traj_length, 
+               save_freq = 40000, 
+               num_steps = 40000)
+
+"""
+
+
+"""
+if __name__ == '__main__':
+    set_seed(1)
+    dataset_name = 'humanoidmaze'
+    specific_dataset = 'large'
+    task_id = 2
+    traj_length = None
+    
+    train_reward(dataset_name = dataset_name, 
+                 hidden_layers = 4, 
+                 hidden_dim = 512, 
+                 batch_size = 4000, 
+                 num_steps = 40000, 
+                 save_freq = 40000, 
+                 lr = 5e-05, 
+                 min_lr = 5e-09, 
+                 sigma  = 6.0,
+                 #sigma = None,
+                 alpha = None, 
+                 target_reward = 5000.0,
+                 #target_reward = None,
+                 specific_dataset = specific_dataset, 
+                 task_id = task_id, 
+                 traj_length = traj_length)
+  
+    test_Model(dataset_name, 
+               hidden_layers = 4, 
+               hidden_dim = 512, 
+               specific_dataset = specific_dataset, 
+               trajs = None, 
+               sigma = 6.0, 
+               #sigma = None,
+               alpha = None, 
+               target_reward = 5000.0, 
+               #target_reward = None, 
+               task_id = task_id,
+               traj_length = traj_length, 
+               save_freq = 40000, 
+               num_steps = 40000)
+
+"""
+
+
+

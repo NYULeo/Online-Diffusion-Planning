@@ -3,59 +3,54 @@ defaults:
   - override hydra/hydra_logging: disabled
   - _self_
 
-# Shared by every pipeline stage.
 run:
   seed: 1
   validate_only: false
 
 wandb:
-  group: cube-single-task4-pipeline
+  entity: kaiwen_hu-uc-berkeley
+  project: ODP
+  group: cube-single-task4-main
 
-environment:
-  dataset_name: cube
-  specific_dataset: single-play
-  task_id: 4
-
-# Each block below belongs to exactly one executable stage. The script name is
-# the key so similarly named parameters cannot be confused across stages.
+# Values below reproduce the effective Cube Single parameters in main f8740fd.
+# The grouping changes parameter delivery only; training implementations remain main.
 scripts:
-  # Pretrain/pretrain_script4.py (also supported by pretrain_script2.py)
   pretrain_script4:
+    dataset_name: cube
+    specific_dataset: single-play
+    task_id: 4
     horizon: 32
     backbone_name: transformer
-    backbone_layers: 2
-    data_parallel: true
+    backbone_layers: 4
     num_steps: 1000000
-    batch_size: 256
-    gradient_accumulate_every: 1
-    effective_batch_size: 256
+    batch_size: 128
     lr: 0.0002
     stride: 1
 
-  # Pretrain/train_reward_script.py (also supported by train_reward_script2.py)
   train_reward_script:
+    dataset_name: cube
     specific_dataset: single
+    task_id: 4
+    traj_length: null
     hidden_layers: 4
     hidden_dim: 512
     batch_size: 256
-    num_steps: 30000
-    save_freq: 30000
-    lr: 0.005
-    min_lr: 0.0005
+    num_steps: 20000
+    save_freq: 20000
+    lr: 0.0005
+    min_lr: 0.00005
     sigma: 4.0
     alpha: null
     target_reward: 500.0
-    train_goal: null
-    traj_length: null
 
-  # Pretrain/train_kernel_script.py (also supported by train_kernel_script2.py)
   train_kernel_script:
+    dataset_name: cube
     specific_dataset: single
     task_id: null
     batch_size: 512
     lr: 0.0001
     num_steps: 5000
-    save_freq: 1000
+    save_freq: 5000
     ensemble_size: 10
     num_modes: 10
     num_hidden_layers: 4
@@ -64,12 +59,12 @@ scripts:
     noise_floor: 0.0005
     test_quantile: 0.99
 
-  # Finetuning/train_critic_script.py: initial reward-based critic.
   train_critic_script:
-    traj_length: 200
-    horizon: 128
-    new_step: -1
-    value_scale: 5.0
+    dataset_name: cube
+    specific_dataset: single-play
+    task_id: 4
+    traj_length: null
+    horizon: 200
     reward_hidden_layers: 4
     reward_hidden_dim: 512
     reward_checkpoint: 0
@@ -79,44 +74,50 @@ scripts:
     num_steps: 10000
     gamma: 0.99
     lam: 0.95
-    lr: 0.0001
-    min_lr: 0.00001
+    lr: 0.000001
+    min_lr: 0.00000001
     tau: 0.005
     old_step: null
+    new_step: -1
+    value_scale: 5.0
     momentum: 0.005
     test_sigma: 4.0
     test_target_reward: 500.0
 
-  # Finetuning/train_critic_script2.py: planner-based critic warmup.
   train_critic_script2:
-    traj_length: 200
-    test_horizon: 128
+    dataset_name: cube
+    specific_dataset: single-play
+    task_id: 4
+    traj_length: null
+    test_horizon: 200
+    train_horizon: 32
     mixed_precision: bf16
     planner_checkpoint: 0
     reward_checkpoint: 0
     old_critic_checkpoint: -1
-    backbone_layers: 2
+    backbone_layers: 4
     hidden_layers: 4
     hidden_dim: 512
     reward_hidden_layers: 4
     reward_hidden_dim: 512
-    batch_size: 256
-    num_steps: 100
+    batch_size: 512
+    num_steps: 20
     resample_every: 2
     vectorized_sampling: true
     plan_chunk_size: 256
-    horizon: 32
     gamma: 0.99
     lam: null
-    rho: 1.0
-    lr: 0.0001
-    min_lr: 0.00001
+    rho: 0.0
+    lr: 0.00001
+    min_lr: 0.0000001
     tau: 0.005
     diffusion_steps: 10
     num_karras: 1
     eta: 0.0
     new_step: 0
-    log_every: 20
+    log_every: 5
+    mix_reset: false
+    n_reset: 256
     kernel:
       checkpoint: 0
       type_kernel: mog
@@ -125,12 +126,16 @@ scripts:
       num_modes: 10
       noise_floor: 0.0005
       min_log_prob: -110.0
-      oversample: 20
+      oversample: 40
+    test_value_scale: 5.0
     test_sigma: 4.0
     test_target_reward: 500.0
 
-  # Finetuning/finetune_script2.py (finetune_script.py is an alias).
   finetune_script2:
+    dataset_name: cube
+    specific_dataset: single-play
+    task_id: 4
+
     alpha_scheduler:
       alpha_start: 1.0
       alpha_end: 0.1
@@ -140,7 +145,7 @@ scripts:
     adjoint_matching:
       horizon: 32
       backbone_name: transformer
-      backbone_layers: 2
+      backbone_layers: 4
       eta: 0.0
       s: 0.008
       sigma_min: 0.01
@@ -153,7 +158,7 @@ scripts:
 
     reward_objective:
       beta: 1.0
-      min_log_prob: -110.0
+      min_log_prob: -150.0
       quantile: 0.999
       number_of_generated_plans: 50
       explore: false
@@ -186,27 +191,29 @@ scripts:
       kernel_num_modes: 10
       kernel_noise_floor: 0.0005
       lambda_reg: 0.001
-      oversample: 10
+      oversample: 30
 
     critic_update:
       hidden_layers: 4
       hidden_dim: 512
-      batch_size: 64
+      batch_size: 256
       num_steps: 20
       log_every: 5
       warm_up_steps: 1000
       warm_up_log_every: 100
-      lr: 0.000001
-      min_lr: 0.000000001
+      lr: 0.00001
+      min_lr: 0.000001
       tau: 0.005
       gamma: 0.99
       lam: null
-      rho: 1.0
+      rho: 0.0
       resample_every: 1
       vectorized_sampling: true
       plan_chunk_size: 256
       data_conservation: true
       momentum: 0.1
+      mix_reset: false
+      n_reset: 256
 
     settings:
       planner_checkpoint: 0
@@ -216,24 +223,27 @@ scripts:
       offline: true
       critic: true
       update_critic: true
-      kernel: true
+      kernel: false
       update_kernel: false
       buffer_size: 200000
-      finetune_buffer_cutoff_length: 100
-      train_buffer_cutoff_length: 200
+      finetune_buffer_cutoff_length: null
+      train_buffer_cutoff_length: null
+      # main defines a local suffix value but does not pass it to FinetuningConfig;
+      # null is therefore the effective main behavior at f8740fd.
+      finetune_suffix_cut_length: null
       finetune_steps: 90
       finetune_rounds: 30
       diffusion_steps: 10
       karras_percent: 0.1
-      loss_clip_percent: 0.0
-      finetune_batch_size: 32
-      finetune_batch_per_sample: 8
+      loss_clip_percent: 0.2
+      finetune_batch_size: 256
+      finetune_batch_per_sample: 4
       finetune_lr: 0.00002
-      initial_lam: 0.05
-      eta_lam: 0.5
+      initial_lam: 0.0
+      eta_lam: 0.05
       gradient_accumulate_every: 1
       update_lambda_every: 1
-      reward_scaling_factor: 150
+      reward_scaling_factor: 500
       max_ent: false
       entropy_scaling_factor: 0.5
       rollout_length: 4000
@@ -241,20 +251,6 @@ scripts:
       num_rollout_processes: 8
       continual_rollout: true
       chunk_size: 31
-
-  # Finetuning/Rollout.py: standalone final evaluation.
-  rollout:
-    horizon: 32
-    num_layers: 2
-    diffusion_steps: 10
-    num_karras: 1
-    eta: 0.0
-    episode_length: 3000
-    checkpoint: 60
-    render: true
-    base_seed: 1
-    continual_rollout: true
-    chunk_size: 10
 
 hydra:
   run:

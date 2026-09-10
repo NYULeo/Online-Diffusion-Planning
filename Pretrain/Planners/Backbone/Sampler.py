@@ -36,7 +36,7 @@ def sample_reverse_sde(
     #t_asc = torch.linspace(0.0, 1.0, steps_T + 1, device=device)
     beta = cosine_beta(t_asc, s=0.008)
     alpha, sigma = cosine_alpha_sigma(t_asc, s = 0.008)
-
+    
     # Initialize x_T ~ N(0, I) with shape (horizon, dim)
     x = torch.randn(horizon, dim, dtype=torch.float32, device=device).unsqueeze(0)
     conditions = s0_t.unsqueeze(0)
@@ -46,8 +46,8 @@ def sample_reverse_sde(
     y[:, 0, :d_s] = conditions.clone()
     #x = apply_conditioning(x, conditions, d_s)
     x = mask * y + (1 - mask) * x
-
-
+    
+    
 
     for i in range(len(t_asc) - 1):
         t_now, t_next = t_asc[i], t_asc[i + 1]
@@ -56,20 +56,20 @@ def sample_reverse_sde(
         drift = -0.5 * g2_val * x
         #t_tensor = t_now.repeat(batch)
         score = score_model(x, t_now.unsqueeze(0))
-
-
+        
+       
         if eta > 0:
             noise = torch.randn_like(x)
             noise_scale = eta * math.sqrt(g2_val * (-dt))
             x = x + ((drift - g2_val * score) * dt + noise_scale * noise)
         else:
             x = x + (drift - g2_val * score) * dt
-
+        
         x = mask * y + (1 - mask) * x
 
         x = clip_actions(x, d_s)
-
-
+        
+        
     #x = clip_actions(x, d_s)
     return x.squeeze(0).detach().cpu().numpy()
 
@@ -96,7 +96,7 @@ def karras_beta_schedule(
     # Compute β(t) from dσ²/dt = β(t) * σ²(t)
     # From VP-SDE: dσ²/dt = β(t) * (1 - σ²(t))
     # But we use numerical diff for stability
-
+    
     sigma_sq = sigma**2
     d_sigma_sq = torch.diff(sigma_sq, dim=0)
     dt = torch.diff(t, dim=0)
@@ -145,8 +145,8 @@ def sample_euler_karras(
     y = torch.zeros_like(x)
     y[:, 0, :d_s] = s0_t.unsqueeze(0)
     x = mask * y + (1 - mask) * x
-
-
+    
+    
 
     for i in range(num_steps):
         t_now = t_grid[i]
@@ -349,12 +349,12 @@ def sample_reverse_sde3(
     if ( (s0_t.shape[0] != d_s)   ):
         raise ValueError(f"s0 should have shape ({d_s},), but got {s0_t.shape}")
     dim = d_s + d_a
-
+    
     t_full = torch.linspace(0.0, 1.0, 8000+1, device = device)
     t_asc = torch.linspace(8000, 0.0, steps_T + 1, device=device).long()[:-1]
     beta = cosine_beta(t_full, s=0.008)
     #alpha, sigma = cosine_alpha_sigma(t_asc, s = 0.008)
-
+    
     # Initialize x_T ~ N(0, I) with shape (horizon, dim)
     x = torch.randn(horizon, dim, dtype=torch.float32, device=device).unsqueeze(0)
     conditions = s0_t.unsqueeze(0)
@@ -364,7 +364,7 @@ def sample_reverse_sde3(
     y[:, 0, :d_s] = conditions.clone()
     #x = apply_conditioning(x, conditions, d_s)
     x = mask * y + (1 - mask) * x
-
+    
 
     for i in range(len(t_asc) - 1):
         k, k_next = t_asc[i].item(), t_asc[i+1].item()
@@ -375,18 +375,18 @@ def sample_reverse_sde3(
         drift = -0.5 * g2_val * x
         #t_tensor = t_now.repeat(batch)
         score = score_model(x, t.unsqueeze(0))
-
+        
         if eta > 0:
             noise = torch.randn_like(x)
             noise_scale = eta * math.sqrt(g2_val * (-dt))
             x = x + ((drift - g2_val * score) * dt + noise_scale * noise)
         else:
             x = x + (drift - g2_val * score) * dt
-
+        
         x = mask * y + (1 - mask) * x
 
-        x = clip_actions(x, d_s)
-
+        x = clip_actions(x, d_s)    
+       
     #x = clip_actions(x, d_s)
     return x.squeeze(0).detach().cpu().numpy()
 
@@ -395,7 +395,7 @@ def sample_reverse_sde3(
 
 
 def cosine_alpha_sigma(t: torch.Tensor, s: float = 0.008) -> Tuple[torch.Tensor, torch.Tensor]:
-
+   
     t = t.clamp(0.0, 1.0 - 1e-6)
     a = (math.pi / 2.0) * ((t + s) / (1.0 + s))
     a0 = (math.pi / 2.0) * (s / (1.0 + s))
@@ -422,7 +422,7 @@ def sample_dpm_cosine(
     eta: float = 0.0,               # 0.0 → ODE, >0 → SDE
     device: Optional[str] = None,
 ) -> np.ndarray:
-
+    
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     s0_t = torch.from_numpy(s0).to(device).float()
     if s0_t.shape[0] != state_dim:
@@ -486,7 +486,7 @@ def sample_dpm_cosine(
 
         # ---- 4. SDE noise (eta > 0) — variance always ≥ 0 ----
         if eta > 0.0 and i < num_steps - 1:
-
+           
             variance_inc = -h * (sigma_nxt**2 - sigma_cur**2)
             variance_inc = torch.clamp(variance_inc, min=1e-12)        # ← NEVER NEGATIVE
             noise_scale = eta * torch.sqrt(variance_inc)
@@ -510,7 +510,7 @@ def karras_timesteps(
     sigma_max: float = 80.0,
     device: str = "cpu"
 ) -> torch.Tensor:
-
+    
     t = torch.linspace(1.0, 0.0, num_steps + 1, device=device)
     sigmas = sigma_min * (sigma_max / sigma_min) ** t
     return sigmas  # shape: (num_steps + 1,)
@@ -522,7 +522,7 @@ def karras_timesteps(
 def vp_marginals_from_sigma(
     sigma_karras: torch.Tensor
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-
+    
     alpha = 1.0 / torch.sqrt(1.0 + sigma_karras**2)
     sigma = sigma_karras * alpha  # renormalized
     return alpha, sigma
@@ -542,7 +542,7 @@ def sample_dpm_karras_cosine(
     eta: float = 0.0,                    # 0.0 = ODE, >0 = SDE
     device: Optional[str] = None,
     ) -> np.ndarray:
-
+    
     # --------------------------------------------------------------
     # 0. Setup
     # --------------------------------------------------------------
@@ -645,7 +645,7 @@ def sample_dpm_karras_cosine(
 # 1. COSINE SCHEDULE (VP-SDE MARGINALS) — MEMORYLESS
 # ===================================================================
 def cosine_alpha_sigma(t: torch.Tensor, s: float = 0.008) -> Tuple[torch.Tensor, torch.Tensor]:
-
+    
     t = t.clamp(0.0, 1.0 - 1e-6)
     a = (math.pi / 2.0) * ((t + s) / (1.0 + s))
     a0 = (math.pi / 2.0) * (s / (1.0 + s))
@@ -671,13 +671,13 @@ def sample_ddim(
     guidance_scale: float = 0.0,         # CFG: 1.0 = no guidance
     device: Optional[str] = None,
 ) -> np.ndarray:
-
+    
     # --------------------------------------------------------------
     # 0. Setup
     # --------------------------------------------------------------
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     s0 = torch.from_numpy(initial_state).to(device).float()
-
+   
 
     total_dim = state_dim + action_dim
     batch_size = 1
@@ -745,3 +745,7 @@ def sample_ddim(
 
     return x.squeeze(0).cpu().numpy()
 """
+
+
+
+

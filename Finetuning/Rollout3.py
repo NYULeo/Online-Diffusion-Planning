@@ -410,8 +410,6 @@ def rollout(env_name,
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
      elif(env_name == 'scene'):
            model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
-     elif(env_name == 'puzzle'):
-           model = DiT1d(in_dim = (d_s + d_a), emb_dim = 128, d_model = 256, n_heads = 256//64, depth= num_layers, timestep_emb_type="fourier").to(device)
      else:
           raise ValueError(f"Invalid Environment: {env_name}")
      model.load_state_dict(state_dict)
@@ -637,20 +635,19 @@ def Test_Kernel_on_Generated_Trajs(env_name, specific_env, horizon, kernel_confi
      #print(get_normalized_score([traj]))
 
 
-
 # ---- 4) Example usage (fill ScoreWrapper first) ----
 if __name__ == "__main__":
     horizon = 32
-    env_name = 'cube'
-    specific_train_dataset = 'single-play'
+    env_name = 'antmaze'
+    specific_train_dataset = 'large'
     task_id = 4
-    checkpoint = 90
+    checkpoint = 0
     total_reward = 0.0
     device = check_device()
     print(f"Using device {device}")
     chunk_size2 = [5,6,7,8,9,10,11]
     total_return = 0.0
-    
+    """
     RConfig = RewardConfig(
                     beta=1.0,
                     min_log_prob=-110.0,
@@ -667,10 +664,7 @@ if __name__ == "__main__":
                     num_hidden_layers_critic=4,
                     hidden_dim_critic=512,
             )
-
-    set_seed(19)
     
-    """
     selector = Selector(
                 env_name,
                 specific_train_dataset,
@@ -680,7 +674,7 @@ if __name__ == "__main__":
                 critic_checkpoint=checkpoint,   # omit or None to use TotalReward only
                 task_id=task_id,
                 lam=0.0,
-                n_candidates=10,
+                n_candidates=50,
             )
     """
     return_value, length = rollout(
@@ -697,99 +691,7 @@ if __name__ == "__main__":
             base_seed=1,
             task_id=task_id,
             continual_rollout=True,
-            chunk_size=15,
-            device=device,
-            #selector=selector,
-    )
-    print(length)
-    exit()
-    
-    total = 0.0
-    for i in range(1, 101):
-         #set_seed(i)
-         return_value, length = rollout(
-            env_name,
-            specific_train_dataset,
-            horizon,
-            num_layers=2,
-            steps_T=10,
-            num_karras=1,
-            eta=0.0,
-            episode_length=5000,
-            checkpoint_steps=checkpoint,
-            render=False,
-            base_seed=1,
-            task_id=task_id,
-            continual_rollout=True,
-            chunk_size=15,
-            device=device,
-            selector=selector,
-          )
-         print(return_value)
-         total += return_value
-         #print()
-    print(f"Success Rate: {total / 100 :.4f}")
-    exit()
-
-"""
-# ---- 4) Example usage (fill ScoreWrapper first) ----
-if __name__ == "__main__":
-    horizon = 32
-    env_name = 'puzzle'
-    specific_train_dataset = '3x3-play'
-    task_id = 4
-    checkpoint = 0
-    total_reward = 0.0
-    device = check_device()
-    print(f"Using device {device}")
-    chunk_size2 = [5,6,7,8,9,10,11]
-    total_return = 0.0
-    
-    RConfig = RewardConfig(
-                    beta=1.0,
-                    min_log_prob=-110.0,
-                    quantile=0.999,
-                    critic_gamma=0.99,
-                    explore=False,
-                    type_kernel='mog',
-                    kernel_num_modes=10,
-                    kernel_noise_floor=5e-4,
-                    num_hidden_layers_kernel=4,
-                    hidden_dim_kernel=514,
-                    num_hidden_layers_reward=4,
-                    hidden_dim_reward=512,
-                    num_hidden_layers_critic=4,
-                    hidden_dim_critic=512,
-            )
-   
-    
-    selector = Selector(
-                env_name,
-                specific_train_dataset,
-                RConfig,
-                reward_checkpoint=0,
-                kernel_checkpoint=0,
-                critic_checkpoint=checkpoint,   # omit or None to use TotalReward only
-                task_id=task_id,
-                lam=0.0,
-                n_candidates=50,
-            )
-    
-    return_value, length = rollout(
-            env_name,
-            specific_train_dataset,
-            horizon,
-            num_layers=2,
-            steps_T=10,
-            num_karras=1,
-            eta=0.0,
-            episode_length=5000,
-            checkpoint_steps=checkpoint,
-            render=True,
-            base_seed=1,
-            task_id=task_id,
-            continual_rollout=True,
-            chunk_size=15,
+            chunk_size=32,
             device=device,
             #selector=selector,
           )
@@ -851,5 +753,5 @@ if __name__ == "__main__":
        print(return_value)
     print(f"Total return: {total_return / 100 :.4f}")
     
-"""
+
     

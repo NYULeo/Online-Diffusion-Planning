@@ -566,6 +566,9 @@ class Acc_AdjointMatchingFineTuner:
 
         for terminal_state in reversed_states[:, 0]:
             reward, gradient = reward_model(terminal_state, self.Lam.get_lam())
+            if gradient.norm().item() == 0.0:
+                  print(f"reward gradient is 0: {gradient.norm().item()}")
+                  print(f"reward: {reward}")
             if self.config.MaxEnt:
                 score = self.old_score_net(
                     terminal_state.unsqueeze(0),
@@ -575,7 +578,7 @@ class Acc_AdjointMatchingFineTuner:
             else:
                 entropy_gradient = torch.zeros_like(gradient)
             terminal_adjoint = (
-                -1 * (self.config.reward_scaling_factor / alpha) * gradient
+                -1 * (self.config.reward_scaling_factor / alpha / reward_std) * gradient
                 - self.config.Entropy_Scaling_Factor * entropy_gradient
             ).detach()
             terminal_adjoints.append(terminal_adjoint)
@@ -719,12 +722,7 @@ class Acc_AdjointMatchingFineTuner:
         clip_count = min(self.config.num_Loss_Clip_steps + 1, step_count)
         return losses[:, clip_count:].sum() / (trajectory_count * step_count)
 
-    def step(
-        self,
-        s0_batch: torch.Tensor,
-        reward_model: Union[TotalReward, TotalReward_Critic],
-        diagnostic_critic: Optional[nn.Module] = None,
-    ) -> Tuple[float, float, float, dict]:
+    def step(self, s0_batch: torch.Tensor, reward_model: Union[TotalReward, TotalReward_Critic]) -> Tuple[float, float, float]:
         # 1. Split batch across processes
         base_reward_model = self.accelerator.unwrap_model(reward_model)
         with self.accelerator.split_between_processes(s0_batch) as local_s0:
@@ -738,49 +736,10 @@ class Acc_AdjointMatchingFineTuner:
                 local_final_Cs = torch.stack(
                     [base_reward_model.get_c(plan) for plan in local_trajs[:, -1, 0]]
                 )
-                final_plans = local_trajs[:, -1, 0]
-                components = base_reward_model.diagnostic_components_batch(
-                    final_plans, self.Lam.get_lam()
-                )
-                frozen_terminal_value = base_reward_model.diagnostic_terminal_value_batch(
-                    final_plans, critic_override=diagnostic_critic
-                )
-                frozen_compositional_reward = (
-                    components["immediate_reward"]
-                    + frozen_terminal_value
-                    - components["constraint_penalty_applied"]
-                )
-                frozen_base_reward = (
-                    components["immediate_reward"] + frozen_terminal_value
-                )
-                component_names = (
-                    "immediate_reward",
-                    "terminal_value",
-                    "base_reward",
-                    "constraint_mean",
-                    "constraint_centered",
-                    "constraint_penalty_applied",
-                    "compositional_reward",
-                    "paper_compositional_reward",
-                )
-                component_values = torch.stack(
-                    [components[name].mean() for name in component_names]
-                    + [
-                        frozen_terminal_value.mean(),
-                        frozen_base_reward.mean(),
-                        frozen_compositional_reward.mean(),
-                        (
-                            components["compositional_reward"] - local_rewards
-                        ).abs().mean(),
-                    ]
-                ).unsqueeze(0)
         local_Cs_det = local_final_Cs.detach()
         # 2. Gather C values and update lambda on main process
         all_final_Cs = self.accelerator.gather_for_metrics(local_Cs_det, use_gather_object = False)
         all_rewards = self.accelerator.gather_for_metrics(local_rewards, use_gather_object = False)
-        all_component_values = self.accelerator.gather_for_metrics(
-            component_values, use_gather_object=False
-        )
         if self.accelerator.is_main_process:
             total_avgC = float(all_final_Cs.mean().item())
             #reward_std = float(all_rewards.std().item())
@@ -842,28 +801,10 @@ class Acc_AdjointMatchingFineTuner:
              #if isinstance(all_losses, torch.Tensor):
             avg_loss = float(all_losses.mean().item())
             avg_reward = float(all_rewards.mean().item())
-            component_means = all_component_values.mean(dim=0)
-            diagnostic_names = component_names + (
-                "frozen_terminal_value",
-                "frozen_base_reward",
-                "frozen_compositional_reward",
-                "objective_consistency_error",
-            )
-            diagnostics = {
-                name: float(value.item())
-                for name, value in zip(diagnostic_names, component_means)
-            }
-            return avg_loss, avg_reward, total_avgC, diagnostics
-        return 0, 0, 0, {}
+            return avg_loss, avg_reward, total_avgC
+        return 0, 0, 0
 
-    def finetune_planner(
-        self,
-        dataloader: DataLoader,
-        reward_model: Union[TotalReward, TotalReward_Critic],
-        round: int,
-        old_planner_checkpoint: Optional[int] = None,
-        diagnostic_critic: Optional[nn.Module] = None,
-    ):
+    def finetune_planner(self, dataloader: DataLoader, reward_model: Union[TotalReward, TotalReward_Critic], round: int, old_planner_checkpoint: Optional[int] = None):
         if old_planner_checkpoint is not None:
             self.reset_old_score_net(old_planner_checkpoint)
             self.set_new_score_net2()
@@ -895,9 +836,7 @@ class Acc_AdjointMatchingFineTuner:
         #conds = next(dataloader)
         while step < self.config.per_round_steps:
              conds = next(dataloader)
-             loss, avg_reward, avg_C, diagnostics = self.step(
-                 conds, reward_model, diagnostic_critic=diagnostic_critic
-             )
+             loss, avg_reward, avg_C = self.step(conds, reward_model)
 
              if self.accelerator.is_main_process:
                 total_loss += loss
@@ -929,20 +868,6 @@ class Acc_AdjointMatchingFineTuner:
                         "finetune/constraint": avg_C,
                         "finetune/alpha": self.alpha_scheduler.get_alpha(),
                         "finetune/lambda": self.Lam.get_lam(),
-                        **{
-                            f"finetune/components/{name}": value
-                            for name, value in diagnostics.items()
-                            if not name.startswith("frozen_")
-                        },
-                        "finetune/frozen/terminal_value": diagnostics.get(
-                            "frozen_terminal_value", 0.0
-                        ),
-                        "finetune/frozen/base_reward": diagnostics.get(
-                            "frozen_base_reward", 0.0
-                        ),
-                        "finetune/frozen/compositional_reward": diagnostics.get(
-                            "frozen_compositional_reward", 0.0
-                        ),
                     }
                 )
 

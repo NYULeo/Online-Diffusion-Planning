@@ -11,14 +11,18 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from Pretrain.Dataset import (
-    CubeDataset_Singletask,
-    KitchenDataset,
-    OGPointmazeDataset,
-    OGPointmazeDataset_Singletask,
-    PointMazeDataset,
-    CubeDataset,
-    SceneDataset,
-    SceneDataset_Singletask
+    CubeDataset_Singletask, 
+    OGPointmazeDataset, 
+    OGPointmazeDataset_Singletask, 
+    AntmazeDataset,
+    AntmazeDataset_Singletask,
+    HumanoidmazeDataset,
+    HumanoidmazeDataset_Singletask,
+    CubeDataset, 
+    SceneDataset, 
+    SceneDataset_Singletask,
+    PuzzleDataset,
+    PuzzleDataset_Singletask
 )
 from .Kernel_Net import  RobustTransitionKernel, MoGTransitionKernel
 from sympy import factorint
@@ -29,15 +33,15 @@ import math
 import copy
 
 try:
-    from Pretrain.utils import SAStats, cycle, check_device, wandb_log
+    from Pretrain.utils import SAStats, cycle, check_device
 except ModuleNotFoundError:
-    from utils import SAStats, cycle, check_device, wandb_log
+    from utils import SAStats, cycle, check_device
 import json
 
 def check_specific_dataset(dataset_name):
-    if(dataset_name == 'kitchen'):
+    if(dataset_name in ['kitchen', 'scene']):
          return False
-    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze', 'scene', 'puzzle', 'antmaze', 'humanoidmaze']:
+    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze', 'puzzle', 'antmaze', 'humanoidmaze']:
         return True
 
 def getName(env_name, specific_env):
@@ -60,21 +64,27 @@ def getName(env_name, specific_env):
                return 'PointMaze_Open'
           else:
               raise ValueError(f"Invalid specific environment: {specific_env}")
+     
      elif(env_name == 'antmaze'):
-          if specific_env == 'medium_play':
-               return 'AntMaze_MediumPlay'
-          elif specific_env == 'umaze_diverse':
-               return 'AntMaze_UmazeDiverse'
-          elif specific_env == 'large_diverse':
-               return 'AntMaze_LargeDiverse'
-          elif specific_env == 'large_play':
-               return 'AntMaze_LargePlay'
-          elif specific_env == 'medium_diverse':
-               return 'AntMaze_MediumDiverse'
-          elif specific_env == 'umaze':
-               return 'AntMaze_Umaze'
+          if specific_env == 'medium':
+               return 'AntMaze_Medium'
+          elif specific_env == 'large':
+               return 'AntMaze_Large'
+          elif specific_env == 'giant':
+               return 'AntMaze_Giant'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
+     
+     elif(env_name == 'humanoidmaze'):
+          if specific_env == 'medium':
+                return 'HumanoidMaze_Medium'
+          elif specific_env == 'large':
+                return 'HumanoidMaze_Large'
+          elif specific_env == 'giant':
+                return 'HumanoidMaze_Giant'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
+
      elif(env_name == 'cube'):
           if specific_env == 'single':
                return 'Cube_Single'
@@ -86,10 +96,22 @@ def getName(env_name, specific_env):
                return 'Cube_Quadruple'
           else:
                raise ValueError(f"Invalid cube dataset name: {specific_env}")
+     
+     elif(env_name == 'puzzle'):
+          if specific_env == '3x3':
+                return 'Puzzle_3x3'
+          elif specific_env == '4x4':
+                return 'Puzzle_4x4'
+          elif specific_env == '4x5':
+                return 'Puzzle_4x5'
+          elif specific_env == '4x6':
+                return 'Puzzle_4x6'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
 
      elif(env_name == 'scene'):
          return 'Scene'
-
+             
      elif(env_name == 'ogpointmaze'):
           if specific_env == 'medium':
                return 'OG2DMaze_Medium'
@@ -98,15 +120,15 @@ def getName(env_name, specific_env):
           elif specific_env == 'giant':
                return 'OG2DMaze_Giant'
           else:
-               raise ValueError(f"Invalid cube dataset name: {specific_env}")
+               raise ValueError(f"Invalid ogpointmaze dataset name: {specific_env}")
      else:
          raise ValueError(f"Invalid environment name: {env_name}")
 
-def save_kernel_hyperparameters(dataset_name, batch_size, num_steps, lr,
-                                obs_dim, act_dim, kernel_name, optimizer, kernel_net,
+def save_kernel_hyperparameters(dataset_name, batch_size, num_steps, lr, 
+                                obs_dim, act_dim, kernel_name, optimizer, kernel_net, 
                                 ensemble_size, λ_reg, specific_dataset: Optional[str] = None):
-
-
+    
+   
     """
     os.makedirs(f"./Pretrain/Transition_Kernel/{kernel_name}/args/", exist_ok=True)
     filepath = f"./Pretrain/Transition_Kernel/{kernel_name}/args/hyperparameters.json"
@@ -134,7 +156,7 @@ def save_kernel_hyperparameters(dataset_name, batch_size, num_steps, lr,
         elif hasattr(obj, '__dict__') and not isinstance(obj, (str, int, float, bool, type(None))):
             return str(obj)
         return obj
-
+    
     # Get optimizer info
     optimizer_type = type(optimizer).__name__
     optimizer_params = {
@@ -142,14 +164,14 @@ def save_kernel_hyperparameters(dataset_name, batch_size, num_steps, lr,
         'lr': lr,
         'weight_decay': optimizer.param_groups[0].get('weight_decay', 0)
     }
-
+    
     # Get model architecture info
     model_info = {
         'model_type': type(kernel_net).__name__,
         'obs_dim': int(obs_dim),
         'act_dim': int(act_dim),
     }
-
+    
     # Add model-specific parameters if available
     if hasattr(kernel_net, 'min_log_std'):
         model_info['min_log_std'] = float(kernel_net.min_log_std)
@@ -157,7 +179,7 @@ def save_kernel_hyperparameters(dataset_name, batch_size, num_steps, lr,
         model_info['max_log_std'] = float(kernel_net.max_log_std)
     if hasattr(kernel_net, 'noise_floor'):
         model_info['noise_floor'] = float(kernel_net.noise_floor)
-
+    
     # Compile all hyperparameters
     hyperparams = {
         'env_details': {
@@ -180,14 +202,14 @@ def save_kernel_hyperparameters(dataset_name, batch_size, num_steps, lr,
             'λ_reg': float(λ_reg),
         }
     }
-
+    
     # Handle numpy arrays, torch.device, and other non-JSON-serializable types
     hyperparams = convert_to_json_serializable(hyperparams)
-
+    
     # Save with pretty printing (indent=4 makes it human-readable)
     with open(filepath, 'w') as f:
         json.dump(hyperparams, f, indent=4, sort_keys=False)
-
+    
     print(f"Kernel pretraining hyperparameters saved to {filepath}", flush=True)
 
 
@@ -263,7 +285,7 @@ def save_stats_to_finetuning(stats, dataset_name, specific_dataset: Optional[str
     with open(savepath, "wb") as f:
         pickle.dump(stats, f)
     print(f"saved stats to {savepath}")
-
+   
 
 def check_trajs_exit(env_name, specific_env, task_id, step):
     from pathlib import Path
@@ -277,7 +299,7 @@ def check_trajs_exit(env_name, specific_env, task_id, step):
         with path.open('rb') as f:
              trajs = pickle.load(f)
         return trajs
-
+    
 def count_files_in_folder(folder_path):
     """
     Count the number of files in a specific folder.
@@ -286,14 +308,14 @@ def count_files_in_folder(folder_path):
     try:
         # Get all items in the folder
         items = os.listdir(folder_path)
-
+        
         # Count only files (not directories)
         file_count = 0
         for item in items:
             item_path = os.path.join(folder_path, item)
             if os.path.isfile(item_path):
                 file_count += 1
-
+        
         return file_count
     except FileNotFoundError:
         print(f"Folder '{folder_path}' not found.")
@@ -322,38 +344,8 @@ def load_model(kernel_name, num_steps, ensemble_idx):
     return state_dict
 
 def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
-    if(dataset_name == 'kitchen'):
-         data_1 = KitchenDataset('complete')
-         data_2 = KitchenDataset('partial')
-         data_3 = KitchenDataset('mixed')
-         trajs = data_1.get_trajectories() + data_2.get_trajectories() + data_3.get_trajectories()
-         name = 'Kitchen_Kernel'
-         obs_dim = data_1.get_state_dim()
-         act_dim = data_1.get_action_dim()
-         return trajs, name, obs_dim, act_dim
-
-    elif(dataset_name == 'pointmaze'):
-         if(specific_dataset is None):
-             raise ValueError(f"Invalid dataset name: {dataset_name}")
-         elif(specific_dataset == 'large'):
-              data = PointMazeDataset('large')
-              name = '2DMaze_Kernel_large'
-         elif(specific_dataset == 'medium'):
-              data = PointMazeDataset('medium')
-              name = '2DMaze_Kernel_medium'
-         elif(specific_dataset == 'umaze'):
-              data = PointMazeDataset('umaze')
-              name = '2DMaze_Kernel_umaze'
-         else:
-              raise ValueError(f"Invalid dataset name: {specific_dataset}")
-         obs_dim = data.get_state_dim()
-         act_dim = data.get_action_dim()
-         trajs = data.get_trajectories()
-         return trajs, name, obs_dim, act_dim
-
-    elif(dataset_name == 'cube'):
-
-        if(specific_dataset is None):
+    if(dataset_name == 'cube'):
+        if(specific_dataset is None): 
              raise ValueError(f"Invalid dataset name: {dataset_name}")
         elif(specific_dataset == 'single'):
              data_1 = CubeDataset('single-play')
@@ -383,7 +375,48 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
                  data_3 = CubeDataset_Singletask('quadruple-play', task_id)
                  data_4 = CubeDataset_Singletask('quadruple-noisy', task_id)
              name = 'Cube_Kernel_quadruple'
+        else: 
+            raise ValueError(f"Invalid dataset name: {specific_dataset}")
+        if(task_id is not None):
+            trajs = data_1.get_trajectories() + data_2.get_trajectories() + data_3.get_trajectories() + data_4.get_trajectories()
         else:
+            trajs = data_1.get_trajectories() + data_2.get_trajectories()
+        obs_dim = data_1.get_state_dim()
+        act_dim = data_1.get_action_dim()
+        return trajs, name, obs_dim, act_dim
+    
+    elif(dataset_name == 'puzzle'):
+        if(specific_dataset is None): 
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+        elif(specific_dataset == '3x3'):
+             data_1 = PuzzleDataset('3x3-play')
+             data_2 = PuzzleDataset('3x3-noisy')
+             if(task_id is not None):
+                 data_3 = PuzzleDataset_Singletask('3x3-play', task_id)
+                 data_4 = PuzzleDataset_Singletask('3x3-noisy', task_id)
+             name = 'Puzzle_Kernel_3x3'
+        elif(specific_dataset == '4x4'):
+             data_1 = PuzzleDataset('4x4-play')
+             data_2 = PuzzleDataset('4x4-noisy')
+             if(task_id is not None):
+                 data_3 = PuzzleDataset_Singletask('4x4-play', task_id)
+                 data_4 = PuzzleDataset_Singletask('4x4-noisy', task_id)
+             name = 'Puzzle_Kernel_4x4'
+        elif(specific_dataset == '4x5'):
+             data_1 = PuzzleDataset('4x5-play')
+             data_2 = PuzzleDataset('4x5-noisy')
+             if(task_id is not None):
+                 data_3 = PuzzleDataset_Singletask('4x5-play', task_id)
+                 data_4 = PuzzleDataset_Singletask('4x5-noisy', task_id)
+             name = 'Puzzle_Kernel_4x5'
+        elif(specific_dataset == '4x6'):
+             data_1 = PuzzleDataset('4x6-play')
+             data_2 = PuzzleDataset('4x6-noisy')
+             if(task_id is not None):
+                 data_3 = PuzzleDataset_Singletask('4x6-play', task_id)
+                 data_4 = PuzzleDataset_Singletask('4x6-noisy', task_id)
+             name = 'Puzzle_Kernel_4x6'
+        else: 
             raise ValueError(f"Invalid dataset name: {specific_dataset}")
         if(task_id is not None):
             trajs = data_1.get_trajectories() + data_2.get_trajectories() + data_3.get_trajectories() + data_4.get_trajectories()
@@ -409,28 +442,83 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
         return trajs, name, obs_dim, act_dim
 
     elif(dataset_name == 'ogpointmaze'):
-
-        if(specific_dataset is None):
+        if(specific_dataset is None): 
              raise ValueError(f"Invalid dataset name: {dataset_name}")
         elif(specific_dataset == 'medium'):
              data_1 = OGPointmazeDataset('medium')
              if(task_id is not None):
-                 data_2 = OGPointmazeDataset_Singletask('medium', task_id, mode = 'reward')
+                 data_2 = OGPointmazeDataset_Singletask('medium', task_id)
              name = 'OG2DMaze_Kernel_medium'
         elif(specific_dataset == 'large'):
              data_1 =  OGPointmazeDataset('large')
              if(task_id is not None):
-                 data_2 = OGPointmazeDataset_Singletask('large', task_id, mode = 'reward')
+                 data_2 = OGPointmazeDataset_Singletask('large', task_id)
              name = 'OG2DMaze_Kernel_large'
         elif(specific_dataset == 'giant'):
              data_1 = OGPointmazeDataset('giant')
              if(task_id is not None):
-                 data_2 = OGPointmazeDataset_Singletask('giant', task_id, mode = 'reward')
-             name = 'Cube_Kernel_giant'
-        else:
+                 data_2 = OGPointmazeDataset_Singletask('giant', task_id)
+             name = 'OG2DMaze_Kernel_giant'
+        else: 
             raise ValueError(f"Invalid dataset name: {specific_dataset}")
         if(task_id is not None):
-            trajs = data_1.get_trajectories() + data_2.get_trajectories()
+            trajs = data_1.get_trajectories() + data_2.get_trajectories() 
+        else:
+            trajs = data_1.get_trajectories()
+        obs_dim = data_1.get_state_dim()
+        act_dim = data_1.get_action_dim()
+        return trajs, name, obs_dim, act_dim
+    
+    elif(dataset_name == 'antmaze'):
+        if(specific_dataset is None): 
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+        elif(specific_dataset == 'medium'):
+             data_1 = AntmazeDataset('medium')
+             if(task_id is not None):
+                 data_2 = AntmazeDataset_Singletask('medium', task_id)
+             name = 'AntMaze_Kernel_medium'
+        elif(specific_dataset == 'large'):
+             data_1 =  AntmazeDataset('large')
+             if(task_id is not None):
+                 data_2 = AntmazeDataset_Singletask('large', task_id)
+             name = 'AntMaze_Kernel_large'
+        elif(specific_dataset == 'giant'):
+             data_1 = AntmazeDataset('giant')
+             if(task_id is not None):
+                 data_2 = AntmazeDataset_Singletask('giant', task_id)
+             name = 'AntMaze_Kernel_giant'
+        else: 
+            raise ValueError(f"Invalid dataset name: {specific_dataset}")
+        if(task_id is not None):
+            trajs = data_1.get_trajectories() + data_2.get_trajectories() 
+        else:
+            trajs = data_1.get_trajectories()
+        obs_dim = data_1.get_state_dim()
+        act_dim = data_1.get_action_dim()
+        return trajs, name, obs_dim, act_dim
+    
+    elif(dataset_name == 'humanoidmaze'):
+        if(specific_dataset is None): 
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+        elif(specific_dataset == 'medium'):
+             data_1 = HumanoidmazeDataset('medium')
+             if(task_id is not None):
+                 data_2 = HumanoidmazeDataset_Singletask('medium', task_id)
+             name = 'HumanoidMaze_Kernel_medium'
+        elif(specific_dataset == 'large'):
+             data_1 =  HumanoidmazeDataset('large')
+             if(task_id is not None):
+                 data_2 = HumanoidmazeDataset_Singletask('large', task_id)
+             name = 'HumanoidMaze_Kernel_large'
+        elif(specific_dataset == 'giant'):
+             data_1 = HumanoidmazeDataset('giant')
+             if(task_id is not None):
+                 data_2 = HumanoidmazeDataset_Singletask('giant', task_id)
+             name = 'HumanoidMaze_Kernel_giant'
+        else: 
+            raise ValueError(f"Invalid dataset name: {specific_dataset}")
+        if(task_id is not None):
+            trajs = data_1.get_trajectories() + data_2.get_trajectories() 
         else:
             trajs = data_1.get_trajectories()
         obs_dim = data_1.get_state_dim()
@@ -438,16 +526,13 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
         return trajs, name, obs_dim, act_dim
 
     else:
-        raise ValueError(f"Invalid Dataset Name: {dataset_name}")
-
-
-
-
+        raise ValueError(f"Invalid Dataset Name: {dataset_name}")   
+             
 # Build (s, a, s') transitions from your offline trajectories
 class KernelDataset(Dataset):
     def __init__(self, trajectories, kernel_name):
          obs_list, act_list = [], []
-
+        
          for traj in trajectories:
             obs, acts = traj['observations'], traj['actions']
             L = min(len(obs), len(acts))
@@ -455,7 +540,7 @@ class KernelDataset(Dataset):
             act_list.append(acts[:L])
          obs_all = np.concatenate(obs_list, axis=0)  # [N, d_s]
          #act_all = np.concatenate(act_list, axis=0)  # [N, d_a]
-
+        
         #get stats
          self.stats = SAStats()
          self.stats.obs_mean = obs_all.mean(axis=0)
@@ -514,7 +599,7 @@ class test_dataset(Dataset):
                self.stats = pickle.load(f)
         transitions = []
         for traj in trajs:
-            obs = np.asarray(traj['observations'])
+            obs = np.asarray(traj['observations'])      
             acts = np.asarray(traj['actions'])
             if(len(obs) != len(acts)):
                  L = len(acts)
@@ -527,7 +612,7 @@ class test_dataset(Dataset):
                 transitions.append((s_t, a_t, s_tp1))
 
         self.transitions = transitions
-
+    
     def __len__(self):
         return len(self.transitions)
 
@@ -538,14 +623,14 @@ class test_dataset(Dataset):
             torch.tensor(a, dtype=torch.float32),
             torch.tensor(s_next, dtype=torch.float32),
         )
-
+        
 """
 def train_kernel(dataset_name, specific_dataset: Optional[str] = None, batch_size = 256, lr = 1e-3, num_steps = 10000):
      # Prepare dataset and dataloader
      save_freq = 2000
      if(specific_dataset is None):
          print(f"Training kernel for {dataset_name} Dataset")
-     else:
+     else: 
          print(f"Training kernel for {dataset_name}_{specific_dataset} Dataset")
      device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
      print(f'Using device: {device}')
@@ -575,9 +660,9 @@ def train_kernel(dataset_name, specific_dataset: Optional[str] = None, batch_siz
           optimiser.zero_grad()
           loss.backward()
           optimiser.step()
-          total_nll += loss.item()
+          total_nll += loss.item() 
           step += 1
-
+          
           if step % 500 == 0:
               avg_loss = total_nll / 500
               print(f"Step {step}, loss {avg_loss:.4f}")
@@ -586,23 +671,22 @@ def train_kernel(dataset_name, specific_dataset: Optional[str] = None, batch_siz
           if step % save_freq == 0:
               checkpoint = copy.deepcopy(model)
               save_model(checkpoint, kernel_name, step)
-
-
+        
+         
      #total probability after training
      model.eval()
      save_model(model, kernel_name, num_steps)
-
-
+     
 def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None,  save_freq: int = 50, num_steps: int = 500):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device {device}")
-    Train_trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
+    Train_trajs, kernel_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)  
     if(trajs is None):
          dataset = test_dataset(Train_trajs, kernel_name)
     else:
          dataset = test_dataset(trajs, kernel_name)
     dataloader = DataLoader(dataset, batch_size = 1, shuffle = True, pin_memory = True, num_workers = 8)
-    num = save_freq
+    num = save_freq 
     while num <= num_steps:
         state_dict = load_model(kernel_name, num)
         kernel_net = TransitionKernel(obs_dim, act_dim).to(device)
@@ -618,7 +702,6 @@ def test_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Opti
         min_probs = np.min(probs)
         print(f"Model {num}, mean_prob: {mean_probs:.4f}, min_prob {min_probs:.4f}")
         num += save_freq
-
 """
 
 import torch
@@ -639,7 +722,7 @@ def train_mog_kernel(
     num_steps: int = 25000,
     save_freq: int = 2000,
     ensemble_size: int = 6,           # 5~8 recommended
-    num_modes: int = 8,
+    num_modes: int = 8,  
     num_hidden_layers: int = 3,             # 6~8 recommended for manipulation
     hidden_dim: int = 512,
     λ_reg: float = 2e-3,              # disagreement regularization
@@ -657,11 +740,11 @@ def train_mog_kernel(
     if(trajs is not None):
           total_trajs = train_trajs + trajs
     else:
-          total_trajs = train_trajs
+          total_trajs = train_trajs 
     dataset = KernelDataset(total_trajs, kernel_name)
     loader = cycle(DataLoader(dataset, batch_size = batch_size, shuffle = True,
                               pin_memory=True, num_workers=8, persistent_workers = True))
-
+    
     # Create ensemble of MoG kernels
     ensemble = [
         MoGTransitionKernel(
@@ -669,13 +752,13 @@ def train_mog_kernel(
             act_dim=act_dim,
             num_modes = num_modes,
             num_hidden_layers = num_hidden_layers,
-            hidden_dim = hidden_dim,
+            hidden_dim = hidden_dim, 
             noise_floor = noise_floor
         ).to(device)
         for _ in range(ensemble_size)
     ]
 
-    optimizers = [optim.Adam(m.parameters(), lr=lr, weight_decay=1e-5)
+    optimizers = [optim.Adam(m.parameters(), lr=lr, weight_decay=1e-5) 
                   for m in ensemble]
 
     # Save hyperparameters (you may need to adjust this function for MoG)
@@ -698,9 +781,6 @@ def train_mog_kernel(
 
     step = 0
     total_loss = 0.0
-    total_nll = 0.0
-    total_regularization = 0.0
-    total_member_spread = 0.0
 
     for step in tqdm(range(1, num_steps + 1), desc="Training MoG Kernel"):
         s, a, s_next = next(loader)
@@ -709,26 +789,21 @@ def train_mog_kernel(
         s_next = s_next.to(device)
 
         losses = []
-        nll_values = []
-        regularization_values = []
 
         for m in ensemble:
             mu, log_std, weights = m(s, a)
-            nll = m.mog_nll(s_next, mu, log_std, weights)
+            loss = m.mog_nll(s_next, mu, log_std, weights)
 
             # === Optional: disagreement regularization ===
             # Average over modes for disagreement calculation
             mu_mean = mu.mean(dim=1)                    # (B, obs_dim)
             disagreement = ((mu - mu_mean.unsqueeze(1)) ** 2).mean(dim=1).mean(dim=0)
-
+            
             var = torch.exp(2 * log_std) + m.noise_floor
             penalty = (disagreement / (var.mean(dim=1) + 1e-6)).mean()
-
-            regularization = λ_reg * penalty
-            loss = nll + regularization
+            
+            loss = loss + λ_reg * penalty
             losses.append(loss)
-            nll_values.append(nll.detach())
-            regularization_values.append(regularization.detach())
 
         # Backprop
         for m, opt, loss in zip(ensemble, optimizers, losses):
@@ -740,28 +815,10 @@ def train_mog_kernel(
         # Logging
         avg_loss = sum(loss.item() for loss in losses) / ensemble_size
         total_loss += avg_loss
-        total_nll += torch.stack(nll_values).mean().item()
-        total_regularization += torch.stack(regularization_values).mean().item()
-        total_member_spread += torch.stack([loss.detach() for loss in losses]).std(
-            unbiased=False
-        ).item()
 
         if step % 100 == 0:
-            logged_loss = total_loss / 100
-            print(f"Step {step:6d} | Avg Loss: {logged_loss:.6f}")
-            wandb_log(
-                {
-                    "kernel/loss": logged_loss,
-                    "kernel/train/nll": total_nll / 100,
-                    "kernel/train/regularization": total_regularization / 100,
-                    "kernel/train/member_loss_spread": total_member_spread / 100,
-                },
-                step=step,
-            )
+            print(f"Step {step:6d} | Avg Loss: {total_loss/100:.6f}")
             total_loss = 0.0
-            total_nll = 0.0
-            total_regularization = 0.0
-            total_member_spread = 0.0
 
         # Save checkpoints
         if step % save_freq == 0 or step == num_steps:
@@ -779,8 +836,6 @@ def train_mog_kernel(
 
     print("MoG Transition Kernel training completed!")
     return ensemble
-
-
 
 
 def train_kernel(dataset_name, specific_dataset: str = None,
@@ -807,13 +862,13 @@ def train_kernel(dataset_name, specific_dataset: str = None,
 
     # Save hyperparameters at the start of training
     save_kernel_hyperparameters(
-        dataset_name,
-        batch_size,
-        num_steps,
+        dataset_name, 
+        batch_size, 
+        num_steps, 
         lr,
         obs_dim,
-        act_dim,
-        kernel_name,
+        act_dim, 
+        kernel_name, 
         optimizers[0],  # Use first optimizer as representative
         ensemble[0],    # Use first model as representative
         ensemble_size,
@@ -848,7 +903,7 @@ def train_kernel(dataset_name, specific_dataset: str = None,
         mus_stack = torch.stack(mus, dim=0)  # (K, B, obs_dim)
         mu_mean = mus_stack.mean(dim=0)      # (B, obs_dim)
         # disagreement = average squared deviation
-        disagreement = ((mus_stack - mu_mean.unsqueeze(0)) ** 2).mean(dim=0)
+        disagreement = ((mus_stack - mu_mean.unsqueeze(0)) ** 2).mean(dim=0) 
         disagreement_detached = disagreement.detach()
         # inflate each model’s loss by penalizing small variance in high disagreement dims
         for i, m in enumerate(ensemble):
@@ -879,8 +934,8 @@ def train_kernel(dataset_name, specific_dataset: str = None,
                 for idx, m in enumerate(ensemble):
                     ckpt = copy.deepcopy(m).cpu()
                     save_to_finetuning(ckpt, dataset_name, idx, SD)
-
-
+                 
+    
     stats = get_pretrained_kernel_stats(kernel_name)
     save_stats_to_finetuning(stats, dataset_name, SD)
     # Return final ensemble
@@ -900,7 +955,7 @@ def test_kernel(dataset_name, specific_dataset: str = None,
     else:
         dataset = test_dataset(trajs, kernel_name)
     dataloader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=True, num_workers=8)
-
+    
     # For each saved checkpoint / ensemble member
     step = save_freq
     while step <= num_steps:
@@ -933,7 +988,7 @@ def test_kernel(dataset_name, specific_dataset: str = None,
             all_D2_total.extend(D2)
             all_log_density.extend(log_density)
             count += 1
-
+        
         print('Mahalanobis Distance')
         all_D2_total = np.array(all_D2_total)
         mean_D2_total = float(all_D2_total.mean())
@@ -947,7 +1002,7 @@ def test_kernel(dataset_name, specific_dataset: str = None,
         print(f"max_D2_total = {max_D2_total:.4f}")
         print(f"std_D2_total = {std_D2_total:.4f}")
         print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
-
+        
         print('Log Density')
         all_log_density = np.array(all_log_density)
         mean_log_density = float(all_log_density.mean())
@@ -978,7 +1033,7 @@ def test_kernel_mog(dataset_name, specific_dataset: str = None, task_id: Optiona
         total_trajs = train_trajs
     dataset = test_dataset(total_trajs, kernel_name)
     dataloader = DataLoader(dataset, batch_size=256, shuffle=True, pin_memory=True, num_workers=8)
-
+    
     # For each saved checkpoint / ensemble member
     step = save_freq
     while step <= num_steps:
@@ -994,7 +1049,6 @@ def test_kernel_mog(dataset_name, specific_dataset: str = None, task_id: Optiona
         # Compute log-probs over dataset
         all_D2_total = []
         all_log_density = []
-        all_corrupted_log_density = []
         #all_D_total = []
         count = 0
         #worst = (None, float("inf"), None)  # (idx, log_prob, (s, a, s_next))
@@ -1007,21 +1061,12 @@ def test_kernel_mog(dataset_name, specific_dataset: str = None, task_id: Optiona
             with torch.no_grad():
                 D2_total = compute_total_mahalanobis_score_mog(ensemble, s, a, s_next)
                 log_density = compute_log_density_mog(ensemble, s, a, s_next)
-                if s_next.shape[0] > 1:
-                    corrupted_log_density = compute_log_density_mog(
-                        ensemble, s, a, torch.roll(s_next, shifts=1, dims=0)
-                    )
-                else:
-                    corrupted_log_density = log_density
             D2 = D2_total.detach().cpu().numpy()
             log_density = log_density.detach().cpu().numpy()
             all_D2_total.extend(D2)
             all_log_density.extend(log_density)
-            all_corrupted_log_density.extend(
-                corrupted_log_density.detach().cpu().numpy()
-            )
             count += 1
-
+        
         print('Mahalanobis Distance')
         all_D2_total = np.array(all_D2_total)
         mean_D2_total = float(all_D2_total.mean())
@@ -1035,7 +1080,7 @@ def test_kernel_mog(dataset_name, specific_dataset: str = None, task_id: Optiona
         print(f"max_D2_total = {max_D2_total:.4f}")
         print(f"std_D2_total = {std_D2_total:.4f}")
         print(f"τ ({quantile*100:.0f}th percentile) : {tau:.4f}")
-
+        
         print('Log Density')
         all_log_density = np.array(all_log_density)
         mean_log_density = float(all_log_density.mean())
@@ -1049,35 +1094,6 @@ def test_kernel_mog(dataset_name, specific_dataset: str = None, task_id: Optiona
         print(f"max_log_density = {max_log_density:.4f}")
         print(f"std_log_density = {std_log_density:.4f}")
         print(f"τ ({(1-quantile)*100:.0f}th percentile) : {tau:.4f}")
-        corrupted_log_density = np.asarray(all_corrupted_log_density)
-        id_acceptance = float((all_log_density > tau).mean())
-        corrupted_acceptance = float((corrupted_log_density > tau).mean())
-        sorted_corrupted = np.sort(corrupted_log_density)
-        lower = np.searchsorted(sorted_corrupted, all_log_density, side="left")
-        upper = np.searchsorted(sorted_corrupted, all_log_density, side="right")
-        density_auc = float(
-            np.mean((lower + 0.5 * (upper - lower)) / max(len(sorted_corrupted), 1))
-        )
-        wandb_log(
-            {
-                "kernel/eval/mahalanobis_mean": mean_D2_total,
-                "kernel/eval/mahalanobis_std": std_D2_total,
-                "kernel/eval/mahalanobis_p99": float(
-                    np.quantile(all_D2_total, quantile)
-                ),
-                "kernel/eval/log_density_mean": mean_log_density,
-                "kernel/eval/log_density_std": std_log_density,
-                "kernel/eval/log_density_threshold": tau,
-                "kernel/eval/id_acceptance": id_acceptance,
-                "kernel/eval/corrupted_acceptance": corrupted_acceptance,
-                "kernel/eval/corrupted_rejection": 1.0 - corrupted_acceptance,
-                "kernel/eval/density_separation": float(
-                    all_log_density.mean() - corrupted_log_density.mean()
-                ),
-                "kernel/eval/density_auc": density_auc,
-            },
-            step=step,
-        )
         step += save_freq
 
 
@@ -1114,7 +1130,7 @@ def compute_total_mahalanobis_score(
     a: torch.Tensor,
     s_next: torch.Tensor,
 ) -> torch.Tensor:
-
+    
     K = len(kernels)
     device = s.device
 
@@ -1189,31 +1205,31 @@ def compute_log_density(kernels: List[RobustTransitionKernel], s, a, s_next):
         log_probs.append(lp)
     #log_probs = torch.stack(log_probs, dim=0).mean(dim = 0)
     log_probs = torch.stack(log_probs, dim=0)
-    log_density = torch.logsumexp(log_probs, dim=0) - math.log(len(kernels))
+    log_density = torch.logsumexp(log_probs, dim=0) - math.log(len(kernels)) 
     return log_density
     #return log_probs
 
 def compute_log_density_mog(kernels: List[MoGTransitionKernel], s, a, s_next):
     """Returns total log p(s'|s,a) under ensemble of MoGs"""
     all_log_probs = []
-
+    
     for kernel in kernels:
         mu, log_std, weights = kernel(s, a)
         lp = kernel.log_prob(s_next, mu, log_std, weights)   # must use this method
         all_log_probs.append(lp)
-
+    
     all_log_probs = torch.stack(all_log_probs, dim=0)            # (K_ens, B)
-
+    
     # Proper ensemble logsumexp
     log_density = torch.logsumexp(all_log_probs, dim=0) - math.log(len(kernels))
-
+    
     return log_density
 
 
 def compute_total_mahalanobis_score_mog(
-    kernels: list,
-    s: torch.Tensor,
-    a: torch.Tensor,
+    kernels: list, 
+    s: torch.Tensor, 
+    a: torch.Tensor, 
     s_next: torch.Tensor
 ) -> torch.Tensor:
     """
@@ -1221,50 +1237,51 @@ def compute_total_mahalanobis_score_mog(
     """
     K_ens = len(kernels)                    # number of ensemble members
     B = s.shape[0]
-
+    
     mu_list = []
     var_list = []
-
+    
     for kernel in kernels:
         mu, log_std, weights = kernel(s, a)           # mu: (B, K_modes, obs_dim)
                                                       # weights: (B, K_modes)
-
+        
         K_modes = weights.shape[1]
-
+        
         # === Mixture statistics for this model ===
         # Weighted mean
         mu_mix = torch.sum(weights.unsqueeze(-1) * mu, dim=1)          # (B, obs_dim)
-
+        
         # Aleatoric variance: E[Var]
         var_ale = torch.exp(2 * log_std) + kernel.noise_floor          # (B, K_modes, obs_dim)
         var_ale_mix = torch.sum(weights.unsqueeze(-1) * var_ale, dim=1)  # (B, obs_dim)
-
+        
         # Epistemic variance: Var[E]
         mu_centered = mu - mu_mix.unsqueeze(1)                         # (B, K_modes, obs_dim)
         var_epi_mix = torch.sum(weights.unsqueeze(-1) * (mu_centered ** 2), dim=1)
-
+        
         var_mix = var_ale_mix + var_epi_mix
         var_mix = torch.clamp(var_mix, min=1e-6)
-
+        
         mu_list.append(mu_mix)
         var_list.append(var_mix)
-
+    
     # === Ensemble level ===
     mu_ensemble = torch.stack(mu_list, dim=0)           # (K_ens, B, obs_dim)
     var_ensemble = torch.stack(var_list, dim=0)         # (K_ens, B, obs_dim)
-
+    
     mu_total = mu_ensemble.mean(dim=0)                  # (B, obs_dim)
-
+    
     var_aleatoric = var_ensemble.mean(dim=0)
     var_epistemic = mu_ensemble.var(dim=0, unbiased=False)
-
+    
     var_total = var_aleatoric + var_epistemic
     var_total = torch.clamp(var_total, min=1e-6)
-
+    
     # === Mahalanobis ===
     residual = s_next - mu_total
     residual = torch.clamp(residual, -10.0, 10.0)
-
+    
     D2_total = ((residual ** 2) / var_total).sum(dim=-1)   # (B,)
-
+    
     return D2_total
+

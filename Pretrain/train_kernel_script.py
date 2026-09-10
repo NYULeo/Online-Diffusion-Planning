@@ -13,62 +13,48 @@ sys.path.insert(0, str(REPO_ROOT))
 os.chdir(REPO_ROOT)
 
 from Pretrain.Transition_Kernel.Kernel_Backbone import test_kernel_mog, train_mog_kernel
-from Pretrain.utils import init_wandb_run, set_seed
+from Pretrain.utils import set_seed
 
 
 @hydra.main(version_base="1.3", config_path="../Finetuning/conf", config_name="cube_single")
 def main(config: DictConfig) -> None:
     os.chdir(REPO_ROOT)
     OmegaConf.set_struct(config, True)
-    print(OmegaConf.to_yaml(config, resolve=True))
+    stage = config.scripts.train_kernel_script
     if config.run.validate_only:
+        print(OmegaConf.to_yaml(stage, resolve=True))
         return
 
-    env = config.environment
-    kernel = config.scripts.train_kernel_script
     set_seed(int(config.run.seed))
-    wandb_run = init_wandb_run(
-        f"{env.dataset_name}-{env.specific_dataset}-task{env.task_id}-kernel",
-        {
-            "stage": "kernel",
-            "resolved_hydra_config": OmegaConf.to_container(config, resolve=True),
-        },
-        group=config.wandb.group,
-        job_type="kernel",
+    train_mog_kernel(
+        dataset_name=stage.dataset_name,
+        specific_dataset=stage.specific_dataset,
+        task_id=stage.task_id,
+        batch_size=stage.batch_size,
+        lr=stage.lr,
+        num_steps=stage.num_steps,
+        save_freq=stage.save_freq,
+        ensemble_size=stage.ensemble_size,
+        num_modes=stage.num_modes,
+        num_hidden_layers=stage.num_hidden_layers,
+        hidden_dim=stage.hidden_dim,
+        λ_reg=stage.lambda_reg,
+        noise_floor=stage.noise_floor,
     )
-    try:
-        train_mog_kernel(
-            dataset_name=env.dataset_name,
-            specific_dataset=kernel.specific_dataset,
-            task_id=kernel.task_id,
-            trajs=None,
-            batch_size=kernel.batch_size,
-            lr=kernel.lr,
-            num_steps=kernel.num_steps,
-            save_freq=kernel.save_freq,
-            ensemble_size=kernel.ensemble_size,
-            num_modes=kernel.num_modes,
-            num_hidden_layers=kernel.num_hidden_layers,
-            hidden_dim=kernel.hidden_dim,
-            λ_reg=kernel.lambda_reg,
-            noise_floor=kernel.noise_floor,
-        )
-        test_kernel_mog(
-            dataset_name=env.dataset_name,
-            specific_dataset=kernel.specific_dataset,
-            task_id=kernel.task_id,
-            trajs=None,
-            save_freq=kernel.num_steps,
-            num_steps=kernel.num_steps,
-            num_hidden_layers=kernel.num_hidden_layers,
-            hidden_dim=kernel.hidden_dim,
-            ensemble_size=kernel.ensemble_size,
-            num_modes=kernel.num_modes,
-            quantile=kernel.test_quantile,
-            noise_floor=kernel.noise_floor,
-        )
-    finally:
-        wandb_run.finish()
+    test_kernel_mog(
+        dataset_name=stage.dataset_name,
+        specific_dataset=stage.specific_dataset,
+        task_id=stage.task_id,
+        trajs=None,
+        save_freq=stage.save_freq,
+        num_steps=stage.num_steps,
+        num_hidden_layers=stage.num_hidden_layers,
+        hidden_dim=stage.hidden_dim,
+        ensemble_size=stage.ensemble_size,
+        num_modes=stage.num_modes,
+        quantile=stage.test_quantile,
+        noise_floor=stage.noise_floor,
+    )
 
 
 if __name__ == "__main__":

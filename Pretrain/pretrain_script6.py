@@ -1,4 +1,5 @@
 
+
 from utils import set_seed
 from Planners.Backbone.Trainer import SDETrainer
 import torch
@@ -9,9 +10,9 @@ import torch
 
 if __name__ == '__main__':  # pragma: no cover
      set_seed(1)
-     dataset_name = 'scene'
-     specific_dataset = 'play'
-     task_id = 5
+     dataset_name = 'cube'
+     specific_dataset = 'double-play'
+     task_id = 4
      horizon = 32
      device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
      trainer = SDETrainer(
@@ -28,3 +29,5 @@ if __name__ == '__main__':  # pragma: no cover
          stride = 1)
      trainer.train()
      #trainer.selector('complete', times = 1000)
+
+

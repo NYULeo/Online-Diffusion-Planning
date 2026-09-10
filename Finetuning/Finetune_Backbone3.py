@@ -5,13 +5,10 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(project_root)
 from dataclasses import dataclass
 from gymnasium.vector import AsyncVectorEnv
-from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs, check_Critic, get_kernel, get_new_critic_stats, load_success_trajs, KernelConfig, train_critic_with_planner2, train_critic_with_planner4, train_critic_with_planner5, train_critic_with_planner7
-#from Finetuning.traj_reward import RewardConfig, TotalReward, TotalReward_Critic
-#from Finetuning.traj_reward3 import RewardConfig, TotalReward, TotalReward_Critic
+from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs, check_Critic, get_kernel, get_new_critic_stats, load_success_trajs, KernelConfig, train_critic_with_planner2, train_critic_with_planner7, train_critic_with_planner5
 from Finetuning.traj_reward4 import RewardConfig, TotalReward, TotalReward_Critic
 from adjoint_matching import AdjointMatchingFineTuner, AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
-#from AM import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
 from Finetuning.Rollout import rollout
 from Pretrain.Planners.Backbone.Dit import DiT1d
 from Pretrain.Dataset import get_PlannerName, get_dataset, Planner_Processor
@@ -19,9 +16,9 @@ from Pretrain.Planners.Backbone.Sampler import sample_euler_karras
 from typing import List
 from utils import TrajectoryDict, rollout_parallel, get_planner, rollout_parallel2, save_planner, train_reward, train_kernel, train_kernel_mog, train_critic, save_trajs, AlphaSchedulerConfig, checktrajs, rollout_parallel3, train_reward_ensemble
 from Pretrain.Dataset import get_env
-from Pretrain.utils import init_wandb_run, wandb_log
 from torch.utils.data import DataLoader, DistributedSampler
 from accelerate.utils import broadcast
+from Finetuning.Raw import probe_multi_horizon_bellman
 import torch
 import copy
 import os
@@ -33,12 +30,11 @@ import json
 from dataclasses import asdict
 from random import random
 import random
-import time
-
+import wandb
 
 
 @dataclass
-class Train_Reward_Config:
+class Train_Reward_Config: 
     hidden_layers: int = 1
     hidden_dim: int = 128
     ensemble_size: Optional[int] = None
@@ -87,11 +83,13 @@ class Train_Critic_Config:
     plan_chunk_size: int = 256
     data_conservation: bool = False
     momentum: float = 0.005
+    mix_reset: bool = False
+    n_reset: int = 256
 
 @dataclass
 class FinetuningConfig():
     AMConfig: AdjointMatchingConfig | Acc_AdjointMatchingConfig
-    RewardConfig: RewardConfig
+    RewardConfig: RewardConfig 
     AlphaConfig: AlphaSchedulerConfig
     dataset_name: str
     specific_dataset: str
@@ -99,8 +97,8 @@ class FinetuningConfig():
     reward_model_checkpoint: int
     kernel_model_checkpoint: int
     critic_model_checkpoint: int
-    train_reward_config: Train_Reward_Config
-    train_kernel_config: Train_Kernel_Config
+    train_reward_config: Train_Reward_Config 
+    train_kernel_config: Train_Kernel_Config 
     train_critic_config: Train_Critic_Config
     offline: bool = False
     critic: bool = False
@@ -110,6 +108,7 @@ class FinetuningConfig():
     buffer_size: int = 100000
     finetune_buffer_cutoff_length: Optional[int] = None
     train_buffer_cutoff_length: Optional[int] = None
+    finetune_suffix_cut_length: Optional[int] = None
     finetune_steps: int = 1000000
     finetune_rounds: int = 10
     diffusion_steps: int = 30
@@ -127,15 +126,15 @@ class FinetuningConfig():
     Entropy_Scaling_Factor: float = 0.5
     rollout_length: int = 1000
     rollout_num_envs: int = 1
-    num_rollout_processes: Optional[int] = None
+    num_rollout_processes: Optional[int] = None 
     continual_rollout: bool = False
     chunk_size: int = 10
-
+   
 def save_hyperparameters(config: FinetuningConfig, filepath: Optional[str] = None):
     if filepath is None:
         os.makedirs(f"./Finetuning/args/{config.dataset_name}/{config.specific_dataset}/", exist_ok=True)
         filepath = f"./Finetuning/args/{config.dataset_name}/{config.specific_dataset}/hyperparameters.json"
-
+    
     def convert_to_json_serializable(obj):
         """Recursively convert objects to JSON-serializable types"""
         if isinstance(obj, np.ndarray):
@@ -156,7 +155,7 @@ def save_hyperparameters(config: FinetuningConfig, filepath: Optional[str] = Non
             # Handle other custom objects by converting to string
             return str(obj)
         return obj
-
+    
     # Convert all config dataclasses to dictionaries
     hyperparams = {
         'env_details': {
@@ -215,14 +214,14 @@ def save_hyperparameters(config: FinetuningConfig, filepath: Optional[str] = Non
             'gpu_name': torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
         }
     }
-
+    
     # Handle numpy arrays, torch.device, and other non-JSON-serializable types
     hyperparams = convert_to_json_serializable(hyperparams)
-
+    
     # Save with pretty printing (indent=4 makes it human-readable)
     with open(filepath, 'w') as f:
         json.dump(hyperparams, f, indent=4, sort_keys=False)
-
+    
     print(f"Hyperparameters saved to {filepath}")
 
 class OnlineFinetuner():
@@ -278,51 +277,24 @@ class OnlineFinetuner():
                mixed_precision='bf16',
                gradient_accumulation_steps = self.config.gradient_accumulate_every,
         )
-        self.device = self.accelerator.device
-        self.wandb_run = None
         if self.accelerator.is_main_process:
-            self.wandb_run = init_wandb_run(
-                f"{self.config.dataset_name}-{self.config.specific_dataset}-"
-                f"task{self.config.train_reward_config.task_id}-finetune",
-                {
-                    "stage": "finetune",
-                    "dataset_name": self.config.dataset_name,
-                    "specific_dataset": self.config.specific_dataset,
-                    "task_id": self.config.train_reward_config.task_id,
-                    "finetune_steps": self.config.finetune_steps,
-                    "finetune_rounds": self.config.finetune_rounds,
-                    "batch_size": self.config.finetune_batch_size,
-                    "batch_per_sample": self.config.finetune_batch_per_sample,
-                    "diffusion_steps": self.config.diffusion_steps,
-                    "num_processes": self.accelerator.num_processes,
-                },
-                job_type="finetune",
-            )
-            self.wandb_run.define_metric("finetune/step")
-            self.wandb_run.define_metric("finetune/loss", step_metric="finetune/step")
-            self.wandb_run.define_metric("finetune/reward", step_metric="finetune/step")
-            self.wandb_run.define_metric("finetune/objective", step_metric="finetune/step")
-            self.wandb_run.define_metric("finetune/constraint", step_metric="finetune/step")
-            self.wandb_run.define_metric("finetune/alpha", step_metric="finetune/step")
-            self.wandb_run.define_metric("finetune/lambda", step_metric="finetune/step")
-            self.wandb_run.define_metric("finetune/components/*", step_metric="finetune/step")
-            self.wandb_run.define_metric("finetune/frozen/*", step_metric="finetune/step")
-            self.wandb_run.define_metric("finetune/round")
-            self.wandb_run.define_metric("finetune/rollout/*", step_metric="finetune/round")
-            self.wandb_run.define_metric("finetune/timing/*", step_metric="finetune/round")
-            self.wandb_run.define_metric("finetune/critic_step")
-            self.wandb_run.define_metric("finetune/critic/*", step_metric="finetune/critic_step")
-
+           if(self.config.offline): 
+                name = f"{self.config.dataset_name}-{self.config.specific_dataset}-task{self.config.train_reward_config.task_id}-finetune-offline"
+           else:
+                name = f"{self.config.dataset_name}-{self.config.specific_dataset}-task{self.config.train_reward_config.task_id}-finetune-online"
+           wandb.init(
+                    entity="kaiwen_hu-uc-berkeley",
+                    project="ODP",
+                    name=name,
+                    config={'finetune_config': asdict(self.config)},
+                )
+        self.device = self.accelerator.device
+        
         self.Initialize_BufferDataset()
         self.set_reward_model(self.device)
-        self.frozen_diagnostic_critic = None
-        if isinstance(self.reward_model, TotalReward_Critic):
-            self.frozen_diagnostic_critic = copy.deepcopy(self.reward_model.critic).eval()
-            for parameter in self.frozen_diagnostic_critic.parameters():
-                parameter.requires_grad_(False)
         self.AMFineTuner = Acc_AdjointMatchingFineTuner(
                    self.accelerator,
-                   self.config.planner_checkpoint,
+                   self.config.planner_checkpoint, 
                    self.config.AMConfig)
 
     def Initialize_BufferDataset(self):
@@ -335,47 +307,32 @@ class OnlineFinetuner():
              self.Base_Critic_Buffer = None
 
         if(self.config.train_reward_config.task_id is not None):
-            dataset_reward = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = None)
-            trajs_reward = dataset_reward.get_trajectories()
-            dataset_kernel = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id)
-            trajs_kernel = dataset_kernel.get_trajectories()
-            self.Finetune_Buffer.extend(trajs_reward)
+            dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = None)
+            trajs_reward = dataset.get_trajectories()
+            trajs_finetune = dataset.get_trajectories(suffix_length = self.config.finetune_suffix_cut_length)
+            #dataset_kernel = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id)
+            #trajs_kernel = dataset_kernel.get_trajectories()
+            self.Finetune_Buffer.extend(trajs_finetune)
             self.Train_Buffer.extend(trajs_reward)
-            self.Train_Kernel_Buffer.extend(trajs_kernel)
+            self.Train_Kernel_Buffer.extend(trajs_reward)
             if(self.Base_Critic_Buffer is not None):
-                dataset_critic = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = self.config.train_buffer_cutoff_length)
-                trajs_critic = dataset_critic.get_trajectories()
-                #success_trajs = load_success_trajs(self.config.dataset_name, self.config.specific_dataset, self.config.train_reward_config.task_id, step = 0)
-                #self.Base_Critic_Buffer.extend(success_trajs)
-                self.Base_Critic_Buffer.extend(trajs_critic)
+                self.Base_Critic_Buffer.extend(trajs_finetune)
 
-        elif(self.config.train_reward_config.train_goal is not None):
-            dataset_reward = get_dataset(self.config.dataset_name, self.config.specific_dataset, goal = self.config.train_reward_config.train_goal, mode = 'reward')
-            trajs_reward = dataset_reward.get_trajectories()
-            dataset_kernel = get_dataset(self.config.dataset_name, self.config.specific_dataset)
-            trajs_kernel = dataset_kernel.get_trajectories()
-            dataset_critic = get_dataset(self.config.dataset_name, self.config.specific_dataset, goal = self.config.train_reward_config.train_goal, mode = 'critic')
-            trajs_critic = dataset_critic.get_trajectories()
-            self.Finetune_Buffer.extend(trajs_reward)
-            self.Train_Buffer.extend(trajs_reward)
-            self.Train_Kernel_Buffer.extend(trajs_kernel)
-            if(self.Base_Critic_Buffer is not None):
-                self.Base_Critic_Buffer.extend(trajs_critic)
-                #self.Base_Critic_Buffer.extend(trajs_reward)
         else:
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
-            trajs = dataset.get_trajectories()
-            self.Finetune_Buffer.extend(trajs)
-            self.Train_Buffer.extend(trajs)
-            self.Train_Kernel_Buffer.extend(trajs)
+            trajs_reward = dataset.get_trajectories()
+            trajs_finetune = dataset.get_trajectories(suffix_length = self.config.finetune_suffix_cut_length)
+            self.Finetune_Buffer.extend(trajs_finetune)
+            self.Train_Buffer.extend(trajs_reward)
+            self.Train_Kernel_Buffer.extend(trajs_reward)
             if(self.Base_Critic_Buffer is not None):
-                self.Base_Critic_Buffer.extend(trajs)
+                 self.Base_Critic_Buffer.extend(trajs_finetune)
 
         self.PlannerDataset = PlannerDataset(
-                   self.Finetune_Buffer,
-                   self.config.AMConfig.horizon,
-                   self.config.dataset_name,
-                   self.config.specific_dataset,
+                   self.Finetune_Buffer, 
+                   self.config.AMConfig.horizon, 
+                   self.config.dataset_name, 
+                   self.config.specific_dataset, 
                    self.config.train_reward_config.task_id,
                    self.config.finetune_buffer_cutoff_length)
 
@@ -384,12 +341,12 @@ class OnlineFinetuner():
             self.reward_model = TotalReward(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, self.config.train_reward_config.task_id)
         else:
             self.reward_model = TotalReward_Critic(device, self.config.RewardConfig, self.config.dataset_name, self.config.specific_dataset, self.config.reward_model_checkpoint, self.config.kernel_model_checkpoint, self.config.critic_model_checkpoint, self.config.train_reward_config.task_id)
-
+                    
     def gather_and_sync_trajs_and_buffer(self, local_trajs):
         # Gather local trajectories from all processes
         gathered_trajs_list = self.accelerator.gather_for_metrics([local_trajs if local_trajs else []], use_gather_object=True)
         self.accelerator.wait_for_everyone()
-
+        
         update_reward = False
         if self.accelerator.is_main_process:
             # Flatten and extend buffer only on main
@@ -397,9 +354,9 @@ class OnlineFinetuner():
             for process_trajs in gathered_trajs_list:
                if process_trajs:
                   collected_trajs.extend(process_trajs)
-
-            num_rollout = (self.config.num_rollout_processes
-               if self.config.num_rollout_processes is not None
+            
+            num_rollout = (self.config.num_rollout_processes 
+               if self.config.num_rollout_processes is not None 
                else self.accelerator.num_processes)
             print(f"Rollout Completed: Collected {len(collected_trajs)} trajectories across {num_rollout} rollout processes")
             #print(f"Rollout Completed: Collected {len(collected_trajs)} trajectories across {self.accelerator.num_processes} processes")
@@ -416,14 +373,14 @@ class OnlineFinetuner():
             self.Finetune_Buffer.extend(collected_trajs)
             if len(self.Finetune_Buffer) > self.config.buffer_size:
                  num_to_remove = len(self.Finetune_Buffer) - self.config.buffer_size
-                 self.Finetune_Buffer = self.Finetune_Buffer[num_to_remove:]
+                 self.Finetune_Buffer = self.Finetune_Buffer[num_to_remove:] 
                  #print(f"Buffer size limited to {self.config.buffer_size}, removed {num_to_remove} oldest trajectories")
-
+    
             # Prepare updated buffer for sync
             buffer_for_sync = [self.Finetune_Buffer]
         else:
             buffer_for_sync = [None]
-
+        
         # Broadcast full updated buffer to all processes
         synced_buffer = self.accelerator.gather_for_metrics(buffer_for_sync, use_gather_object=True)
         if synced_buffer[0] is not None:
@@ -431,7 +388,7 @@ class OnlineFinetuner():
         flag = torch.tensor([1 if update_reward else 0], device=self.accelerator.device, dtype=torch.int64)
         flag = broadcast(flag, from_process=0)   # accelerate.utils.broadcast
         update_reward = bool(flag.item())
-
+        
         self.PlannerDataset = PlannerDataset(
                  self.Finetune_Buffer,
                  self.config.AMConfig.horizon,
@@ -441,7 +398,7 @@ class OnlineFinetuner():
                  self.config.finetune_buffer_cutoff_length
          )
         return update_reward
-
+   
     def collect_critic_buffer(self, local_trajs):
           # ALL processes must participate in gather_for_metrics (collective operation)
           gathered_trajs_list = self.accelerator.gather_for_metrics([local_trajs if local_trajs else []], use_gather_object=True)
@@ -471,9 +428,9 @@ class OnlineFinetuner():
               critic_buffer.extend(success_trajs)
           else:
               critic_buffer = None
-
+          
           return critic_buffer
-
+   
     def data_conservation_update(self, critic_buffer):
         """
         if(self.config.train_reward_config.task_id is not None):
@@ -482,12 +439,12 @@ class OnlineFinetuner():
         elif(self.config.train_reward_config.train_goal is not None):
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset, goal = self.config.train_reward_config.train_goal, mode = 'critic')
             trajs = dataset.get_trajectories()
-        else:
+        else: 
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
             trajs = dataset.get_trajectories()
         """
         trajs = self.Base_Critic_Buffer.copy()
-
+        
         if(len(critic_buffer) < 2):
              critic_buffer.extend(trajs)
         else:
@@ -497,7 +454,7 @@ class OnlineFinetuner():
              half_buffer_trajs = random.sample(critic_buffer, half_size_2)
              critic_buffer = half_pretrained_trajs + half_buffer_trajs
         return critic_buffer
-
+    
     """
     def get_generated_plans(self, number_of_generated_plans: int):
         dataloader = cycle(DataLoader(self.PlannerDataset, batch_size = 12, shuffle = False))
@@ -505,16 +462,16 @@ class OnlineFinetuner():
         for i in range(number_of_generated_plans):
             s0 = next(dataloader)
             s0 = s0.squeeze(0).cpu().numpy()
-            x = sample_euler_karras(s0,
-                               self.AMFineTuner.new_score_net,
-                               self.config.AMConfig.d_s,
-                               self.config.AMConfig.d_a,
-                               self.config.AMConfig.horizon,
-                               self.config.AMConfig.diffusion_steps,
-                               self.config.AMConfig.num_karras,
-                               self.config.AMConfig.eta,
+            x = sample_euler_karras(s0, 
+                               self.AMFineTuner.new_score_net, 
+                               self.config.AMConfig.d_s, 
+                               self.config.AMConfig.d_a, 
+                               self.config.AMConfig.horizon,  
+                               self.config.AMConfig.diffusion_steps, 
+                               self.config.AMConfig.num_karras, 
+                               self.config.AMConfig.eta, 
                                self.device)
-
+            
             generated_plans.append(x)
         return generated_plans
     """
@@ -525,12 +482,26 @@ class OnlineFinetuner():
          loader = DataLoader(
                  self.PlannerDataset,
                  batch_size=number_of_generated_plans,
-                 shuffle=False,
+                 shuffle=True,
                  drop_last=False,
           )
          s0_batch = next(iter(loader))  # torch.Tensor, shape (N, d_s) if enough data
-          # Optional safety: trim/pad logic if dataset is smaller than N
+         
+         """
+         self._s0_loader = getattr(self, "_s0_loader", None)
+         if self._s0_loader is None:
+             self._s0_loader = cycle(DataLoader(
+                   self.PlannerDataset,
+                   batch_size=number_of_generated_plans,
+                   shuffle=True,          # new permutation each epoch
+                   drop_last=True,
+                   generator=torch.Generator().manual_seed(self.config.seed + self.step),
+          ))
+         s0_batch = next(self._s0_loader)
+         """
+         # Optional safety: trim/pad logic if dataset is smaller than N
          s0_batch = s0_batch[:number_of_generated_plans]
+         
 
           #    Split s0 list across processes
          with self.accelerator.split_between_processes(s0_batch) as local_s0_batch:
@@ -631,17 +602,17 @@ class OnlineFinetuner():
             print(f"The number of GPUs is: {torch.cuda.device_count()}")
             print(f"The GPU name is: {torch.cuda.get_device_name(0)}")
             print('-------------------------------------------------------------------------------------------')
-
+        
         if self.accelerator.is_main_process:
              save_hyperparameters(self.config)
-
+        
         self.accelerator.wait_for_everyone()
-
+        
         rank = self.accelerator.process_index
         world_size = self.accelerator.num_processes
         num_envs_per_process = self.config.rollout_num_envs  # Total envs = base * world_size
         last_reward_update_step = 0
-
+        
         """
         #warm up critic
         print(f"Warming Up Critic: ---------------------------------------------------------------- ")
@@ -672,23 +643,23 @@ class OnlineFinetuner():
                                new_step               = 0,
                                task_id                = self.config.train_reward_config.task_id,
                                log_every              = self.config.train_critic_config.warm_up_log_every,
-                               accelerator            = self.accelerator)
+                               accelerator            = self.accelerator) 
         self.accelerator.wait_for_everyone()
         """
-
+        
         for step in range(self.config.finetune_rounds):
-            round_started = time.perf_counter()
             if (torch.cuda.device_count() > 1):
                 world_size = self.accelerator.num_processes
+                num_workers = min(8, max(1, os.cpu_count() // (2 * world_size)))  # 
                 sampler = DistributedSampler(self.PlannerDataset, shuffle=True, drop_last=True)
                 sampler.set_epoch(step)
-
+                
                 dataloader = DataLoader(
-                    self.PlannerDataset,
-                    self.config.finetune_batch_size,
-                    pin_memory = True,
-                    num_workers = 0,
-                    sampler = sampler,
+                    self.PlannerDataset, 
+                    self.config.finetune_batch_size, 
+                    pin_memory = True, 
+                    num_workers = (os.cpu_count() // 2),  
+                    sampler = sampler,  
                     drop_last = True)
                 """
                 dataloader = DataLoader(
@@ -703,53 +674,46 @@ class OnlineFinetuner():
                 """
             else:
                 dataloader = DataLoader(
-                    self.PlannerDataset,
-                    self.config.finetune_batch_size,
-                    pin_memory = True,
-                    num_workers = 0,
-                    shuffle = True,
+                    self.PlannerDataset, 
+                    self.config.finetune_batch_size, 
+                    pin_memory = True, 
+                    num_workers = (os.cpu_count() // 2), 
+                    #num_workers = 0,
+                    shuffle = True, 
                     drop_last = True)
-
+            
             if self.accelerator.is_main_process:
                  print(f"Finetuning round {step+1} started")
-
-
+                
+            
             #self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1)
-            am_started = time.perf_counter()
-            self.AMFineTuner.finetune_planner(
-                dataloader,
-                self.reward_model,
-                step + 1,
-                diagnostic_critic=self.frozen_diagnostic_critic,
-            )
+            self.AMFineTuner.finetune_planner(dataloader, self.reward_model, step+1, old_planner_checkpoint = (step * self.config.AMConfig.per_round_steps))
             self.accelerator.wait_for_everyone()
-
-
+            
+            
 
             if torch.cuda.is_available():
-                  torch.cuda.synchronize()
-            self.accelerator.wait_for_everyone()
-            am_seconds = time.perf_counter() - am_started
+                  torch.cuda.synchronize()  
+            self.accelerator.wait_for_everyone() 
 
-            rollout_started = time.perf_counter()
             if self.accelerator.is_main_process:
                   print(f"Starting Rollout")
-
-
+                  
+            
             num_rollout_procs = self.config.num_rollout_processes
             do_rollout = (num_rollout_procs is None) or (rank < num_rollout_procs)
             if do_rollout:
                 seed_base = rank * num_envs_per_process
-                trajs, score, success_rate, total_steps = rollout_parallel2(self.config.dataset_name,
-                                             self.config.specific_dataset,
+                trajs, score, success_rate, total_steps = rollout_parallel2(self.config.dataset_name, 
+                                             self.config.specific_dataset, 
                                              backbone_layers = self.config.AMConfig.backbone_layers,
-                                             horizon = self.config.AMConfig.horizon,
-                                             steps_T = self.config.diffusion_steps,
-                                             num_karras = self.config.AMConfig.num_karras,
-                                             eta = self.config.AMConfig.eta,
-                                             episode_length = self.config.rollout_length,
-                                             checkpoint_step = ((step+1) * self.config.AMConfig.per_round_steps),
-                                             num_envs = self.config.rollout_num_envs,
+                                             horizon = self.config.AMConfig.horizon, 
+                                             steps_T = self.config.diffusion_steps, 
+                                             num_karras = self.config.AMConfig.num_karras, 
+                                             eta = self.config.AMConfig.eta, 
+                                             episode_length = self.config.rollout_length, 
+                                             checkpoint_step = ((step+1) * self.config.AMConfig.per_round_steps), 
+                                             num_envs = self.config.rollout_num_envs, 
                                              goal_cell = self.config.train_reward_config.rollout_goal,
                                              device = self.device,
                                              start_cells = self.config.train_reward_config.rollout_start_cells,
@@ -758,12 +722,11 @@ class OnlineFinetuner():
                                              continual_rollout = self.config.continual_rollout,
                                              chunk_size = self.config.chunk_size)
             else:
-                trajs, score, success_rate, total_steps = [], 0.0, 0.0, 0
-            self.accelerator.wait_for_everyone()
-            rollout_seconds = time.perf_counter() - rollout_started
+                trajs, score, success_rate, total_steps = [], 0.0, 0.0, 0      
+            self.accelerator.wait_for_everyone()                    
             if self.accelerator.is_main_process:
-                  print(f"Rollout Completed")
-            if(not self.config.offline):
+                  print(f"Rollout Completed") 
+            if(not self.config.offline): 
                  update_reward = self.gather_and_sync_trajs_and_buffer(trajs)
             self.accelerator.wait_for_everyone()
 
@@ -772,52 +735,25 @@ class OnlineFinetuner():
                  if self.accelerator.is_main_process:
                      print(f"Number of trajectories for critic training: {len(critic_buffer)}")
                  self.accelerator.wait_for_everyone()
-
+                 
             #collect the score and number of env stepsacross all processes
             gathered_scores = self.accelerator.gather_for_metrics(torch.tensor([score], device=self.device, dtype = torch.float32),  use_gather_object=False)
             gathered_success_rates = self.accelerator.gather_for_metrics(torch.tensor([success_rate], device=self.device, dtype = torch.float32), use_gather_object=False)
             gathered_steps = self.accelerator.gather_for_metrics(torch.tensor([total_steps], device=self.device, dtype = torch.int64),  use_gather_object=False)
-            local_rollout_totals = torch.tensor(
-                [
-                    len(trajs),
-                    sum(float(np.asarray(traj["rewards"]).sum()) for traj in trajs),
-                    sum(len(traj["actions"]) for traj in trajs),
-                ],
-                device=self.device,
-                dtype=torch.float64,
-            )
-            gathered_rollout_totals = self.accelerator.gather_for_metrics(
-                local_rollout_totals.unsqueeze(0), use_gather_object=False
-            )
             if self.accelerator.is_main_process:
                  total_steps = gathered_steps.int().sum().item()
-                 num_rollout = (num_rollout_procs if num_rollout_procs is not None
+                 num_rollout = (num_rollout_procs if num_rollout_procs is not None 
                                else self.accelerator.num_processes)
                  rollout_scores = gathered_scores.float()[:num_rollout]
                  rollout_success_rates = gathered_success_rates.float()[:num_rollout]
                  avg_score = rollout_scores.float().mean().item()
                  avg_success_rate = rollout_success_rates.float().mean().item()
-                 rollout_totals = gathered_rollout_totals[:num_rollout].sum(dim=0)
-                 episode_count = max(float(rollout_totals[0].item()), 1.0)
-                 avg_episode_return = float(rollout_totals[1].item() / episode_count)
-                 avg_episode_length = float(rollout_totals[2].item() / episode_count)
                  print(f"Total Number of Environment Steps: {total_steps}")
                  print(f"Average Success Rate: {avg_success_rate:.2f}")
                  print(f"Average Normalized Score: {avg_score:.2f}")
-                 wandb_log(
-                     {
-                         "finetune/round": step + 1,
-                         "finetune/rollout/success_rate": avg_success_rate,
-                         "finetune/rollout/normalized_score": avg_score,
-                         "finetune/rollout/environment_steps": total_steps,
-                         "finetune/rollout/episode_return": avg_episode_return,
-                         "finetune/rollout/episode_length": avg_episode_length,
-                     }
-                 )
-            self.accelerator.wait_for_everyone()
-
+            self.accelerator.wait_for_everyone()  
+            
             if(self.config.offline):
-                critic_started = time.perf_counter()
                 if self.config.critic and self.config.update_critic:
                       print(f"Starting Critic Training with Planner")
                       train_critic_with_planner7(
@@ -850,96 +786,110 @@ class OnlineFinetuner():
                                eta                    = self.config.AMConfig.eta,
                                new_step               = ((step+1) * self.config.AMConfig.per_round_steps),
                                task_id                = self.config.train_reward_config.task_id,
+                               mix_reset              = self.config.train_critic_config.mix_reset,
+                               n_reset                = self.config.train_critic_config.n_reset,
                                log_every              = self.config.train_critic_config.log_every,
                                accelerator            = self.accelerator,
                                wandb_prefix           = "finetune/critic",
                                wandb_step_metric      = "finetune/critic_step",
                                wandb_step_offset      = step * self.config.train_critic_config.num_steps)
-                critic_seconds = time.perf_counter() - critic_started
                 print(f"Finetuning round {step+1} completed")
                 print()
-                self.accelerator.wait_for_everyone()
                 if self.config.critic and self.config.update_critic:
                       self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
                 self.set_reward_model(self.device)
                 self.accelerator.wait_for_everyone()
-                round_seconds = time.perf_counter() - round_started
-                if self.accelerator.is_main_process:
-                      print(
-                          f"Round timing: finetune={am_seconds:.1f}s "
-                          f"rollout={rollout_seconds:.1f}s "
-                          f"critic={critic_seconds:.1f}s total={round_seconds:.1f}s"
-                      )
-                      wandb_log(
-                          {
-                              "finetune/round": step + 1,
-                              "finetune/timing/finetune_seconds": am_seconds,
-                              "finetune/timing/rollout_seconds": rollout_seconds,
-                              "finetune/timing/critic_seconds": critic_seconds,
-                              "finetune/timing/round_seconds": round_seconds,
-                          }
-                      )
+                if self.config.critic:
+                     if self.accelerator.is_main_process:
+                           print(f"calculating bellman metrics")
+                     self.accelerator.wait_for_everyone()
+                     probe_multi_horizon_bellman(
+                         trajs=self.Base_Critic_Buffer,
+                         dataset_name=self.config.dataset_name,
+                         specific_dataset=self.config.specific_dataset,
+                         planner_checkpoint=((step+1) * self.config.AMConfig.per_round_steps),
+                         reward_checkpoint=self.config.reward_model_checkpoint,
+                         critic_checkpoint=self.config.critic_model_checkpoint,
+                         backbone_layers=self.config.AMConfig.backbone_layers,
+                         hidden_layers=self.config.train_critic_config.hidden_layers,
+                         hidden_dim=self.config.train_critic_config.hidden_dim,
+                         reward_hidden_layers=self.config.train_reward_config.hidden_layers,
+                         reward_hidden_dim=self.config.train_reward_config.hidden_dim,
+                         n_s0  =  self.config.train_critic_config.batch_size,
+                         n_plans_per_s0=self.config.train_kernel_config.oversample,
+                         horizon=self.config.AMConfig.horizon,
+                         gamma=self.config.train_critic_config.gamma,
+                         steps_T=self.config.diffusion_steps,
+                         num_karras=self.config.AMConfig.num_karras,
+                         eta=self.config.AMConfig.eta,
+                         task_id=self.config.train_reward_config.task_id,
+                         mix_reset=self.config.train_critic_config.mix_reset,
+                         n_reset=self.config.train_critic_config.n_reset,
+                         plan_chunk_size=self.config.train_critic_config.plan_chunk_size,
+                         accelerator=self.accelerator,
+                       )
+                self.accelerator.wait_for_everyone()
                 continue
 
-
-
+            
+            
             if self.accelerator.is_main_process:
                   #print(f"Starting Reward Training")
                   if update_reward:
                       print(f"Starting Reward Training")
                       if(self.config.train_reward_config.ensemble_size is not None):
-                          train_reward_ensemble(self.Train_Buffer,
-                             dataset_name = self.config.dataset_name,
+                          train_reward_ensemble(self.Train_Buffer, 
+                             dataset_name = self.config.dataset_name, 
                              hidden_layers = self.config.train_reward_config.hidden_layers,
                              hidden_dim = self.config.train_reward_config.hidden_dim,
-                             batch_size = self.config.train_reward_config.batch_size,
-                             num_steps = self.config.train_reward_config.num_steps,
-                             lr = self.config.train_reward_config.lr,
+                             batch_size = self.config.train_reward_config.batch_size, 
+                             num_steps = self.config.train_reward_config.num_steps, 
+                             lr = self.config.train_reward_config.lr, 
                              min_lr = self.config.train_reward_config.min_lr,
                              ensemble_size = self.config.train_reward_config.ensemble_size,
                              bootstrap = True,
                              save_percentage = 0.02,
-                             sigma = self.config.train_reward_config.sigma,
-                             step = ((step+1) * self.config.AMConfig.per_round_steps),
-                             target_reward = self.config.train_reward_config.target_reward,
-                             specific_dataset = self.config.specific_dataset,
+                             sigma = self.config.train_reward_config.sigma, 
+                             step = ((step+1) * self.config.AMConfig.per_round_steps), 
+                             target_reward = self.config.train_reward_config.target_reward, 
+                             specific_dataset = self.config.specific_dataset, 
                              goal = self.config.train_reward_config.train_goal,
                              task_id = self.config.train_reward_config.task_id)
                       else:
-                          train_reward(self.Train_Buffer,
-                             dataset_name = self.config.dataset_name,
+                          train_reward(self.Train_Buffer, 
+                             dataset_name = self.config.dataset_name, 
                              hidden_layers = self.config.train_reward_config.hidden_layers,
                              hidden_dim = self.config.train_reward_config.hidden_dim,
-                             batch_size = self.config.train_reward_config.batch_size,
-                             num_steps = self.config.train_reward_config.num_steps,
-                             lr = self.config.train_reward_config.lr,
+                             batch_size = self.config.train_reward_config.batch_size, 
+                             num_steps = self.config.train_reward_config.num_steps, 
+                             lr = self.config.train_reward_config.lr, 
                              min_lr = self.config.train_reward_config.min_lr,
-                             sigma = self.config.train_reward_config.sigma,
-                             step = ((step+1) * self.config.AMConfig.per_round_steps),
-                             target_reward = self.config.train_reward_config.target_reward,
-                             specific_dataset = self.config.specific_dataset,
+                             sigma = self.config.train_reward_config.sigma, 
+                             step = ((step+1) * self.config.AMConfig.per_round_steps), 
+                             target_reward = self.config.train_reward_config.target_reward, 
+                             specific_dataset = self.config.specific_dataset, 
                              goal = self.config.train_reward_config.train_goal,
                              task_id = self.config.train_reward_config.task_id)
-
+                  
                   """
                   if self.config.kernel:
                       print(f"Starting Kernel Training")
                       if(self.config.train_kernel_config.type_kernel == 'robust'):
-                          threshold = train_kernel(self.Train_Kernel_Buffer,
-                             dataset_name = self.config.dataset_name,
+                          threshold = train_kernel(self.Train_Kernel_Buffer, 
+                             dataset_name = self.config.dataset_name, 
                              specific_dataset = self.config.specific_dataset,
-                             batch_size = self.config.train_kernel_config.batch_size,
-                             lr = self.config.train_kernel_config.lr,
+                             batch_size = self.config.train_kernel_config.batch_size, 
+                             lr = self.config.train_kernel_config.lr, 
                              num_steps = self.config.train_kernel_config.num_steps,
-                             ensemble_size = self.config.train_kernel_config.ensemble_size,
-                             λ_reg = self.config.train_kernel_config.λ_reg,
+                             ensemble_size = self.config.train_kernel_config.ensemble_size, 
+                             λ_reg = self.config.train_kernel_config.λ_reg, 
                              num_hidden_layers = self.config.train_kernel_config.num_hidden_layers,
                              hidden_dim = self.config.train_kernel_config.hidden_dim,
                              step = ((step+1) * self.config.AMConfig.per_round_steps),
                              constraint_type = self.config.RewardConfig.constraint_type,
-                             quantile = self.config.RewardConfig.quantile,
+                             quantile = self.config.RewardConfig.quantile, 
                              x_generated_plans = x_generated_plans)
-
+                      
                       elif(self.config.train_kernel_config.type_kernel == 'mog'):
                           threshold = train_kernel_mog(self.Train_Kernel_Buffer,
                                       dataset_name = self.config.dataset_name,
@@ -998,7 +948,7 @@ class OnlineFinetuner():
                                accelerator            = self.accelerator,
                                wandb_prefix           = "finetune/critic",
                                wandb_step_metric      = "finetune/critic_step",
-                               wandb_step_offset      = step * self.config.train_critic_config.num_steps)
+                               wandb_step_offset      = step * self.config.train_critic_config.num_steps) 
             self.accelerator.wait_for_everyone()
             #plans = self.get_generated_plans(number_of_generated_plans = self.config.RewardConfig.number_of_generated_plans)
             if self.config.kernel and self.config.update_kernel:
@@ -1006,22 +956,22 @@ class OnlineFinetuner():
                       if self.accelerator.is_main_process:
                            print(f"Starting Kernel Training")
                       if(self.config.train_kernel_config.type_kernel == 'robust'):
-                          threshold = train_kernel(self.Train_Kernel_Buffer,
-                             dataset_name = self.config.dataset_name,
+                          threshold = train_kernel(self.Train_Kernel_Buffer, 
+                             dataset_name = self.config.dataset_name, 
                              specific_dataset = self.config.specific_dataset,
-                             batch_size = self.config.train_kernel_config.batch_size,
-                             lr = self.config.train_kernel_config.lr,
+                             batch_size = self.config.train_kernel_config.batch_size, 
+                             lr = self.config.train_kernel_config.lr, 
                              num_steps = self.config.train_kernel_config.num_steps,
-                             ensemble_size = self.config.train_kernel_config.ensemble_size,
-                             λ_reg = self.config.train_kernel_config.λ_reg,
+                             ensemble_size = self.config.train_kernel_config.ensemble_size, 
+                             λ_reg = self.config.train_kernel_config.λ_reg, 
                              num_hidden_layers = self.config.train_kernel_config.num_hidden_layers,
                              hidden_dim = self.config.train_kernel_config.hidden_dim,
                              step = ((step+1) * self.config.AMConfig.per_round_steps),
                              constraint_type = "log_prob",
-                             quantile = self.config.RewardConfig.quantile,
+                             quantile = self.config.RewardConfig.quantile, 
                              x_generated_plans = plans,
                              accelerator = self.accelerator)
-
+                      
                       elif(self.config.train_kernel_config.type_kernel == 'mog'):
                           threshold = train_kernel_mog(self.Train_Kernel_Buffer,
                                       dataset_name = self.config.dataset_name,
@@ -1040,11 +990,11 @@ class OnlineFinetuner():
                                       quantile = self.config.RewardConfig.quantile,
                                       x_generated_plans = plans,
                                       accelerator = self.accelerator)
-
+                      
                       if threshold is not None:
                             if self.config.RewardConfig.min_log_prob > threshold:
                                 self.config.RewardConfig.min_log_prob = threshold
-
+           
             self.accelerator.wait_for_everyone()
             #set the new total reward model
             if update_reward:
@@ -1057,16 +1007,24 @@ class OnlineFinetuner():
                   self.config.kernel_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             else:
                   self.config.kernel_model_checkpoint = 0
-
+            
             if(self.config.critic and self.config.update_critic):
                  self.config.critic_model_checkpoint = ((step+1) * self.config.AMConfig.per_round_steps)
             else:
                  self.config.critic_model_checkpoint = 0
-
+              
             self.set_reward_model(self.device)
             if self.accelerator.is_main_process:
                    print(f"Finetuning round {step+1} completed")
                    print()
             self.accelerator.wait_for_everyone()
-        if self.accelerator.is_main_process and self.wandb_run is not None:
-            self.wandb_run.finish()
+
+        if self.accelerator.is_main_process:
+              wandb.finish()   
+
+     
+        
+            
+
+
+

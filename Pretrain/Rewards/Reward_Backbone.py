@@ -5,12 +5,13 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 os.chdir(project_root)
 from typing import Optional
 from Dataset import (
-    CubeDataset,
-    CubeDataset_Singletask,
     get_dataset,
     get_env,
+    CubeDataset_Singletask,
     OGPointmazeDataset_Singletask,
-    SceneDataset,
+    AntmazeDataset_Singletask,
+    HumanoidmazeDataset_Singletask,
+    PuzzleDataset_Singletask,
     SceneDataset_Singletask,
 )
 import random
@@ -19,9 +20,9 @@ import torch
 import torch.optim as optim
 import numpy as np
 try:
-    from Pretrain.utils import set_seed, SAStats, ema_smooth, cycle, check_device, regression_diagnostics, wandb_log
+    from Pretrain.utils import set_seed, SAStats, ema_smooth, cycle, check_device
 except ModuleNotFoundError:
-    from utils import set_seed, SAStats, ema_smooth, cycle, check_device, regression_diagnostics, wandb_log
+    from utils import set_seed, SAStats, ema_smooth, cycle, check_device
 import torch.nn as nn
 import pickle
 try:
@@ -38,6 +39,7 @@ import torch.nn.functional as F
 import numpy as np
 import json
 from typing import TypedDict, List
+import wandb
 
 
 def make_reward_increase(trajs) -> List[TrajectoryDict]:
@@ -69,6 +71,7 @@ class TrajectoryDict(TypedDict):
     observations: np.ndarray
     actions: np.ndarray  
     rewards: np.ndarray
+    masks: np.ndarray
 
 def divide_trajs(trajs):
     success_trajs = []
@@ -87,9 +90,9 @@ def drop_trajs(trajs, percentage):
     return success_trajs + failed_trajs
 
 def check_specific_dataset(dataset_name):
-    if(dataset_name == 'kitchen'):
+    if(dataset_name in ['kitchen', 'scene']):
          return False
-    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze', 'scene', 'puzzle', 'antmaze', 'humanoidmaze']:
+    elif dataset_name in ['pointmaze', 'cube', 'ogpointmaze', 'puzzle', 'antmaze', 'humanoidmaze']:
         return True
 
 def get_trajs(env_name, specific_env, step, task_id: Optional[int] = None):
@@ -121,21 +124,31 @@ def getName(env_name, specific_env, task_id: Optional[int] = None):
                return 'PointMaze_Open'
           else:
               raise ValueError(f"Invalid specific environment: {specific_env}")
+     
      elif(env_name == 'antmaze'):
-          if specific_env == 'medium_play':
-               return 'AntMaze_MediumPlay'
-          elif specific_env == 'umaze_diverse':
-               return 'AntMaze_UmazeDiverse'
-          elif specific_env == 'large_diverse':
-               return 'AntMaze_LargeDiverse'
-          elif specific_env == 'large_play':
-               return 'AntMaze_LargePlay'
-          elif specific_env == 'medium_diverse':
-               return 'AntMaze_MediumDiverse'
-          elif specific_env == 'umaze':
-               return 'AntMaze_Umaze'
+          if(task_id is None):
+               raise ValueError('Task ID is required for antmaze dataset')
+          elif specific_env == 'medium':
+               return f'AntMaze_Medium_Task{task_id}'
+          elif specific_env == 'large':
+               return f'AntMaze_Large_Task{task_id}'
+          elif specific_env == 'giant':
+               return f'AntMaze_Giant_Task{task_id}'
           else:
               raise ValueError(f"Invalid Dataset name: {specific_env}")
+     
+     elif(env_name == 'humanoidmaze'):
+          if(task_id is None):
+               raise ValueError('Task ID is required for humanoidmaze dataset')
+          elif specific_env == 'medium':
+               return f'HumanoidMaze_Medium_Task{task_id}'
+          elif specific_env == 'large':
+               return f'HumanoidMaze_Large_Task{task_id}'
+          elif specific_env == 'giant':
+               return f'HumanoidMaze_Giant_Task{task_id}'
+          else:
+              raise ValueError(f"Invalid Dataset name: {specific_env}")
+
      elif(env_name == 'cube'):
          if(task_id is None):
             raise ValueError('Task ID is required for cube dataset')
@@ -151,7 +164,24 @@ def getName(env_name, specific_env, task_id: Optional[int] = None):
               raise ValueError(f"Invalid cube dataset name: {specific_env}")
 
      elif(env_name == 'scene'):
-        return f'Scene_Task{task_id}'
+        if(task_id is None):
+               raise ValueError('Task ID is required for scene dataset')
+        else:
+               return f'Scene_Task{task_id}'
+    
+     elif(env_name == 'puzzle'):
+         if(task_id is None):
+            raise ValueError('Task ID is required for puzzle dataset')
+         if specific_env == '3x3' or specific_env == '3x3-play':
+              return f'Puzzle_3x3_Task{task_id}'
+         elif specific_env == '4x4'  or specific_env == '4x4-play':
+              return f'Puzzle_4x4_Task{task_id}'
+         elif specific_env == '4x5' or specific_env == '4x5-play':
+              return f'Puzzle_4x5_Task{task_id}'
+         elif specific_env == '4x6' or specific_env == '4x6-play':
+              return f'Puzzle_4x6_Task{task_id}'
+         else:
+              raise ValueError(f"Invalid dataset name: {specific_env}")
         
      elif(env_name == 'ogpointmaze'):
          if(task_id is None):
@@ -440,38 +470,7 @@ def check_trajs_exit(env_name, specific_env, task_id, step):
         return trajs
     
 def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None, goal: Optional[np.array] = None, traj_length: Optional[int] = None):
-    from Dataset import KitchenDataset, PointMazeDataset, CubeDataset
-    if(dataset_name == 'kitchen'):
-         data_1 = KitchenDataset('complete')
-         data_2 = KitchenDataset('partial')
-         data_3 = KitchenDataset('mixed')
-         trajs = data_1.get_trajectories() + data_2.get_trajectories() + data_3.get_trajectories()
-        # trajs = data_1.get_trajectories()
-         name = 'Kitchen_Reward'
-         obs_dim = data_1.get_state_dim()
-         act_dim = data_1.get_action_dim()
-         return trajs, name, obs_dim, act_dim
-     
-    elif(dataset_name == 'pointmaze'):
-         if(specific_dataset is None): 
-             raise ValueError(f"Invalid dataset name: {dataset_name}")
-         elif(specific_dataset == 'large'):
-              data = PointMazeDataset('large', goal, mode = 'reward')
-              name = '2DMaze_Reward_large'
-         elif(specific_dataset == 'medium'):
-              data = PointMazeDataset('medium', goal, mode = 'reward')
-              name = '2DMaze_Reward_medium'
-         elif(specific_dataset == 'umaze'):
-              data = PointMazeDataset('umaze', goal, mode = 'reward')
-              name = '2DMaze_Reward_umaze'
-         else: 
-              raise ValueError(f"Invalid dataset name: {specific_dataset}")
-         obs_dim = data.get_state_dim()
-         act_dim = data.get_action_dim()
-         trajs = data.get_trajectories()
-         return trajs, name, obs_dim, act_dim
-
-    elif(dataset_name == 'ogpointmaze'):
+    if(dataset_name == 'ogpointmaze'):
          if(specific_dataset is None): 
              raise ValueError(f"Invalid dataset name: {dataset_name}")
          elif(specific_dataset == 'medium'):
@@ -483,6 +482,46 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
          elif(specific_dataset == 'giant'):
               data = OGPointmazeDataset_Singletask('giant', task_id, mode = 'reward')
               name = f'OG2DMaze_Reward_giant_task{task_id}'
+         else: 
+              raise ValueError(f"Invalid dataset name: {specific_dataset}")
+         obs_dim = data.get_state_dim()
+         act_dim = data.get_action_dim()
+         trajs = data.get_trajectories()
+         #trajs = make_reward_increase(trajs)
+         return trajs, name, obs_dim, act_dim
+    
+    if(dataset_name == 'antmaze'):
+         if(specific_dataset is None): 
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+         elif(specific_dataset == 'medium'):
+              data = AntmazeDataset_Singletask('medium', task_id, mode = 'reward')
+              name = f'AntMaze_Reward_medium_task{task_id}'
+         elif(specific_dataset == 'large'):
+              data = AntmazeDataset_Singletask('large', task_id, mode = 'reward')
+              name = f'AntMaze_Reward_large_task{task_id}'
+         elif(specific_dataset == 'giant'):
+              data = AntmazeDataset_Singletask('giant', task_id, mode = 'reward')
+              name = f'AntMaze_Reward_giant_task{task_id}'
+         else: 
+              raise ValueError(f"Invalid dataset name: {specific_dataset}")
+         obs_dim = data.get_state_dim()
+         act_dim = data.get_action_dim()
+         trajs = data.get_trajectories()
+         #trajs = make_reward_increase(trajs)
+         return trajs, name, obs_dim, act_dim
+    
+    if(dataset_name == 'humanoidmaze'):
+         if(specific_dataset is None): 
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+         elif(specific_dataset == 'medium'):
+              data = HumanoidmazeDataset_Singletask('medium', task_id, mode = 'reward')
+              name = f'HumanoidMaze_Reward_medium_task{task_id}'
+         elif(specific_dataset == 'large'):
+              data = HumanoidmazeDataset_Singletask('large', task_id, mode = 'reward')
+              name = f'HumanoidMaze_Reward_large_task{task_id}'
+         elif(specific_dataset == 'giant'):
+              data = HumanoidmazeDataset_Singletask('giant', task_id, mode = 'reward')
+              name = f'HumanoidMaze_Reward_giant_task{task_id}'
          else: 
               raise ValueError(f"Invalid dataset name: {specific_dataset}")
          obs_dim = data.get_state_dim()
@@ -506,26 +545,60 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
              data_1 = CubeDataset_Singletask('triple-play', task_id, traj_length, mode = 'reward')
              data_2 = CubeDataset_Singletask('triple-noisy', task_id, traj_length, mode = 'reward')
              name = f'Cube_Reward_triple_task{task_id}'
+         elif(specific_dataset == 'quadruple'):
+             data_1 = CubeDataset_Singletask('quadruple-play', task_id, traj_length, mode = 'reward')
+             data_2 = CubeDataset_Singletask('quadruple-noisy', task_id, traj_length, mode = 'reward')
+             name = f'Cube_Reward_quadruple_task{task_id}'
          else: 
               raise ValueError(f"Invalid dataset name: {specific_dataset}")
          obs_dim = data_1.get_state_dim()
          act_dim = data_1.get_action_dim()
-         trajs = data_1.get_trajectories() + data_2.get_trajectories()
+         #trajs = data_1.get_trajectories() + data_2.get_trajectories()
+         trajs = data_1.get_trajectories() 
          #trajs = make_reward_increase(trajs)
          return trajs, name, obs_dim, act_dim
     
+    elif(dataset_name == 'puzzle'):
+         if(specific_dataset is None): 
+             raise ValueError(f"Invalid dataset name: {dataset_name}")
+         elif(specific_dataset == '3x3'):
+             data_1 = PuzzleDataset_Singletask('3x3-play', task_id, traj_length, mode = 'reward')
+             data_2 = PuzzleDataset_Singletask('3x3-noisy', task_id, traj_length, mode = 'reward')
+             name = f'Puzzle_Reward_3x3_task{task_id}'
+         elif(specific_dataset == '4x4'):
+             data_1 = PuzzleDataset_Singletask('4x4-play', task_id, traj_length, mode = 'reward')
+             data_2 = PuzzleDataset_Singletask('4x4-noisy', task_id, traj_length, mode = 'reward')
+             name = f'Puzzle_Reward_4x4_task{task_id}'
+         elif(specific_dataset == '4x5'):
+             data_1 = PuzzleDataset_Singletask('4x5-play', task_id, traj_length, mode = 'reward')
+             data_2 = PuzzleDataset_Singletask('4x5-noisy', task_id, traj_length, mode = 'reward')
+             name = f'Puzzle_Reward_4x5_task{task_id}'
+         elif(specific_dataset == '4x6'):
+             data_1 = PuzzleDataset_Singletask('4x6-play', task_id, traj_length, mode = 'reward')
+             data_2 = PuzzleDataset_Singletask('4x6-noisy', task_id, traj_length, mode = 'reward')
+             name = f'Puzzle_Reward_4x6_task{task_id}'
+         else: 
+              raise ValueError(f"Invalid dataset name: {specific_dataset}")
+         obs_dim = data_1.get_state_dim()
+         act_dim = data_1.get_action_dim()
+         #trajs = data_1.get_trajectories() + data_2.get_trajectories()
+         trajs = data_1.get_trajectories() 
+         #trajs = make_reward_increase(trajs)
+         return trajs, name, obs_dim, act_dim
+
     elif(dataset_name == 'scene'):
          data_1 = SceneDataset_Singletask('play', task_id, mode = 'reward')
          data_2 = SceneDataset_Singletask('noisy', task_id, mode = 'reward')
          obs_dim = data_1.get_state_dim()
          act_dim = data_1.get_action_dim()
          name = f'Scene_Reward_task{task_id}'
-         trajs = data_1.get_trajectories() + data_2.get_trajectories()
+         #trajs = data_1.get_trajectories() + data_2.get_trajectories()
+         trajs = data_1.get_trajectories() 
          #trajs = make_reward_increase(trajs)
          return trajs, name, obs_dim, act_dim
     else:
          raise ValueError(f"Invalid dataset name: {dataset_name}")
-
+         
 def reward_filter_goals(trajs: List[TrajectoryDict], goal) -> List[TrajectoryDict]:
     def reward_filter2(traj: TrajectoryDict, goal) -> List[TrajectoryDict]:
         last_step = 1
@@ -675,24 +748,14 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
            scheduler.step()
            total_loss += loss.item()
            step += 1
+           
 
            if step % 2000 == 0:
-              avg_loss = total_loss / 2000
-              print(f"Step {step}, loss {avg_loss:.4f}")
-              diagnostics = regression_diagnostics(pred, r)
-              wandb_log(
-                  {
-                      "reward/loss": avg_loss,
-                      "reward/lr": scheduler.get_last_lr()[0],
-                      **{
-                          f"reward/train/{name}": value
-                          for name, value in diagnostics.items()
-                      },
-                  },
-                  step=step,
-              )
-              total_loss = 0
-        
+                avg_loss = total_loss / 2000
+                print(f"Step {step}, loss {avg_loss:.4f}")
+                wandb.log({"loss": avg_loss, "step": step})         
+                total_loss = 0
+                
            if step % save_freq == 0:
               checkpoint = copy.deepcopy(reward_net)
               save_model(checkpoint, dataset_name, specific_dataset, task_id, step)
@@ -1112,7 +1175,6 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
     num = save_freq
     while num <= num_steps:
          Rewards = []
-         Targets = []
          state_dict = load_model(dataset_name, specific_dataset, task_id, num)
          reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
          #reward_net = DeepScaledReward(obs_dim, act_dim).to(device)
@@ -1134,7 +1196,6 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
              total_mean_loss += loss.item()
              total_reward += pred.mean().item()
              Rewards.extend(pred.detach().cpu().numpy())
-             Targets.extend(r.detach().cpu().numpy())
              
          avg_mean_loss = total_mean_loss / len(dataloader)
          avg_reward = total_reward / len(dataloader)
@@ -1149,28 +1210,16 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
          print(f'std_reward: {std_R:.4f}')
          print(f"max_reward: {max_R:.4f}")
          print(f"min_reward: {min_R:.4f}")
-         diagnostics = regression_diagnostics(
-             torch.as_tensor(np.asarray(Rewards)),
-             torch.as_tensor(np.asarray(Targets)),
-         )
-         wandb_log(
-             {
-                 "reward/eval/loss": avg_mean_loss,
-                 **{
-                     f"reward/eval/{name}": value
-                     for name, value in diagnostics.items()
-                 },
-             },
-             step=num,
-         )
-
+        
          num += save_freq
 
-def get_pretrained_reward(dataset_name, checkpoints, specific_dataset: Optional[str] = None, task_id: Optional[int] = None):
-       _, _, obs_dim, act_dim  =  Train_Dataset(dataset_name, specific_dataset)
-       reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
-       reward_model_state_dict = load_model(reward_name, checkpoints)
-       return reward_model_state_dict, obs_dim, act_dim, reward_name
+def get_pretrained_reward(dataset_name, checkpoints, specific_dataset=None, task_id=None):
+    _, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id)
+    reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
+    reward_model_state_dict = load_model(
+        dataset_name, specific_dataset, task_id, checkpoints
+    )
+    return reward_model_state_dict, obs_dim, act_dim, reward_name
 
 def get_pretrained_reward_stats(reward_name):
     #stats_path = f'./Pretrain/Rewards/{Reward_name}/Stats/{Reward_name}_stats.pkl'
@@ -1187,67 +1236,3 @@ def get_pretrained_reward_stats(reward_name):
     return stats
 
 
-'''
-def test_Single_Model(dataset_name, specific_dataset: Optional[str] = None, trajs: Optional[list] = None, sigma: float = 3, target_reward: Optional[float] = None, num: int = 10000):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device {device}")
-    if(trajs is None): 
-        train_Trajs, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
-        dataset = RewardDataset(train_Trajs, sigma, reward_name, target_reward)
-    else:
-        _, reward_name, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset)
-        dataset = test_dataset(trajs, sigma, reward_name, target_reward)
-    print(f"Testing the reward model on {len(dataset)} samples")
-    a = factorint(len(dataset))
-    batch_size = int(np.min(list(a.keys())))
-    dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, pin_memory = True, num_workers = 8)
-    
-    state_dict = load_model(reward_name, num)
-    reward_net = ScalarReward(obs_dim, act_dim).to(device)
-    reward_net.load_state_dict(state_dict)
-    reward_net.eval()
-    total_mean_loss = 0
-    total_var = 0
-    for s, a, r in dataloader:
-        s = s.to(device)
-        a = a.to(device)
-        r = r.to(device)
-        mean = reward_net.predict(s, a)
-        var = reward_net.variance(s, a)
-        mean_loss = ((mean - r).abs()).mean()
-        total_mean_loss += mean_loss.item()
-        total_var += var.mean().item()
-    avg_mean_loss = total_mean_loss / len(dataloader)
-    avg_var = total_var / len(dataloader)
-    print(f"model {num}, Loss {avg_mean_loss:.4f}, Variance {avg_var:.4f}")
-
-
-
-def grad_norm(s, a, reward_net):
-     s.requires_grad_(True)
-     a.requires_grad_(True)
-     pred = reward_net(s, a)
-     
-     # Compute gradients with respect to the full batch
-     grad_outputs = torch.ones_like(pred)
-     grads_s, grads_a = torch.autograd.grad(
-         outputs=pred,
-         inputs=(s, a),
-         grad_outputs=grad_outputs,
-         create_graph=False,
-         retain_graph=False,
-         allow_unused=True  # In case one input is not used
-     )
-     
-     # Handle case where one input might not be used
-     if grads_s is None:
-         grads_s = torch.zeros_like(s)
-     if grads_a is None:
-         grads_a = torch.zeros_like(a)
-     
-     # Compute per-sample gradient norms
-     grad_norms = torch.cat([grads_s, grads_a], dim=-1).norm(p=2, dim=-1)  # [batch_size]
-     grad_norm_avg = grad_norms.mean().item()
-     
-     return pred, grad_norm_avg
-'''

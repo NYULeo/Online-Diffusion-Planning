@@ -1,6 +1,6 @@
 # Hydra experiment profiles
 
-Each environment/task profile contains every stage of the pipeline in one YAML file. `cube_single.yaml` covers planner, reward, kernel, critic, critic warmup, finetune, and rollout for Cube Single task 4. Parameters are grouped under `scripts` by the entrypoint that consumes them, so `train_critic_script`, `train_critic_script2`, and `finetune_script2.critic_update` have distinct scopes.
+`cube_single.yaml` contains the effective Cube Single parameters from main commit `f8740fd`. Parameters are grouped by entrypoint so initial critic, warmup critic, and per-round critic settings have distinct scopes.
 
 Select a profile with:
 
@@ -20,17 +20,14 @@ Run the complete configured pipeline from the repository root:
 bash run_hydra_pipeline.sh
 ```
 
-The pipeline creates one W&B group per launch and one run per stage. Metrics are namespaced as `planner/*`, `reward/*`, `kernel/*`, `critic/*`, `critic_warmup/*`, `finetune/*`, and `rollout/*`.
+Hydra changes configuration delivery only. Training, logging, model construction, losses, datasets, and rollout behavior come from main.
 
 The Cube Single critic uses the main-branch symlog representation: initial critic checkpoint `-1`, planner7 warmup checkpoint `0`, and `Q_scale × symexp(V)` decoding. Debugger-era `Q_mean/Q_std` critics are not compatible; rerun critic, warmup, and finetune after switching representations.
 
-Planner7 candidate generation and kernel filtering are vectorized in GPU chunks. Restore the scalar path for debugging with `scripts.train_critic_script2.vectorized_sampling=false` (warmup) or `scripts.finetune_script2.critic_update.vectorized_sampling=false` (per-round critic updates).
+Planner7 candidate generation and kernel filtering follow main. The sampling implementation can be selected with `scripts.train_critic_script2.vectorized_sampling` or `scripts.finetune_script2.critic_update.vectorized_sampling`.
 
-The planner profile uses a four-GPU effective batch of 256 (`batch_size=256`, `gradient_accumulate_every=1`). Restore the original single-GPU execution without changing code:
+The planner profile reproduces main's Cube Single planner configuration:
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 python Pretrain/pretrain_script4.py --config-name cube_single \
-  scripts.pretrain_script4.data_parallel=false \
-  scripts.pretrain_script4.batch_size=128 \
-  scripts.pretrain_script4.gradient_accumulate_every=2
+CUDA_VISIBLE_DEVICES=0 python Pretrain/pretrain_script4.py --config-name cube_single
 ```

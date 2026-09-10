@@ -14,77 +14,76 @@ os.chdir(REPO_ROOT)
 
 from Finetuning.utils import test_critic, train_critic_with_reward
 from Pretrain.Dataset import get_dataset
-from Pretrain.utils import init_wandb_run, set_seed
+from Pretrain.utils import set_seed
 
 
 @hydra.main(version_base="1.3", config_path="conf", config_name="cube_single")
 def main(config: DictConfig) -> None:
     os.chdir(REPO_ROOT)
     OmegaConf.set_struct(config, True)
-    print(OmegaConf.to_yaml(config, resolve=True))
+    stage = config.scripts.train_critic_script
     if config.run.validate_only:
+        print(OmegaConf.to_yaml(stage, resolve=True))
         return
 
-    env = config.environment
-    critic = config.scripts.train_critic_script
+    import wandb
+
     set_seed(int(config.run.seed))
-    data = get_dataset(
-        env.dataset_name,
-        env.specific_dataset,
-        task_id=env.task_id,
-        traj_length=critic.traj_length,
+    hp = OmegaConf.to_container(stage, resolve=True)
+    run = wandb.init(
+        entity=config.wandb.entity,
+        project=config.wandb.project,
+        group=os.environ.get("WANDB_RUN_GROUP", config.wandb.group),
+        name=f"{stage.dataset_name}-{stage.specific_dataset}-task{stage.task_id}-critic_1",
+        config=hp,
     )
-    trajectories = data.get_trajectories()
-    wandb_run = init_wandb_run(
-        f"{env.dataset_name}-{env.specific_dataset}-task{env.task_id}-critic",
-        {
-            "stage": "critic",
-            "resolved_hydra_config": OmegaConf.to_container(config, resolve=True),
-        },
-        group=config.wandb.group,
-        job_type="critic",
+    data = get_dataset(
+        stage.dataset_name,
+        stage.specific_dataset,
+        task_id=stage.task_id,
+        traj_length=stage.traj_length,
     )
     try:
         train_critic_with_reward(
-            trajectories,
-            dataset_name=env.dataset_name,
-            specific_dataset=env.specific_dataset,
-            reward_hidden_layers=critic.reward_hidden_layers,
-            reward_hidden_dim=critic.reward_hidden_dim,
-            reward_checkpoint=critic.reward_checkpoint,
-            critic_hidden_layers=critic.critic_hidden_layers,
-            critic_hidden_dim=critic.critic_hidden_dim,
-            batch_size=critic.batch_size,
-            num_steps=critic.num_steps,
-            gamma=critic.gamma,
-            lam=critic.lam,
-            horizon=critic.horizon,
-            lr=critic.lr,
-            min_lr=critic.min_lr,
-            tau=critic.tau,
-            old_step=critic.old_step,
-            new_step=critic.new_step,
-            momentum=critic.momentum,
-            value_scale=critic.value_scale,
-            task_id=env.task_id,
+            trajs=data.get_trajectories(),
+            dataset_name=stage.dataset_name,
+            specific_dataset=stage.specific_dataset,
+            reward_hidden_layers=stage.reward_hidden_layers,
+            reward_hidden_dim=stage.reward_hidden_dim,
+            reward_checkpoint=stage.reward_checkpoint,
+            critic_hidden_layers=stage.critic_hidden_layers,
+            critic_hidden_dim=stage.critic_hidden_dim,
+            batch_size=stage.batch_size,
+            num_steps=stage.num_steps,
+            gamma=stage.gamma,
+            lam=stage.lam,
+            horizon=stage.horizon,
+            lr=stage.lr,
+            min_lr=stage.min_lr,
+            tau=stage.tau,
+            old_step=stage.old_step,
+            new_step=stage.new_step,
+            momentum=stage.momentum,
+            value_scale=stage.value_scale,
+            task_id=stage.task_id,
         )
         test_critic(
-            dataset_name=env.dataset_name,
-            specific_dataset=env.specific_dataset,
-            hidden_layers=critic.critic_hidden_layers,
-            hidden_dim=critic.critic_hidden_dim,
-            checkpoint_step=critic.reward_checkpoint,
-            critic_checkpoint=critic.new_step,
-            gamma=critic.gamma,
-            horizon=critic.horizon,
-            value_scale=critic.value_scale,
-            sigma=critic.test_sigma,
-            target_reward=critic.test_target_reward,
+            dataset_name=stage.dataset_name,
+            specific_dataset=stage.specific_dataset,
+            hidden_layers=stage.critic_hidden_layers,
+            hidden_dim=stage.critic_hidden_dim,
+            checkpoint_step=stage.reward_checkpoint,
+            critic_checkpoint=stage.new_step,
+            gamma=stage.gamma,
+            horizon=stage.horizon,
+            value_scale=stage.value_scale,
+            sigma=stage.test_sigma,
+            target_reward=stage.test_target_reward,
             trajs=data.get_trajectories(),
-            task_id=env.task_id,
+            task_id=stage.task_id,
         )
     finally:
-        wandb_run.finish()
+        run.finish()
 
 
 if __name__ == "__main__":

@@ -9,78 +9,12 @@ import os
 import pickle
 
 
-def init_wandb_run(
-    name: str,
-    config: dict,
-    *,
-    group: Optional[str] = None,
-    job_type: Optional[str] = None,
-):
-    """Initialize one stage run inside an optional shared pipeline group."""
-    import wandb
-
-    return wandb.init(
-        entity=os.environ.get("WANDB_ENTITY", "kaiwen_hu-uc-berkeley"),
-        project=os.environ.get("WANDB_PROJECT", "ODP"),
-        name=name,
-        group=os.environ.get("WANDB_RUN_GROUP", group),
-        job_type=job_type,
-        config=config,
-    )
-
-
 def wandb_log(metrics: dict, step: Optional[int] = None) -> None:
     """Log only when the current process owns an initialized W&B run."""
     import wandb
 
     if wandb.run is not None:
         wandb.log(metrics, step=step)
-
-
-@torch.no_grad()
-def regression_diagnostics(prediction: torch.Tensor, target: torch.Tensor) -> dict:
-    """Scale-aware regression diagnostics for training and evaluation logs."""
-    prediction = prediction.detach().float().reshape(-1)
-    target = target.detach().float().reshape(-1)
-    if prediction.numel() != target.numel() or prediction.numel() == 0:
-        raise ValueError("prediction and target must be non-empty tensors of equal size")
-
-    error = prediction - target
-    target_std = target.std(unbiased=False)
-    pred_std = prediction.std(unbiased=False)
-    scale = target_std.clamp_min(1e-8)
-    centered_pred = prediction - prediction.mean()
-    centered_target = target - target.mean()
-    correlation = (
-        (centered_pred * centered_target).mean()
-        / (pred_std * target_std).clamp_min(1e-8)
-    )
-    positive = target > 0
-    background = ~positive
-
-    def masked_mae(mask: torch.Tensor) -> float:
-        if not bool(mask.any()):
-            return 0.0
-        return float(error[mask].abs().mean().item())
-
-    return {
-        "mae": float(error.abs().mean().item()),
-        "normalized_mae": float((error.abs().mean() / scale).item()),
-        "rmse": float(error.square().mean().sqrt().item()),
-        "bias": float(error.mean().item()),
-        "normalized_bias": float((error.mean().abs() / scale).item()),
-        "correlation": float(correlation.clamp(-1.0, 1.0).item()),
-        "pred_mean": float(prediction.mean().item()),
-        "pred_std": float(pred_std.item()),
-        "target_mean": float(target.mean().item()),
-        "target_std": float(target_std.item()),
-        "std_ratio": float((pred_std / scale).item()),
-        "pred_negative_fraction": float((prediction < 0).float().mean().item()),
-        "target_negative_fraction": float((target < 0).float().mean().item()),
-        "positive_fraction": float(positive.float().mean().item()),
-        "positive_mae": masked_mae(positive),
-        "background_mae": masked_mae(background),
-    }
 
 
 def cycle(dl):
@@ -200,4 +134,4 @@ def check_device():
     else:
         device = torch.device("cpu")
         print("⚠️  Falling back to CPU (no GPU acceleration)")
-    return device
+    return device 

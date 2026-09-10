@@ -14,55 +14,39 @@ sys.path.insert(0, str(REPO_ROOT))
 os.chdir(REPO_ROOT)
 
 from Pretrain.Planners.Backbone.Trainer import SDETrainer
-from Pretrain.utils import init_wandb_run, set_seed
+from Pretrain.utils import set_seed
 
 
 @hydra.main(version_base="1.3", config_path="../Finetuning/conf", config_name="cube_single")
 def main(config: DictConfig) -> None:
     os.chdir(REPO_ROOT)
     OmegaConf.set_struct(config, True)
-    print(OmegaConf.to_yaml(config, resolve=True))
+    stage = config.scripts.pretrain_script4
     if config.run.validate_only:
+        print(OmegaConf.to_yaml(stage, resolve=True))
         return
 
-    env = config.environment
-    planner = config.scripts.pretrain_script4
-    actual_effective_batch = planner.batch_size * planner.gradient_accumulate_every
-    if actual_effective_batch != planner.effective_batch_size:
-        raise ValueError(
-            "planner_pretrain.batch_size * gradient_accumulate_every must equal "
-            f"effective_batch_size ({actual_effective_batch} != {planner.effective_batch_size})"
-        )
     set_seed(int(config.run.seed))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    wandb_run = init_wandb_run(
-        f"{env.dataset_name}-{env.specific_dataset}-task{env.task_id}-planner",
-        {
-            "stage": "planner",
-            "resolved_hydra_config": OmegaConf.to_container(config, resolve=True),
-        },
-        group=config.wandb.group,
-        job_type="planner",
+    trainer = SDETrainer(
+        stage.dataset_name,
+        stage.specific_dataset,
+        stage.task_id,
+        stage.horizon,
+        backbone_name=stage.backbone_name,
+        backbone_layers=stage.backbone_layers,
+        num_steps=stage.num_steps,
+        batch_size=stage.batch_size,
+        lr=stage.lr,
+        device=device,
+        stride=stage.stride,
     )
-    try:
-        trainer = SDETrainer(
-            env.dataset_name,
-            env.specific_dataset,
-            env.task_id,
-            planner.horizon,
-            backbone_name=planner.backbone_name,
-            backbone_layers=planner.backbone_layers,
-            num_steps=planner.num_steps,
-            batch_size=planner.batch_size,
-            gradient_accumulate_every=planner.gradient_accumulate_every,
-            lr=planner.lr,
-            device=device,
-            stride=planner.stride,
-            data_parallel=planner.data_parallel,
-        )
-        trainer.train()
-    finally:
-        wandb_run.finish()
+    print(
+        f"dataset_name: {stage.dataset_name}, "
+        f"specific_dataset: {stage.specific_dataset}, task_id: {stage.task_id}, "
+        f"backbone_layers: {stage.backbone_layers}"
+    )
+    trainer.train()
 
 
 if __name__ == "__main__":

@@ -1,5 +1,4 @@
 import os
-import time
 REPO_ROOT = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..")
 )
@@ -9,7 +8,7 @@ from .utils import cosine_alpha_sigma, cosine_beta, EMA, cycle
 import torch.nn.functional as F
 from typing import Dict
 import copy
-from Dataset import get_env, determine_stride
+from Dataset import get_env
 from torch.utils.data import DataLoader
 import numpy as np
 from .Dit import DiT1d
@@ -17,10 +16,6 @@ from .UNet import TemporalUnet
 import os
 from Dataset import get_PlannerName, PlannerDataset, PlannerDataset_Rollout
 from .utils import LossTracker, get_pretrained_planner, getName
-try:
-    from Pretrain.utils import wandb_log
-except ModuleNotFoundError:
-    from utils import wandb_log
 import json
 
 
@@ -46,20 +41,18 @@ class SDETrainer:
         s: float = 0.008,                  # cosine offset
         weight_type: str = 'sigma2',         # {"one", "sigma2", "beta"}
         eps: float = 1e-5,               # clamp for t, ᾱ stability
-        stride: Optional[int] = 1,
-        data_parallel: bool = False,
+        stride: Optional[int] = 1
     ):
         self.device = device
         self.dataset_name = dataset_name
         self.specific_dataset = specific_dataset
         self.task_id = task_id
         _, self.state_dim, self.action_dim = get_env(self.dataset_name, self.specific_dataset)
-        if(determine_stride(self.dataset_name, self.specific_dataset)):
-            self.Dimension = self.state_dim
-            self.stride = stride
+        self.stride = stride
+        if(self.stride == 1):
+           self.Dimension = self.state_dim + self.action_dim
         else:
-            self.Dimension = self.state_dim + self.action_dim
-            self.stride = 1
+           self.Dimension = self.state_dim 
         self.backbone_name = backbone_name
         self.backbone_selection(backbone_layers)
         self.model_name = get_PlannerName(self.dataset_name, self.specific_dataset, self.task_id)
@@ -90,15 +83,6 @@ class SDETrainer:
              + "_checkpoints",
         )
         self.loss_tracker = LossTracker(save_dir="./logs/")
-        self.data_parallel = bool(data_parallel and torch.cuda.device_count() > 1)
-        if self.data_parallel:
-            self.model = torch.nn.DataParallel(self.model)
-            print(f"Planner DataParallel enabled on {torch.cuda.device_count()} GPUs")
-
-    def base_model(self):
-        if isinstance(self.model, torch.nn.DataParallel):
-            return self.model.module
-        return self.model
     
     def save_hyperparameters(self, filepath: Optional[str] = None):
         if filepath is None:
@@ -138,7 +122,6 @@ class SDETrainer:
              'T_max': self.num_steps if hasattr(self.scheduler, 'T_max') else None
         }
     
-        model_for_info = self.base_model()
        # Get model architecture info
         model_info = {
              'backbone_name': self.backbone_name,
@@ -148,16 +131,16 @@ class SDETrainer:
          }
     
         # Add backbone-specific parameters if available
-        if hasattr(model_for_info, 'in_dim'):
-              model_info['model_in_dim'] = int(model_for_info.in_dim)
-        if hasattr(model_for_info, 'emb_dim'):
-              model_info['model_emb_dim'] = int(model_for_info.emb_dim)
-        if hasattr(model_for_info, 'd_model'):
-              model_info['model_d_model'] = int(model_for_info.d_model)
-        if hasattr(model_for_info, 'n_heads'):
-              model_info['model_n_heads'] = int(model_for_info.n_heads)
-        if hasattr(model_for_info, 'depth'):
-              model_info['model_depth'] = int(model_for_info.depth)
+        if hasattr(self.model, 'in_dim'):
+              model_info['model_in_dim'] = int(self.model.in_dim)
+        if hasattr(self.model, 'emb_dim'):
+              model_info['model_emb_dim'] = int(self.model.emb_dim)
+        if hasattr(self.model, 'd_model'):
+              model_info['model_d_model'] = int(self.model.d_model)
+        if hasattr(self.model, 'n_heads'):
+              model_info['model_n_heads'] = int(self.model.n_heads)
+        if hasattr(self.model, 'depth'):
+              model_info['model_depth'] = int(self.model.depth)
     
         # Compile all hyperparameters
         hyperparams = {
@@ -174,7 +157,6 @@ class SDETrainer:
                 'batch_size': self.batch_size,
                 'lr': self.lr,
                 'gradient_accumulate_every': self.gradient_accumulate_every,
-                'data_parallel': self.data_parallel,
                 'optimizer': optimizer_params,
                 'scheduler': scheduler_params,
             },
@@ -214,13 +196,13 @@ class SDETrainer:
               self.model = TemporalUnet(self.horizon, self.Dimension).to(self.device)
               
     def reset_parameters(self):
-        self.ema_model.load_state_dict(self.base_model().state_dict())
+        self.ema_model.load_state_dict(self.model.state_dict())
 
     def step_ema(self):
         if self.step < self.step_start_ema:
             self.reset_parameters()
             return
-        self.ema.update_model_average(self.ema_model, self.base_model())
+        self.ema.update_model_average(self.ema_model, self.model)
     
 
     """
@@ -291,43 +273,25 @@ class SDETrainer:
               p.requires_grad_(False)
         self.step = 0
         total_loss = 0
-        timing_started = time.perf_counter()
-        timed_steps = 0
         while(self.step < self.num_steps):
             for i in range(self.gradient_accumulate_every):
                 traj, cond = next(dataloader)
                 loss = self.Loss(traj.to(self.device), cond.to(self.device))
                 loss = loss / self.gradient_accumulate_every
                 loss.backward()
-            gradient_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
             self.optim.step()
             self.optim.zero_grad()
             self.scheduler.step()
             total_loss += loss.item()
-            timed_steps += 1
             self.loss_tracker.log_loss(self.step, loss.item(), self.optim.param_groups[0]['lr'])
 
             if ((self.step % self.update_ema_every) == 0):
                 self.step_ema()
             
             if ((self.step % self.log_freq) == 0):
-                logged_loss = total_loss / self.log_freq
-                elapsed = max(time.perf_counter() - timing_started, 1e-8)
-                steps_per_second = timed_steps / elapsed
-                print(f"step {self.step} loss {logged_loss} steps/s {steps_per_second:.3f}")
-                wandb_log(
-                    {
-                        "planner/loss": logged_loss,
-                        "planner/lr": self.optim.param_groups[0]['lr'],
-                        "planner/steps_per_second": steps_per_second,
-                        "planner/gradient_norm": float(gradient_norm.detach().item()),
-                        **self.last_score_diagnostics,
-                    },
-                    step=self.step,
-                )
+                print(f"step {self.step} loss {total_loss/self.log_freq}")
                 total_loss = 0
-                timing_started = time.perf_counter()
-                timed_steps = 0
             
             if ((self.step % self.save_freq == 0) and (self.step!=0)):
                 self.save(self.step)
@@ -433,24 +397,5 @@ class SDETrainer:
         mse = diff.pow(2).sum(dim = (1,2)) 
         loss = (lam * mse).mean()
         loss = loss/((H*D) - self.state_dim)
-        with torch.no_grad():
-            active = (1 - mask).bool()
-            active_pred = pred[active].float()
-            active_target = target[active].float()
-            score_error = active_pred - active_target
-            target_rms = active_target.square().mean().sqrt().clamp_min(1e-8)
-            cosine = F.cosine_similarity(
-                (pred * (1 - mask)).reshape(B, -1).float(),
-                (target * (1 - mask)).reshape(B, -1).float(),
-                dim=1,
-                eps=1e-8,
-            ).mean()
-            self.last_score_diagnostics = {
-                "planner/score_normalized_rmse": float(
-                    (score_error.square().mean().sqrt() / target_rms).item()
-                ),
-                "planner/score_cosine_similarity": float(cosine.item()),
-                "planner/score_pred_std": float(active_pred.std(unbiased=False).item()),
-                "planner/score_target_std": float(active_target.std(unbiased=False).item()),
-            }
         return loss
+

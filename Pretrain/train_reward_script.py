@@ -5,7 +5,6 @@ import sys
 from pathlib import Path
 
 import hydra
-import numpy as np
 from omegaconf import DictConfig, OmegaConf
 
 
@@ -14,67 +13,62 @@ sys.path.insert(0, str(REPO_ROOT))
 os.chdir(REPO_ROOT)
 
 from Pretrain.Rewards.Reward_Backbone import test_Model, train_reward
-from Pretrain.utils import init_wandb_run, set_seed
-
-
-def optional_array(value):
-    return None if value is None else np.asarray(value, dtype=np.float32)
+from Pretrain.utils import set_seed
 
 
 @hydra.main(version_base="1.3", config_path="../Finetuning/conf", config_name="cube_single")
 def main(config: DictConfig) -> None:
     os.chdir(REPO_ROOT)
     OmegaConf.set_struct(config, True)
-    print(OmegaConf.to_yaml(config, resolve=True))
+    stage = config.scripts.train_reward_script
     if config.run.validate_only:
+        print(OmegaConf.to_yaml(stage, resolve=True))
         return
 
-    env = config.environment
-    reward = config.scripts.train_reward_script
+    import wandb
+
     set_seed(int(config.run.seed))
-    wandb_run = init_wandb_run(
-        f"{env.dataset_name}-{env.specific_dataset}-task{env.task_id}-reward",
-        {
-            "stage": "reward",
-            "resolved_hydra_config": OmegaConf.to_container(config, resolve=True),
-        },
-        group=config.wandb.group,
-        job_type="reward",
+    hp = OmegaConf.to_container(stage, resolve=True)
+    run = wandb.init(
+        entity=config.wandb.entity,
+        project=config.wandb.project,
+        group=os.environ.get("WANDB_RUN_GROUP", config.wandb.group),
+        name=f"{stage.dataset_name}-{stage.specific_dataset}-task{stage.task_id}-reward",
+        config=hp,
     )
     try:
         train_reward(
-            dataset_name=env.dataset_name,
-            hidden_layers=reward.hidden_layers,
-            hidden_dim=reward.hidden_dim,
-            batch_size=reward.batch_size,
-            num_steps=reward.num_steps,
-            save_freq=reward.save_freq,
-            lr=reward.lr,
-            min_lr=reward.min_lr,
-            sigma=reward.sigma,
-            alpha=reward.alpha,
-            target_reward=reward.target_reward,
-            specific_dataset=reward.specific_dataset,
-            task_id=env.task_id,
-            goal=optional_array(reward.train_goal),
-            traj_length=reward.traj_length,
+            dataset_name=stage.dataset_name,
+            hidden_layers=stage.hidden_layers,
+            hidden_dim=stage.hidden_dim,
+            batch_size=stage.batch_size,
+            num_steps=stage.num_steps,
+            save_freq=stage.save_freq,
+            lr=stage.lr,
+            min_lr=stage.min_lr,
+            sigma=stage.sigma,
+            alpha=stage.alpha,
+            target_reward=stage.target_reward,
+            specific_dataset=stage.specific_dataset,
+            task_id=stage.task_id,
+            traj_length=stage.traj_length,
         )
         test_Model(
-            env.dataset_name,
-            hidden_layers=reward.hidden_layers,
-            hidden_dim=reward.hidden_dim,
-            specific_dataset=reward.specific_dataset,
+            stage.dataset_name,
+            hidden_layers=stage.hidden_layers,
+            hidden_dim=stage.hidden_dim,
+            specific_dataset=stage.specific_dataset,
             trajs=None,
-            sigma=reward.sigma,
-            alpha=reward.alpha,
-            target_reward=reward.target_reward,
-            task_id=env.task_id,
-            traj_length=reward.traj_length,
-            save_freq=reward.save_freq,
-            num_steps=reward.num_steps,
+            sigma=stage.sigma,
+            alpha=stage.alpha,
+            target_reward=stage.target_reward,
+            task_id=stage.task_id,
+            traj_length=stage.traj_length,
+            save_freq=stage.save_freq,
+            num_steps=stage.num_steps,
         )
     finally:
-        wandb_run.finish()
+        run.finish()
 
 
 if __name__ == "__main__":
