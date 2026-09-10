@@ -753,12 +753,12 @@ class CubeDataset_Singletask:
         trajectories = []
         last_start = 0
         N = len(self.dataset["observations"])
-        rewards = reward_processor(self.dataset['rewards'].copy(), 'cube')
+        #rewards = reward_processor(self.dataset['rewards'].copy(), 'cube')
         #rewards =  reward_processor_2(self.dataset['rewards'].copy())
         for i in range(N):
             # End of a natural episode (terminal or dataset end)
-            if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
-            #if self.dataset['terminals'][i] == 1:
+            #if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
+            if self.dataset['terminals'][i] == 1:
                      """
                      obs_slice = self.dataset["observations"][last_start : i+1].copy()
                      act_slice = self.dataset["actions"][last_start : i+1].copy()
@@ -766,7 +766,7 @@ class CubeDataset_Singletask:
                      """
                      obs_slice = self.dataset["observations"][last_start : i+1].copy()
                      act_slice = self.dataset["actions"][last_start : i+1].copy()
-                     rews = rewards[last_start: i+1].copy()
+                     rews = self.dataset["rewards"][last_start: i+1].copy()
                      masks = self.dataset['masks'][last_start : i+1].copy()
                      
             
@@ -779,32 +779,10 @@ class CubeDataset_Singletask:
                             index =  0
                      
 
-                     if self.dataset['terminals'][i] == 1 and suffix_length is not None:
-                           obs_slice = obs_slice[:-suffix_length].copy()
-                           act_slice = act_slice[:-suffix_length].copy()
-                           rews = rews[:-suffix_length].copy()
-                           masks = masks[:-suffix_length].copy()
-
-                           
-                          
-
-
-
-
-
-
-
-
                      """
                      if len(act_slice) < 10:
                           last_start = i + 1
                           continue
-                     """
-                     """
-                     if(self.mode == 'reward'):
-                        if(sum(rews) == 0):
-                            last_start = i + 1
-                            continue 
                      """
                          
                      trajectory = {
@@ -818,10 +796,10 @@ class CubeDataset_Singletask:
                      trajectories.append(trajectory)
                      last_start = i + 1
         
-        """
+        
         if suffix_length is not None:
              trajectories = drop_the_suffix(trajectories, suffix_length)
-        """
+    
         return trajectories
 
     def get_state_dim(self) -> int:
