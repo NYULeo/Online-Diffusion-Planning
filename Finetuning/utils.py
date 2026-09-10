@@ -7742,7 +7742,7 @@ def train_critic_with_planner7(
 
 
               # reward clipping -----------------------------------------------------
-              r_hat = torch.clamp(r_hat, 0.0, float('inf'))      # adjust bounds if needed
+              r_hat = torch.clamp(r_hat, float('-inf'), 0.0)      # adjust bounds if needed
               r_hat = r_hat / Scale.Q_scale                     # or use a running std
 
               plan_targets = torch.zeros(N, device=device)
@@ -7807,7 +7807,7 @@ def train_critic_with_planner7(
               averaged_targets = averaged_targets / counts.clamp(min=1.0)
 
               averaged_targets = averaged_targets.detach()
-              averaged_targets  = averaged_targets.clamp(0.0, float('inf'))
+              averaged_targets  = averaged_targets.clamp(float('-inf'), 0.0)
               averaged_targets = symlog(averaged_targets)
 
               # running normalization

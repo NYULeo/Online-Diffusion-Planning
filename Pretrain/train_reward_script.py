@@ -107,7 +107,7 @@ if __name__ == '__main__':
         "min_lr": 5e-05,
         "sigma": 4.0,
         "alpha": None,
-        "target_reward": 50.0,
+        "target_reward": 1.0,
     }
 
     # Initialize wandb
