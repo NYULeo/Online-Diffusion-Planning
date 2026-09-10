@@ -20,9 +20,9 @@ import torch
 import torch.optim as optim
 import numpy as np
 try:
-    from Pretrain.utils import set_seed, SAStats, ema_smooth, cycle, check_device
+    from Pretrain.utils import set_seed, SAStats, ema_smooth, cycle, check_device, wandb_log
 except ModuleNotFoundError:
-    from utils import set_seed, SAStats, ema_smooth, cycle, check_device
+    from utils import set_seed, SAStats, ema_smooth, cycle, check_device, wandb_log
 import torch.nn as nn
 import pickle
 try:
@@ -469,7 +469,14 @@ def check_trajs_exit(env_name, specific_env, task_id, step):
              trajs = pickle.load(f)
         return trajs
     
-def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id: Optional[int] = None, goal: Optional[np.array] = None, traj_length: Optional[int] = None):
+def Train_Dataset(
+    dataset_name,
+    specific_dataset: Optional[str] = None,
+    task_id: Optional[int] = None,
+    goal: Optional[np.array] = None,
+    traj_length: Optional[int] = None,
+    split: str = "train",
+):
     if(dataset_name == 'ogpointmaze'):
          if(specific_dataset is None): 
              raise ValueError(f"Invalid dataset name: {dataset_name}")
@@ -554,7 +561,7 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
          obs_dim = data_1.get_state_dim()
          act_dim = data_1.get_action_dim()
          #trajs = data_1.get_trajectories() + data_2.get_trajectories()
-         trajs = data_1.get_trajectories() 
+         trajs = data_1.get_trajectories(split=split)
          #trajs = make_reward_increase(trajs)
          return trajs, name, obs_dim, act_dim
     
@@ -633,7 +640,16 @@ def reward_filter_goals(trajs: List[TrajectoryDict], goal) -> List[TrajectoryDic
     return new_trajs2
 
 class RewardDataset(Dataset):
-    def __init__(self, trajs, reward_name, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None):
+    def __init__(
+        self,
+        trajs,
+        reward_name,
+        sigma: Optional[float] = None,
+        alpha: Optional[float] = None,
+        target_reward: Optional[float] = None,
+        stats: Optional[SAStats] = None,
+        save_stats: bool = True,
+    ):
             
     
         # ----- gather raw obs/actions to fit stats -----
@@ -647,9 +663,12 @@ class RewardDataset(Dataset):
         
         allowed_values = [0.0, 1.0]
         #get stats
-        self.stats = SAStats()
-        self.stats.obs_mean = obs_all.mean(axis=0)
-        self.stats.obs_std = obs_all.std(axis=0)+ 1e-8
+        if stats is None:
+            self.stats = SAStats()
+            self.stats.obs_mean = obs_all.mean(axis=0)
+            self.stats.obs_std = obs_all.std(axis=0)+ 1e-8
+        else:
+            self.stats = stats
         
         transitions = []
         for traj in trajs:
@@ -658,7 +677,7 @@ class RewardDataset(Dataset):
             rews = np.asarray(traj['rewards'])
             """
             if(not np.all(np.isin(rews, allowed_values))):
-                raise ValueError(f"Rewards must be etiher 0 or 1, but got {rews}")
+                raise ValueError(f"Rewards must be either -1 or 0, but got {rews}")
             """
             if(target_reward is not None):
                 rews = self.boost_signal(target_reward, rews)
@@ -674,7 +693,8 @@ class RewardDataset(Dataset):
                 transitions.append((obs_t, a_t, r_t))
             
         self.transitions = transitions
-        self.save_stats(reward_name)
+        if save_stats:
+            self.save_stats(reward_name)
     
     def save_stats(self, reward_name):
         stats_name =  str(reward_name) + '_stats.pkl'
@@ -753,7 +773,11 @@ def train_reward(dataset_name: str, hidden_layers: int, hidden_dim: int, batch_s
            if step % 2000 == 0:
                 avg_loss = total_loss / 2000
                 print(f"Step {step}, loss {avg_loss:.4f}")
-                wandb.log({"loss": avg_loss, "step": step})         
+                wandb_log({
+                    "reward/step": step,
+                    "reward/train_loss": avg_loss,
+                    "reward/learning_rate": optimizer.param_groups[0]["lr"],
+                })
                 total_loss = 0
                 
            if step % save_freq == 0:
@@ -990,7 +1014,7 @@ class test_dataset(Dataset):
     def __init__(self, trajs, Reward_name, sigma: Optional[float] = None, alpha: Optional[float] = None, target_reward: Optional[float] = None, goal: Optional[np.array] = None):
         self.stats = get_pretrained_reward_stats(Reward_name)
         transitions = []
-        allowed_values = [0,1]
+        allowed_values = [-1, 0]
         for traj in trajs:
             obs = np.asarray(traj['observations'])        
             acts = np.asarray(traj['actions'])
@@ -1161,8 +1185,24 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
     print(f"Target reward: {target_reward}, Sigma: {sigma}, Alpha: {alpha}")
     reward_name = get_reward_name(dataset_name, specific_dataset, task_id)
     if(trajs is None): 
-        train_trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, goal, traj_length)
-        dataset = RewardDataset(train_trajs, reward_name, sigma, alpha, target_reward)
+        val_trajs, _, obs_dim, act_dim = Train_Dataset(
+            dataset_name,
+            specific_dataset,
+            task_id,
+            goal,
+            traj_length,
+            split="val",
+        )
+        train_stats = get_pretrained_reward_stats(reward_name)
+        dataset = RewardDataset(
+            val_trajs,
+            reward_name,
+            sigma,
+            alpha,
+            target_reward,
+            stats=train_stats,
+            save_stats=False,
+        )
     else:
         train_trajs, _, obs_dim, act_dim = Train_Dataset(dataset_name, specific_dataset, task_id, goal, traj_length)
         trajs = trajs + train_trajs
@@ -1209,6 +1249,14 @@ def test_Model(dataset_name, hidden_layers: int, hidden_dim: int, specific_datas
          print(f'std_reward: {std_R:.4f}')
          print(f"max_reward: {max_R:.4f}")
          print(f"min_reward: {min_R:.4f}")
+         wandb_log({
+             "reward/checkpoint": num,
+             "reward/validation_loss": avg_mean_loss,
+             "reward/prediction_mean": float(mean_R),
+             "reward/prediction_std": float(std_R),
+             "reward/prediction_min": float(min_R),
+             "reward/prediction_max": float(max_R),
+         })
         
          num += save_freq
 
@@ -1233,5 +1281,3 @@ def get_pretrained_reward_stats(reward_name):
     with open(stats_path, 'rb') as f:
         stats = pickle.load(f)
     return stats
-
-

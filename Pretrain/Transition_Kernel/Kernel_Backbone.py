@@ -33,9 +33,9 @@ import math
 import copy
 
 try:
-    from Pretrain.utils import SAStats, cycle, check_device
+    from Pretrain.utils import SAStats, cycle, check_device, wandb_log
 except ModuleNotFoundError:
-    from utils import SAStats, cycle, check_device
+    from utils import SAStats, cycle, check_device, wandb_log
 import json
 
 def check_specific_dataset(dataset_name):
@@ -817,7 +817,13 @@ def train_mog_kernel(
         total_loss += avg_loss
 
         if step % 100 == 0:
-            print(f"Step {step:6d} | Avg Loss: {total_loss/100:.6f}")
+            avg_train_loss = total_loss / 100
+            print(f"Step {step:6d} | Avg Loss: {avg_train_loss:.6f}")
+            wandb_log({
+                "kernel/step": step,
+                "kernel/train_loss": avg_train_loss,
+                "kernel/learning_rate": optimizers[0].param_groups[0]["lr"],
+            })
             total_loss = 0.0
 
         # Save checkpoints
@@ -1016,6 +1022,16 @@ def test_kernel(dataset_name, specific_dataset: str = None,
         print(f"max_log_density = {max_log_density:.4f}")
         print(f"std_log_density = {std_log_density:.4f}")
         print(f"τ ({(1-quantile)*100:.0f}th percentile) : {tau:.4f}")
+        wandb_log({
+            "kernel/checkpoint": step,
+            "kernel/data_fit/mahalanobis_mean": mean_D2_total,
+            "kernel/data_fit/mahalanobis_std": std_D2_total,
+            "kernel/data_fit/mahalanobis_max": max_D2_total,
+            "kernel/data_fit/log_density_mean": mean_log_density,
+            "kernel/data_fit/log_density_std": std_log_density,
+            "kernel/data_fit/log_density_min": min_log_density,
+            "kernel/data_fit/log_density_threshold": tau,
+        })
         step += save_freq
 
 
@@ -1094,6 +1110,16 @@ def test_kernel_mog(dataset_name, specific_dataset: str = None, task_id: Optiona
         print(f"max_log_density = {max_log_density:.4f}")
         print(f"std_log_density = {std_log_density:.4f}")
         print(f"τ ({(1-quantile)*100:.0f}th percentile) : {tau:.4f}")
+        wandb_log({
+            "kernel/checkpoint": step,
+            "kernel/data_fit/mahalanobis_mean": mean_D2_total,
+            "kernel/data_fit/mahalanobis_std": std_D2_total,
+            "kernel/data_fit/mahalanobis_max": max_D2_total,
+            "kernel/data_fit/log_density_mean": mean_log_density,
+            "kernel/data_fit/log_density_std": std_log_density,
+            "kernel/data_fit/log_density_min": min_log_density,
+            "kernel/data_fit/log_density_threshold": tau,
+        })
         step += save_freq
 
 
@@ -1284,4 +1310,3 @@ def compute_total_mahalanobis_score_mog(
     D2_total = ((residual ** 2) / var_total).sum(dim=-1)   # (B,)
     
     return D2_total
-

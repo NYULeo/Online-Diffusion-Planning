@@ -17,6 +17,7 @@ import os
 from Dataset import get_PlannerName, PlannerDataset, PlannerDataset_Rollout
 from .utils import LossTracker, get_pretrained_planner, getName
 import json
+from Pretrain.utils import wandb_log
 
 
 class SDETrainer:
@@ -289,8 +290,14 @@ class SDETrainer:
             if ((self.step % self.update_ema_every) == 0):
                 self.step_ema()
             
-            if ((self.step % self.log_freq) == 0):
-                print(f"step {self.step} loss {total_loss/self.log_freq}")
+            if ((self.step + 1) % self.log_freq) == 0:
+                avg_loss = total_loss / self.log_freq
+                print(f"step {self.step + 1} loss {avg_loss}")
+                wandb_log({
+                    "planner/step": self.step + 1,
+                    "planner/train_loss": avg_loss,
+                    "planner/learning_rate": self.optim.param_groups[0]["lr"],
+                })
                 total_loss = 0
             
             if ((self.step % self.save_freq == 0) and (self.step!=0)):
@@ -398,4 +405,3 @@ class SDETrainer:
         loss = (lam * mse).mean()
         loss = loss/((H*D) - self.state_dim)
         return loss
-

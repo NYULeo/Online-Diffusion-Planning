@@ -1,0 +1,251 @@
+defaults:
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+  - _self_
+
+run:
+  seed: 1
+  validate_only: false
+
+wandb:
+  entity: kaiwen_hu-uc-berkeley
+  project: ODP
+  group: cube-single-task4-main
+
+# Cube Single pipeline.  Every entrypoint reads only its own section.
+scripts:
+  pretrain_script4:
+    dataset_name: cube
+    specific_dataset: single-play
+    task_id: 4
+    horizon: 32
+    backbone_name: transformer
+    backbone_layers: 4
+    num_steps: 1000000
+    batch_size: 128
+    lr: 0.0002
+    stride: 1
+
+  train_reward_script:
+    dataset_name: cube
+    specific_dataset: single
+    task_id: 4
+    traj_length: null
+    hidden_layers: 4
+    hidden_dim: 512
+    batch_size: 256
+    num_steps: 20000
+    save_freq: 20000
+    lr: 0.0005
+    min_lr: 0.00005
+    sigma: 4.0
+    alpha: null
+    target_reward: 1.0
+
+  train_kernel_script:
+    dataset_name: cube
+    specific_dataset: single
+    task_id: null
+    batch_size: 512
+    lr: 0.0001
+    num_steps: 5000
+    save_freq: 5000
+    ensemble_size: 10
+    num_modes: 10
+    num_hidden_layers: 4
+    hidden_dim: 514
+    lambda_reg: 0.001
+    noise_floor: 0.0005
+    test_quantile: 0.99
+
+  train_critic_script:
+    dataset_name: cube
+    specific_dataset: single-play
+    task_id: 4
+    traj_length: null
+    reward_hidden_layers: 4
+    reward_hidden_dim: 512
+    reward_checkpoint: 0
+    critic_hidden_layers: 4
+    critic_hidden_dim: 512
+    batch_size: 256
+    num_steps: 2000
+    gamma: 0.99
+    lr: 0.0001
+    min_lr: 0.00001
+    old_step: null
+    new_step: -1
+    value_scale: 1.0
+    momentum: 0.005
+
+  train_critic_script2:
+    dataset_name: cube
+    specific_dataset: single-play
+    task_id: 4
+    traj_length: null
+    train_horizon: 32
+    mixed_precision: bf16
+    planner_checkpoint: 0
+    reward_checkpoint: 0
+    old_critic_checkpoint: -1
+    backbone_layers: 4
+    hidden_layers: 4
+    hidden_dim: 512
+    reward_hidden_layers: 4
+    reward_hidden_dim: 512
+    batch_size: 512
+    num_steps: 20
+    resample_every: 2
+    vectorized_sampling: true
+    plan_chunk_size: 256
+    gamma: 0.99
+    lam: null
+    rho: 0.0
+    lr: 0.00001
+    min_lr: 0.0000001
+    tau: 0.005
+    diffusion_steps: 10
+    num_karras: 1
+    eta: 0.0
+    new_step: 0
+    log_every: 5
+    mix_reset: false
+    n_reset: 256
+    kernel:
+      checkpoint: 0
+      type_kernel: mog
+      num_hidden_layers: 4
+      hidden_dim: 514
+      num_modes: 10
+      noise_floor: 0.0005
+      min_log_prob: -110.0
+      oversample: 40
+    probe_n_s0: 64
+    probe_n_plans_per_s0: 16
+
+  finetune_script2:
+    dataset_name: cube
+    specific_dataset: single-play
+    task_id: 4
+
+    alpha_scheduler:
+      alpha_start: 1.0
+      alpha_end: 0.1
+      total_steps: 300
+      decay: true
+
+    adjoint_matching:
+      horizon: 32
+      backbone_name: transformer
+      backbone_layers: 4
+      eta: 0.0
+      s: 0.008
+      sigma_min: 0.01
+      sigma_max: 30.0
+      step_start_ema: 50
+      ema_decay: 0.99
+      save_freq: 10
+      save_model_freq: 50
+      log_freq: 10
+
+    reward_objective:
+      beta: 1.0
+      min_log_prob: -150.0
+      quantile: 0.999
+      number_of_generated_plans: 50
+      explore: false
+      gamma: 0.8
+      gae_lam: 0.95
+      critic_gamma: 0.99
+
+    reward_model:
+      hidden_layers: 4
+      hidden_dim: 512
+      ensemble_size: null
+      batch_size: 256
+      num_steps: 30000
+      lr: 0.005
+      min_lr: 0.0005
+      sigma: 4.0
+      target_reward: 500.0
+      train_goal: null
+      rollout_goal: null
+      rollout_start_cells: null
+
+    kernel_model:
+      batch_size: 512
+      num_steps: 5000
+      lr: 0.0001
+      ensemble_size: 10
+      num_hidden_layers: 4
+      hidden_dim: 514
+      type_kernel: mog
+      kernel_num_modes: 10
+      kernel_noise_floor: 0.0005
+      lambda_reg: 0.001
+      oversample: 30
+
+    critic_update:
+      hidden_layers: 4
+      hidden_dim: 512
+      batch_size: 256
+      num_steps: 20
+      log_every: 5
+      warm_up_steps: 1000
+      warm_up_log_every: 100
+      lr: 0.00001
+      min_lr: 0.000001
+      tau: 0.005
+      gamma: 0.99
+      lam: null
+      rho: 0.0
+      resample_every: 1
+      vectorized_sampling: true
+      plan_chunk_size: 256
+      data_conservation: true
+      momentum: 0.1
+      mix_reset: false
+      n_reset: 256
+
+    settings:
+      planner_checkpoint: 0
+      reward_model_checkpoint: 0
+      kernel_model_checkpoint: 0
+      critic_model_checkpoint: 0
+      offline: true
+      critic: true
+      update_critic: true
+      kernel: false
+      update_kernel: false
+      buffer_size: 200000
+      finetune_buffer_cutoff_length: null
+      train_buffer_cutoff_length: null
+      # null keeps every pre-success state in the finetuning buffer.
+      finetune_suffix_cut_length: null
+      finetune_steps: 90
+      finetune_rounds: 30
+      diffusion_steps: 10
+      karras_percent: 0.1
+      loss_clip_percent: 0.2
+      finetune_batch_size: 256
+      finetune_batch_per_sample: 4
+      finetune_lr: 0.00002
+      initial_lam: 0.0
+      eta_lam: 0.05
+      gradient_accumulate_every: 1
+      update_lambda_every: 1
+      reward_scaling_factor: 500
+      max_ent: false
+      entropy_scaling_factor: 0.5
+      rollout_length: 4000
+      rollout_num_envs: 8
+      num_rollout_processes: 8
+      continual_rollout: true
+      chunk_size: 31
+
+hydra:
+  run:
+    dir: .
+  job:
+    chdir: false
+  output_subdir: null

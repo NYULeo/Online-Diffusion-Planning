@@ -1,358 +1,87 @@
-import numpy as np
-import matplotlib.pyplot as plt
+from __future__ import annotations
+
 import os
-import numpy as np
-import ogbench as og
-import mediapy as media
-import matplotlib.pyplot as plt
-import numpy as np
-import seaborn as sns
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-os.chdir(project_root)
-import gymnasium as gym
-import numpy as np
-import torch
-import pickle
-from scipy.ndimage import gaussian_filter1d
+from pathlib import Path
+
+import hydra
+from omegaconf import DictConfig, OmegaConf
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+os.chdir(REPO_ROOT)
+
+from Finetuning.utils import test_critic_with_reward, train_critic_with_reward
 from Pretrain.Dataset import get_dataset
-import ogbench
-from Finetuning.utils import (
-    train_critic_with_reward,
-    train_critic_with_planner,
-    train_critic_with_planner3,
-    train_critic_with_planner4,
-    train_critic_with_planner5,
-    train_critic,
-    test_critic,
-    KernelConfig,
-)
 from Pretrain.utils import set_seed
-from accelerate import Accelerator
-import random 
-import wandb
-
-"""
-if __name__ == '__main__':  # pragma: no cover
-       set_seed(1)
-      
-       
-       env_name = 'cube'
-       specific_env = 'single-play'
-       traj_length = 200
-       horizon = 128
-       task_id = 4
-       step = -1
-       data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
-       trajs = data.get_trajectories()
-       
-      
-       
-       mean, std = train_critic_with_reward(trajs,
-                             dataset_name  = env_name,
-                             specific_dataset = specific_env,
-                             reward_hidden_layers = 4,
-                             reward_hidden_dim  = 512,
-                             reward_checkpoint  = 0,
-                             critic_hidden_layers = 4,
-                             critic_hidden_dim  = 512,
-                             batch_size = 256,
-                             num_steps  = 10000,
-                             gamma = 0.99,
-                             lam = 0.95,
-                             horizon = horizon,
-                             #lr = 1e-04, 
-                             lr = 1e-04,
-                             #min_lr = 1e-05, 
-                             min_lr = 1e-05,
-                             tau = 0.005, 
-                             old_step = None,    # from scratch
-                             new_step = step,
-                             momentum = 0.005,   # unused when old_step is None
-                             task_id = task_id)
-      
-       trajs = data.get_trajectories()
-       test_critic(dataset_name = env_name, 
-            specific_dataset = specific_env, 
-            hidden_layers = 4, 
-            hidden_dim = 512, 
-            checkpoint_step = 0, 
-            mean = None,
-            std = None,
-            gamma = 0.99, 
-            horizon = horizon,  
-            sigma = 4.0, 
-            #sigma = None,
-            target_reward = 500.0, 
-            trajs = trajs,
-            task_id = task_id)
-"""
-
-if __name__ == '__main__':  # pragma: no cover
-       set_seed(1)
-       env_name = 'cube'
-       specific_env = 'single-play'
-       traj_length = None
-       horizon = 200
-       task_id = 4
-       step = -1
-       hp = {
-              "dataset_name": env_name,
-              "specific_dataset": specific_env,
-              "task_id": task_id,
-              "traj_length": traj_length,
-              "horizon": horizon,
-              "reward_hidden_layers": 4,
-              "reward_hidden_dim": 512,
-              "reward_checkpoint": 0,
-              "critic_hidden_layers": 4,
-              "critic_hidden_dim": 512,
-              "batch_size": 256,
-              "num_steps": 2000,
-              "gamma": 0.99,
-              "lam": 0.95,
-              "lr": 1e-04,
-              "min_lr": 1e-05,
-              "tau": 0.005,
-              "old_step": None,
-              "new_step": step,
-              "value_scale": 1.0,
-              "momentum": 0.005,
-          }
-
-       wandb.init(
-           entity="kaiwen_hu-uc-berkeley",
-           project="ODP",
-           name=f"{env_name}-{specific_env}-task{task_id}-critic_1",
-           config=hp,
-       )
-       data = get_dataset(env_name, specific_env, task_id=task_id, traj_length=traj_length)
-       trajs = data.get_trajectories()
-
-       trainer_keys = (
-              "dataset_name", "specific_dataset", "reward_hidden_layers", "reward_hidden_dim",
-              "reward_checkpoint", "critic_hidden_layers", "critic_hidden_dim",
-              "batch_size", "num_steps", "gamma", "lam", "horizon", "lr", "min_lr", "tau",
-              "old_step", "new_step", "momentum", "value_scale", "task_id",
-       )
-       os.chdir(project_root)
-       train_critic_with_reward(
-              trajs=trajs,
-              **{k: hp[k] for k in trainer_keys},
-       )
-
-       trajs = data.get_trajectories()
-       test_critic(
-            dataset_name=hp["dataset_name"],
-            specific_dataset=hp["specific_dataset"],
-            hidden_layers=hp["critic_hidden_layers"],
-            hidden_dim=hp["critic_hidden_dim"],
-            checkpoint_step=hp["reward_checkpoint"],
-            critic_checkpoint=hp["new_step"],
-            gamma=hp["gamma"],
-            horizon=hp["horizon"],
-            value_scale=hp["value_scale"],
-            sigma=1.0,
-            target_reward=1.0,
-            trajs=trajs,
-            task_id=hp["task_id"],
-       )
-       wandb.finish()
-
-"""
-if __name__ == '__main__':  # pragma: no cover
-       set_seed(1)
-       
-       
-       env_name = 'cube'
-       specific_env = 'double-play'
-       traj_length = 500
-       horizon = 480
-       task_id = 4
-       step = 0
-       data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
-       trajs = data.get_trajectories()
-       
-       
-       
-       mean, std = train_critic_with_reward(trajs,
-                             dataset_name  = env_name,
-                             specific_dataset = specific_env,
-                             reward_hidden_layers = 4,
-                             reward_hidden_dim  = 512,
-                             reward_checkpoint  = 0,
-                             critic_hidden_layers = 4,
-                             critic_hidden_dim  = 512,
-                             batch_size = 256,
-                             num_steps  = 5000,
-                             gamma = 0.99,
-                             lam = 0.95,
-                             horizon = horizon,
-                             lr = 1e-04, 
-                             min_lr = 1e-05, 
-                             tau = 0.005, 
-                             old_step = None,    # from scratch
-                             new_step = step,
-                             momentum = 0.005,   # unused when old_step is None
-                             task_id = task_id)
-    
-       
-       
-       
-    
-       trajs = data.get_trajectories()
-       test_critic(dataset_name = env_name, 
-            specific_dataset = specific_env, 
-            hidden_layers = 4, 
-            hidden_dim = 512, 
-            checkpoint_step = 0, 
-            mean = None,
-            std = None,
-            gamma = 0.99, 
-            horizon = horizon,  
-            #sigma = 3.0, 
-            sigma = None,
-            #target_reward = 10.0, 
-            target_reward = None, 
-            trajs = trajs,
-            task_id = task_id)
-
-"""
-    
-    
-
-"""
-if __name__ == '__main__':  # pragma: no cover
-       set_seed(1)
-       env_name = 'antmaze'
-       specific_env = 'large'
-       traj_length = 1000
-       horizon = 800
-       task_id = 4
-       step = -1
-       hp = {
-              "dataset_name": env_name,
-              "specific_dataset": specific_env,
-              "task_id": task_id,
-              "traj_length": traj_length,
-              "horizon": horizon,
-              "reward_hidden_layers": 4,
-              "reward_hidden_dim": 512,
-              "reward_checkpoint": 0,
-              "critic_hidden_layers": 4,
-              "critic_hidden_dim": 512,
-              "batch_size": 1024,
-              "num_steps": 10000,
-              "gamma": 0.99,
-              "lam": 0.95,
-              "lr": 1e-04,
-              "min_lr": 1e-06,
-              "tau": 0.005,
-              "old_step": None,
-              "new_step": step,
-              "value_scale": 1.0,
-              "momentum": 0.001,
-          }
-
-       wandb.init(
-           entity="kaiwen_hu-uc-berkeley",
-           project="ODP",
-           name=f"{env_name}-{specific_env}-task{task_id}-critic_1",
-           config=hp,
-       )
-       data = get_dataset(env_name, specific_env, task_id=task_id, traj_length=traj_length)
-       trajs = data.get_trajectories()
-
-       trainer_keys = (
-              "dataset_name", "specific_dataset", "reward_hidden_layers", "reward_hidden_dim",
-              "reward_checkpoint", "critic_hidden_layers", "critic_hidden_dim",
-              "batch_size", "num_steps", "gamma", "lam", "horizon", "lr", "min_lr", "tau",
-              "old_step", "new_step", "momentum", "value_scale", "task_id",
-       )
-
-       train_critic_with_reward(
-              trajs=trajs,
-              **{k: hp[k] for k in trainer_keys},
-       )
-
-       trajs = data.get_trajectories()
-       test_critic(
-            dataset_name=hp["dataset_name"],
-            specific_dataset=hp["specific_dataset"],
-            hidden_layers=hp["critic_hidden_layers"],
-            hidden_dim=hp["critic_hidden_dim"],
-            checkpoint_step=hp["reward_checkpoint"],
-            critic_checkpoint=hp["new_step"],
-            gamma=hp["gamma"],
-            horizon=hp["horizon"],
-            value_scale=hp["value_scale"],
-            sigma=4.0,
-            target_reward=500.0,
-            trajs=trajs,
-            task_id=hp["task_id"],
-       )
-       wandb.finish()
-
-"""
 
 
-"""
-if __name__ == '__main__':  # pragma: no cover
-       set_seed(1)
-       env_name = 'humanoidmaze'
-       specific_env = 'large'
-       traj_length = 2000
-       horizon = 1800
-       task_id = 2
-       step = 0
-       data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
-       trajs = data.get_trajectories()
-       
-       mean, std = train_critic_with_reward(trajs,
-                             dataset_name  = env_name,
-                             specific_dataset = specific_env,
-                             reward_hidden_layers = 4,
-                             reward_hidden_dim  = 1024,
-                             reward_checkpoint  = 0,
-                             critic_hidden_layers = 4,
-                             critic_hidden_dim  = 512,
-                             batch_size = 256,
-                             num_steps  = 10000,
-                             gamma = 0.99,
-                             lam = 0.95,
-                             horizon = horizon,
-                             #lr = 1e-04, 
-                             lr = 1e-04,
-                             #min_lr = 1e-05, 
-                             min_lr = 1e-05,
-                             tau = 0.005, 
-                             old_step = None,    # from scratch
-                             new_step = step,
-                             momentum = 0.005,   # unused when old_step is None
-                             task_id = task_id)
-      
-       trajs = data.get_trajectories()
-       test_critic(dataset_name = env_name, 
-            specific_dataset = specific_env, 
-            hidden_layers = 4, 
-            hidden_dim = 512, 
-            checkpoint_step = 0, 
-            mean = None,
-            std = None,
-            gamma = 0.99, 
-            horizon = horizon,  
-            sigma = 4.0, 
-            #sigma = None,
-            target_reward = 500.0, 
-            trajs = trajs,
-            task_id = task_id)
+@hydra.main(version_base="1.3", config_path="conf", config_name="cube_single")
+def main(config: DictConfig) -> None:
+    os.chdir(REPO_ROOT)
+    OmegaConf.set_struct(config, True)
+    stage = config.scripts.train_critic_script
+    if config.run.validate_only:
+        print(OmegaConf.to_yaml(stage, resolve=True))
+        return
 
-"""
+    import wandb
+
+    set_seed(int(config.run.seed))
+    hp = OmegaConf.to_container(stage, resolve=True)
+    run = wandb.init(
+        entity=config.wandb.entity,
+        project=config.wandb.project,
+        group=os.environ.get("WANDB_RUN_GROUP", config.wandb.group),
+        name=f"{stage.dataset_name}-{stage.specific_dataset}-task{stage.task_id}-critic_1",
+        config=hp,
+    )
+    data = get_dataset(
+        stage.dataset_name,
+        stage.specific_dataset,
+        task_id=stage.task_id,
+        traj_length=stage.traj_length,
+    )
+    try:
+        train_critic_with_reward(
+            trajs=data.get_trajectories(),
+            dataset_name=stage.dataset_name,
+            specific_dataset=stage.specific_dataset,
+            reward_hidden_layers=stage.reward_hidden_layers,
+            reward_hidden_dim=stage.reward_hidden_dim,
+            reward_checkpoint=stage.reward_checkpoint,
+            critic_hidden_layers=stage.critic_hidden_layers,
+            critic_hidden_dim=stage.critic_hidden_dim,
+            batch_size=stage.batch_size,
+            num_steps=stage.num_steps,
+            gamma=stage.gamma,
+            lr=stage.lr,
+            min_lr=stage.min_lr,
+            old_step=stage.old_step,
+            new_step=stage.new_step,
+            momentum=stage.momentum,
+            value_scale=stage.value_scale,
+            task_id=stage.task_id,
+        )
+        test_critic_with_reward(
+            trajs=data.get_trajectories(split="val"),
+            dataset_name=stage.dataset_name,
+            specific_dataset=stage.specific_dataset,
+            reward_hidden_layers=stage.reward_hidden_layers,
+            reward_hidden_dim=stage.reward_hidden_dim,
+            reward_checkpoint=stage.reward_checkpoint,
+            critic_hidden_layers=stage.critic_hidden_layers,
+            critic_hidden_dim=stage.critic_hidden_dim,
+            critic_checkpoint=stage.new_step,
+            batch_size=stage.batch_size,
+            gamma=stage.gamma,
+            value_scale=stage.value_scale,
+            task_id=stage.task_id,
+        )
+    finally:
+        run.finish()
 
 
-
-
-
-
-
+if __name__ == "__main__":
+    main()

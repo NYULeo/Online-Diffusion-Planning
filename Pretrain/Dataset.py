@@ -748,53 +748,48 @@ class CubeDataset_Singletask:
                  self.dataset_id, render_mode="rgb_array"
             )
 
-    def get_trajectories(self, suffix_length: Optional[int] = None) -> List[Dict[str, np.ndarray]]:
+    def get_trajectories(
+        self,
+        suffix_length: Optional[int] = None,
+        split: str = "train",
+    ) -> List[Dict[str, np.ndarray]]:
+        if split not in {"train", "val"}:
+            raise ValueError(f"split must be 'train' or 'val', got {split!r}")
+        source = self.dataset if split == "train" else self.eval_dataset
        
         trajectories = []
         last_start = 0
-        N = len(self.dataset["observations"])
-        #rewards = reward_processor(self.dataset['rewards'].copy(), 'cube')
-        #rewards =  reward_processor_2(self.dataset['rewards'].copy())
+        N = len(source["observations"])
         for i in range(N):
-            # End of a natural episode (terminal or dataset end)
-            #if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
-            if self.dataset['terminals'][i] == 1:
-                     """
-                     obs_slice = self.dataset["observations"][last_start : i+1].copy()
-                     act_slice = self.dataset["actions"][last_start : i+1].copy()
-                     rews = rewards[last_start: i+1].copy()
-                     """
-                     obs_slice = self.dataset["observations"][last_start : i+1].copy()
-                     act_slice = self.dataset["actions"][last_start : i+1].copy()
-                     rews = self.dataset["rewards"][last_start: i+1].copy()
-                     masks = self.dataset['masks'][last_start : i+1].copy()
-                     
-            
-                     L = len(obs_slice)  
-                     if(self.traj_length is not None):
-                           index = L - self.traj_length
-                           if(index < 0):
-                                index = 0
-                     else:
-                            index =  0
-                     
+            # First find a natural episode boundary, then discard everything
+            # after its first success.  Starting a new trajectory at a
+            # post-success state would teach a non-episodic value function.
+            if source['terminals'][i] == 1 or i == N - 1:
+                episode_rewards = source["rewards"][last_start : i + 1]
+                hit_indices = np.flatnonzero(episode_rewards == 0)
+                episode_stop = (
+                    last_start + int(hit_indices[0]) + 1
+                    if hit_indices.size
+                    else i + 1
+                )
 
-                     """
-                     if len(act_slice) < 10:
-                          last_start = i + 1
-                          continue
-                     """
-                         
-                     trajectory = {
-                           "observations": obs_slice[index:],
-                           "actions": act_slice[index:],
-                           #"rewards":  reward_processor_2(rews[index:].copy())
-                           "rewards":  rews[index:],
-                           "masks": masks[index:]
-                     }
-                         
-                     trajectories.append(trajectory)
-                     last_start = i + 1
+                obs_slice = source["observations"][last_start:episode_stop].copy()
+                act_slice = source["actions"][last_start:episode_stop].copy()
+                rews = source["rewards"][last_start:episode_stop].copy()
+                masks = source["masks"][last_start:episode_stop].copy()
+
+                if self.traj_length is not None:
+                    index = max(0, len(obs_slice) - self.traj_length)
+                else:
+                    index = 0
+
+                trajectories.append({
+                    "observations": obs_slice[index:],
+                    "actions": act_slice[index:],
+                    "rewards": rews[index:],
+                    "masks": masks[index:],
+                })
+                last_start = i + 1
         
         
         if suffix_length is not None:
@@ -1421,12 +1416,6 @@ class PlannerDataset_Rollout(Dataset):
 
     def __getitem__(self, idx):
         return self.windows[idx], self.conditions[idx]
-
-
-
-
-
-
 
 
 

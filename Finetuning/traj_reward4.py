@@ -10,7 +10,7 @@ from Pretrain.Rewards.nets import SimpleReward
 from Pretrain.Transition_Kernel.Kernel_Net import RobustTransitionKernel, MoGTransitionKernel
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_log_density, compute_log_density_mog
 from Pretrain.Critic.nets import Critic
-from Finetuning.utils import get_reward_model, get_kernel, get_reward_stats, get_kernel_stats, get_critic_model, get_critic_stats, get_Q_scale, symexp
+from Finetuning.utils import get_reward_model, get_kernel, get_reward_stats, get_kernel_stats, get_critic_model, get_critic_stats, get_Q_scale, symexp, first_hit_cost_terms
 from typing import Optional
 from torch.nn import functional as F
 from dataclasses import dataclass
@@ -393,17 +393,21 @@ class TotalReward_Critic(nn.Module):
         kernel_states = self.kernel_processor(x[:-1, :self.config.d_s])
         kernel_next_states = self.kernel_processor(x[1:, :self.config.d_s])
         rewards = self.reward_net(reward_states, actions)
+        effective_rewards, survival_after = first_hit_cost_terms(rewards)
         constraints = self.sigmoid(kernel_states, actions, kernel_next_states)
         discounts = x.new_tensor(self.config.critic_gamma).pow(
             torch.arange(H - 1, device=x.device)
         )
-        total_reward = (discounts * rewards).sum() - lam * constraints.sum()
+        total_reward = (discounts * effective_rewards).sum() - lam * constraints.sum()
 
         final_s_critic = x[H-1][:self.config.critic_d_s]
         final_s_norm_critic = self.critic_processor(final_s_critic).unsqueeze(0).requires_grad_(False)
         v = symexp(self.critic(final_s_norm_critic))
         total_reward += (
-            (self.config.critic_gamma**(H-1)) * self.q_scale.Q_scale * v.squeeze(0)
+            (self.config.critic_gamma**(H-1))
+            * survival_after[-1]
+            * self.q_scale.Q_scale
+            * v.squeeze(0)
         )
         total_reward = total_reward + (lam  * self.config.delta)
         return total_reward
@@ -428,11 +432,21 @@ class TotalReward_Critic(nn.Module):
         ).detach().requires_grad_(True)
 
         rewards = self.reward_net(reward_states, actions)
+        effective_rewards, survival_after = first_hit_cost_terms(rewards)
         constraints = self.sigmoid(kernel_states, actions, kernel_next_states)
-        reward_state_grad, reward_action_grad = torch.autograd.grad(
-            rewards,
-            (reward_states, actions),
-            grad_outputs=discounts,
+
+        final_s_critic = x[H-1][:self.config.critic_d_s]
+        final_s_norm_critic = self.critic_processor(final_s_critic).unsqueeze(0).requires_grad_(True)
+        v = symexp(self.critic(final_s_norm_critic))
+        task_return = (discounts * effective_rewards).sum() + (
+            (self.config.critic_gamma**(H-1))
+            * survival_after[-1]
+            * self.q_scale.Q_scale
+            * v.squeeze(0)
+        )
+        reward_state_grad, reward_action_grad, critic_state_grad = torch.autograd.grad(
+            task_return,
+            (reward_states, actions, final_s_norm_critic),
             create_graph=False,
             retain_graph=False,
             allow_unused=False,
@@ -447,27 +461,13 @@ class TotalReward_Critic(nn.Module):
 
         gradient[:-1, :self.config.d_s] += reward_state_grad / self.reward_obs_std
         gradient[:-1, self.config.d_s:] += reward_action_grad
+        gradient[H-1, :self.config.critic_d_s] += (
+            critic_state_grad.squeeze(0) / self.critic_obs_std
+        )
         gradient[:-1, :self.config.d_s] -= lam * constraint_state_grad / self.kernel_obs_std
         gradient[:-1, self.config.d_s:] -= lam * constraint_action_grad
         gradient[1:, :self.config.d_s] -= lam * constraint_next_grad / self.kernel_obs_std
-        total_reward = (discounts * rewards).sum() - lam * constraints.sum()
 
-        final_s_critic = x[H-1][:self.config.critic_d_s]
-        final_s_norm_critic = self.critic_processor(final_s_critic).unsqueeze(0).requires_grad_(True)
-        v = symexp(self.critic(final_s_norm_critic))
-        grads = torch.autograd.grad(
-                outputs = v,
-                inputs = (final_s_norm_critic),
-                grad_outputs = torch.ones_like(v),
-                create_graph = False,
-                retain_graph = False
-            )
-        v_s = grads[0].squeeze(0) / self.critic_obs_std
-        gradient[H-1, :self.config.critic_d_s] += (
-            (self.config.critic_gamma**(H-1)) * self.q_scale.Q_scale * v_s
-        )
-        total_reward += (
-            (self.config.critic_gamma**(H-1)) * self.q_scale.Q_scale * v.squeeze(0)
-        )
-        total_reward = total_reward + (lam  * self.config.delta)
+        total_reward = task_return - lam * constraints.sum()
+        total_reward = total_reward + (lam * self.config.delta)
         return total_reward, gradient

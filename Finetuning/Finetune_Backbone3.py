@@ -283,8 +283,9 @@ class OnlineFinetuner():
            else:
                 name = f"{self.config.dataset_name}-{self.config.specific_dataset}-task{self.config.train_reward_config.task_id}-finetune-online"
            wandb.init(
-                    entity="kaiwen_hu-uc-berkeley",
-                    project="ODP",
+                    entity=os.environ.get("WANDB_ENTITY", "kaiwen_hu-uc-berkeley"),
+                    project=os.environ.get("WANDB_PROJECT", "ODP"),
+                    group=os.environ.get("WANDB_RUN_GROUP"),
                     name=name,
                     config={'finetune_config': asdict(self.config)},
                 )
@@ -826,6 +827,7 @@ class OnlineFinetuner():
                          mix_reset=self.config.train_critic_config.mix_reset,
                          n_reset=self.config.train_critic_config.n_reset,
                          plan_chunk_size=self.config.train_critic_config.plan_chunk_size,
+                         kernel_config=self.kernel_config,
                          accelerator=self.accelerator,
                        )
                 self.accelerator.wait_for_everyone()
@@ -1025,6 +1027,3 @@ class OnlineFinetuner():
      
         
             
-
-
-

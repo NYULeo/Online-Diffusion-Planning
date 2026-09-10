@@ -35,8 +35,13 @@ from Finetuning.utils import (
     get_planner,
     get_reward_model,
     get_reward_stats,
+    get_kernel,
+    get_kernel_stats,
     get_critic_model,
     get_critic_stats,
+    get_Q_scale,
+    first_hit_cost_terms,
+    check_device,
     sample_euler_karras,
     planner_karras_beta_schedule,
     planner_cosine_beta,
@@ -54,7 +59,12 @@ from Pretrain.Planners.Backbone.Sampler import (
 )
 from Finetuning.traj_reward5 import TotalReward_Critic, RewardConfig, TotalReward
 from Pretrain.Transition_Kernel.Kernel_Backbone import (
+    compute_log_density,
     compute_log_density_mog,
+)
+from Pretrain.Transition_Kernel.Kernel_Net import (
+    MoGTransitionKernel,
+    RobustTransitionKernel,
 )
 import math
 import torch
@@ -334,6 +344,7 @@ def probe_multi_horizon_bellman(
     mix_reset: bool = True,
     n_reset: int = 64,
     plan_chunk_size: int = 256,
+    kernel_config=None,
     eps: float = 1e-8,
     accelerator=None,
 ):
@@ -402,6 +413,44 @@ def probe_multi_horizon_bellman(
     c_std = torch.as_tensor(
         np.maximum(critic_stat.obs_std, 1e-3), device=device, dtype=torch.float32
     )
+
+    kernels = []
+    k_mean = k_std = None
+    if kernel_config is not None:
+        kernel_states, _, _ = get_kernel(
+            dataset_name, specific_dataset, kernel_config.checkpoint
+        )
+        kernel_stats = get_kernel_stats(
+            dataset_name, specific_dataset, kernel_config.checkpoint
+        )
+        k_mean = torch.as_tensor(
+            kernel_stats.obs_mean, device=device, dtype=torch.float32
+        )
+        k_std = torch.as_tensor(
+            np.maximum(kernel_stats.obs_std, 1e-3),
+            device=device,
+            dtype=torch.float32,
+        )
+        for state_dict in kernel_states:
+            if kernel_config.type_kernel == "mog":
+                kernel_model = MoGTransitionKernel(
+                    d_s,
+                    d_a,
+                    kernel_config.num_modes,
+                    kernel_config.num_hidden_layers,
+                    kernel_config.hidden_dim,
+                    noise_floor=kernel_config.noise_floor,
+                )
+            else:
+                kernel_model = RobustTransitionKernel(
+                    d_s,
+                    d_a,
+                    kernel_config.num_hidden_layers,
+                    kernel_config.hidden_dim,
+                )
+            kernel_model.load_state_dict(state_dict)
+            kernel_model.eval().to(device)
+            kernels.append(kernel_model)
 
     play = np.concatenate([t["observations"] for t in trajs], 0).astype(np.float32)
     if is_main:
@@ -484,10 +533,29 @@ def probe_multi_horizon_bellman(
         actions = torch.clamp(plans[..., d_s:], -1.0, 1.0)
         P, H, _ = s_raw.shape
         n = H - 1
+        feasible = torch.ones(P, dtype=torch.bool, device=device)
+        if kernel_config is not None:
+            kernel_s = ((s_raw[:, :-1] - k_mean) / k_std).reshape(P * n, -1)
+            kernel_next_s = ((s_raw[:, 1:] - k_mean) / k_std).reshape(P * n, -1)
+            kernel_a = actions[:, :-1].reshape(P * n, -1)
+            if kernel_config.type_kernel == "mog":
+                log_prob = compute_log_density_mog(
+                    kernels, kernel_s, kernel_a, kernel_next_s
+                )
+            else:
+                log_prob = compute_log_density(
+                    kernels, kernel_s, kernel_a, kernel_next_s
+                )
+            feasible = (
+                log_prob.view(P, n) > kernel_config.min_log_prob
+            ).all(dim=1)
         r_hat = reward_net(
             ((s_raw[:, :n] - r_mean) / r_std).reshape(P * n, -1),
             actions[:, :n].reshape(P * n, -1),
         ).reshape(P, n)
+        r_hat, survival_after = first_hit_cost_terms(r_hat)
+        scale = get_Q_scale(dataset_name, specific_dataset, task_id).Q_scale
+        r_hat = r_hat / scale
         V = symexp(
             critic(((s_raw - c_mean) / c_std).reshape(P * H, -1)).reshape(P, H)
         )
@@ -497,9 +565,18 @@ def probe_multi_horizon_bellman(
         cuts = []
         for K in range(1, n):  # R^(L) = sum_{t=0}^{L-1} γ^t r_t + γ^L V(s_L)
                disc = (gpow[:K].unsqueeze(0) * r_hat[:, :K]).sum(1)
-               cuts.append(disc + (gamma ** K) * V[:, K])
+               cuts.append(
+                   disc
+                   + (gamma ** K) * survival_after[:, K - 1] * V[:, K]
+               )
         R_tau = torch.stack(cuts, dim=1).view(M_loc, L, -1)
-        R_s_loc = R_tau.mean(dim=1).cpu()  # (M_loc, nK)  E_τ first
+        feasible = feasible.view(M_loc, L)
+        valid_counts = feasible.sum(dim=1)
+        valid_states = valid_counts > 0
+        R_s_loc = (
+            (R_tau * feasible.unsqueeze(-1)).sum(dim=1)
+            / valid_counts.clamp(min=1).unsqueeze(-1)
+        )[valid_states].cpu()
 
     if accelerator.num_processes > 1:
         gathered = [None] * accelerator.num_processes
@@ -507,6 +584,16 @@ def probe_multi_horizon_bellman(
         R_s = torch.cat(gathered, dim=0) if is_main else None
     else:
         R_s = R_s_loc
+
+    empty_probe = torch.tensor(
+        [int(is_main and R_s.shape[0] == 0)],
+        device=device,
+        dtype=torch.int64,
+    )
+    if accelerator.num_processes > 1:
+        dist.broadcast(empty_probe, src=0)
+    if empty_probe.item():
+        raise RuntimeError("Bellman probe found no kernel-feasible plans")
 
     stats = None
     if is_main:
@@ -520,19 +607,25 @@ def probe_multi_horizon_bellman(
         ok = R1.abs() > eps
         M = int(R_s.shape[0])
         ratio_ok = ratio_s[ok]
+        mean_R1 = R1.mean()
+        mean_R1_denom = torch.where(
+            mean_R1 >= 0,
+            torch.ones_like(mean_R1),
+            -torch.ones_like(mean_R1),
+        ) * mean_R1.abs().clamp(min=eps)
         stats = {
                "n_s0": M,
                "n_plans_per_s0": L,
                "mean_of_RK": float(m_s.mean()),
                "mean_of_STD": float(std_s.mean()),
                "ratio": float(ratio_ok.mean()) if ok.any() else float("nan"),
-               "se_mean_of_RK": float(m_s.std(unbiased=True) / math.sqrt(M)),
-               "se_mean_of_STD": float(std_s.std(unbiased=True) / math.sqrt(M)),
-               "se_ratio": float(ratio_ok.std(unbiased=True) / math.sqrt(int(ok.sum().clamp(min=1)))) if ok.any() else float("nan"),
+               "se_mean_of_RK": float(m_s.std(unbiased=False) / math.sqrt(M)),
+               "se_mean_of_STD": float(std_s.std(unbiased=False) / math.sqrt(M)),
+               "se_ratio": float(ratio_ok.std(unbiased=False) / math.sqrt(int(ok.sum().clamp(min=1)))) if ok.any() else float("nan"),
                "median_ratio": float(ratio_ok.median()) if ok.any() else float("nan"),
                "n_ratio": int(ok.sum().item()),
                "E_RNm1_div_E_R1": float(
-                  (RNm1.mean() / (R1.mean().sign() * R1.mean().abs().clamp(min=eps))).item()
+                  (RNm1.mean() / mean_R1_denom).item()
                 ),
          }
         print("=== slide 4.1–4.3 (E_τ per s, then s) ===")
@@ -541,10 +634,8 @@ def probe_multi_horizon_bellman(
         print(f"mean_of_STD        = {stats['mean_of_STD']:.4f}  se={stats['se_mean_of_STD']:.4f}")
         print(f"ratio              = {stats['ratio']:.4f}  se={stats['se_ratio']:.4f}")
         wandb_log({
-                 "checkpoint": critic_checkpoint,
-                 "mean_of_RK": stats["mean_of_RK"],
-                 "mean_of_STD": stats["mean_of_STD"],
-                 "ratio": stats["ratio"],
+            "bellman_prob/checkpoint": critic_checkpoint,
+            **{f"bellman_prob/{key}": value for key, value in stats.items()},
         })
 
     accelerator.wait_for_everyone()
@@ -786,5 +877,3 @@ for i in range(len(dataset['observations'])):
                    
 """
           
-
-
