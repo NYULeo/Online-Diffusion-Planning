@@ -1761,7 +1761,7 @@ def test_critic(dataset_name: str,
 
             pred = model(s).squeeze(-1)                # (B,)  ← normalized V(s)
             pred = symexp(pred)
-            pred = pred * q_scale
+            pred = pred * q_scale.Q_scale
             """
             if(mean is not None and std is not None):
                 pred = (pred * std_pred) + mean_pred
