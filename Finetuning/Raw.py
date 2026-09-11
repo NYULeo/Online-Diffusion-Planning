@@ -37,6 +37,7 @@ from Finetuning.utils import (
     get_reward_stats,
     get_critic_model,
     get_critic_stats,
+    get_Q_scale,
     sample_euler_karras,
     planner_karras_beta_schedule,
     planner_cosine_beta,
@@ -391,6 +392,7 @@ def probe_multi_horizon_bellman(
     critic_state, _ = get_critic_model(
         dataset_name, specific_dataset, task_id=task_id, step=critic_checkpoint
     )
+    q_scale = get_Q_scale(dataset_name, specific_dataset, task_id)
     critic.load_state_dict(critic_state)
     critic.eval()
     for p in critic.parameters():
@@ -443,7 +445,7 @@ def probe_multi_horizon_bellman(
     M_loc = int(local_s0.shape[0])
 
     if M_loc == 0:
-        R_s_loc = torch.zeros(0, horizon - 2, device="cpu")
+        R_s_loc = torch.zeros(0, horizon - 1, device="cpu")
     else:
         s0_norm = torch.as_tensor(
             np.stack([planner_proc.preprocess(s) for s in local_s0]),
@@ -488,6 +490,8 @@ def probe_multi_horizon_bellman(
             ((s_raw[:, :n] - r_mean) / r_std).reshape(P * n, -1),
             actions[:, :n].reshape(P * n, -1),
         ).reshape(P, n)
+        r_hat = torch.clamp(r_hat, float('-inf'), 0.0)
+        r_hat = r_hat / q_scale
         V = symexp(
             critic(((s_raw - c_mean) / c_std).reshape(P * H, -1)).reshape(P, H)
         )
@@ -495,7 +499,7 @@ def probe_multi_horizon_bellman(
             [gamma ** t for t in range(n)], device=device, dtype=torch.float32
         )
         cuts = []
-        for K in range(1, n):  # R^(L) = sum_{t=0}^{L-1} γ^t r_t + γ^L V(s_L)
+        for K in range(1, n+1):  # R^(L) = sum_{t=0}^{L-1} γ^t r_t + γ^L V(s_L)
                disc = (gpow[:K].unsqueeze(0) * r_hat[:, :K]).sum(1)
                cuts.append(disc + (gamma ** K) * V[:, K])
         R_tau = torch.stack(cuts, dim=1).view(M_loc, L, -1)

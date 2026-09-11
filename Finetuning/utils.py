@@ -1643,6 +1643,7 @@ def train_critic(trajs: List[TrajectoryDict],
 
            # Predicted Q-values
            q_pred = critic(s)
+           q_pred = symexp(q_pred)
            loss = F.smooth_l1_loss(q_pred, target_value, beta = 1.0)
            #loss = F.mse_loss(q_pred, target_value)
            total_loss += loss.item()
@@ -1684,6 +1685,7 @@ class Critic_Test_Dataset(Dataset):
         for traj in trajs:
             obs = traj['observations']
             rews = traj['rewards'].copy()
+            masks = traj['masks'].copy()
 
             if target_reward is not None:
                 rews = self.boost_signal(target_reward, rews)
@@ -1736,6 +1738,7 @@ def test_critic(dataset_name: str,
     dataloader = DataLoader(dataset, batch_size=256, shuffle=False, drop_last=False)
 
     # Load model
+    q_scale = get_Q_scale(dataset_name, specific_dataset, task_id)
     model_state_dict, obs_dim = get_critic_model(dataset_name, specific_dataset, task_id, critic_checkpoint)
     model = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
     model.load_state_dict(model_state_dict)
@@ -1757,8 +1760,8 @@ def test_critic(dataset_name: str,
             rews_chunk = rews_chunk.to(device)
 
             pred = model(s).squeeze(-1)                # (B,)  ← normalized V(s)
-            #pred = value_scale * pred
             pred = symexp(pred)
+            pred = pred * q_scale
             """
             if(mean is not None and std is not None):
                 pred = (pred * std_pred) + mean_pred
@@ -3251,9 +3254,11 @@ class Critic_Buffer_Reward():
         with torch.no_grad():
                  values = target_critic(obs_chunks)                      # (B, T)
                  values = symexp(values)
+                 #values = torch.clamp(values, float('-inf'), 0.0)
                  deltas = (
                        rews_chunks[:, :-1]
-                       + self.gamma * m * values[:, 1:]
+                       +# self.gamma * m * values[:, 1:]
+                       + self.gamma * values[:, 1:]
                        - values[:, :-1]
                  )                                                       # (B, T-1)
 
@@ -3261,7 +3266,8 @@ class Critic_Buffer_Reward():
                  advantages = torch.zeros_like(deltas)
                  last_adv = torch.zeros(B, device=device)
                  for t in reversed(range(deltas.shape[1])):
-                     last_adv = deltas[:, t] + self.gamma * self.lam * m[:, t] * last_adv
+                     #last_adv = deltas[:, t] + self.gamma * self.lam * m[:, t] * last_adv
+                     last_adv = deltas[:, t] + self.gamma * self.lam  * last_adv
                      advantages[:, t] = last_adv
 
                  # === ADD NORMALIZATION HERE ===
@@ -3363,7 +3369,6 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
            s = s.to(device)
            target_value = target_value.to(device)
            target_value = symlog(target_value)
-           #target_value = torch.clamp(target_value, 0.0, 50.0)
 
            # Predicted Q-values
            q_pred = critic(s)
@@ -7752,12 +7757,13 @@ def train_critic_with_planner7(
                   w = 1.0 - lam
                   weight_sum = 0.0
 
-                  for L in range(1, n):  # L = 1 .. n-1
+                  for L in range(1, n+1):  # L = 1 .. n-1
                       discounts = gamma_pow_t[:L]
                       disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
                       s_L = (s_raw[:, L] - c_mean) / c_std
                       v_boot = target_critic(s_L)
                       v_boot = symexp(v_boot)
+                      #v_boot = torch.clamp(v_boot, float('-inf'), 0.0)
                       #v_boot = (v_boot * running_tgt_std) + running_tgt_mean
                       partial = disc_return + (gamma ** L) * v_boot
                       plan_targets += w * partial
@@ -7773,7 +7779,7 @@ def train_critic_with_planner7(
                   #   R_std  = std_K(R^K)
                   #   R_target = R_mean - rho * R_std
                   r_list = []
-                  for L in range(1, n):  # L = 1 .. n-1  ↔ K = 2 .. N in 1-based form
+                  for L in range(1, n+1):  # L = 1 .. n-1  ↔ K = 2 .. N in 1-based form
                       discounts = gamma_pow_t[:L]
                       disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
                       s_L = (s_raw[:, L] - c_mean) / c_std
@@ -7782,6 +7788,7 @@ def train_critic_with_planner7(
                       #v_boot = (v_boot * running_tgt_std) + running_tgt_mean
                       #print(f"critic value denormalized: {v_boot.mean().item()}")
                       v_boot = symexp(v_boot)
+                      #v_boot = torch.clamp(v_boot, float('-inf'), 0.0)
                       partial = disc_return + (gamma ** L) * v_boot
                       r_list.append(partial)
 
