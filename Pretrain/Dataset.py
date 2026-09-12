@@ -320,8 +320,8 @@ class OGPointmazeDataset_Singletask:
             if self.dataset['terminals'][i] == 1:
                      obs_slice = self.dataset["observations"][last_start : i+1].copy()
                      act_slice = self.dataset["actions"][last_start : i].copy()
-                     rews = rewards[last_start: i].copy()
-                     masks = self.dataset['masks'][last_start : i].copy()
+                     rews = rewards[last_start+1: i+1].copy()
+                     masks = self.dataset['masks'][last_start : i+1].copy()
                      
             
                      L = len(obs_slice)
@@ -332,17 +332,12 @@ class OGPointmazeDataset_Singletask:
                      else:
                             index =  0
                 
-                     
+                     """
                      if len(act_slice) < 10:
                           last_start = i + 1
                           continue
-
                      """
-                     if(self.mode == 'reward'):
-                        if(sum(rews) == 0):
-                            last_start = i + 1
-                            continue 
-                     """
+                     
                          
                      trajectory = {
                            "observations": obs_slice[index:],
@@ -459,8 +454,8 @@ class AntmazeDataset_Singletask:
             if self.dataset['terminals'][i] == 1:
                      obs_slice = self.dataset["observations"][last_start : i+1].copy()
                      act_slice = self.dataset["actions"][last_start : i].copy()
-                     rews = rewards[last_start: i].copy()
-                     masks = self.dataset['masks'][last_start : i].copy()
+                     rews = rewards[last_start+1: i+1].copy()
+                     masks = self.dataset['masks'][last_start : i+1].copy()
                      
             
                      L = len(obs_slice)
@@ -471,17 +466,12 @@ class AntmazeDataset_Singletask:
                      else:
                             index =  0
                 
-                     
+                     """
                      if len(act_slice) < 10:
                           last_start = i + 1
                           continue
-
                      """
-                     if(self.mode == 'reward'):
-                        if(sum(rews) == 0):
-                            last_start = i + 1
-                            continue 
-                     """
+                    
                          
                      trajectory = {
                            "observations": obs_slice[index:],
@@ -598,8 +588,8 @@ class HumanoidmazeDataset_Singletask:
             if self.dataset['terminals'][i] == 1:
                      obs_slice = self.dataset["observations"][last_start : i+1].copy()
                      act_slice = self.dataset["actions"][last_start : i].copy()
-                     rews = rewards[last_start: i].copy()
-                     masks = self.dataset['masks'][last_start : i].copy()
+                     rews = rewards[last_start+1: i+1].copy()
+                     masks = self.dataset['masks'][last_start : i+1].copy()
                      
             
                      L = len(obs_slice)
@@ -611,17 +601,7 @@ class HumanoidmazeDataset_Singletask:
                             index =  0
                 
                      
-                     if len(act_slice) < 10:
-                          last_start = i + 1
-                          continue
-
-                     """
-                     if(self.mode == 'reward'):
-                        if(sum(rews) == 0):
-                            last_start = i + 1
-                            continue 
-                     """
-                         
+                    
                      trajectory = {
                            "observations": obs_slice[index:],
                            "actions": act_slice[index:],
@@ -891,8 +871,8 @@ class SceneDataset_Singletask:
             if self.dataset["terminals"][i] == 1 :
                 obs_slice = self.dataset["observations"][last_start:i+1].copy()
                 act_slice = self.dataset["actions"][last_start:i].copy()
-                rews = rewards[last_start : i].copy()
-                masks = self.dataset['masks'][last_start : i].copy()
+                rews = rewards[last_start+1 : i+1].copy()
+                masks = self.dataset['masks'][last_start : i+1].copy()
 
                 L = len(obs_slice)
                 if self.traj_length is not None:
@@ -902,11 +882,11 @@ class SceneDataset_Singletask:
                 else:
                     index = 0
                 
-               
+                """
                 if len(act_slice) < 10:
                     last_start = i + 1
                     continue
-                
+                """
 
                 trajectory = {
                     "observations": obs_slice[index:],
@@ -1023,8 +1003,8 @@ class PuzzleDataset_Singletask:
             if self.dataset["terminals"][i] == 1:
                 obs_slice = self.dataset["observations"][last_start:i+1].copy()
                 act_slice = self.dataset["actions"][last_start:i].copy()
-                rews = rewards[last_start : i].copy()
-                masks = self.dataset['masks'][last_start : i].copy()
+                rews = rewards[last_start+1 : i+1].copy()
+                masks = self.dataset['masks'][last_start : i+1].copy()
 
                 L = len(obs_slice)
                 if self.traj_length is not None:
@@ -1034,11 +1014,11 @@ class PuzzleDataset_Singletask:
                 else:
                     index = 0
                 
-               
+                """
                 if len(act_slice) < 10:
                     last_start = i + 1
                     continue
-                
+                """
 
                 trajectory = {
                     "observations": obs_slice[index:],
