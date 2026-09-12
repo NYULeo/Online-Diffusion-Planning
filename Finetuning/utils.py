@@ -3257,8 +3257,8 @@ class Critic_Buffer_Reward():
                  #values = torch.clamp(values, float('-inf'), 0.0)
                  deltas = (
                        rews_chunks[:, :-1]
-                       +# self.gamma * m * values[:, 1:]
-                       + self.gamma * values[:, 1:]
+                       + self.gamma * m * values[:, 1:]
+                       #+ self.gamma * values[:, 1:]
                        - values[:, :-1]
                  )                                                       # (B, T-1)
 
@@ -3266,8 +3266,8 @@ class Critic_Buffer_Reward():
                  advantages = torch.zeros_like(deltas)
                  last_adv = torch.zeros(B, device=device)
                  for t in reversed(range(deltas.shape[1])):
-                     #last_adv = deltas[:, t] + self.gamma * self.lam * m[:, t] * last_adv
-                     last_adv = deltas[:, t] + self.gamma * self.lam  * last_adv
+                     last_adv = deltas[:, t] + self.gamma * self.lam * m[:, t] * last_adv
+                     #last_adv = deltas[:, t] + self.gamma * self.lam  * last_adv
                      advantages[:, t] = last_adv
 
                  # === ADD NORMALIZATION HERE ===
