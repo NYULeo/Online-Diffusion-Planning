@@ -222,6 +222,7 @@ if __name__ == "__main__":
         buffer_size = 200000,
         finetune_buffer_cutoff_length = finetune_buffer_cutoff_length,
         train_buffer_cutoff_length = train_buffer_cutoff_length,
+        finetune_suffix_cut_length = finetune_suffix_cut_length,
         finetune_steps = 90,
         finetune_rounds = 30,
         diffusion_steps = 10,
