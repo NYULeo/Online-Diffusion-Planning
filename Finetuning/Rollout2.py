@@ -668,7 +668,7 @@ if __name__ == "__main__":
                     hidden_dim_critic=512,
             )
 
-    set_seed(19)
+    set_seed(1)
     
     """
     selector = Selector(
@@ -701,7 +701,6 @@ if __name__ == "__main__":
             device=device,
             #selector=selector,
     )
-    print(length)
     exit()
     
     total = 0.0
