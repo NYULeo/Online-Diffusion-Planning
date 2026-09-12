@@ -7448,8 +7448,8 @@ def train_critic_with_planner7(
         oversample = kernel_config.oversample
 
         if accelerator.is_main_process:
-            #rng = np.random.RandomState(training_step + 10007)
-            rng = np.random.RandomState(42)
+            rng = np.random.RandomState(training_step + 10007)
+            #rng = np.random.RandomState(42)
             if mix_reset:
                 n_r = batch_size // 2
                 selected_s0 = np.concatenate(
