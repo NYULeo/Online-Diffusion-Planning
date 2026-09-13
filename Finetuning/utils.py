@@ -7817,7 +7817,7 @@ def train_critic_with_planner7(
               averaged_targets = averaged_targets / counts.clamp(min=1.0)
 
               averaged_targets = averaged_targets.detach()
-              averaged_targets  = averaged_targets.clamp(float('-inf'), 0.0)
+              #averaged_targets  = averaged_targets.clamp(float('-inf'), 0.0)
               averaged_targets = symlog(averaged_targets)
 
               # running normalization
