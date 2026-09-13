@@ -744,8 +744,7 @@ class CubeDataset_Singletask:
                      act_slice = self.dataset["actions"][last_start : i+1].copy()
                      rews = rewards[last_start: i+1].copy()
                      """
-                     #obs_slice = self.dataset["observations"][last_start : i+1].copy()
-                     obs_slice = self.dataset["observations"][last_start : i].copy()
+                     obs_slice = self.dataset["observations"][last_start : i+1].copy()
                      act_slice = self.dataset["actions"][last_start : i].copy()
                      #rews = self.dataset["rewards"][last_start+1: i+1].copy()
                      rews = rewards[last_start+1: i+1].copy()
