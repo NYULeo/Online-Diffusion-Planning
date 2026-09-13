@@ -137,8 +137,8 @@ if __name__ == '__main__':  # pragma: no cover
               "reward_hidden_dim": 512,
               "batch_size": 256,
               "oversample": 30,
-              "num_steps": 200,
-              "resample_every": 2,
+              "num_steps": 100,
+              "resample_every": 1,
               "train_horizon": train_horizon,             # passed as horizon= to the trainer
               "gamma": 0.99,
               "lam": None,
