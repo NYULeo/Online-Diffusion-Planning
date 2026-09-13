@@ -760,10 +760,6 @@ if __name__ == "__main__":
 
 
 
-
-
-
-
 """
 env, dataset, eval_dataset = ogbench.make_env_and_datasets(
                  "cube-single-play-singletask-task4-v0", render_mode="rgb_array"

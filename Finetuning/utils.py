@@ -3104,6 +3104,7 @@ class CriticDataset_Reward(Dataset):
                 rews = reward_net(s_t, a_t).cpu().numpy().astype(np.float32)   # (T_traj,)  
                 
                 # Scale down predicted rewards from reward model
+                #rews = np.clip(rews, float('-inf'), 0)      # adjust bounds if needed
                 rews = np.clip(rews, float('-inf'), 0)      # adjust bounds if needed
                 rews = rews / value_scale                    # or use a running std
                 
