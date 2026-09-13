@@ -93,7 +93,7 @@ if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'cube'
        specific_env = 'single-play'
-       traj_length = None
+       traj_length = 200
        horizon = 128
        task_id = 4
        step = -1
@@ -154,7 +154,7 @@ if __name__ == '__main__':  # pragma: no cover
             horizon=hp["horizon"],
             value_scale=hp["value_scale"],
             sigma=4.0,
-            target_reward=50.0,
+            target_reward=500.0,
             trajs=trajs,
             task_id=hp["task_id"],
        )
