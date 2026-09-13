@@ -136,7 +136,7 @@ if __name__ == '__main__':  # pragma: no cover
               "reward_hidden_layers": 4,
               "reward_hidden_dim": 512,
               "batch_size": 256,
-              "oversample": 30,
+              "oversample": 10,
               "num_steps": 100,
               "resample_every": 1,
               "train_horizon": train_horizon,             # passed as horizon= to the trainer
@@ -172,8 +172,8 @@ if __name__ == '__main__':  # pragma: no cover
                  config=hp,
                )
         data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
-        trajs = data.get_trajectories(suffix_length = train_horizon)
-        #trajs = data.get_trajectories()
+        #trajs = data.get_trajectories(suffix_length = train_horizon)
+        trajs = data.get_trajectories()
         kernel_config = KernelConfig(
                    checkpoint=hp["kernel_checkpoint"],
                    type_kernel=hp["kernel_type"],
