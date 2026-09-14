@@ -93,7 +93,7 @@ if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'cube'
        specific_env = 'single-play'
-       traj_length = None
+       traj_length = 200
        horizon = 128
        task_id = 4
        step = -1
@@ -110,7 +110,7 @@ if __name__ == '__main__':  # pragma: no cover
               "critic_hidden_dim": 512,
               "batch_size": 256,
               "num_steps": 2000,
-              "gamma": 0.9,
+              "gamma": 0.99,
               "lam": 0.95,
               "lr": 1e-04,
               "min_lr": 1e-05,
