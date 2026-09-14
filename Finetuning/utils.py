@@ -8089,20 +8089,24 @@ def train_critic_with_planner7(
         running += loss.item()
         total_mae += mae.item()
         total_bias += bias.item()
-
+        
+        
         if log_every > 0 and k % log_every == 0 and is_main:
             avg_loss = running / log_every
             avg_mae = total_mae / log_every
             avg_bias = total_bias / log_every
+
+            with torch.no_grad():
+                 logged_targets = symexp(averaged_targets)
             wandb_log({
                     wandb_step_metric: wandb_step_offset + k,
                     f"{wandb_prefix}/loss": avg_loss,
                     f"{wandb_prefix}/pred_mean": pred_mean.item(),
                     f"{wandb_prefix}/pred_std": pred_std.item(),
-                    f"{wandb_prefix}/target_mean": averaged_targets.mean().item(),
-                    f"{wandb_prefix}/target_std": averaged_targets.std().item(),
-                    f"{wandb_prefix}/target_min": averaged_targets.min().item(),
-                    f"{wandb_prefix}/target_max": averaged_targets.max().item(),
+                    f"{wandb_prefix}/target_mean": logged_targets.mean().item(),
+                    f"{wandb_prefix}/target_std": logged_targets.std().item(),
+                    f"{wandb_prefix}/target_min": logged_targets.min().item(),
+                    f"{wandb_prefix}/target_max": logged_targets.max().item(),
                     f"{wandb_prefix}/bias": avg_bias,
                     f"{wandb_prefix}/mae": avg_mae,
                     f"{wandb_prefix}/sampling_seconds": sampling_seconds,
