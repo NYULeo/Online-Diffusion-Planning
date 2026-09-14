@@ -141,7 +141,8 @@ if __name__ == '__main__':  # pragma: no cover
               trajs=trajs,
               **{k: hp[k] for k in trainer_keys},
        )
-
+       
+       """
        trajs = data.get_trajectories()
        test_critic(
             dataset_name=hp["dataset_name"],
@@ -158,6 +159,7 @@ if __name__ == '__main__':  # pragma: no cover
             trajs=trajs,
             task_id=hp["task_id"],
        )
+       """
        wandb.finish()
 
 """
