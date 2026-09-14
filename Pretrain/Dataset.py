@@ -772,8 +772,8 @@ class CubeDataset_Singletask:
                           last_start = i + 1
                           continue
                      """
-                     if (suffix_length is not None):
-                          trajectory = {
+                     if (suffix_length is not None and self.dataset["terminals"][i] == 1):
+                             trajectory = {
                                  "observations": obs_slice[index:-suffix_length],
                                  "actions": act_slice[index:-suffix_length],
                                  #"rewards":  reward_processor_2(rews[index:].copy())
