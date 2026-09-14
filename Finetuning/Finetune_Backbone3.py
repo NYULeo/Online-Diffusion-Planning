@@ -308,7 +308,7 @@ class OnlineFinetuner():
 
         if(self.config.train_reward_config.task_id is not None):
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id, traj_length = None)
-            trajs_reward = dataset.get_trajectories()
+            trajs_reward = dataset.get_trajectories(mode = 'reward')
             trajs_finetune = dataset.get_trajectories(suffix_length = self.config.finetune_suffix_cut_length)
             #dataset_kernel = get_dataset(self.config.dataset_name, self.config.specific_dataset, task_id = self.config.train_reward_config.task_id)
             #trajs_kernel = dataset_kernel.get_trajectories()
@@ -320,7 +320,7 @@ class OnlineFinetuner():
 
         else:
             dataset = get_dataset(self.config.dataset_name, self.config.specific_dataset)
-            trajs_reward = dataset.get_trajectories()
+            trajs_reward = dataset.get_trajectories(mode = 'reward')
             trajs_finetune = dataset.get_trajectories(suffix_length = self.config.finetune_suffix_cut_length)
             self.Finetune_Buffer.extend(trajs_finetune)
             self.Train_Buffer.extend(trajs_reward)

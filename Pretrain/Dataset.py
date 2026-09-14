@@ -702,11 +702,10 @@ class CubeDataset:
         return env
 
 class CubeDataset_Singletask:
-    def __init__(self, name: str, task_id, traj_length: Optional[int] = None, mode: Optional[str] = None):
+    def __init__(self, name: str, task_id, traj_length: Optional[int] = None):
         
         self.name = name
         self.traj_length = traj_length
-        self.mode = mode
         name_to_id = {
             "single-play": f"cube-single-play-singletask-task{task_id}-v0",
             "single-noisy": f"cube-single-noisy-singletask-task{task_id}-v0",
@@ -728,17 +727,25 @@ class CubeDataset_Singletask:
                  self.dataset_id, render_mode="rgb_array"
             )
 
-    def get_trajectories(self, suffix_length: Optional[int] = None) -> List[Dict[str, np.ndarray]]:
+    def get_trajectories(self, mode: Optional[str] = None, suffix_length: Optional[int] = None) -> List[Dict[str, np.ndarray]]:
        
         trajectories = []
         last_start = 0
         N = len(self.dataset["observations"])
         #rewards = reward_processor(self.dataset['rewards'].copy(), 'cube')
         #rewards =  reward_processor_2(self.dataset['rewards'].copy())
+        
         for i in range(N):
             # End of a natural episode (terminal or dataset end)
             #if self.dataset['terminals'][i] == 1 or self.dataset['rewards'][i] == 0:
-            if self.dataset['terminals'][i] == 1:
+            if mode == "reward":
+                       should_split = self.dataset["terminals"][i] == 1
+            else:
+                       should_split = (
+                          self.dataset["terminals"][i] == 1
+                          or self.dataset["rewards"][i] == 0
+                   )
+            if should_split:
                      """
                      obs_slice = self.dataset["observations"][last_start : i+1].copy()
                      act_slice = self.dataset["actions"][last_start : i+1].copy()
@@ -765,21 +772,27 @@ class CubeDataset_Singletask:
                           last_start = i + 1
                           continue
                      """
-                         
-                     trajectory = {
-                           "observations": obs_slice[index:],
-                           "actions": act_slice[index:],
-                           #"rewards":  reward_processor_2(rews[index:].copy())
-                           "rewards":  rews[index:],
-                           "masks": masks[index:]
-                     }
+                     if (suffix_length is not None):
+                          trajectory = {
+                                 "observations": obs_slice[index:-suffix_length],
+                                 "actions": act_slice[index:-suffix_length],
+                                 #"rewards":  reward_processor_2(rews[index:].copy())
+                                 "rewards":  rews[index:-suffix_length],
+                                 "masks": masks[index:-suffix_length]
+                            }
+                     else:
+                          trajectory = {
+                                 "observations": obs_slice[index:],
+                                 "actions": act_slice[index:],
+                                 #"rewards":  reward_processor_2(rews[index:].copy())
+                                 "rewards":  rews[index:],
+                                 "masks": masks[index:]
+                            }
                          
                      trajectories.append(trajectory)
                      last_start = i + 1
         
         
-        if suffix_length is not None:
-             trajectories = drop_the_suffix(trajectories, suffix_length)
     
         return trajectories
 
