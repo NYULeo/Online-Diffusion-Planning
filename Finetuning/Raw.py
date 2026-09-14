@@ -756,11 +756,7 @@ if __name__ == "__main__":
     #reward_heatmap(0)
 """
 
-a = [-500, -500, -500, -500, -500, 0]
 
-a = gaussian_filter1d(a, 4.0)
-print(a)
-exit()
 
 """
 env, dataset, eval_dataset = ogbench.make_env_and_datasets(
