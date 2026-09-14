@@ -104,7 +104,7 @@ if __name__ == '__main__':  # pragma: no cover
               "traj_length": traj_length,
               "horizon": horizon,
               "reward_hidden_layers": 4,
-              "reward_hidden_d1im": 512,
+              "reward_hidden_dim": 512,
               "reward_checkpoint": 0,
               "critic_hidden_layers": 4,
               "critic_hidden_dim": 512,
