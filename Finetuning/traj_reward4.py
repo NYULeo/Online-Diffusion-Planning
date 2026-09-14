@@ -393,7 +393,7 @@ class TotalReward_Critic(nn.Module):
         kernel_states = self.kernel_processor(x[:-1, :self.config.d_s])
         kernel_next_states = self.kernel_processor(x[1:, :self.config.d_s])
         rewards = self.reward_net(reward_states, actions)
-        rewards = torch.clamp(rewards, float('-inf'), 0.0)
+        #rewards = torch.clamp(rewards, float('-inf'), 0.0)
         constraints = self.sigmoid(kernel_states, actions, kernel_next_states)
         discounts = x.new_tensor(self.config.critic_gamma).pow(
             torch.arange(H - 1, device=x.device)
@@ -430,7 +430,7 @@ class TotalReward_Critic(nn.Module):
         ).detach().requires_grad_(True)
 
         rewards = self.reward_net(reward_states, actions)
-        rewards = torch.clamp(rewards, float('-inf'), 0.0)
+        #rewards = torch.clamp(rewards, float('-inf'), 0.0)
         constraints = self.sigmoid(kernel_states, actions, kernel_next_states)
         reward_state_grad, reward_action_grad = torch.autograd.grad(
             rewards,

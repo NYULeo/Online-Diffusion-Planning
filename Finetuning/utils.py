@@ -1761,7 +1761,7 @@ def test_critic(dataset_name: str,
 
             pred = model(s).squeeze(-1)                # (B,)  ← normalized V(s)
             pred = symexp(pred)
-            pred = pred * q_scale.Q_scale
+            #pred = pred * q_scale.Q_scale
             """
             if(mean is not None and std is not None):
                 pred = (pred * std_pred) + mean_pred
@@ -1779,10 +1779,12 @@ def test_critic(dataset_name: str,
             tgt_std = raw_target.std(unbiased=False) + 1e-8
             target = (raw_target - tgt_mean) / tgt_std
             """
+            # === Normalize target (CRITICAL) ===
+            target = raw_target / q_scale.get_Q_scale()
         
             
-            #loss = F.smooth_l1_loss(pred, target, beta=1.0)
-            loss = F.smooth_l1_loss(pred, raw_target, beta=1.0)
+            loss = F.smooth_l1_loss(pred, target, beta=1.0)
+            #loss = F.smooth_l1_loss(pred, raw_target, beta=1.0)
             total_loss += loss.item() * s.size(0)
 
             all_preds.extend(pred.cpu().numpy())
@@ -3036,6 +3038,8 @@ def train_critic_with_planner(
     save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
     print("critic saved.")
 
+
+"""
 class CriticDataset_Reward(Dataset):
     def __init__(self, dataset_name: str, 
                        specific_dataset: str, 
@@ -3141,6 +3145,139 @@ class CriticDataset_Reward(Dataset):
     def __len__(self):
         return len(self.transitions)
 
+"""
+
+
+class CriticDataset_Reward(Dataset):
+    def __init__(self, dataset_name: str,
+                       specific_dataset: str,
+                       reward_hidden_layers: int,
+                       reward_hidden_dim: int,
+                       reward_checkpoint: int,
+                       trajs: List[TrajectoryDict],
+                       horizon: int = 32,
+                       old_step: Optional[int] = None,
+                       new_step: int = 0,
+                       momentum: float = 0.005,
+                       value_scale: float = 5.0,
+                       task_id: Optional[int] = None):
+        obs_all = [traj["observations"] for traj in trajs]
+        obs_all = np.concatenate(obs_all, axis=0)
+
+        stats = SAStats()
+        stats.obs_mean = obs_all.mean(axis=0)
+        stats.obs_std = obs_all.std(axis=0) + 1e-8
+        if old_step is not None:
+            self.stats = update_critic_stats(
+                dataset_name, specific_dataset, stats, task_id, old_step, momentum
+            )
+        else:
+            self.stats = stats
+
+        device = check_device()
+        _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
+        reward_state, _, _ = get_reward_model(
+            dataset_name, specific_dataset, reward_checkpoint, task_id,
+        )
+        reward_net = SimpleReward(
+            obs_dim, act_dim, reward_hidden_dim, reward_hidden_layers,
+        ).to(device)
+        reward_net.load_state_dict(reward_state)
+        reward_net.eval()
+        for p in reward_net.parameters():
+            p.requires_grad_(False)
+        reward_stat = get_reward_stats(
+            dataset_name, specific_dataset, reward_checkpoint, task_id,
+        )
+
+        transitions = []
+        goal_states = []
+
+        for traj in trajs:
+            obs = np.asarray(traj["observations"])
+            acts = np.asarray(traj["actions"])
+            n_obs = len(obs)
+            if n_obs == 0:
+                continue
+
+            raw_masks = traj.get("masks", None)
+            if raw_masks is None:
+                masks = np.ones(n_obs, dtype=np.float32)
+            else:
+                masks = np.asarray(raw_masks[:n_obs], dtype=np.float32)
+                if len(masks) < n_obs:
+                    pad = np.ones(n_obs - len(masks), dtype=np.float32)
+                    masks = np.concatenate([masks, pad], axis=0)
+
+            # Type A last frame is the only GT row
+            if masks[-1] == 0.0:
+                goal_states.append(self.stats.norm_obs(obs[-1]).astype(np.float32))
+
+            n_act = min(len(acts), max(n_obs - 1, 0))
+            rews = np.zeros(n_obs, dtype=np.float32)
+            if n_act > 0:
+                with torch.no_grad():
+                    s_t = torch.as_tensor(
+                        reward_stat.norm_obs(obs[:n_act]).astype(np.float32),
+                        device=device,
+                    )
+                    a_t = torch.as_tensor(
+                        acts[:n_act].astype(np.float32), device=device,
+                    )
+                    rews[:n_act] = (
+                        reward_net(s_t, a_t).cpu().numpy().astype(np.float32)
+                        / value_scale
+                    )
+
+            if n_obs < 2:
+                continue
+
+            # pad so every window has length `horizon` (pad is NOT a goal)
+            if n_obs < horizon:
+                pad_n = horizon - n_obs
+                obs_w = np.concatenate([obs, np.repeat(obs[-1:], pad_n, axis=0)], axis=0)
+                rew_w = np.concatenate([rews, np.zeros(pad_n, dtype=np.float32)], axis=0)
+                m_w = np.concatenate([masks, np.ones(pad_n, dtype=np.float32)], axis=0)
+                starts = [0]
+            else:
+                obs_w, rew_w, m_w = obs, rews, masks
+                # include a window that ENDS on the last state (the goal on Type A)
+                starts = range(n_obs - horizon + 1)
+
+            for t in starts:
+                transitions.append((
+                    self.stats.norm_obs(obs_w[t : t + horizon]).astype(np.float32),
+                    rew_w[t : t + horizon].astype(np.float32),
+                    m_w[t : t + horizon].astype(np.float32),
+                ))
+
+        self.transitions = transitions
+        self.goal_states = goal_states
+        self.save_stats(dataset_name, specific_dataset, task_id, new_step)
+
+    def save_stats(self, dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
+        critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
+        stats_name = str(critic_name) + f"_Critic_stats_{str(step)}.pkl"
+        stats_dir = f"./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/"
+        os.makedirs(stats_dir, exist_ok=True)
+        savepath = os.path.join(stats_dir, stats_name)
+        with open(savepath, "wb") as f:
+            pickle.dump(self.stats, f)
+        print(f"saved stats to {savepath}")
+
+    def __getitem__(self, idx):
+        obs_chunk, rews_chunk, mask_chunk = self.transitions[idx]
+        return (
+            torch.tensor(obs_chunk, dtype=torch.float32),
+            torch.tensor(rews_chunk, dtype=torch.float32),
+            torch.tensor(mask_chunk, dtype=torch.float32),
+        )
+
+    def __len__(self):
+        return len(self.transitions)
+
+
+
 class Critic_Buffer_Reward():
     def __init__(self, dataset_name: str,
                        specific_dataset: str,
@@ -3242,7 +3379,8 @@ class Critic_Buffer_Reward():
         return obs_chunks[:, 0], value_targets, tgt_mean_new, tgt_std_new
         #return obs_chunks[:, 0], value_targets
     """
-
+    
+    """
     def obtain_training_data(self, target_critic: nn.Module, batch, tgt_mean: torch.Tensor, tgt_std: torch.Tensor, device: str):
         
         obs_chunks, rews_chunks, mask_chunks = batch
@@ -3293,6 +3431,47 @@ class Critic_Buffer_Reward():
 
         return obs_chunks[:, 0], value_targets, tgt_mean_new, tgt_std_new
         #return obs_chunks[:, 0], value_targets
+    """
+
+    def obtain_training_data(self, target_critic: nn.Module, batch,
+                             tgt_mean: torch.Tensor, tgt_std: torch.Tensor,
+                             device: str):
+        obs_chunks, rews_chunks, mask_chunks = batch
+        obs_chunks = obs_chunks.to(device)
+        rews_chunks = rews_chunks.to(device)
+        mask_chunks = mask_chunks.to(device)
+        B, T = obs_chunks.shape[:2]
+
+        with torch.no_grad():
+            V = symexp(target_critic(obs_chunks))          # return units
+            done_next = (mask_chunks[:, 1:] == 0).float()  # next state is goal
+
+            deltas = (
+                rews_chunks[:, :-1]
+                + self.gamma * (1.0 - done_next) * V[:, 1:]
+                - V[:, :-1]
+            )
+
+            advantages = torch.zeros_like(deltas)
+            last_adv = torch.zeros(B, device=device)
+            for t in reversed(range(deltas.shape[1])):
+                last_adv = (
+                    deltas[:, t]
+                    + self.gamma * self.lam * (1.0 - done_next[:, t]) * last_adv
+                )
+                advantages[:, t] = last_adv
+
+            y_raw = V[:, 0] + advantages[:, 0]
+            # only if this window *starts* on a goal (rare); real GT is the extra Huber
+            is_goal = (mask_chunks[:, 0] == 0)
+            y_raw = torch.where(is_goal, torch.zeros_like(y_raw), y_raw)
+            y_head = symlog(y_raw)
+
+        return obs_chunks[:, 0], y_head, tgt_mean, tgt_std
+
+
+
+
 
 def train_critic_with_reward(trajs: List[TrajectoryDict], 
                  dataset_name: str, 
@@ -3362,6 +3541,8 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
     )
     print(f"Training critic for {dataset_name}-{specific_dataset}")
     total_loss = 0.0
+
+    """
     tgt_mean = torch.zeros(1, device=device)
     tgt_std = torch.ones(1, device=device)
     for k in range(1, num_steps + 1):  # number of passes over dataset
@@ -3399,15 +3580,62 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
     q_scale.Q_scale = value_scale
     save_Q_scale(q_scale, dataset_name, specific_dataset, task_id)
     print(f"mean: {tgt_mean.item()}, std: {tgt_std.item()}")
+    """
     
-    """
-    q_stats = Q_Stats()
-    q_stats.Q_mean = tgt_mean.item()
-    q_stats.Q_std = tgt_std.item()
-    save_Q_stats(q_stats, dataset_name, specific_dataset, task_id, new_step)
+
+
+    tgt_mean = torch.zeros(1, device=device)
+    tgt_std = torch.ones(1, device=device)
+    goal_states = buffer.data.goal_states
+    print(f"goal-state GT rows: {len(goal_states)}")
+
+    for k in range(1, num_steps + 1):
+        batch = next(loader)
+        s, target_value, tgt_mean, tgt_std = buffer.obtain_training_data(
+            target_critic, batch, tgt_mean, tgt_std, device,
+        )
+        s = s.to(device)
+        target_value = target_value.to(device)
+        # target_value is already symlog(y_raw) — do NOT symlog again
+
+        q_pred = critic(s)
+        loss = F.smooth_l1_loss(q_pred, target_value, beta=1.0)
+
+        if len(goal_states) > 0:
+            n_g = min(batch_size, len(goal_states))
+            idx = np.random.randint(0, len(goal_states), size=n_g)
+            s_g = torch.as_tensor(
+                np.stack([goal_states[i] for i in idx], axis=0),
+                dtype=torch.float32, device=device,
+            )
+            loss = loss + F.smooth_l1_loss(
+                critic(s_g), torch.zeros(n_g, device=device),
+            )
+
+        total_loss += loss.item()
+        optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(critic.parameters(), max_norm=1.0)
+        optimizer.step()
+        scheduler.step()
+
+        if(k % 200 == 0):
+                print(f"Critic Training step {k} loss: {total_loss/200}")
+                wandb.log({"loss": total_loss/200, "step": k})     
+                total_loss = 0.0
+            
+           # Soft update target network
+        for param, tgt_param in zip(critic.parameters(), target_critic.parameters()):
+               tgt_param.data.mul_(1 - tau)
+               tgt_param.data.add_(tau * param.data)
+    target_critic.eval()
+    save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
+    print(f"critic model saved")
+    q_scale = Q_Scale()
+    q_scale.Q_scale = value_scale
+    save_Q_scale(q_scale, dataset_name, specific_dataset, task_id)
     print(f"mean: {tgt_mean.item()}, std: {tgt_std.item()}")
-    return tgt_mean.item(), tgt_std.item()
-    """
+
 
 @dataclass
 class KernelConfig:
@@ -7750,7 +7978,7 @@ def train_critic_with_planner7(
 
               # reward clipping -----------------------------------------------------
               #r_hat = torch.clamp(r_hat, float('-inf'), 0.0)      # adjust bounds if needed
-              r_hat = torch.clamp(r_hat, 0.0, float('inf'))      # adjust bounds if needed
+              #r_hat = torch.clamp(r_hat, 0.0, float('inf'))      # adjust bounds if needed
               r_hat = r_hat / Scale.Q_scale                     # or use a running std
 
               plan_targets = torch.zeros(N, device=device)

@@ -490,7 +490,7 @@ def probe_multi_horizon_bellman(
             ((s_raw[:, :n] - r_mean) / r_std).reshape(P * n, -1),
             actions[:, :n].reshape(P * n, -1),
         ).reshape(P, n)
-        r_hat = torch.clamp(r_hat, float('-inf'), 0.0)
+        #r_hat = torch.clamp(r_hat, float('-inf'), 0.0)
         r_hat = r_hat / q_scale.get_Q_scale()
         V = symexp(
             critic(((s_raw - c_mean) / c_std).reshape(P * H, -1)).reshape(P, H)
