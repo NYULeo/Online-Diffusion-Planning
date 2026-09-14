@@ -110,7 +110,7 @@ if __name__ == '__main__':  # pragma: no cover
               "critic_hidden_dim": 512,
               "batch_size": 256,
               "num_steps": 10000,
-              "gamma": 0.99,
+              "gamma": 0.999999999999999,
               "lam": 0.95,
               "lr": 1e-04,
               "min_lr": 1e-05,
