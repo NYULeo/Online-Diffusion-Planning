@@ -150,7 +150,7 @@ def get_dataset(name: str,
             if(task_id is None):
                 return CubeDataset(specific_name)
             else:
-                return CubeDataset_Singletask(specific_name, task_id, traj_length, mode)
+                return CubeDataset_Singletask(specific_name, task_id, traj_length)
        elif name == "scene":
             if task_id is None:
                 return SceneDataset(specific_name)
