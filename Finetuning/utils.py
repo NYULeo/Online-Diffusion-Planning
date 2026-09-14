@@ -3619,9 +3619,9 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
         optimizer.step()
         scheduler.step()
 
-        if(k % 200 == 0):
-                print(f"Critic Training step {k} loss: {total_loss/200}")
-                wandb.log({"loss": total_loss/200, "step": k})     
+        if(k % 1000 == 0):
+                print(f"Critic Training step {k} loss: {total_loss/1000}")
+                wandb.log({"loss": total_loss/1000, "step": k})     
                 total_loss = 0.0
             
            # Soft update target network
