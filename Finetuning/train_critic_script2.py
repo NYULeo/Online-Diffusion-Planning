@@ -148,7 +148,7 @@ if __name__ == '__main__':  # pragma: no cover
               "tau": 0.005,
               "steps_T": 10,
               "num_karras": 1,
-              "eta": 0.3,
+              "eta": 0.0,
               "new_step": step,
               "log_every": 20,
               "mix_reset": False,
