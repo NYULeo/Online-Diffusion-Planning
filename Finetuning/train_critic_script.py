@@ -93,7 +93,7 @@ if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'cube'
        specific_env = 'single-play'
-       traj_length = 200
+       traj_length = None
        horizon = 128
        task_id = 4
        step = -1
