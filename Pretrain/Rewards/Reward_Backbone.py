@@ -534,20 +534,20 @@ def Train_Dataset(dataset_name, specific_dataset: Optional[str] = None, task_id:
          if(specific_dataset is None): 
              raise ValueError(f"Invalid dataset name: {dataset_name}")
          elif(specific_dataset == 'single'):
-             data_1 = CubeDataset_Singletask('single-play', task_id, traj_length, mode = 'reward')
-             data_2 = CubeDataset_Singletask('single-noisy', task_id, traj_length, mode = 'reward')
+             data_1 = CubeDataset_Singletask('single-play', task_id, traj_length)
+             data_2 = CubeDataset_Singletask('single-noisy', task_id, traj_length)
              name = f'Cube_Reward_single_task{task_id}'
          elif(specific_dataset == 'double'):
-             data_1 = CubeDataset_Singletask('double-play', task_id, traj_length, mode = 'reward')
-             data_2 = CubeDataset_Singletask('double-noisy', task_id, traj_length, mode = 'reward')
+             data_1 = CubeDataset_Singletask('double-play', task_id, traj_length)
+             data_2 = CubeDataset_Singletask('double-noisy', task_id, traj_length)
              name = f'Cube_Reward_double_task{task_id}'
          elif(specific_dataset == 'triple'):
-             data_1 = CubeDataset_Singletask('triple-play', task_id, traj_length, mode = 'reward')
-             data_2 = CubeDataset_Singletask('triple-noisy', task_id, traj_length, mode = 'reward')
+             data_1 = CubeDataset_Singletask('triple-play', task_id, traj_length)
+             data_2 = CubeDataset_Singletask('triple-noisy', task_id, traj_length)
              name = f'Cube_Reward_triple_task{task_id}'
          elif(specific_dataset == 'quadruple'):
-             data_1 = CubeDataset_Singletask('quadruple-play', task_id, traj_length, mode = 'reward')
-             data_2 = CubeDataset_Singletask('quadruple-noisy', task_id, traj_length, mode = 'reward')
+             data_1 = CubeDataset_Singletask('quadruple-play', task_id, traj_length)
+             data_2 = CubeDataset_Singletask('quadruple-noisy', task_id, traj_length)
              name = f'Cube_Reward_quadruple_task{task_id}'
          else: 
               raise ValueError(f"Invalid dataset name: {specific_dataset}")
