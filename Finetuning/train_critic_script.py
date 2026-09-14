@@ -93,7 +93,7 @@ if __name__ == '__main__':  # pragma: no cover
        set_seed(1)
        env_name = 'cube'
        specific_env = 'single-play'
-       traj_length = 200
+       traj_length = None
        horizon = 128
        task_id = 4
        step = -1
@@ -104,7 +104,7 @@ if __name__ == '__main__':  # pragma: no cover
               "traj_length": traj_length,
               "horizon": horizon,
               "reward_hidden_layers": 4,
-              "reward_hidden_dim": 512,
+              "reward_hidden_d1im": 512,
               "reward_checkpoint": 0,
               "critic_hidden_layers": 4,
               "critic_hidden_dim": 512,
