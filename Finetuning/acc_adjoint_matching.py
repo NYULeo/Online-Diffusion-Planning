@@ -689,9 +689,16 @@ class Acc_AdjointMatchingFineTuner:
         v_old = k_values * trajectory + k_values * old_score
         sigma = torch.sqrt((-2 * self.k[:step_count]).clamp_min(1e-12)).view(-1, 1, 1)
         losses = ((v_new - v_old) * (2 / sigma) + sigma * adjoint).square().mean(dim=(1, 2))
-
+        
+        """
         clip_count = min(self.config.num_Loss_Clip_steps + 1, step_count)
         return losses[clip_count:].sum() / step_count
+        """
+        cap = (self.config.reward_scaling_factor ** 2) * 1.6
+        n_clip = min(self.config.num_Loss_Clip_steps + 1, step_count)
+        clipped = torch.minimum(losses[:n_clip], losses.new_tensor(cap))
+        rest = losses[n_clip:]
+        return (clipped.sum() + rest.sum()) / step_count
 
     def adjoint_matching_loss_batch(
         self,
@@ -718,9 +725,17 @@ class Acc_AdjointMatchingFineTuner:
         losses = (
             (v_new - v_old) * (2 / sigma) + sigma * flat_adjoints
         ).square().mean(dim=(1, 2)).reshape(trajectory_count, step_count)
-
+        
+        """
         clip_count = min(self.config.num_Loss_Clip_steps + 1, step_count)
         return losses[:, clip_count:].sum() / (trajectory_count * step_count)
+        """
+        
+        cap = (self.config.reward_scaling_factor ** 2) * 1.6
+        n_clip = min(self.config.num_Loss_Clip_steps + 1, step_count)
+        clipped = torch.minimum(losses[:, :n_clip], losses.new_tensor(cap))
+        rest = losses[:, n_clip:]
+        return (clipped.sum() + rest.sum()) / (trajectory_count * step_count)
 
     def step(self, s0_batch: torch.Tensor, reward_model: Union[TotalReward, TotalReward_Critic]) -> Tuple[float, float, float]:
         # 1. Split batch across processes
