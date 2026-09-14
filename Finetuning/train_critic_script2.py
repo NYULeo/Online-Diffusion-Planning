@@ -137,7 +137,7 @@ if __name__ == '__main__':  # pragma: no cover
               "reward_hidden_dim": 512,
               "batch_size": 256,
               "oversample": 10,
-              "num_steps": 10,
+              "num_steps": 100,
               "resample_every": 1,
               "train_horizon": train_horizon,             # passed as horizon= to the trainer
               "gamma": 1.0,
@@ -150,7 +150,7 @@ if __name__ == '__main__':  # pragma: no cover
               "num_karras": 1,
               "eta": 0.3,
               "new_step": step,
-              "log_every": 1,
+              "log_every": 20,
               "mix_reset": False,
               'n_reset': 256,
               # kernel
