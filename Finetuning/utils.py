@@ -8813,7 +8813,8 @@ def train_critic_with_planner7(
 
               if len(goal_pool) > 0:
                    rng_g = np.random.RandomState(k + 20011)
-                   n_goal = min(len(goal_pool), unique_s0.shape[0])
+                   #n_goal = min(len(goal_pool), unique_s0.shape[0])
+                   n_goal = min(len(goal_pool), batch_size)
                    g_idx = rng_g.randint(0, len(goal_pool), size=n_goal)
                    g_raw = torch.as_tensor(
                            goal_pool[g_idx], device=device, dtype=torch.float32,
@@ -8821,7 +8822,7 @@ def train_critic_with_planner7(
                    g_critic = ((g_raw - c_mean) / c_std).detach()
               else:
                    g_critic = None
-
+        print(f"tgt_mean: {running_tgt_mean.item()}, tgt_std: {running_tgt_std.item()}")
 
         # gradient step
         """
