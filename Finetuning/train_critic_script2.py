@@ -115,7 +115,7 @@ if __name__ == '__main__':  # pragma: no cover
         set_seed(1)
         env_name = 'cube'
         specific_env = 'single-play'
-        traj_length = None
+        traj_length = 200
         horizon = 128
         train_horizon = 32
         task_id = 4
@@ -172,7 +172,6 @@ if __name__ == '__main__':  # pragma: no cover
                  config=hp,
                )
         data = get_dataset(env_name, specific_env, task_id = task_id, traj_length = traj_length)
-        #trajs = data.get_trajectories(suffix_length = train_horizon)
         trajs = data.get_trajectories()
         kernel_config = KernelConfig(
                    checkpoint=hp["kernel_checkpoint"],
@@ -189,7 +188,7 @@ if __name__ == '__main__':  # pragma: no cover
               "old_critic_checkpoint", "backbone_layers", "hidden_layers", "hidden_dim",
               "reward_hidden_layers", "reward_hidden_dim", "batch_size", "num_steps",
               "resample_every", "gamma", "lam", "rho", "lr", "min_lr", "tau",
-              "steps_T", "num_karras", "eta", "new_step", "task_id", "log_every", "mix_reset",
+              "steps_T", "num_karras", "eta", "new_step", "task_id", "log_every", "mix_reset", "traj_length",
          )
 
         
