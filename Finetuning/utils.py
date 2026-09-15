@@ -8822,7 +8822,6 @@ def train_critic_with_planner7(
                    g_critic = ((g_raw - c_mean) / c_std).detach()
               else:
                    g_critic = None
-        print(f"tgt_mean: {running_tgt_mean.item()}, tgt_std: {running_tgt_std.item()}")
 
         # gradient step
         """
@@ -8884,6 +8883,7 @@ def train_critic_with_planner7(
 
             with torch.no_grad():
                  logged_targets = symexp(averaged_targets)
+            print(f"tgt_mean: {running_tgt_mean.item()}, tgt_std: {running_tgt_std.item()}")
             wandb_log({
                     wandb_step_metric: wandb_step_offset + k,
                     f"{wandb_prefix}/loss": avg_loss,
