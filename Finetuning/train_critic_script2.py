@@ -115,7 +115,7 @@ if __name__ == '__main__':  # pragma: no cover
         set_seed(1)
         env_name = 'cube'
         specific_env = 'single-play'
-        traj_length = 200
+        traj_length = None
         horizon = 128
         train_horizon = 32
         task_id = 4
@@ -195,7 +195,6 @@ if __name__ == '__main__':  # pragma: no cover
         
         accelerator.wait_for_everyone()
         train_critic_with_planner7(
-                   trajs = trajs,
                    kernel_config=kernel_config,
                    horizon=hp["train_horizon"],
                    accelerator=accelerator,
