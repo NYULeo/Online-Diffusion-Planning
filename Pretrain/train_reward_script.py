@@ -105,7 +105,7 @@ if __name__ == '__main__':
         "save_freq": 50000,
         "lr": 5e-03,
         "min_lr": 5e-04,
-        "sigma": 3.0,
+        "sigma": None,
         "alpha": None,
         "target_reward": 10.0,
     }
