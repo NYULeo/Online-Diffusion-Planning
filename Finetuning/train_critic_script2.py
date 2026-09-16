@@ -162,9 +162,12 @@ if __name__ == '__main__':  # pragma: no cover
               "noise_floor": 5e-4,
               "min_log_prob": -150.0,
               #weights
-              "w_all": 0.1,
-              "w_near": 0.6,
-              "w_goal": 0.3,
+              #"w_all": 0.1,
+              #"w_near": 0.6,
+              #"w_goal": 0.3,
+              "w_all": 1.0,
+              "w_near": 0.0,
+              "w_goal": 0.0,
           }
         accelerator = Accelerator(mixed_precision='bf16')
         os.chdir(project_root)
