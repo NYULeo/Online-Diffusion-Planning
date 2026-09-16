@@ -115,7 +115,7 @@ if __name__ == '__main__':  # pragma: no cover
         set_seed(1)
         env_name = 'cube'
         specific_env = 'single-play'
-        traj_length = 100
+        traj_length = None
         horizon = 128
         train_horizon = 32
         task_id = 4
@@ -161,6 +161,10 @@ if __name__ == '__main__':  # pragma: no cover
               "num_modes": 10,
               "noise_floor": 5e-4,
               "min_log_prob": -150.0,
+              #weights
+              "w_all": 0.5,
+              "w_near": 0.0,
+              "w_goal": 0.5,
           }
         accelerator = Accelerator(mixed_precision='bf16')
         os.chdir(project_root)
@@ -189,6 +193,7 @@ if __name__ == '__main__':  # pragma: no cover
               "reward_hidden_layers", "reward_hidden_dim", "batch_size", "num_steps",
               "resample_every", "gamma", "lam", "rho", "lr", "min_lr", "tau",
               "steps_T", "num_karras", "eta", "new_step", "task_id", "log_every", "mix_reset", "traj_length",
+              "w_all", "w_near", "w_goal",
          )
         
         
