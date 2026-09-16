@@ -115,7 +115,7 @@ if __name__ == '__main__':  # pragma: no cover
         set_seed(1)
         env_name = 'cube'
         specific_env = 'single-play'
-        traj_length = 500
+        traj_length = None
         horizon = 128
         train_horizon = 32
         task_id = 4
@@ -190,7 +190,7 @@ if __name__ == '__main__':  # pragma: no cover
               "resample_every", "gamma", "lam", "rho", "lr", "min_lr", "tau",
               "steps_T", "num_karras", "eta", "new_step", "task_id", "log_every", "mix_reset", "traj_length",
          )
-
+        
         
         
         accelerator.wait_for_everyone()
