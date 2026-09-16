@@ -8969,7 +8969,7 @@ def train_critic_with_planner7(
             avg_mae = total_mae / log_every
             avg_bias = total_bias / log_every
             
-            """
+            
             with torch.no_grad():
                  logged_targets = symexp(y_all)
             print(f"tgt_mean: {running_tgt_mean.item()}, tgt_std: {running_tgt_std.item()}")
@@ -8987,6 +8987,8 @@ def train_critic_with_planner7(
                     f"{wandb_prefix}/sampling_seconds": sampling_seconds,
                     f"{wandb_prefix}/plans_per_second": B_eff / max(sampling_seconds, 1e-8),
             })
+            
+
             """
             with torch.no_grad():
                   parts = [y_all]
@@ -9020,6 +9022,7 @@ def train_critic_with_planner7(
                             f"{wandb_prefix}/sampling_seconds": sampling_seconds,
                             f"{wandb_prefix}/plans_per_second": B_eff / max(sampling_seconds, 1e-8),
                             })
+            """
             print(
                 f" step {k:>6}/{num_steps} "
                 f"loss = {avg_loss:.10f}  "
