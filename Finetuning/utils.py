@@ -8818,6 +8818,15 @@ def train_critic_with_planner7(
 
             with torch.no_grad():
                  sampling_started = time.perf_counter()
+                 n_all = batch_size // 3
+                 n_near = batch_size // 3
+                 n_goal_b = batch_size - n_all - n_near
+                 if len(near_pool) == 0:
+                        n_all += n_near
+                        n_near = 0
+                 if len(goal_pool) == 0:
+                        n_all += n_goal_b
+                        n_goal_b = 0
                  plans_all, _ = _generate_feasible_plans_parallel(
                         play_pool=all_pool,
                         reset_pool=reset_pool,
@@ -8835,7 +8844,7 @@ def train_critic_with_planner7(
                         steps_T=steps_T,
                         num_karras=num_karras,
                         eta=eta,
-                        batch_size=batch_size,
+                        batch_size=n_all,
                         training_step=k,
                         vectorized_sampling=vectorized_sampling,
                         plan_chunk_size=plan_chunk_size,
@@ -8865,7 +8874,7 @@ def train_critic_with_planner7(
                                 steps_T=steps_T,
                                 num_karras=num_karras,
                                 eta=eta,
-                                batch_size=batch_size,
+                                batch_size=n_near,
                                 training_step=k + 10000,
                                 vectorized_sampling=vectorized_sampling,
                                 plan_chunk_size=plan_chunk_size,
@@ -8881,7 +8890,7 @@ def train_critic_with_planner7(
 
                  if len(goal_pool) > 0:
                          rng_g = np.random.RandomState(k + 20011)
-                         n_goal = min(len(goal_pool), batch_size)
+                         n_goal = min(len(goal_pool), n_goal_b)
                          g_idx = rng_g.randint(0, len(goal_pool), size=n_goal)
                          g_raw = torch.as_tensor(
                                  goal_pool[g_idx], device=device, dtype=torch.float32,
@@ -8935,7 +8944,7 @@ def train_critic_with_planner7(
         else:
                loss_goal = torch.zeros((), device=device, dtype=loss_all.dtype)
 
-        loss = loss_all + loss_near + loss_goal
+        loss = (0.2 * loss_all) + (0.5 * loss_near) + (0.3 * loss_goal)
 
         with torch.no_grad():
              pred_mean = v_pred.detach().mean()
