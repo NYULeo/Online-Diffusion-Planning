@@ -8944,7 +8944,7 @@ def train_critic_with_planner7(
         else:
                loss_goal = torch.zeros((), device=device, dtype=loss_all.dtype)
 
-        loss = (0.2 * loss_all) + (0.5 * loss_near) + (0.3 * loss_goal)
+        loss = (0.0 * loss_all) + (0.7 * loss_near) + (0.3 * loss_goal)
 
         with torch.no_grad():
              pred_mean = v_pred.detach().mean()
