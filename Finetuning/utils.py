@@ -8227,8 +8227,6 @@ def test_teacher_ic(
     return {"ic": ic, "ev": ev, "J": Js, "G": Gs}
 
 
-
-
 def train_critic_with_planner7(
     dataset_name: str,
     specific_dataset: str,
