@@ -8991,7 +8991,7 @@ def train_critic_with_planner7(
         target_critic.eval()
         save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
         print("critic saved.")
-        test_critic_cost_to_go(dataset_name, specific_dataset, hidden_layers, hidden_dim, new_step, all_trajs, gamma, task_id, drop_timeouts = True)
+        test_critic_cost_to_go(dataset_name, specific_dataset, hidden_layers, hidden_dim, new_step, all_trajs, gamma, task_id, drop_timeouts = False)
     return 0.0, 1.0
 
 
