@@ -115,7 +115,7 @@ if __name__ == '__main__':  # pragma: no cover
         set_seed(1)
         env_name = 'cube'
         specific_env = 'single-play'
-        traj_length = 200
+        traj_length = 50
         horizon = 128
         train_horizon = 32
         task_id = 4
@@ -165,9 +165,9 @@ if __name__ == '__main__':  # pragma: no cover
               #"w_all": 0.1,
               #"w_near": 0.6,
               #"w_goal": 0.3,
-              "w_all": 0.2,
-              "w_near": 0.5,
-              "w_goal": 0.2,
+              "w_all": 0.1,
+              "w_near": 0.6,
+              "w_goal": 0.3,
           }
         accelerator = Accelerator(mixed_precision='bf16')
         os.chdir(project_root)
