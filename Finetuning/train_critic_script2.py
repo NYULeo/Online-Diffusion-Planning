@@ -165,9 +165,9 @@ if __name__ == '__main__':  # pragma: no cover
               #"w_all": 0.1,
               #"w_near": 0.6,
               #"w_goal": 0.3,
-              "w_all": 0.5,
-              "w_near": 0.3,
-              "w_goal": 0.2,
+              "w_all": 0.4,
+              "w_near": 0.5,
+              "w_goal": 0.1,
           }
         accelerator = Accelerator(mixed_precision='bf16')
         os.chdir(project_root)
