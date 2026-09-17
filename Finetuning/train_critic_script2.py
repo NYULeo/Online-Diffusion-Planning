@@ -165,8 +165,8 @@ if __name__ == '__main__':  # pragma: no cover
               #"w_all": 0.1,
               #"w_near": 0.6,
               #"w_goal": 0.3,
-              "w_all": 0.8,
-              "w_near": 0.0,
+              "w_all": 0.5,
+              "w_near": 0.3,
               "w_goal": 0.2,
           }
         accelerator = Accelerator(mixed_precision='bf16')
