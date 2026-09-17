@@ -1,6 +1,5 @@
 import sys
 import os
-
 #from Finetuning.heatmap_plot import critic_heatmap
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -44,6 +43,7 @@ import torch.distributed as dist
 import time
 import wandb
 import ogbench
+from Finetuning.metrics import explained_variance
 
 def _compact_tensor_rows_for_object_gather(tensor: torch.Tensor) -> List[torch.Tensor]:
     """Detach rows from shared backing storage before object serialization."""
@@ -345,21 +345,6 @@ def get_kernel_stats(dataset_name, specific_dataset, step):
         stats = pickle.load(f)
     return stats  
 
-"""
-def save_planner(model, dataset_name, specific_dataset, step: int):
-    model.eval()
-    data = {
-            'dataset_name': dataset_name,
-            'specific_dataset': specific_dataset,
-            'step': step,
-            'ema': model.state_dict()
-    }
-    name = getName(dataset_name, specific_dataset)
-    savepath = f"./Finetuning/Planners/{dataset_name}/{specific_dataset}/{name}_Planner_{str(step)}.pt"
-    torch.save(data, savepath)
-    print(f"saved model to {savepath}")
-"""
-
 def save_planner(model, dataset_name, specific_dataset, step: int,
                  task_id: Optional[int] = None):              # NEW arg
     model.eval()
@@ -387,17 +372,6 @@ def get_planner(dataset_name, specific_dataset, step,
     if not os.path.exists(path):
         raise FileNotFoundError(f"Checkpoint not found: {path}")
     return torch.load(path, weights_only=True, map_location='cpu')['ema']
-
-"""
-def get_planner(dataset_name, specific_dataset, step):
-    name = getName(dataset_name, specific_dataset)
-    path = f"./Finetuning/Planners/{dataset_name}/{specific_dataset}/{name}_Planner_{str(step)}.pt"
-    if not os.path.exists(path):
-          raise FileNotFoundError(f"Checkpoint not found: {path}")
-    checkpoint = torch.load(path, weights_only = True,map_location='cpu')
-    #checkpoint = torch.load(checkpoint_path,  weights_only=True)
-    return checkpoint['ema']
-"""
 
 def save_critic(model, dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
     model.eval()
@@ -1849,71 +1823,6 @@ class PlannerDataset(Dataset):
     def __getitem__(self, idx):
         return self.conditions[idx]
 
-"""
-class PlannerDataset(Dataset):
-    def __init__(
-        self,
-        trajs: List[TrajectoryDict],
-        horizon: int,
-        dataset_name: str,
-        specific_dataset: str,
-        task_id: Optional[int] = None,
-        cutoff_length: Optional[int] = None,
-        n_reset: int = 256,
-        reset_seed0: int = 10_000,
-        mix_reset: bool = True,
-    ):
-        self.trajs = copy.deepcopy(trajs)
-        if cutoff_length is not None:
-            self.trajs = traj_cutoff(self.trajs, cutoff_length)
-
-        print(
-            f"total steps for Finetuning: "
-            f"{np.sum([len(traj['observations']) for traj in self.trajs])}"
-        )
-
-        self.conditions = []
-        self.horizon = horizon
-        self.task_id = task_id
-        self.planner_processor = Planner_Processor(
-            dataset_name, specific_dataset, task_id
-        )
-
-        # play occupancy (normalized s0)
-        for traj in self.trajs:
-            obs = traj["observations"]
-            for t in range(len(obs)):
-                s_norm = self.planner_processor.preprocess(obs[t])
-                self.conditions.append(
-                    torch.tensor(s_norm, dtype=torch.float32)
-                )
-
-        n_play = len(self.conditions)
-
-        # train resets: same reset law as eval, seeds disjoint from 0..999
-        if mix_reset and n_reset > 0:
-            env, _, _ = get_env(dataset_name, specific_dataset, task_id = task_id)
-            reset_conds = []
-            for i in range(n_reset):
-                ob, _ = env.reset(
-                    seed=reset_seed0 + i,
-                    options=dict(task_id=task_id),
-                )
-                s_norm = self.planner_processor.preprocess(
-                    np.asarray(ob, dtype=np.float32)
-                )
-                reset_conds.append(
-                    torch.tensor(s_norm, dtype=torch.float32)
-                )
-            repeat = max(1, n_play // max(n_reset, 1))
-            self.conditions.extend(reset_conds * repeat)
-
-    def __len__(self):
-        return len(self.conditions)
-
-    def __getitem__(self, idx):
-        return self.conditions[idx]
-"""
 def cycle(dl):
     while True:
         for data in dl:
@@ -3038,116 +2947,6 @@ def train_critic_with_planner(
     save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
     print("critic saved.")
 
-
-"""
-class CriticDataset_Reward(Dataset):
-    def __init__(self, dataset_name: str, 
-                       specific_dataset: str, 
-                       reward_hidden_layers: int,
-                       reward_hidden_dim: int,
-                       reward_checkpoint: int,
-                       trajs: List[TrajectoryDict], 
-                       horizon: int = 32,
-                       old_step: Optional[int] = None,  
-                       new_step: int = 0, 
-                       momentum: float = 0.005,
-                       value_scale: float = 5.0,
-                       task_id: Optional[int] = None):
-        # ----- gather raw obs/actions to fit stats -----
-
-        obs_all = []
-        for traj in trajs:
-            obs_all.append(traj['observations'])
-        obs_all = np.concatenate(obs_all, axis = 0)
-        
-        #get stats
-        stats = SAStats()
-        stats.obs_mean = obs_all.mean(axis=0)
-        stats.obs_std = obs_all.std(axis=0)+ 1e-8
-        if(old_step is not None):
-             self.stats = update_critic_stats(dataset_name, specific_dataset, stats, task_id, old_step, momentum)
-        else:
-             self.stats = stats
-        
-        device = check_device()
-        _, obs_dim, act_dim = get_env(dataset_name, specific_dataset)
-        reward_state, _, _ = get_reward_model(
-            dataset_name, specific_dataset, reward_checkpoint, task_id,
-        )
-        reward_net = SimpleReward(
-            obs_dim, act_dim, reward_hidden_dim, reward_hidden_layers,
-        ).to(device)
-        reward_net.load_state_dict(reward_state)
-        reward_net.eval()
-        for p in reward_net.parameters():
-            p.requires_grad_(False)
-        reward_stat = get_reward_stats(
-            dataset_name, specific_dataset, reward_checkpoint, task_id,
-        )
-
-        transitions = []
-        
-        for traj in trajs:
-            obs = traj['observations'] 
-            acts = traj['actions']   
-            masks = traj.get('masks', None)
-            T_traj = min(len(obs), len(acts))
-            if masks is None:
-                  masks = np.ones(T_traj, dtype=np.float32)
-            else:
-                  masks = np.asarray(masks[:T_traj], dtype=np.float32)
-
-            if T_traj < horizon:
-                continue
-            
-            with torch.no_grad():
-                obs_for_r = reward_stat.norm_obs(obs[:T_traj]).astype(np.float32)
-                s_t = torch.as_tensor(obs_for_r, dtype=torch.float32, device=device)
-                a_t = torch.as_tensor(acts[:T_traj], dtype=torch.float32, device=device)
-                #a_t = torch.clamp(a_t, -1.0, 1.0)
-                rews = reward_net(s_t, a_t).cpu().numpy().astype(np.float32)   # (T_traj,)  
-                
-                # Scale down predicted rewards from reward model
-                #rews = np.clip(rews, float('-inf'), 0)      # adjust bounds if needed
-                #rews = np.clip(rews, 0, float('inf'))      # adjust bounds if needed
-                rews = rews / value_scale                    # or use a running std
-                
-            
-            for t in range(len(obs) - horizon):
-                 obs_chunk = self.stats.norm_obs(obs[t : t + horizon]).astype(np.float32)
-                 #rews_chunk = rews[t: min(t+horizon, len(rews))]
-                 #transitions.append((obs_chunk, rews_chunk))
-                 rews_chunk = rews[t : t + horizon]
-                 mask_chunk = masks[t : t + horizon]
-                 transitions.append((obs_chunk, rews_chunk, mask_chunk))
-
-        self.transitions = transitions
-        self.save_stats(dataset_name, specific_dataset, task_id, new_step)
-    
-    def save_stats(self, dataset_name, specific_dataset, task_id: Optional[int] = None, step: int = 0):
-        critic_name = get_CriticName(dataset_name, specific_dataset, task_id)
-        stats_name =  str(critic_name) + f'_Critic_stats_{str(step)}.pkl'
-        stats_dir = f'./Finetuning/Critics/{dataset_name}/{specific_dataset}/Stats/'
-        os.makedirs(stats_dir, exist_ok=True)
-        savepath = os.path.join(stats_dir, stats_name)
-        with open(savepath, 'wb') as f:
-              pickle.dump(self.stats, f)
-        print(f"saved stats to {savepath}")
-
-    def __getitem__(self, idx):
-        obs_chunk, rews_chunk, mask_chunk = self.transitions[idx]
-        return (
-            torch.tensor(obs_chunk, dtype = torch.float32),
-            torch.tensor(rews_chunk, dtype = torch.float32),
-            torch.tensor(mask_chunk, dtype=torch.float32),
-        )
-
-    def __len__(self):
-        return len(self.transitions)
-
-"""
-
-
 class CriticDataset_Reward(Dataset):
     def __init__(self, dataset_name: str,
                        specific_dataset: str,
@@ -3275,7 +3074,6 @@ class CriticDataset_Reward(Dataset):
 
     def __len__(self):
         return len(self.transitions)
-
 
 class Critic_Buffer_Reward():
     def __init__(self, dataset_name: str,
@@ -3468,7 +3266,6 @@ class Critic_Buffer_Reward():
 
         return obs_chunks[:, 0], y_head, tgt_mean, tgt_std
 
-
 def train_critic_with_reward(trajs: List[TrajectoryDict], 
                  dataset_name: str, 
                  specific_dataset: str, 
@@ -3631,7 +3428,6 @@ def train_critic_with_reward(trajs: List[TrajectoryDict],
     q_scale.Q_scale = value_scale
     save_Q_scale(q_scale, dataset_name, specific_dataset, task_id)
     print(f"mean: {tgt_mean.item()}, std: {tgt_std.item()}")
-
 
 @dataclass
 class KernelConfig:
@@ -5414,8 +5210,6 @@ def train_critic_with_planner5(
         print("critic saved.")
 
     return running_tgt_mean.item(), running_tgt_std.item()
-
-
 
 def train_critic_with_planner6(
     trajs: List[TrajectoryDict],
@@ -8139,6 +7933,301 @@ def train_critic_with_planner7(
 
 
 
+class CostToGoDataset(Dataset):
+    def __init__(
+        self,
+        trajs: List[dict],
+        stats,
+        gamma: float = 0.99,
+        drop_timeouts: bool = True,
+    ):
+        xs, gs = [], []
+        for traj in trajs:
+            obs = np.asarray(traj["observations"], dtype=np.float32)
+            rews = np.asarray(traj["rewards"], dtype=np.float64)
+            masks = np.asarray(traj.get("masks", np.ones(len(obs))), dtype=np.float32)
+            n = min(len(obs), len(rews) + 1, len(masks))
+            obs, masks = obs[:n], masks[:n]
+            # rewards are next-state / transition length n-1 in your Dataset.py
+            if len(rews) == n:
+                r = rews
+            elif len(rews) == n - 1:
+                r = np.concatenate([rews, [0.0]])
+            else:
+                r = rews[:n]
+            G = self.traj_cost_to_go(r, masks, gamma, drop_timeouts=drop_timeouts)
+            if G is None:
+                continue
+            for t in range(n):
+                xs.append(stats.norm_obs(obs[t]))
+                gs.append(G[t])
+        self.x = np.asarray(xs, dtype=np.float32)
+        self.g = np.asarray(gs, dtype=np.float32)
+        print(f"cost-to-go dataset: {len(self.x)} states")
+    
+    def traj_cost_to_go(
+         self,
+         rews: np.ndarray,
+         masks: np.ndarray,
+         gamma: float,
+         drop_timeouts: bool = True,
+    ) -> Optional[np.ndarray]:
+        
+         n = len(rews)
+         if n == 0:
+              return None
+         goal = np.where(np.asarray(masks[:n]) == 0.0)[0]
+         if len(goal) == 0:
+              if drop_timeouts:
+                 return None
+              T = n
+              g = np.zeros(n, dtype=np.float64)
+              acc = 0.0
+              for t in range(n - 1, -1, -1):
+                  acc = float(rews[t]) + gamma * acc
+                  g[t] = acc
+              return g
+         T = int(goal[0])
+         g = np.zeros(n, dtype=np.float64)
+         acc = 0.0
+         # absorb: G[T] = 0 (reward at goal already in r[T-1] if you shifted)
+         for t in range(T - 1, -1, -1):
+              acc = float(rews[t]) + gamma * acc
+              g[t] = acc
+         return g
+
+    def __len__(self):
+        return len(self.x)
+
+    def __getitem__(self, i):
+        return torch.from_numpy(self.x[i]), torch.tensor(self.g[i])
+
+
+@torch.no_grad()
+def test_critic_cost_to_go(
+    dataset_name: str,
+    specific_dataset: str,
+    hidden_layers: int,
+    hidden_dim: int,
+    critic_checkpoint: int,
+    trajs: List[dict],
+    gamma: float = 0.99,
+    task_id: Optional[int] = None,
+    drop_timeouts: bool = True,
+):
+    """V(s) vs dataset cost-to-go G(s). Returns Spearman IC and MAE in raw units."""
+    from scipy.stats import spearmanr
+
+    device = check_device()
+    ns = 0 if critic_checkpoint == -1 else critic_checkpoint
+    stats = get_critic_stats(dataset_name, specific_dataset, task_id, ns)
+    data = CostToGoDataset(trajs, stats, gamma, drop_timeouts)
+    loader = DataLoader(data, batch_size=512, shuffle=False)
+
+    state, obs_dim = get_critic_model(
+        dataset_name, specific_dataset, task_id, critic_checkpoint,
+    )
+    model = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
+    model.load_state_dict(state)
+    model.eval()
+
+    preds, targets = [], []
+    for s, g in loader:
+        s = s.to(device)
+        v = symexp(model(s).squeeze(-1)).cpu().numpy()
+        preds.append(v)
+        targets.append(g.numpy())
+    pred = np.concatenate(preds)
+    tgt = np.concatenate(targets)
+    ic = float(spearmanr(pred, tgt).correlation)
+    ev = explained_variance(tgt, pred)
+    mae = float(np.mean(np.abs(pred - tgt)))
+    print(
+        f"cost-to-go test ckpt={critic_checkpoint}\n"
+        f"  n={len(pred)}  IC={ic:.3f}  EV={ev:.3f}  MAE={mae:.3f}\n"
+        f"  pred mean/std={pred.mean():.3f}/{pred.std():.3f}\n"
+        f"  G    mean/std={tgt.mean():.3f}/{tgt.std():.3f}\n"
+        f"  G    min/max={tgt.min():.3f}/{tgt.max():.3f}"
+    )
+    return {"ic": ic, "ev": ev, "mae": mae, "pred": pred, "G": tgt}
+
+
+@torch.no_grad()
+def test_teacher_ic(
+    dataset_name: str,
+    specific_dataset: str,
+    planner_checkpoint: int,
+    reward_checkpoint: int,
+    critic_checkpoint: int,
+    backbone_layers: int,
+    hidden_layers: int,
+    hidden_dim: int,
+    trajs: List[dict],
+    task_id: Optional[int] = None,
+    horizon: int = 32,
+    gamma: float = 0.99,
+    n_s0: int = 64,
+    n_plans: int = 8,
+    steps_T: int = 10,
+    num_karras: int = 1,
+    eta: float = 0.0,
+    roll_env: bool = False,
+    max_env_steps: Optional[int] = None,
+    suffix_length: Optional[int] = 32,
+    seed: int = 0,
+):
+    """
+    For each s0 (last-suffix play frames by default):
+      sample n_plans, compute J, and G.
+    G:
+      roll_env=False -> dataset cost-to-go at that s0 (Type A only).
+      roll_env=True  -> execute planned actions in OGBench, G = success or -T.
+    IC = mean over s0 of Spearman(J, G) if n_plans>=3 and G varies;
+         else global Spearman over all (s0, plan) pairs.
+    """
+    from scipy.stats import spearmanr
+
+    device = check_device()
+    rng = np.random.RandomState(seed)
+    _, obs_dim, act_dim = get_env(dataset_name, specific_dataset, task_id=task_id)
+
+    # ---- s0 from last-N play on Type A ----
+    s0_raw, s0_G = [], []
+    stats_c = get_critic_stats(
+        dataset_name, specific_dataset, task_id,
+        0 if critic_checkpoint == -1 else critic_checkpoint,
+    )
+    for traj in trajs:
+        obs = np.asarray(traj["observations"], dtype=np.float32)
+        rews = np.asarray(traj["rewards"], dtype=np.float64)
+        masks = np.asarray(traj.get("masks", np.ones(len(obs))), dtype=np.float32)
+        n = len(obs)
+        if n == 0 or masks[-1] != 0.0:
+            continue
+        if len(rews) == n - 1:
+            r = np.concatenate([rews, [0.0]])
+        else:
+            r = rews[:n]
+        G = _traj_cost_to_go(r, masks, gamma, drop_timeouts=True)
+        if G is None:
+            continue
+        play = np.where(masks != 0.0)[0]
+        if suffix_length is not None:
+            play = play[-suffix_length:]
+        for t in play:
+            s0_raw.append(obs[t])
+            s0_G.append(G[t])
+    if not s0_raw:
+        raise RuntimeError("no Type A s0 for teacher IC")
+    idx = rng.choice(len(s0_raw), size=min(n_s0, len(s0_raw)), replace=False)
+    s0_raw = np.stack([s0_raw[i] for i in idx], axis=0)
+    s0_G = np.asarray([s0_G[i] for i in idx], dtype=np.float64)
+
+    # ---- models ----
+    planner = DiT1d(
+        in_dim=(obs_dim + act_dim), emb_dim=128, d_model=256,
+        n_heads=256 // 64, depth=backbone_layers, timestep_emb_type="fourier",
+    ).to(device)
+    planner.load_state_dict(
+        get_planner(dataset_name, specific_dataset, planner_checkpoint, task_id)
+    )
+    planner.eval()
+    proc = Planner_Processor(dataset_name, specific_dataset, task_id)
+    p_mean = torch.as_tensor(proc.stats.obs_mean, device=device, dtype=torch.float32)
+    p_std = torch.as_tensor(np.maximum(proc.stats.obs_std, 1e-3), device=device)
+
+    rew_state, _, _ = get_reward_model(
+        dataset_name, specific_dataset, reward_checkpoint, task_id,
+    )
+    # hidden sizes must match your reward ckpt
+    reward_net = SimpleReward(obs_dim, act_dim, hidden_dim, hidden_layers).to(device)
+    reward_net.load_state_dict(rew_state)
+    reward_net.eval()
+    rstat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint, task_id)
+    r_mean = torch.as_tensor(rstat.obs_mean, device=device, dtype=torch.float32)
+    r_std = torch.as_tensor(np.maximum(rstat.obs_std, 1e-3), device=device)
+
+    c_state, _ = get_critic_model(
+        dataset_name, specific_dataset, task_id, critic_checkpoint,
+    )
+    critic = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
+    critic.load_state_dict(c_state)
+    critic.eval()
+    c_mean = torch.as_tensor(stats_c.obs_mean, device=device, dtype=torch.float32)
+    c_std = torch.as_tensor(np.maximum(stats_c.obs_std, 1e-3), device=device)
+    q_scale = get_Q_scale(dataset_name, specific_dataset, task_id)
+    scale = float(getattr(q_scale, "Q_scale", 1.0) or 1.0)
+
+    env = None
+    if roll_env:
+        env, _, _ = get_env(dataset_name, specific_dataset, task_id=task_id)
+
+    Js, Gs = [], []
+    for i in range(len(s0_raw)):
+        s0 = s0_raw[i]
+        s0_p = proc.preprocess(s0)
+        j_s, g_s = [], []
+        for _ in range(n_plans):
+            x = sample_euler_karras(
+                s0_p, planner, obs_dim, act_dim, horizon,
+                num_steps=steps_T, num_karras=num_karras, eta=eta, device=device,
+            )
+            xt = torch.from_numpy(np.asarray(x)).float().to(device)
+            if xt.dim() == 2:
+                xt = xt.unsqueeze(0)
+            s_pl = xt[..., :obs_dim]
+            a = torch.clamp(xt[..., obs_dim:], -1.0, 1.0)
+            s_raw = s_pl * p_std + p_mean
+            H = s_raw.shape[1]
+            n = H - 1
+            s_r = (s_raw[:, :n] - r_mean) / r_std
+            r_hat = reward_net(
+                s_r.reshape(n, -1), a[:, :n].reshape(n, -1),
+            ).reshape(n) / scale
+            discounts = torch.tensor(
+                [gamma ** t for t in range(n)], device=device, dtype=torch.float32
+            )
+            sH = (s_raw[0, -1] - c_mean) / c_std
+            vH = symexp(critic(sH.unsqueeze(0)).squeeze())
+            J = (discounts * r_hat).sum() + (gamma ** (n)) * vH
+            j_s.append(float(J.item()))
+
+            if roll_env:
+                # execute actions; G = +1 success else -T
+                Tlim = max_env_steps or horizon
+                # OGBench reset-to-state is task-specific; fallback: cost-to-go
+                try:
+                    ob, _ = env.reset(options=dict(task_id=task_id))
+                    # if env supports set_state, hook it here
+                    success, t_done = 0.0, Tlim
+                    acts = a[0, :n].cpu().numpy()
+                    for t in range(min(n, Tlim)):
+                        ob, r, term, trunc, info = env.step(acts[t])
+                        if bool(info.get("success", False)) or term:
+                            success, t_done = 1.0, t + 1
+                            break
+                    g_s.append(success if success else -float(t_done))
+                except Exception:
+                    g_s.append(float(s0_G[i]))
+            else:
+                g_s.append(float(s0_G[i]))
+        Js.extend(j_s)
+        Gs.extend(g_s)
+
+    Js = np.asarray(Js)
+    Gs = np.asarray(Gs)
+    ic = float(spearmanr(Js, Gs).correlation) if np.std(Gs) > 1e-8 else float("nan")
+    ev = explained_variance(Gs, Js)
+    print(
+        f"teacher IC ckpt={critic_checkpoint} roll_env={roll_env}\n"
+        f"  pairs={len(Js)}  IC={ic:.3f}  EV={ev:.3f}\n"
+        f"  J mean/std={Js.mean():.3f}/{Js.std():.3f}\n"
+        f"  G mean/std={Gs.mean():.3f}/{Gs.std():.3f}"
+    )
+    return {"ic": ic, "ev": ev, "J": Js, "G": Gs}
+
+
+
 
 def train_critic_with_planner7(
     dataset_name: str,
@@ -8904,7 +8993,9 @@ def train_critic_with_planner7(
         target_critic.eval()
         save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
         print("critic saved.")
+        test_critic_cost_to_go(dataset_name, specific_dataset, hidden_layers, hidden_dim, new_step, all_trajs, gamma, task_id, drop_timeouts = True)
     return 0.0, 1.0
+
 
 
 
