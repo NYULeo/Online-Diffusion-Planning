@@ -1063,21 +1063,22 @@ def train_critic_with_planner7(
             f"goal={len(goal_pool)} traj_length={traj_length}"
         )
         print("testing critic quality droping the failed episodes")
-        evaluate_critic(
+    evaluate_critic(
                     dataset_name, specific_dataset, task_id,
                     planner_checkpoint, reward_checkpoint, old_critic_checkpoint,
                     hidden_layers, hidden_dim, reward_hidden_layers, reward_hidden_dim,
                     backbone_layers, all_trajs, gamma, 
                     drop_timeouts=True, value_decode="symlog", accelerator=accelerator,
-        )
+    )
+    if is_main:
         print("testing critic quality keeping the failed episodes")
-        evaluate_critic(
+    evaluate_critic(
                     dataset_name, specific_dataset, task_id,
                     planner_checkpoint, reward_checkpoint, old_critic_checkpoint,
                     hidden_layers, hidden_dim, reward_hidden_layers, reward_hidden_dim,
                     backbone_layers, all_trajs, gamma,
                     drop_timeouts=False, value_decode="symlog", accelerator=accelerator,
-        )
+    )
 
     reset_pool = (
         _train_reset_pool(dataset_name, specific_dataset, task_id, n=n_reset)
@@ -1323,20 +1324,21 @@ def train_critic_with_planner7(
         save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
         print("critic saved.")
         print("testing critic quality droping the failed episodes")
-        evaluate_critic(
+    evaluate_critic(
                     dataset_name, specific_dataset, task_id,
                     planner_checkpoint, reward_checkpoint, old_critic_checkpoint,
                     hidden_layers, hidden_dim, reward_hidden_layers, reward_hidden_dim,
                     backbone_layers, all_trajs, gamma, 
                     drop_timeouts=True, value_decode="symlog", accelerator=accelerator,
         )
+    if is_main:
         print("testing critic quality keeping the failed episodes")
-        evaluate_critic(
+    evaluate_critic(
                     dataset_name, specific_dataset, task_id,
                     planner_checkpoint, reward_checkpoint, old_critic_checkpoint,
                     hidden_layers, hidden_dim, reward_hidden_layers, reward_hidden_dim,
                     backbone_layers, all_trajs, gamma, 
                     drop_timeouts=False, value_decode="symlog", accelerator=accelerator,
-        )
+    )
     return 0.0, 1.0
 
