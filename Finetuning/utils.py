@@ -7932,7 +7932,7 @@ def train_critic_with_planner7(
 
 
 
-
+"""
 class CostToGoDataset(Dataset):
     def __init__(
         self,
@@ -8015,7 +8015,7 @@ def test_critic_cost_to_go(
     task_id: Optional[int] = None,
     drop_timeouts: bool = True,
 ):
-    """V(s) vs dataset cost-to-go G(s). Returns Spearman IC and MAE in raw units."""
+   
     from scipy.stats import spearmanr
 
     device = check_device()
@@ -8076,15 +8076,7 @@ def test_teacher_ic(
     suffix_length: Optional[int] = 32,
     seed: int = 0,
 ):
-    """
-    For each s0 (last-suffix play frames by default):
-      sample n_plans, compute J, and G.
-    G:
-      roll_env=False -> dataset cost-to-go at that s0 (Type A only).
-      roll_env=True  -> execute planned actions in OGBench, G = success or -T.
-    IC = mean over s0 of Spearman(J, G) if n_plans>=3 and G varies;
-         else global Spearman over all (s0, plan) pairs.
-    """
+    
     from scipy.stats import spearmanr
 
     device = check_device()
@@ -8225,6 +8217,162 @@ def test_teacher_ic(
         f"  G mean/std={Gs.mean():.3f}/{Gs.std():.3f}"
     )
     return {"ic": ic, "ev": ev, "J": Js, "G": Gs}
+"""
+
+
+
+
+
+def _align_reward_mask(traj: dict):
+    """obs, masks (len n), trans_r[t] for s_t -> s_{t+1} (len n-1)."""
+    obs = np.asarray(traj["observations"], dtype=np.float32)
+    n = len(obs)
+    raw_m = traj.get("masks", None)
+    if raw_m is None:
+        masks = np.ones(n, dtype=np.float32)
+    else:
+        masks = np.asarray(raw_m, dtype=np.float32).reshape(-1)
+        if len(masks) < n:
+            masks = np.concatenate([masks, np.ones(n - len(masks), dtype=np.float32)])
+        masks = masks[:n]
+    r = np.asarray(traj["rewards"], dtype=np.float64).reshape(-1)
+    if len(r) == n - 1:
+        trans_r = r
+    elif len(r) == n:
+        trans_r = r[1:]
+    elif len(r) > n - 1:
+        trans_r = r[: n - 1]
+    else:
+        trans_r = np.concatenate([r, np.zeros(n - 1 - len(r), dtype=np.float64)])
+    return obs, masks, trans_r
+
+def traj_cost_to_go(traj: dict, gamma: float, drop_timeouts: bool = True):
+    """G[t] for every state. None if timeout and drop_timeouts."""
+    obs, masks, trans_r = _align_reward_mask(traj)
+    n = len(obs)
+    if n == 0:
+        return None, None
+    goal = np.where(masks == 0.0)[0]
+    G = np.zeros(n, dtype=np.float64)
+    if len(goal) == 0:
+        if drop_timeouts:
+            return None, None
+        acc = 0.0
+        for t in range(n - 2, -1, -1):
+            acc = float(trans_r[t]) + gamma * acc
+            G[t] = acc
+        G[n - 1] = 0.0
+        return obs, G
+    T = int(goal[0])
+    G[T:] = 0.0
+    acc = 0.0
+    for t in range(T - 1, -1, -1):
+        acc = float(trans_r[t]) + gamma * acc
+        G[t] = acc
+    return obs, G
+
+class CostToGoDataset(Dataset):
+    def __init__(self, trajs, stats, gamma=0.99, drop_timeouts=True):
+        xs, gs = [], []
+        n_traj, n_drop = 0, 0
+        for traj in trajs:
+            obs, G = traj_cost_to_go(traj, gamma, drop_timeouts)
+            if G is None:
+                n_drop += 1
+                continue
+            n_traj += 1
+            for t in range(len(obs)):
+                xs.append(stats.norm_obs(obs[t]))
+                gs.append(G[t])
+        self.x = np.asarray(xs, dtype=np.float32)
+        self.g = np.asarray(gs, dtype=np.float32)
+        gmin = float(self.g.min()) if len(self.g) else float("nan")
+        gmax = float(self.g.max()) if len(self.g) else float("nan")
+        print(
+            f"cost-to-go dataset: {len(self.x)} states  "
+            f"(trajs kept={n_traj} dropped={n_drop})  "
+            f"G min/max={gmin:.3f}/{gmax:.3f}"
+        )
+
+    def __len__(self):
+        return len(self.x)
+
+    def __getitem__(self, i):
+        return torch.from_numpy(self.x[i]), torch.tensor(self.g[i])
+
+def _decode_v(v, value_decode, q_mean, q_std):
+    if value_decode == "symlog":
+        return symexp(v)
+    if value_decode == "zscore":
+        return v * q_std + q_mean
+    if value_decode == "raw":
+        return v
+    raise ValueError(f"unknown value_decode={value_decode}")
+
+@torch.no_grad()
+def test_critic_cost_to_go(
+    dataset_name: str,
+    specific_dataset: str,
+    hidden_layers: int,
+    hidden_dim: int,
+    critic_checkpoint: int,
+    trajs: List[dict],
+    gamma: float = 0.99,
+    task_id: Optional[int] = None,
+    drop_timeouts: bool = True,
+    value_decode: str = "symlog",
+):
+    from scipy.stats import spearmanr
+
+    device = check_device()
+    ns = 0 if critic_checkpoint == -1 else critic_checkpoint
+    stats = get_critic_stats(dataset_name, specific_dataset, task_id, ns)
+    data = CostToGoDataset(trajs, stats, gamma, drop_timeouts)
+    if len(data) == 0:
+        raise RuntimeError("cost-to-go dataset empty — check masks/rewards on trajs")
+    loader = DataLoader(data, batch_size=512, shuffle=False)
+
+    state, obs_dim = get_critic_model(
+        dataset_name, specific_dataset, task_id, critic_checkpoint,
+    )
+    model = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
+    model.load_state_dict(state)
+    model.eval()
+
+    q_mean = q_std = 0.0
+    if value_decode == "zscore":
+        try:
+            qs = get_Q_scale(dataset_name, specific_dataset, task_id)
+            q_mean = float(getattr(qs, "Q_mean", 0.0) or 0.0)
+            q_std = float(getattr(qs, "Q_std", 1.0) or 1.0)
+        except Exception:
+            q_mean, q_std = 0.0, 1.0
+        q_mean = torch.tensor(q_mean, device=device)
+        q_std = torch.tensor(q_std, device=device)
+
+    preds, targets = [], []
+    for s, g in loader:
+        s = s.to(device)
+        v = _decode_v(model(s).squeeze(-1), value_decode, q_mean, q_std)
+        preds.append(v.detach().cpu().numpy())
+        targets.append(g.numpy())
+    pred = np.concatenate(preds)
+    tgt = np.concatenate(targets)
+    ic = float(spearmanr(pred, tgt).correlation)
+    ev = explained_variance(tgt, pred)
+    mae = float(np.mean(np.abs(pred - tgt)))
+    print(
+        f"cost-to-go test ckpt={critic_checkpoint} decode={value_decode}\n"
+        f"  n={len(pred)}  IC={ic:.3f}  EV={ev:.3f}  MAE={mae:.3f}\n"
+        f"  pred mean/std={pred.mean():.3f}/{pred.std():.3f}\n"
+        f"  G    mean/std={tgt.mean():.3f}/{tgt.std():.3f}\n"
+        f"  G    min/max={tgt.min():.3f}/{tgt.max():.3f}"
+    )
+    return {"ic": ic, "ev": ev, "mae": mae, "pred": pred, "G": tgt}
+
+
+
+
 
 
 def train_critic_with_planner7(
