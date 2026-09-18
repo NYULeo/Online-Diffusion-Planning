@@ -135,7 +135,7 @@ if __name__ == '__main__':  # pragma: no cover
               "hidden_dim": 512,
               "reward_hidden_layers": 4,
               "reward_hidden_dim": 512,
-              "batch_size": 256,
+              "batch_size": 255,
               "oversample": 30,
               "num_steps": 100,
               "resample_every": 1,
