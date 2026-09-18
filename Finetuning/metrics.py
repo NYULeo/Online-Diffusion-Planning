@@ -300,9 +300,6 @@ def compute_j_by_state(
 
 
 
-
-
-
 @torch.no_grad()
 def evaluate_critic(
     dataset_name: str,
@@ -480,7 +477,7 @@ def td_residual_stats(
     trajs: List[dict],
     gamma: float = 0.99,
     value_decode: str = "symlog",
-    suffix_length: Optional[int] = 32,
+    suffix_length: Optional[int] = None,
 ):
     from Finetuning.utils import (
           check_device,
@@ -611,8 +608,6 @@ def td_residual_stats(
     return out
 
 
-
-
 def value_grad_stats(
     dataset_name: str,
     specific_dataset: str,
@@ -622,7 +617,7 @@ def value_grad_stats(
     critic_checkpoint: int,
     trajs: List[dict],
     value_decode: str = "symlog",
-    suffix_length: Optional[int] = 32,
+    suffix_length: Optional[int] = None,
     batch_size: int = 256,
     max_states: int = 8192,
     seed: int = 0,
