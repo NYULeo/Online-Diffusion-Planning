@@ -446,14 +446,15 @@ def evaluate_critic(
          trajs, accelerator)
 
     mae = float(np.mean(np.abs(pred - tgt)))
-    print(
-        f"  cost-to-go test ckpt={critic_checkpoint} decode={value_decode}\n"
-        f"  n={len(pred)}  IC={ic:.3f}  EV={ev:.3f}  MAE={mae:.3f}\n"
-        f"  WSJD = {WSJD['wsjd']:.3f}\n"
-        f"  pred mean/std={pred.mean():.3f}/{pred.std():.3f}\n"
-        f"  G    mean/std={tgt.mean():.3f}/{tgt.std():.3f}\n"
-        f"  G    min/max={tgt.min():.3f}/{tgt.max():.3f}"
-    )
+    if accelerator.is_main_process:
+         print(
+             f"  cost-to-go test ckpt={critic_checkpoint} decode={value_decode}\n"
+             f"  n={len(pred)}  IC={ic:.3f}  EV={ev:.3f}  MAE={mae:.3f}\n"
+             f"  WSJD = {WSJD['wsjd']:.3f}\n"
+             f"  pred mean/std={pred.mean():.3f}/{pred.std():.3f}\n"
+             f"  G    mean/std={tgt.mean():.3f}/{tgt.std():.3f}\n"
+             f"  G    min/max={tgt.min():.3f}/{tgt.max():.3f}"
+         )
     return {"ic": ic, "ev": ev, "WSJD": WSJD['wsjd'], "mae": mae, "pred": pred, "G": tgt}
 
 

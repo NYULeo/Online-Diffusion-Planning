@@ -586,15 +586,12 @@ def train_critic_with_planner7(
     from accelerate import Accelerator
     import math
     import torch.distributed as dist
-
     if accelerator is None:
         accelerator = Accelerator()
-
     device = accelerator.device
     is_main = accelerator.is_main_process
     num_processes = accelerator.num_processes
     process_index = accelerator.process_index
-
     # ---------------------------------------------------------------- helpers
     def load_kernel_ensemble(
         dataset_name: str,
@@ -918,7 +915,6 @@ def train_critic_with_planner7(
         plans = torch.stack(all_plans).to(device)
         return plans, None
     
-
     def _split(traj_list, suffix_only=False, type_a_only=False):
         play, goal = [], []
         for traj in traj_list:
@@ -1326,7 +1322,7 @@ def train_critic_with_planner7(
         print("testing critic quality droping the failed episodes")
     evaluate_critic(
                     dataset_name, specific_dataset, task_id,
-                    planner_checkpoint, reward_checkpoint, old_critic_checkpoint,
+                    planner_checkpoint, reward_checkpoint, new_step,
                     hidden_layers, hidden_dim, reward_hidden_layers, reward_hidden_dim,
                     backbone_layers, all_trajs, gamma, 
                     drop_timeouts=True, value_decode="symlog", accelerator=accelerator,
@@ -1335,7 +1331,7 @@ def train_critic_with_planner7(
         print("testing critic quality keeping the failed episodes")
     evaluate_critic(
                     dataset_name, specific_dataset, task_id,
-                    planner_checkpoint, reward_checkpoint, old_critic_checkpoint,
+                    planner_checkpoint, reward_checkpoint, new_step,
                     hidden_layers, hidden_dim, reward_hidden_layers, reward_hidden_dim,
                     backbone_layers, all_trajs, gamma, 
                     drop_timeouts=False, value_decode="symlog", accelerator=accelerator,
