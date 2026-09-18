@@ -25,7 +25,12 @@ from Pretrain.Transition_Kernel.Kernel_Net import (
     RobustTransitionKernel,
 )
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_log_density_mog
-from Finetuning.metrics import evaluate_critic, compute_j_by_state, td_residual_stats
+from Finetuning.metrics import (
+    evaluate_critic, 
+    compute_j_by_state, 
+    td_residual_stats, 
+    value_grad_stats,
+)
 import os
 import pickle
 import wandb
@@ -1084,6 +1089,11 @@ def train_critic_with_planner7(
                    dataset_name, specific_dataset, task_id, hidden_layers, hidden_dim, old_critic_checkpoint,
                    all_trajs, gamma,
         )
+        print()
+        value_grad_stats(
+                   dataset_name, specific_dataset, task_id, hidden_layers, hidden_dim, old_critic_checkpoint,
+                   all_trajs, batch_size = 256,
+        )
 
     reset_pool = (
         _train_reset_pool(dataset_name, specific_dataset, task_id, n=n_reset)
@@ -1353,6 +1363,11 @@ def train_critic_with_planner7(
         td_residual_stats(
                    dataset_name, specific_dataset, task_id, hidden_layers, hidden_dim, new_step,
                    all_trajs, gamma,
+        )
+        print()
+        value_grad_stats(
+                   dataset_name, specific_dataset, task_id, hidden_layers, hidden_dim, new_step,
+                   all_trajs, batch_size = 256,
         )
     return 0.0, 1.0
 

@@ -613,6 +613,157 @@ def td_residual_stats(
 
 
 
+def value_grad_stats(
+    dataset_name: str,
+    specific_dataset: str,
+    task_id: int,
+    hidden_layers: int,
+    hidden_dim: int,
+    critic_checkpoint: int,
+    trajs: List[dict],
+    value_decode: str = "symlog",
+    suffix_length: Optional[int] = 32,
+    batch_size: int = 256,
+    max_states: int = 8192,
+    seed: int = 0,
+):
+    from Finetuning.utils import (
+          check_device,
+          get_critic_model,
+          get_critic_stats,
+          get_Q_scale,
+          symexp,
+    )
+    def _v_and_grad(model, x, value_decode, q_mean, q_std):
+        x = x.detach().requires_grad_(True)
+        raw = model(x).squeeze(-1)
+        if value_decode == "symlog":
+              V = symexp(raw)
+        elif value_decode == "zscore":
+              V = raw * q_std + q_mean
+        else:
+              V = raw
+        g = torch.autograd.grad(V, x, grad_outputs=torch.ones_like(V), create_graph=False)[0]
+        gn = g.flatten(1).norm(dim=1)
+        return V.detach(), gn.detach(), g.detach()
+    
+    def align_reward_mask(traj: dict):
+        obs = np.asarray(traj["observations"], dtype=np.float32)
+        n = len(obs)
+        raw_m = traj.get("masks", None)
+        if raw_m is None:
+            masks = np.ones(n, dtype=np.float32)
+        else:
+            masks = np.asarray(raw_m, dtype=np.float32).reshape(-1)
+            if len(masks) < n:
+                masks = np.concatenate(
+                    [masks, np.ones(n - len(masks), dtype=np.float32)]
+                )
+            masks = masks[:n]
+        r = np.asarray(traj["rewards"], dtype=np.float64).reshape(-1)
+        if len(r) == n - 1:
+            trans_r = r
+        elif len(r) == n:
+            trans_r = r[1:]
+        elif len(r) > n - 1:
+            trans_r = r[: n - 1]
+        else:
+            trans_r = np.concatenate(
+                [r, np.zeros(n - 1 - len(r), dtype=np.float64)]
+            )
+        return obs, masks, trans_r
+    
+    def _summ(arr):
+        a = np.asarray(arr, dtype=np.float64)
+        if a.size == 0:
+            return dict(n=0, mean=float("nan"), std=float("nan"), p90=float("nan"))
+        return dict(
+            n=int(a.size),
+            mean=float(a.mean()),
+            std=float(a.std()),
+            p90=float(np.quantile(a, 0.90)),
+        )
+
+    device = check_device()
+    ns = 0 if critic_checkpoint == -1 else critic_checkpoint
+    stats = get_critic_stats(dataset_name, specific_dataset, task_id, ns)
+    state, obs_dim = get_critic_model(
+        dataset_name, specific_dataset, task_id, critic_checkpoint,
+    )
+    model = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
+    model.load_state_dict(state)
+    model.eval()
+
+    q_mean = torch.tensor(0.0, device=device)
+    q_std = torch.tensor(1.0, device=device)
+    if value_decode == "zscore":
+        try:
+            qs = get_Q_scale(dataset_name, specific_dataset, task_id)
+            q_mean = torch.tensor(float(getattr(qs, "Q_mean", 0.0) or 0.0), device=device)
+            q_std = torch.tensor(float(getattr(qs, "Q_std", 1.0) or 1.0), device=device)
+        except Exception:
+            pass
+
+    buckets = {k: [] for k in ("all", "near", "far", "goal")}
+    cos_near = []
+    rng = np.random.RandomState(seed)
+    xs_all, tag, xg_ref = [], [], []
+    for traj in trajs:
+        obs, masks, _ = align_reward_mask(traj)
+        if len(obs) == 0:
+            continue
+        play = np.where(masks != 0.0)[0]
+        goals = np.where(masks == 0.0)[0]
+        near = set(play[-suffix_length:]) if suffix_length is not None else set(play)
+        gvec = stats.norm_obs(obs[int(goals[0])]) if len(goals) else None
+        for t in range(len(obs)):
+            xs_all.append(stats.norm_obs(obs[t]))
+            if masks[t] == 0.0:
+                tag.append("goal")
+            elif t in near:
+                tag.append("near")
+            else:
+                tag.append("far")
+            xg_ref.append(gvec)
+    if not xs_all:
+        raise RuntimeError("no states for value_grad_stats")
+    if len(xs_all) > max_states:
+        pick = rng.choice(len(xs_all), size=max_states, replace=False)
+        xs_all = [xs_all[i] for i in pick]
+        tag = [tag[i] for i in pick]
+        xg_ref = [xg_ref[i] for i in pick]
+
+    X = torch.as_tensor(np.stack(xs_all, axis=0), device=device, dtype=torch.float32)
+    for start in range(0, len(X), batch_size):
+        sl = slice(start, min(start + batch_size, len(X)))
+        xb = X[sl]
+        V, gn, g = _v_and_grad(model, xb, value_decode, q_mean, q_std)
+        gn_np = gn.cpu().numpy()
+        g_np = g.cpu().numpy()
+        for i, lab in enumerate(tag[sl]):
+            buckets["all"].append(gn_np[i])
+            buckets[lab].append(gn_np[i])
+            ref = xg_ref[start + i]
+            if lab == "near" and ref is not None:
+                d = ref - xb[i].detach().cpu().numpy()
+                dn = float(np.linalg.norm(d) * np.linalg.norm(g_np[i]) + 1e-8)
+                cos_near.append(float(np.dot(g_np[i], d) / dn))
+
+    out = {k: _summ(v) for k, v in buckets.items()}
+    out["cos_to_goal_near"] = float(np.mean(cos_near)) if cos_near else float("nan")
+    print(
+        "value grad  g=||dV/dx||  x=norm_obs(s)\n"
+        f"  all  n={out['all']['n']}  mean={out['all']['mean']:.4f}  "
+        f"std={out['all']['std']:.4f}  p90={out['all']['p90']:.4f}\n"
+        f"  near mean={out['near']['mean']:.4f}  std={out['near']['std']:.4f}  "
+        f"p90={out['near']['p90']:.4f}\n"
+        f"  far  mean={out['far']['mean']:.4f}  std={out['far']['std']:.4f}\n"
+        f"  goal mean={out['goal']['mean']:.4f}\n"
+        f"  mean cos(dV, x_g-x) on near={out['cos_to_goal_near']:.3f}"
+    )
+    return out
+
+
 
 
 
