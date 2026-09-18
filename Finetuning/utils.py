@@ -8747,6 +8747,10 @@ def train_critic_with_planner7(
             f"planner7 pools: all={len(all_pool)} near={len(near_pool)} "
             f"goal={len(goal_pool)} traj_length={traj_length}"
         )
+        print("testing critic quality droping the failed episodes")
+        test_critic_cost_to_go(dataset_name, specific_dataset, hidden_layers, hidden_dim, old_critic_checkpoint, all_trajs, gamma, task_id, drop_timeouts = True)
+        print("testing critic quality keeping the failed episodes")
+        test_critic_cost_to_go(dataset_name, specific_dataset, hidden_layers, hidden_dim, old_critic_checkpoint, all_trajs, gamma, task_id, drop_timeouts = False)
 
     reset_pool = (
         _train_reset_pool(dataset_name, specific_dataset, task_id, n=n_reset)
