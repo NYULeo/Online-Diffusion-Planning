@@ -164,7 +164,7 @@ def compute_j_by_state(
         from Pretrain.Planners.Backbone.Dit import DiT1d
         from Pretrain.Rewards.nets import SimpleReward
         from Finetuning.utils import (
-            get_planner, get_reward_model, get_reward_stats,
+            get_planner, get_reward_model, get_reward_stats, get_critic_model, get_critic_stats, get_Q_scale,
         )
 
         if accelerator is None:
