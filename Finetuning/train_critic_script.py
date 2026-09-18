@@ -18,6 +18,7 @@ import pickle
 from scipy.ndimage import gaussian_filter1d
 from Pretrain.Dataset import get_dataset
 import ogbench
+"""
 from Finetuning.utils import (
     train_critic_with_reward,
     train_critic_with_planner,
@@ -28,6 +29,8 @@ from Finetuning.utils import (
     test_critic,
     KernelConfig,
 )
+"""
+from Finetuning.Critic_Backbone import train_critic_with_reward
 from Pretrain.utils import set_seed
 from accelerate import Accelerator
 import random 
