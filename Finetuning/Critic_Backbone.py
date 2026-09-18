@@ -25,7 +25,7 @@ from Pretrain.Transition_Kernel.Kernel_Net import (
     RobustTransitionKernel,
 )
 from Pretrain.Transition_Kernel.Kernel_Backbone import compute_log_density_mog
-from Finetuning.metrics import evaluate_critic
+from Finetuning.metrics import evaluate_critic, compute_j_by_state, td_residual_stats
 import os
 import pickle
 import wandb
@@ -1053,28 +1053,37 @@ def train_critic_with_planner7(
         if len(near_trajs)
         else np.zeros((0, obs_dim), dtype=np.float32)
     )
+    accelerator.wait_for_everyone()
+    J_by_state = compute_j_by_state(
+            dataset_name, specific_dataset, task_id,
+            planner_checkpoint, reward_checkpoint, old_critic_checkpoint,
+            backbone_layers, hidden_layers, hidden_dim,
+            reward_hidden_layers, reward_hidden_dim, all_trajs,
+            accelerator=accelerator,
+    )
+    accelerator.wait_for_everyone()
     if is_main:
         print(
             f"planner7 pools: all={len(all_pool)} near={len(near_pool)} "
             f"goal={len(goal_pool)} traj_length={traj_length}"
         )
         print("testing critic quality droping the failed episodes")
-    evaluate_critic(
-                    dataset_name, specific_dataset, task_id,
-                    planner_checkpoint, reward_checkpoint, old_critic_checkpoint,
-                    hidden_layers, hidden_dim, reward_hidden_layers, reward_hidden_dim,
-                    backbone_layers, all_trajs, gamma, 
-                    drop_timeouts=True, value_decode="symlog", accelerator=accelerator,
-    )
-    if is_main:
+        evaluate_critic(
+                    dataset_name, specific_dataset, task_id, old_critic_checkpoint,
+                    hidden_layers, hidden_dim, all_trajs, J_by_state, gamma, 
+                    drop_timeouts=True, value_decode="symlog",
+        )
         print("testing critic quality keeping the failed episodes")
-    evaluate_critic(
-                    dataset_name, specific_dataset, task_id,
-                    planner_checkpoint, reward_checkpoint, old_critic_checkpoint,
-                    hidden_layers, hidden_dim, reward_hidden_layers, reward_hidden_dim,
-                    backbone_layers, all_trajs, gamma,
-                    drop_timeouts=False, value_decode="symlog", accelerator=accelerator,
-    )
+        evaluate_critic(
+                    dataset_name, specific_dataset, task_id, old_critic_checkpoint,
+                    hidden_layers, hidden_dim, all_trajs, J_by_state, gamma,
+                    drop_timeouts=False, value_decode="symlog",
+         )
+        print()
+        td_residual_stats(
+                   dataset_name, specific_dataset, task_id, hidden_layers, hidden_dim, old_critic_checkpoint,
+                   all_trajs, gamma,
+        )
 
     reset_pool = (
         _train_reset_pool(dataset_name, specific_dataset, task_id, n=n_reset)
@@ -1311,30 +1320,39 @@ def train_critic_with_planner7(
                 f"{wandb_prefix}/n_goal": int(len(goal_pool)),
                 f"{wandb_prefix}/sampling_seconds": sampling_seconds,
             })
-
-    accelerator.wait_for_everyone()
+    
     if is_main:
         unwrapped_critic = accelerator.unwrap_model(critic)
         target_critic.load_state_dict(unwrapped_critic.state_dict())
         target_critic.eval()
         save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
         print("critic saved.")
-        print("testing critic quality droping the failed episodes")
-    evaluate_critic(
-                    dataset_name, specific_dataset, task_id,
-                    planner_checkpoint, reward_checkpoint, new_step,
-                    hidden_layers, hidden_dim, reward_hidden_layers, reward_hidden_dim,
-                    backbone_layers, all_trajs, gamma, 
-                    drop_timeouts=True, value_decode="symlog", accelerator=accelerator,
-        )
-    if is_main:
-        print("testing critic quality keeping the failed episodes")
-    evaluate_critic(
-                    dataset_name, specific_dataset, task_id,
-                    planner_checkpoint, reward_checkpoint, new_step,
-                    hidden_layers, hidden_dim, reward_hidden_layers, reward_hidden_dim,
-                    backbone_layers, all_trajs, gamma, 
-                    drop_timeouts=False, value_decode="symlog", accelerator=accelerator,
+    accelerator.wait_for_everyone()
+    J_by_state = compute_j_by_state(
+            dataset_name, specific_dataset, task_id,
+            planner_checkpoint, reward_checkpoint, new_step,
+            backbone_layers, hidden_layers, hidden_dim,
+            reward_hidden_layers, reward_hidden_dim, all_trajs,
+            accelerator=accelerator,
     )
+    accelerator.wait_for_everyone()
+    if is_main:
+        print("testing critic quality droping the failed episodes")
+        evaluate_critic(
+                    dataset_name, specific_dataset, task_id, new_step,
+                    hidden_layers, hidden_dim, all_trajs, J_by_state, gamma, 
+                    drop_timeouts=True, value_decode="symlog",
+        )
+        print("testing critic quality keeping the failed episodes")
+        evaluate_critic(
+                    dataset_name, specific_dataset, task_id, new_step,
+                    hidden_layers, hidden_dim, all_trajs, J_by_state, gamma, 
+                    drop_timeouts=False, value_decode="symlog",
+        )
+        print()
+        td_residual_stats(
+                   dataset_name, specific_dataset, task_id, hidden_layers, hidden_dim, new_step,
+                   all_trajs, gamma,
+        )
     return 0.0, 1.0
 

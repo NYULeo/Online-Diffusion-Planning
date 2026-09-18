@@ -5,7 +5,6 @@ from scipy.stats import spearmanr
 import torch
 from torch.utils.data import Dataset, DataLoader
 from Pretrain.Critic.nets import Critic
-from accelerate import Accelerator
 
 
 # metrics for critic quality evaluation
@@ -47,115 +46,8 @@ def within_state_j_dispersion(J_by_state: np.ndarray, eps: float = 1e-8):
 
 
 
-
-
-
-@torch.no_grad()
-def evaluate_critic(
-    dataset_name: str,
-    specific_dataset: str,
-    task_id: int,
-    planner_checkpoint: int,
-    reward_checkpoint: int,
-    critic_checkpoint: int,
-    hidden_layers: int,
-    hidden_dim: int,
-    reward_hidden_layers: int,
-    reward_hidden_dim: int,
-    backbone_layers: int,
-    trajs: List[dict],
-    gamma: float = 0.99,
-    drop_timeouts: bool = True,
-    value_decode: str = "symlog",
-    accelerator: Accelerator = None,
-):
-    from Finetuning.utils import (
-          check_device,
-          get_critic_model,
-          get_critic_stats,
-          get_Q_scale,
-          symexp,
-    )
-    def align_reward_mask(traj: dict):
-        obs = np.asarray(traj["observations"], dtype=np.float32)
-        n = len(obs)
-        raw_m = traj.get("masks", None)
-        if raw_m is None:
-            masks = np.ones(n, dtype=np.float32)
-        else:
-            masks = np.asarray(raw_m, dtype=np.float32).reshape(-1)
-            if len(masks) < n:
-                masks = np.concatenate(
-                    [masks, np.ones(n - len(masks), dtype=np.float32)]
-                )
-            masks = masks[:n]
-        r = np.asarray(traj["rewards"], dtype=np.float64).reshape(-1)
-        if len(r) == n - 1:
-            trans_r = r
-        elif len(r) == n:
-            trans_r = r[1:]
-        elif len(r) > n - 1:
-            trans_r = r[: n - 1]
-        else:
-            trans_r = np.concatenate(
-                [r, np.zeros(n - 1 - len(r), dtype=np.float64)]
-            )
-        return obs, masks, trans_r
-
-    def traj_cost_to_go(traj: dict, gamma: float, drop_timeouts: bool = True):
-        obs, masks, trans_r = align_reward_mask(traj)
-        n = len(obs)
-        if n == 0:
-            return None, None
-        goal = np.where(masks == 0.0)[0]
-        G = np.zeros(n, dtype=np.float64)
-        if len(goal) == 0:
-            if drop_timeouts:
-                return None, None
-            acc = 0.0
-            for t in range(n - 2, -1, -1):
-                acc = float(trans_r[t]) + gamma * acc
-                G[t] = acc
-            G[n - 1] = 0.0
-            return obs, G
-        T = int(goal[0])
-        G[T:] = 0.0
-        acc = 0.0
-        for t in range(T - 1, -1, -1):
-            acc = float(trans_r[t]) + gamma * acc
-            G[t] = acc
-        return obs, G
-
-    class CostToGoDataset(Dataset):
-        def __init__(self, trajs, stats, gamma=0.99, drop_timeouts=True):
-            xs, gs = [], []
-            n_traj, n_drop = 0, 0
-            for traj in trajs:
-                obs, G = traj_cost_to_go(traj, gamma, drop_timeouts)
-                if G is None:
-                    n_drop += 1
-                    continue
-                n_traj += 1
-                for t in range(len(obs)):
-                    xs.append(stats.norm_obs(obs[t]))
-                    gs.append(G[t])
-            self.x = np.asarray(xs, dtype=np.float32)
-            self.g = np.asarray(gs, dtype=np.float32)
-            gmin = float(self.g.min()) if len(self.g) else float("nan")
-            gmax = float(self.g.max()) if len(self.g) else float("nan")
-            print(
-                f"cost-to-go dataset: {len(self.x)} states  "
-                f"(trajs kept={n_traj} dropped={n_drop})  "
-                f"G min/max={gmin:.3f}/{gmax:.3f}"
-            )
-
-        def __len__(self):
-            return len(self.x)
-
-        def __getitem__(self, i):
-            return torch.from_numpy(self.x[i]), torch.tensor(self.g[i])
-
-    def decode_v(v, value_decode, q_mean, q_std):
+def decode_v(v, value_decode, q_mean, q_std):
+        from Finetuning.utils import symexp
         if value_decode == "symlog":
             return symexp(v)
         if value_decode == "zscore":
@@ -164,7 +56,7 @@ def evaluate_critic(
             return v
         raise ValueError(f"unknown value_decode={value_decode}")
 
-    def sample_euler_karras_batch(
+def sample_euler_karras_batch(
         s0_b: torch.Tensor,
         score_model,
         d_s: int,
@@ -213,7 +105,33 @@ def evaluate_critic(
             x = clip_actions(x, d_s)
         return x
 
-    def compute_j_by_state(
+def align_reward_mask(traj: dict):
+        obs = np.asarray(traj["observations"], dtype=np.float32)
+        n = len(obs)
+        raw_m = traj.get("masks", None)
+        if raw_m is None:
+            masks = np.ones(n, dtype=np.float32)
+        else:
+            masks = np.asarray(raw_m, dtype=np.float32).reshape(-1)
+            if len(masks) < n:
+                masks = np.concatenate(
+                    [masks, np.ones(n - len(masks), dtype=np.float32)]
+                )
+            masks = masks[:n]
+        r = np.asarray(traj["rewards"], dtype=np.float64).reshape(-1)
+        if len(r) == n - 1:
+            trans_r = r
+        elif len(r) == n:
+            trans_r = r[1:]
+        elif len(r) > n - 1:
+            trans_r = r[: n - 1]
+        else:
+            trans_r = np.concatenate(
+                [r, np.zeros(n - 1 - len(r), dtype=np.float64)]
+            )
+        return obs, masks, trans_r
+
+def compute_j_by_state(
         dataset_name: str,
         specific_dataset: str,
         task_id: int,
@@ -380,28 +298,126 @@ def evaluate_critic(
             )
         return J_by_state
 
-    def test_wsjd(
-        dataset_name: str,
-        specific_dataset: str,
-        task_id: int,
-        planner_checkpoint: int,
-        reward_checkpoint: int,
-        critic_checkpoint: int,
-        backbone_layers: int,
-        hidden_layers: int,
-        hidden_dim: int,
-        reward_hidden_layers: int,
-        reward_hidden_dim: int,
-        trajs: List[dict],
-        accelerator: Accelerator,
+
+
+
+
+
+@torch.no_grad()
+def evaluate_critic(
+    dataset_name: str,
+    specific_dataset: str,
+    task_id: int,
+    critic_checkpoint: int,
+    hidden_layers: int,
+    hidden_dim: int,
+    trajs: List[dict],
+    J_by_state: np.ndarray,
+    gamma: float = 0.99,
+    drop_timeouts: bool = True,
+    value_decode: str = "symlog",
+):
+    from Finetuning.utils import (
+          check_device,
+          get_critic_model,
+          get_critic_stats,
+          get_Q_scale,
+          symexp,
+    )
+    def align_reward_mask(traj: dict):
+        obs = np.asarray(traj["observations"], dtype=np.float32)
+        n = len(obs)
+        raw_m = traj.get("masks", None)
+        if raw_m is None:
+            masks = np.ones(n, dtype=np.float32)
+        else:
+            masks = np.asarray(raw_m, dtype=np.float32).reshape(-1)
+            if len(masks) < n:
+                masks = np.concatenate(
+                    [masks, np.ones(n - len(masks), dtype=np.float32)]
+                )
+            masks = masks[:n]
+        r = np.asarray(traj["rewards"], dtype=np.float64).reshape(-1)
+        if len(r) == n - 1:
+            trans_r = r
+        elif len(r) == n:
+            trans_r = r[1:]
+        elif len(r) > n - 1:
+            trans_r = r[: n - 1]
+        else:
+            trans_r = np.concatenate(
+                [r, np.zeros(n - 1 - len(r), dtype=np.float64)]
+            )
+        return obs, masks, trans_r
+
+    def traj_cost_to_go(traj: dict, gamma: float, drop_timeouts: bool = True):
+        obs, masks, trans_r = align_reward_mask(traj)
+        n = len(obs)
+        if n == 0:
+            return None, None
+        goal = np.where(masks == 0.0)[0]
+        G = np.zeros(n, dtype=np.float64)
+        if len(goal) == 0:
+            if drop_timeouts:
+                return None, None
+            acc = 0.0
+            for t in range(n - 2, -1, -1):
+                acc = float(trans_r[t]) + gamma * acc
+                G[t] = acc
+            G[n - 1] = 0.0
+            return obs, G
+        T = int(goal[0])
+        G[T:] = 0.0
+        acc = 0.0
+        for t in range(T - 1, -1, -1):
+            acc = float(trans_r[t]) + gamma * acc
+            G[t] = acc
+        return obs, G
+
+    class CostToGoDataset(Dataset):
+        def __init__(self, trajs, stats, gamma=0.99, drop_timeouts=True):
+            xs, gs = [], []
+            n_traj, n_drop = 0, 0
+            for traj in trajs:
+                obs, G = traj_cost_to_go(traj, gamma, drop_timeouts)
+                if G is None:
+                    n_drop += 1
+                    continue
+                n_traj += 1
+                for t in range(len(obs)):
+                    xs.append(stats.norm_obs(obs[t]))
+                    gs.append(G[t])
+            self.x = np.asarray(xs, dtype=np.float32)
+            self.g = np.asarray(gs, dtype=np.float32)
+            gmin = float(self.g.min()) if len(self.g) else float("nan")
+            gmax = float(self.g.max()) if len(self.g) else float("nan")
+            print(
+                f"cost-to-go dataset: {len(self.x)} states  "
+                f"(trajs kept={n_traj} dropped={n_drop})  "
+                f"G min/max={gmin:.3f}/{gmax:.3f}"
+            )
+
+        def __len__(self):
+            return len(self.x)
+
+        def __getitem__(self, i):
+            return torch.from_numpy(self.x[i]), torch.tensor(self.g[i])
+
+    def decode_v(v, value_decode, q_mean, q_std):
+        if value_decode == "symlog":
+            return symexp(v)
+        if value_decode == "zscore":
+            return v * q_std + q_mean
+        if value_decode == "raw":
+            return v
+        raise ValueError(f"unknown value_decode={value_decode}")
+
+    def test_wsjd( 
+        J_by_state: np.ndarray,
     ):
-        J = compute_j_by_state(
-            dataset_name, specific_dataset, task_id, planner_checkpoint, reward_checkpoint, critic_checkpoint,
-            backbone_layers, hidden_layers, hidden_dim, reward_hidden_layers, reward_hidden_dim, trajs,
-            accelerator = accelerator,
-        )
-        stats = within_state_j_dispersion(J)
-        stats["J_by_state"] = J
+        
+        stats = within_state_j_dispersion(J_by_state)
+        stats["J_by_state"] = J_by_state
         return stats
 
     device = check_device()
@@ -440,14 +456,9 @@ def evaluate_critic(
     tgt = np.concatenate(targets)
     ic = spearman_correlation(pred, tgt)
     ev = explained_variance(tgt, pred)
-    WSJD = test_wsjd(
-         dataset_name, specific_dataset, task_id, planner_checkpoint, reward_checkpoint, critic_checkpoint,
-         backbone_layers, hidden_layers, hidden_dim, reward_hidden_layers, reward_hidden_dim,
-         trajs, accelerator)
-
+    WSJD = test_wsjd(J_by_state)
     mae = float(np.mean(np.abs(pred - tgt)))
-    if accelerator.is_main_process:
-         print(
+    print(
              f"  cost-to-go test ckpt={critic_checkpoint} decode={value_decode}\n"
              f"  n={len(pred)}  IC={ic:.3f}  EV={ev:.3f}  MAE={mae:.3f}\n"
              f"  WSJD = {WSJD['wsjd']:.3f}\n"
@@ -458,7 +469,146 @@ def evaluate_critic(
     return {"ic": ic, "ev": ev, "WSJD": WSJD['wsjd'], "mae": mae, "pred": pred, "G": tgt}
 
 
+@torch.no_grad()
+def td_residual_stats(
+    dataset_name: str,
+    specific_dataset: str,
+    task_id: int,
+    hidden_layers: int,
+    hidden_dim: int,
+    critic_checkpoint: int,
+    trajs: List[dict],
+    gamma: float = 0.99,
+    value_decode: str = "symlog",
+    suffix_length: Optional[int] = 32,
+):
+    from Finetuning.utils import (
+          check_device,
+          get_critic_model,
+          get_critic_stats,
+          get_Q_scale,
+          symexp,
+    )
 
+    def decode_v(v, value_decode, q_mean, q_std):
+        if value_decode == "symlog":
+            return symexp(v)
+        if value_decode == "zscore":
+            return v * q_std + q_mean
+        if value_decode == "raw":
+            return v
+        raise ValueError(f"unknown value_decode={value_decode}")
+
+    def _V(obs_np):
+        x = torch.as_tensor(
+            np.stack([stats.norm_obs(o) for o in obs_np], axis=0),
+            device=device, dtype=torch.float32,
+        )
+        v = model(x).squeeze(-1)
+        return decode_v(v, value_decode, q_mean, q_std).detach().cpu().numpy()
+    
+    def align_reward_mask(traj: dict):
+        obs = np.asarray(traj["observations"], dtype=np.float32)
+        n = len(obs)
+        raw_m = traj.get("masks", None)
+        if raw_m is None:
+            masks = np.ones(n, dtype=np.float32)
+        else:
+            masks = np.asarray(raw_m, dtype=np.float32).reshape(-1)
+            if len(masks) < n:
+                masks = np.concatenate(
+                    [masks, np.ones(n - len(masks), dtype=np.float32)]
+                )
+            masks = masks[:n]
+        r = np.asarray(traj["rewards"], dtype=np.float64).reshape(-1)
+        if len(r) == n - 1:
+            trans_r = r
+        elif len(r) == n:
+            trans_r = r[1:]
+        elif len(r) > n - 1:
+            trans_r = r[: n - 1]
+        else:
+            trans_r = np.concatenate(
+                [r, np.zeros(n - 1 - len(r), dtype=np.float64)]
+            )
+        return obs, masks, trans_r
+
+    def _summ(arr):
+        a = np.asarray(arr, dtype=np.float64)
+        if a.size == 0:
+            return dict(n=0, mean=float("nan"), std=float("nan"), mse=float("nan"))
+        return dict(
+            n=int(a.size),
+            mean=float(a.mean()),
+            std=float(a.std()),
+            mse=float(np.mean(a ** 2)),
+        )
+
+    device = check_device()
+    ns = 0 if critic_checkpoint == -1 else critic_checkpoint
+    stats = get_critic_stats(dataset_name, specific_dataset, task_id, ns)
+    state, obs_dim = get_critic_model(
+        dataset_name, specific_dataset, task_id, critic_checkpoint,
+    )
+    model = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
+    model.load_state_dict(state)
+    model.eval()
+
+    q_mean = torch.tensor(0.0, device=device)
+    q_std = torch.tensor(1.0, device=device)
+    if value_decode == "zscore":
+        try:
+            qs = get_Q_scale(dataset_name, specific_dataset, task_id)
+            q_mean = torch.tensor(float(getattr(qs, "Q_mean", 0.0) or 0.0), device=device)
+            q_std = torch.tensor(float(getattr(qs, "Q_std", 1.0) or 1.0), device=device)
+        except Exception:
+            pass
+
+    
+    d_all, d_near, d_far, d_goal = [], [], [], []
+    for traj in trajs:
+        obs, masks, trans_r = align_reward_mask(traj)
+        n = len(obs)
+        if n < 2:
+            continue
+        V = _V(obs)
+        goal = np.where(masks == 0.0)[0]
+        T = int(goal[0]) if len(goal) else None
+        play = np.where(masks != 0.0)[0]
+        near_set = set(play[-suffix_length:]) if suffix_length is not None else set(play)
+
+        for t in range(n - 1):
+            if T is not None and t >= T:
+                break
+            if T is not None and t + 1 == T:
+                delta = float(trans_r[t] + 0.0 - V[t])
+                d_goal.append(delta)
+            else:
+                delta = float(trans_r[t] + gamma * V[t + 1] - V[t])
+            d_all.append(delta)
+            if t in near_set:
+                d_near.append(delta)
+            elif T is None or t < T:
+                d_far.append(delta)
+
+    out = {
+        "all": _summ(d_all),
+        "near": _summ(d_near),
+        "far": _summ(d_far),
+        "goal_arrive": _summ(d_goal),
+    }
+    print(
+        "TD residual  delta = r + gamma V(s') - V(s)\n"
+        f"  all  n={out['all']['n']}  mean={out['all']['mean']:.4f}  "
+        f"std={out['all']['std']:.4f}  mse={out['all']['mse']:.4f}\n"
+        f"  near n={out['near']['n']}  mean={out['near']['mean']:.4f}  "
+        f"std={out['near']['std']:.4f}\n"
+        f"  far  n={out['far']['n']}  mean={out['far']['mean']:.4f}  "
+        f"std={out['far']['std']:.4f}\n"
+        f"  arrive-goal n={out['goal_arrive']['n']}  "
+        f"mean={out['goal_arrive']['mean']:.4f}  std={out['goal_arrive']['std']:.4f}"
+    )
+    return out
 
 
 

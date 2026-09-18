@@ -621,3 +621,110 @@ def within_state_j_dispersion(J_by_state: np.ndarray, eps: float = 1e-8):
         "mu_s": mu,
     }
 
+
+@torch.no_grad()
+def td_residual_stats(
+    dataset_name: str,
+    specific_dataset: str,
+    hidden_layers: int,
+    hidden_dim: int,
+    critic_checkpoint: int,
+    trajs: List[dict],
+    gamma: float = 0.99,
+    task_id: Optional[int] = None,
+    value_decode: str = "symlog",
+    suffix_length: Optional[int] = 32,
+):
+    """Bellman residual of the decoded critic on stored transitions.
+
+    delta_t = r_t + gamma * V(s_{t+1}) - V(s_t)
+            = 0-bootstrap at first masks==0 (V(s_T)=0, no next V).
+
+    Name: TD residual / Bellman error.
+    Returns mean/std/mse overall, on last-suffix play, on far play, on goals.
+    """
+    device = check_device()
+    ns = 0 if critic_checkpoint == -1 else critic_checkpoint
+    stats = get_critic_stats(dataset_name, specific_dataset, task_id, ns)
+    state, obs_dim = get_critic_model(
+        dataset_name, specific_dataset, task_id, critic_checkpoint,
+    )
+    model = Critic(obs_dim, hidden_dim, hidden_layers).to(device)
+    model.load_state_dict(state)
+    model.eval()
+
+    q_mean = torch.tensor(0.0, device=device)
+    q_std = torch.tensor(1.0, device=device)
+    if value_decode == "zscore":
+        try:
+            qs = get_Q_scale(dataset_name, specific_dataset, task_id)
+            q_mean = torch.tensor(float(getattr(qs, "Q_mean", 0.0) or 0.0), device=device)
+            q_std = torch.tensor(float(getattr(qs, "Q_std", 1.0) or 1.0), device=device)
+        except Exception:
+            pass
+
+    def _V(obs_np):
+        x = torch.as_tensor(
+            np.stack([stats.norm_obs(o) for o in obs_np], axis=0),
+            device=device, dtype=torch.float32,
+        )
+        v = model(x).squeeze(-1)
+        return _decode_v(v, value_decode, q_mean, q_std).detach().cpu().numpy()
+
+    d_all, d_near, d_far, d_goal = [], [], [], []
+    for traj in trajs:
+        obs, masks, trans_r = _align_reward_mask(traj)
+        n = len(obs)
+        if n < 2:
+            continue
+        V = _V(obs)
+        goal = np.where(masks == 0.0)[0]
+        T = int(goal[0]) if len(goal) else None
+        play = np.where(masks != 0.0)[0]
+        near_set = set(play[-suffix_length:]) if suffix_length is not None else set(play)
+
+        for t in range(n - 1):
+            if T is not None and t >= T:
+                break
+            if T is not None and t + 1 == T:
+                delta = float(trans_r[t] + 0.0 - V[t])
+                d_goal.append(delta)
+            else:
+                delta = float(trans_r[t] + gamma * V[t + 1] - V[t])
+            d_all.append(delta)
+            if t in near_set:
+                d_near.append(delta)
+            elif T is None or t < T:
+                d_far.append(delta)
+
+    def _summ(arr):
+        a = np.asarray(arr, dtype=np.float64)
+        if a.size == 0:
+            return dict(n=0, mean=float("nan"), std=float("nan"), mse=float("nan"))
+        return dict(
+            n=int(a.size),
+            mean=float(a.mean()),
+            std=float(a.std()),
+            mse=float(np.mean(a ** 2)),
+        )
+
+    out = {
+        "all": _summ(d_all),
+        "near": _summ(d_near),
+        "far": _summ(d_far),
+        "goal_arrive": _summ(d_goal),
+    }
+    print(
+        "TD residual  delta = r + gamma V(s') - V(s)\n"
+        f"  all  n={out['all']['n']}  mean={out['all']['mean']:.4f}  "
+        f"std={out['all']['std']:.4f}  mse={out['all']['mse']:.4f}\n"
+        f"  near n={out['near']['n']}  mean={out['near']['mean']:.4f}  "
+        f"std={out['near']['std']:.4f}\n"
+        f"  far  n={out['far']['n']}  mean={out['far']['mean']:.4f}  "
+        f"std={out['far']['std']:.4f}\n"
+        f"  arrive-goal n={out['goal_arrive']['n']}  "
+        f"mean={out['goal_arrive']['mean']:.4f}  std={out['goal_arrive']['std']:.4f}"
+    )
+    return out
+
+
