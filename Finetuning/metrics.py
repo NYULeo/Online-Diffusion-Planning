@@ -54,6 +54,7 @@ def within_state_j_dispersion(J_by_state: np.ndarray, eps: float = 1e-8):
 def evaluate_critic(
     dataset_name: str,
     specific_dataset: str,
+    task_id: int,
     planner_checkpoint: int,
     reward_checkpoint: int,
     critic_checkpoint: int,
@@ -64,7 +65,6 @@ def evaluate_critic(
     backbone_layers: int,
     trajs: List[dict],
     gamma: float = 0.99,
-    task_id: Optional[int] = None,
     drop_timeouts: bool = True,
     value_decode: str = "symlog",
     accelerator: Accelerator = None,
@@ -216,7 +216,7 @@ def evaluate_critic(
     def compute_j_by_state(
         dataset_name: str,
         specific_dataset: str,
-        task_id: str,
+        task_id: int,
         planner_checkpoint: int,
         reward_checkpoint: int,
         critic_checkpoint: int,
@@ -383,7 +383,7 @@ def evaluate_critic(
     def test_wsjd(
         dataset_name: str,
         specific_dataset: str,
-        task_id: str,
+        task_id: int,
         planner_checkpoint: int,
         reward_checkpoint: int,
         critic_checkpoint: int,
@@ -394,7 +394,6 @@ def evaluate_critic(
         reward_hidden_dim: int,
         trajs: List[dict],
         accelerator: Accelerator,
-        **kwargs,
     ):
         J = compute_j_by_state(
             dataset_name, specific_dataset, task_id, planner_checkpoint, reward_checkpoint, critic_checkpoint,
@@ -455,7 +454,7 @@ def evaluate_critic(
         f"  G    mean/std={tgt.mean():.3f}/{tgt.std():.3f}\n"
         f"  G    min/max={tgt.min():.3f}/{tgt.max():.3f}"
     )
-    return {"ic": ic, "ev": ev, "mae": mae, "pred": pred, "G": tgt}
+    return {"ic": ic, "ev": ev, "WSJD": WSJD['wsjd'], "mae": mae, "pred": pred, "G": tgt}
 
 
 
