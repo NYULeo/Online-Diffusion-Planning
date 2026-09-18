@@ -115,7 +115,7 @@ if __name__ == '__main__':  # pragma: no cover
         set_seed(1)
         env_name = 'cube'
         specific_env = 'single-play'
-        traj_length = 50
+        traj_length = 200
         horizon = 128
         train_horizon = 32
         task_id = 4
@@ -137,14 +137,14 @@ if __name__ == '__main__':  # pragma: no cover
               "reward_hidden_dim": 512,
               "batch_size": 256,
               "oversample": 30,
-              "num_steps": 200,
+              "num_steps": 100,
               "resample_every": 1,
               "train_horizon": train_horizon,             # passed as horizon= to the trainer
               "gamma": 0.99,
               "lam": None,
               "rho": 0.0,
               "lr": 1e-04,
-              "min_lr": 1e-06,
+              "min_lr": 1e-05,
               "tau": 0.005,
               "steps_T": 10,
               "num_karras": 1,
