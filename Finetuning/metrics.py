@@ -485,19 +485,17 @@ def evaluate_critic_hat_return(
     gamma: float = 0.99,
     drop_timeouts: bool = True,
     value_decode: str = "symlog",
-    bootstrap_timeout: bool = False,
-    max_states: int = 200000,
+    batch_size: int = 4096,
+    max_trajs: Optional[int] = None,
 ):
-    """IC/EV/MAE of V(s) vs G_hat(s) = J-style return on logged (s,a)."""
-    from scipy.stats import spearmanr
     from Pretrain.Rewards.nets import SimpleReward
     from Pretrain.Critic.nets import Critic
     from Finetuning.utils import (
         check_device, get_critic_model, get_critic_stats, get_Q_scale,
-        get_reward_model, get_reward_stats, symexp,
+        get_reward_model, get_reward_stats,
     )
     from Finetuning.metrics import (
-        align_reward_mask, decode_v, explained_variance, spearman_correlation,
+        align_reward_mask, decode_v, explained_variance,
     )
 
     device = check_device()
@@ -510,11 +508,17 @@ def evaluate_critic_hat_return(
     critic.load_state_dict(c_state)
     critic.eval()
 
-    rew_state, _, act_dim = get_reward_model(
+    rew_state, extra, extra2 = get_reward_model(
         dataset_name, specific_dataset, reward_checkpoint, task_id,
     )
-    rh, rhd = reward_hidden_layers, reward_hidden_dim
-    reward_net = SimpleReward(obs_dim, act_dim, rhd, rh).to(device)
+    # get_reward_model -> (state, obs_dim, act_dim) on main
+    act_dim = extra2 if isinstance(extra2, int) else extra
+    if not isinstance(act_dim, int):
+        act_dim = int(np.asarray(trajs[0]["actions"]).shape[-1])
+
+    reward_net = SimpleReward(
+        obs_dim, act_dim, reward_hidden_dim, reward_hidden_layers,
+    ).to(device)
     reward_net.load_state_dict(rew_state)
     reward_net.eval()
     rstat = get_reward_stats(dataset_name, specific_dataset, reward_checkpoint, task_id)
@@ -530,45 +534,26 @@ def evaluate_critic_hat_return(
     except Exception:
         pass
 
-    c_mean = torch.as_tensor(cstat.obs_mean, device=device, dtype=torch.float32)
-    c_std = torch.as_tensor(np.maximum(cstat.obs_std, 1e-3), device=device)
     r_mean = torch.as_tensor(rstat.obs_mean, device=device, dtype=torch.float32)
     r_std = torch.as_tensor(np.maximum(rstat.obs_std, 1e-3), device=device)
 
-    def V_np(obs_batch):
-        x = torch.as_tensor(
-            np.stack([cstat.norm_obs(o) for o in obs_batch], axis=0),
-            device=device, dtype=torch.float32,
-        )
-        v = critic(x).squeeze(-1)
-        return decode_v(v, value_decode, q_mean, q_std).detach().cpu().numpy()
-
-    def rhat_np(obs_t, act_t):
-        if len(obs_t) == 0:
-            return np.zeros((0,), dtype=np.float64)
-        s = torch.as_tensor(np.stack(obs_t, axis=0), device=device, dtype=torch.float32)
-        a = torch.as_tensor(np.stack(act_t, axis=0), device=device, dtype=torch.float32)
-        a = torch.clamp(a, -1.0, 1.0)
-        sn = (s - r_mean) / r_std
-        r = reward_net(sn, a).squeeze(-1) / max(scale, 1e-8)
-        return r.detach().cpu().numpy().astype(np.float64)
-
-    xs, gs = [], []
-    n_keep = n_drop = 0
+    # ---- gather Type A (or all) tapes ----
+    segs = []  # list of (obs[0:T+1], act[0:T])
+    n_drop = 0
+    used = 0
     for traj in trajs:
         obs, masks, _ = align_reward_mask(traj)
         n = len(obs)
-        acts = np.asarray(traj.get("actions", np.zeros((0, 1))), dtype=np.float32)
-        if n == 0:
+        if n < 2:
             continue
-        # actions align with transitions: prefer len n-1
+        acts = np.asarray(traj.get("actions", np.zeros((0, act_dim))), dtype=np.float32)
+        if acts.ndim == 1:
+            acts = acts.reshape(-1, 1)
         if len(acts) >= n:
             acts = acts[: n - 1]
         elif len(acts) < n - 1:
-            pad = np.zeros((n - 1 - len(acts), acts.shape[-1] if acts.ndim == 2 else 1), dtype=np.float32)
-            if acts.ndim == 1:
-                acts = acts.reshape(-1, 1)
-            acts = np.concatenate([acts.reshape(len(acts), -1), pad], axis=0)
+            pad = np.zeros((n - 1 - len(acts), acts.shape[-1]), dtype=np.float32)
+            acts = np.concatenate([acts, pad], axis=0)
 
         goal = np.where(masks == 0.0)[0]
         if len(goal) == 0:
@@ -576,54 +561,78 @@ def evaluate_critic_hat_return(
                 n_drop += 1
                 continue
             T = n - 1
-            v_end = float(V_np(obs[T:T + 1])[0]) if bootstrap_timeout else 0.0
         else:
             T = int(goal[0])
-            v_end = 0.0
+        if T < 1:
+            continue
+        segs.append((obs[: T + 1], acts[:T]))
+        used += 1
+        if max_trajs is not None and used >= max_trajs:
+            break
 
-        n_keep += 1
-        r_seq = rhat_np(obs[:T], [acts[i] for i in range(T)]) if T > 0 else np.zeros((0,))
-        G = np.zeros(T + 1, dtype=np.float64)
-        G[T] = v_end
-        acc = v_end
+    if not segs:
+        raise RuntimeError("hat-return: no tapes")
+
+    all_s, all_a = [], []
+    for obs, acts in segs:
+        all_s.append(obs[:-1])
+        all_a.append(acts)
+    S = np.concatenate(all_s, axis=0).astype(np.float32)
+    A = np.concatenate(all_a, axis=0).astype(np.float32)
+    A = np.clip(A, -1.0, 1.0)
+
+    # ---- one batched reward_net ----
+    r_hat = np.empty((len(S),), dtype=np.float64)
+    for i in range(0, len(S), batch_size):
+        sl = slice(i, min(i + batch_size, len(S)))
+        s = torch.as_tensor(S[sl], device=device)
+        a = torch.as_tensor(A[sl], device=device)
+        sn = (s - r_mean) / r_std
+        r = reward_net(sn, a) / max(scale, 1e-8)
+        r_hat[sl] = r.detach().float().cpu().numpy().reshape(-1)
+
+    # ---- NumPy backup per tape ----
+    xs, gs = [], []
+    off = 0
+    for obs, acts in segs:
+        T = len(acts)
+        rr = r_hat[off : off + T]
+        off += T
+        G = np.zeros(T + 1, dtype=np.float64)  # G[T]=0 absorb
+        acc = 0.0
         for t in range(T - 1, -1, -1):
-            acc = float(r_seq[t]) + gamma * acc
+            acc = float(rr[t]) + gamma * acc
             G[t] = acc
         for t in range(T + 1):
             xs.append(cstat.norm_obs(obs[t]))
             gs.append(G[t])
-        if len(xs) >= max_states:
-            break
 
-    x = np.asarray(xs, dtype=np.float32)
-    g = np.asarray(gs, dtype=np.float32)
+    X = np.asarray(xs, dtype=np.float32)
+    Gv = np.asarray(gs, dtype=np.float32)
     print(
-        f"hat-return G: states={len(x)} trajs kept={n_keep} dropped={n_drop} "
-        f"G min/max={g.min():.3f}/{g.max():.3f} mean/std={g.mean():.3f}/{g.std():.3f}"
+        f"hat-return G: states={len(X)} trajs={len(segs)} dropped={n_drop} "
+        f"G min/max={Gv.min():.3f}/{Gv.max():.3f} mean/std={Gv.mean():.3f}/{Gv.std():.3f}"
     )
 
-    loader = DataLoader(
-        list(zip(torch.from_numpy(x), torch.from_numpy(g))),
-        batch_size=512, shuffle=False,
-    )
-    preds, tgts = [], []
-    for s, gt in loader:
-        s = s.to(device)
+    # ---- one batched critic ----
+    pred = np.empty((len(X),), dtype=np.float64)
+    for i in range(0, len(X), batch_size):
+        sl = slice(i, min(i + batch_size, len(X)))
+        s = torch.as_tensor(X[sl], device=device)
         v = decode_v(critic(s).squeeze(-1), value_decode, q_mean, q_std)
-        preds.append(v.detach().cpu().numpy())
-        tgts.append(gt.numpy())
-    pred = np.concatenate(preds)
-    tgt = np.concatenate(tgts)
-    ic = float(spearmanr(pred, tgt).correlation)
-    ev = explained_variance(tgt, pred)
-    mae = float(np.mean(np.abs(pred - tgt)))
+        pred[sl] = v.detach().float().cpu().numpy().reshape(-1)
+
+    ic = float(spearmanr(pred, Gv).correlation)
+    var_g = float(np.var(Gv))
+    ev = float("nan") if var_g < 1e-12 else float(1.0 - np.var(Gv - pred) / var_g)
+    mae = float(np.mean(np.abs(pred - Gv)))
     print(
         f"hat-return test ckpt={critic_checkpoint}\n"
         f"  n={len(pred)}  IC={ic:.3f}  EV={ev:.3f}  MAE={mae:.3f}\n"
         f"  pred mean/std={pred.mean():.3f}/{pred.std():.3f}\n"
-        f"  Ghat mean/std={tgt.mean():.3f}/{tgt.std():.3f}"
+        f"  Ghat mean/std={Gv.mean():.3f}/{Gv.std():.3f}"
     )
-    return {"ic": ic, "ev": ev, "mae": mae, "pred": pred, "G": tgt}
+    return {"ic": ic, "ev": ev, "mae": mae, "pred": pred, "G": Gv}
 
 @torch.no_grad()
 def td_residual_stats(
