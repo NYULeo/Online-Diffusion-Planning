@@ -1121,6 +1121,7 @@ def train_critic_with_planner7(
         else np.zeros((0, obs_dim), dtype=np.float32)
     )
     accelerator.wait_for_everyone()
+    """
     J_by_state = compute_j_by_state(
             dataset_name, specific_dataset, task_id,
             planner_checkpoint, reward_checkpoint, old_critic_checkpoint,
@@ -1128,6 +1129,7 @@ def train_critic_with_planner7(
             reward_hidden_layers, reward_hidden_dim, all_trajs,
             accelerator=accelerator,
     )
+    """
     accelerator.wait_for_everyone()
     if is_main:
         print(
@@ -1418,6 +1420,7 @@ def train_critic_with_planner7(
         save_critic(target_critic, dataset_name, specific_dataset, task_id, new_step)
         print("critic saved.")
     accelerator.wait_for_everyone()
+    """
     J_by_state = compute_j_by_state(
             dataset_name, specific_dataset, task_id,
             planner_checkpoint, reward_checkpoint, new_step,
@@ -1425,6 +1428,7 @@ def train_critic_with_planner7(
             reward_hidden_layers, reward_hidden_dim, all_trajs,
             accelerator=accelerator,
     )
+    """
     accelerator.wait_for_everyone()
     if is_main:
         print("testing critic quality droping the failed episodes")
