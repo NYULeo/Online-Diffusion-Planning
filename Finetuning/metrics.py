@@ -18,7 +18,7 @@ def explained_variance(g: np.ndarray, v: np.ndarray) -> float:
 
 def spearman_correlation(g: np.ndarray, v: np.ndarray) -> float:
     return float(spearmanr(g, v).correlation)
-    
+
 def within_state_j_dispersion(J_by_state: np.ndarray, eps: float = 1e-8):
     
     J = np.asarray(J_by_state, dtype=np.float64)
@@ -313,6 +313,7 @@ def evaluate_critic(
     gamma: float = 0.99,
     drop_timeouts: bool = True,
     value_decode: str = "symlog",
+    reward_scale: float = 500.0,
 ):
     from Finetuning.utils import (
           check_device,
@@ -372,7 +373,7 @@ def evaluate_critic(
         return obs, G
 
     class CostToGoDataset(Dataset):
-        def __init__(self, trajs, stats, gamma=0.99, drop_timeouts=True):
+        def __init__(self, trajs, stats, gamma=0.99, drop_timeouts=True, reward_scale=500.0):
             xs, gs = [], []
             n_traj, n_drop = 0, 0
             for traj in trajs:
@@ -385,7 +386,8 @@ def evaluate_critic(
                     xs.append(stats.norm_obs(obs[t]))
                     gs.append(G[t])
             self.x = np.asarray(xs, dtype=np.float32)
-            self.g = np.asarray(gs, dtype=np.float32)
+            #self.g = np.asarray(gs, dtype=np.float32)
+            self.g = (np.asarray(gs, dtype=np.float64) * float(reward_scale)).astype(np.float32)
             gmin = float(self.g.min()) if len(self.g) else float("nan")
             gmax = float(self.g.max()) if len(self.g) else float("nan")
             print(
@@ -420,7 +422,10 @@ def evaluate_critic(
     device = check_device()
     ns = 0 if critic_checkpoint == -1 else critic_checkpoint
     stats = get_critic_stats(dataset_name, specific_dataset, task_id, ns)
-    data = CostToGoDataset(trajs, stats, gamma, drop_timeouts)
+    #data = CostToGoDataset(trajs, stats, gamma, drop_timeouts)
+    data = CostToGoDataset(
+        trajs, stats, gamma, drop_timeouts, reward_scale=reward_scale,
+    )
     if len(data) == 0:
         raise RuntimeError("cost-to-go dataset empty — check masks/rewards on trajs")
     loader = DataLoader(data, batch_size=512, shuffle=False)

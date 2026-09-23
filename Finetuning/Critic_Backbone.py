@@ -1076,13 +1076,13 @@ def train_critic_with_planner7(
         evaluate_critic(
                     dataset_name, specific_dataset, task_id, old_critic_checkpoint,
                     hidden_layers, hidden_dim, all_trajs, J_by_state, gamma, 
-                    drop_timeouts=True, value_decode="symlog",
+                    drop_timeouts=True, value_decode="symlog", reward_scale=500.0,
         )
         print("testing critic quality keeping the failed episodes")
         evaluate_critic(
                     dataset_name, specific_dataset, task_id, old_critic_checkpoint,
                     hidden_layers, hidden_dim, all_trajs, J_by_state, gamma,
-                    drop_timeouts=False, value_decode="symlog",
+                    drop_timeouts=False, value_decode="symlog", reward_scale=500.0,
          )
         print()
         td_residual_stats(
@@ -1351,13 +1351,13 @@ def train_critic_with_planner7(
         evaluate_critic(
                     dataset_name, specific_dataset, task_id, new_step,
                     hidden_layers, hidden_dim, all_trajs, J_by_state, gamma, 
-                    drop_timeouts=True, value_decode="symlog",
+                    drop_timeouts=True, value_decode="symlog", reward_scale=500.0,
         )
         print("testing critic quality keeping the failed episodes")
         evaluate_critic(
                     dataset_name, specific_dataset, task_id, new_step,
                     hidden_layers, hidden_dim, all_trajs, J_by_state, gamma, 
-                    drop_timeouts=False, value_decode="symlog",
+                    drop_timeouts=False, value_decode="symlog", reward_scale=500.0,
         )
         print()
         td_residual_stats(
