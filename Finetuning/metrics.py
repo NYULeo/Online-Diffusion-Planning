@@ -385,20 +385,18 @@ def compute_j_by_state(
             )
         return J_by_state
 
-def two_bellman_metrics(R_s: np.ndarray, eps: float = 1e-8) -> dict:
-    R = np.asarray(R_s, dtype=np.float64)
-    if R.ndim != 2 or R.shape[1] < 2:
-        raise ValueError("R_s must be (n_s0, n_horizons) with n_horizons>=2")
-    R1, RN = R[:, 0], R[:, -1]
-    ok = np.abs(R1) > eps
-    rho = float((RN[ok] / R1[ok]).mean()) if np.any(ok) else float("nan")
-    sig2 = float(np.var(R, axis=1).mean())
+def two_bellman_metrics(J_by_state: np.ndarray, eps: float = 1e-8) -> dict:
+    J = np.asarray(J_by_state, dtype=np.float64)
+    if J.ndim != 2 or J.shape[1] < 2:
+        raise ValueError("J_by_state must be (n_s0, n_plans) with n_plans>=2")
+
+    rho = float("nan")
+    sig2 = float(np.var(J, axis=1).mean())
+
     return {
         "expected_ratio_EN_over_E1": rho,
         "expected_var_k": sig2,
     }
-
-
 
 @torch.no_grad()
 def evaluate_critic(
@@ -747,7 +745,7 @@ def evaluate_critic_hat_return(
         [np.concatenate(R1_list), np.concatenate(Rn_list)], axis=1
     )
     #cuts = bellman_cut_stats(R_s)
-    bellman_metrics =  two_bellman_metrics(R_s)
+    bellman_metrics =  two_bellman_metrics(J_by_state)
     ic = float(spearmanr(pred, Gv).correlation)
     var_g = float(np.var(Gv))
     ev = float("nan") if var_g < 1e-12 else float(1.0 - np.var(Gv - pred) / var_g)
