@@ -1137,13 +1137,6 @@ def train_critic_with_planner7(
             f"goal={len(goal_pool)} traj_length={traj_length}"
         )
         print("testing critic quality droping the failed episodes")
-        """
-        evaluate_critic(
-                    dataset_name, specific_dataset, task_id, old_critic_checkpoint,
-                    hidden_layers, hidden_dim, all_trajs, J_by_state, gamma, 
-                    drop_timeouts=True, value_decode="symlog", reward_scale=500.0,
-        )
-        """
         evaluate_critic_hat_return(
                  dataset_name, specific_dataset, task_id,
                  old_critic_checkpoint, reward_checkpoint,  hidden_layers, hidden_dim, 
@@ -1151,13 +1144,7 @@ def train_critic_with_planner7(
                  all_trajs, J_by_state, gamma, drop_timeouts=True, value_decode="symlog",
         )
         print("testing critic quality keeping the failed episodes")
-        """
-        evaluate_critic(
-                    dataset_name, specific_dataset, task_id, old_critic_checkpoint,
-                    hidden_layers, hidden_dim, all_trajs, J_by_state, gamma,
-                    drop_timeouts=False, value_decode="symlog", reward_scale=500.0,
-         )
-        """
+
         evaluate_critic_hat_return(
                  dataset_name, specific_dataset, task_id,
                  old_critic_checkpoint, reward_checkpoint,  hidden_layers, hidden_dim, 
@@ -1165,11 +1152,13 @@ def train_critic_with_planner7(
                  all_trajs, J_by_state, gamma, drop_timeouts=False, value_decode="symlog",
         )
         print()
+        """
         td_residual_stats(
                    dataset_name, specific_dataset, task_id, hidden_layers, hidden_dim, old_critic_checkpoint,
                    all_trajs, gamma,
         )
         print()
+        """
         value_grad_stats(
                    dataset_name, specific_dataset, task_id, hidden_layers, hidden_dim, old_critic_checkpoint,
                    all_trajs, batch_size = 256,
@@ -1384,11 +1373,13 @@ def train_critic_with_planner7(
                  reward_hidden_layers, reward_hidden_dim,
                  all_trajs, J_by_state, gamma, drop_timeouts=False, value_decode="symlog",
         )
+        """
         print()
         td_residual_stats(
                    dataset_name, specific_dataset, task_id, hidden_layers, hidden_dim, new_step,
                    all_trajs, gamma,
         )
+        """
         print()
         value_grad_stats(
                    dataset_name, specific_dataset, task_id, hidden_layers, hidden_dim, new_step,
