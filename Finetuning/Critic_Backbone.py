@@ -1,5 +1,6 @@
 from accelerate import Accelerator
 import math
+from accelerate.utils.offload import offload_weight
 import torch.distributed as dist
 from typing import Optional, List
 import time
@@ -30,6 +31,7 @@ from Finetuning.metrics import (
     compute_j_by_state, 
     td_residual_stats, 
     value_grad_stats,
+    evaluate_critic_hat_return,
 )
 import os
 import pickle
@@ -963,6 +965,66 @@ def train_critic_with_planner7(
             )
             rows.append(np.asarray(ob, dtype=np.float32))
         return np.stack(rows, axis=0)
+    
+    def plans_to_batch(plans):
+        s_planner = plans[..., :obs_dim]
+        actions = torch.clamp(plans[..., obs_dim:], -1.0, 1.0)
+        s_raw = s_planner * planner_std + planner_mean
+        N, H, _ = s_raw.shape
+        n_loc = H - 1
+        s_for_r = (s_raw[:, :n_loc] - r_mean) / r_std
+        r_hat = reward_net(
+            s_for_r.reshape(N * n_loc, -1),
+            actions[:, :n_loc].reshape(N * n_loc, -1),
+        ).reshape(N, n_loc)
+        r_hat = r_hat / Scale.Q_scale
+
+        if lam is not None:
+            plan_targets = torch.zeros(N, device=device)
+            w = 1.0 - lam
+            weight_sum = 0.0
+            for L in range(1, n_loc + 1):
+                discounts = gamma_pow_t[:L]
+                disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
+                s_L = (s_raw[:, L] - c_mean) / c_std
+                v_boot = symexp(target_critic(s_L))
+                plan_targets = plan_targets + w * (disc_return + (gamma ** L) * v_boot)
+                weight_sum += w
+                w *= lam
+            plan_targets = plan_targets / max(weight_sum, 1e-8)
+        else:
+            r_list = []
+            for L in range(1, n_loc + 1):
+                discounts = gamma_pow_t[:L]
+                disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
+                s_L = (s_raw[:, L] - c_mean) / c_std
+                v_boot = symexp(target_critic(s_L))
+                r_list.append(disc_return + (gamma ** L) * v_boot)
+            R = torch.stack(r_list, dim=1)
+            plan_targets = R.mean(dim=1) - rho * R.std(dim=1, unbiased=False).clamp(min=0.0)
+
+        s0_raw = s_raw[:, 0]
+        s0_key = torch.round(s0_raw * 1e5) / 1e5
+        unique_s0, inverse_indices = torch.unique(s0_key, dim=0, return_inverse=True)
+        U = unique_s0.shape[0]
+        averaged_targets = torch.zeros(U, device=device)
+        counts = torch.zeros(U, device=device)
+        averaged_targets.index_add_(0, inverse_indices, plan_targets)
+        counts.index_add_(0, inverse_indices, torch.ones_like(plan_targets))
+        averaged_targets = (averaged_targets / counts.clamp(min=1.0)).detach()
+        averaged_targets = symlog(averaged_targets)
+        s0_critic = ((unique_s0 - c_mean) / c_std).detach()
+        return s0_critic, averaged_targets
+
+    def _stat(t):
+        if t is None:
+            return float("nan"), float("nan"), float("nan"), float("nan")
+        return (
+            t.mean().item(),
+            t.std(unbiased=False).item(),
+            t.min().item(),
+            t.max().item(),
+        )
 
     _, obs_dim, act_dim = get_env(dataset_name, specific_dataset, task_id=task_id)
     data = get_dataset(
@@ -1073,17 +1135,33 @@ def train_critic_with_planner7(
             f"goal={len(goal_pool)} traj_length={traj_length}"
         )
         print("testing critic quality droping the failed episodes")
+        """
         evaluate_critic(
                     dataset_name, specific_dataset, task_id, old_critic_checkpoint,
                     hidden_layers, hidden_dim, all_trajs, J_by_state, gamma, 
                     drop_timeouts=True, value_decode="symlog", reward_scale=500.0,
         )
+        """
+        evaluate_critic_hat_return(
+                 dataset_name, specific_dataset, task_id,
+                 old_critic_checkpoint, reward_checkpoint,  hidden_layers, hidden_dim, 
+                 reward_hidden_layers, reward_hidden_dim,
+                 all_trajs, gamma, drop_timeouts=True, value_decode="symlog",
+        )
         print("testing critic quality keeping the failed episodes")
+        """
         evaluate_critic(
                     dataset_name, specific_dataset, task_id, old_critic_checkpoint,
                     hidden_layers, hidden_dim, all_trajs, J_by_state, gamma,
                     drop_timeouts=False, value_decode="symlog", reward_scale=500.0,
          )
+        """
+        evaluate_critic_hat_return(
+                 dataset_name, specific_dataset, task_id,
+                 old_critic_checkpoint, reward_checkpoint,  hidden_layers, hidden_dim, 
+                 reward_hidden_layers, reward_hidden_dim,
+                 all_trajs, gamma, drop_timeouts=False, value_decode="symlog",
+        )
         print()
         td_residual_stats(
                    dataset_name, specific_dataset, task_id, hidden_layers, hidden_dim, old_critic_checkpoint,
@@ -1112,7 +1190,8 @@ def train_critic_with_planner7(
     gamma_pow_t = torch.tensor(
         [gamma ** t for t in range(n)], device=device, dtype=torch.float32
     )
-
+    
+    """
     def plans_to_batch(plans):
         s_planner = plans[..., :obs_dim]
         actions = torch.clamp(plans[..., obs_dim:], -1.0, 1.0)
@@ -1172,6 +1251,7 @@ def train_critic_with_planner7(
             t.min().item(),
             t.max().item(),
         )
+    """
 
     critic.train()
     s_all = y_all = s_near = y_near = g_critic = None
@@ -1348,16 +1428,32 @@ def train_critic_with_planner7(
     accelerator.wait_for_everyone()
     if is_main:
         print("testing critic quality droping the failed episodes")
+        """
         evaluate_critic(
                     dataset_name, specific_dataset, task_id, new_step,
                     hidden_layers, hidden_dim, all_trajs, J_by_state, gamma, 
                     drop_timeouts=True, value_decode="symlog", reward_scale=500.0,
         )
+        """
+        evaluate_critic_hat_return(
+                 dataset_name, specific_dataset, task_id,
+                 new_step, reward_checkpoint,  hidden_layers, hidden_dim, 
+                 reward_hidden_layers, reward_hidden_dim,
+                 all_trajs, gamma, drop_timeouts=True, value_decode="symlog",
+        )
         print("testing critic quality keeping the failed episodes")
+        """
         evaluate_critic(
                     dataset_name, specific_dataset, task_id, new_step,
                     hidden_layers, hidden_dim, all_trajs, J_by_state, gamma, 
                     drop_timeouts=False, value_decode="symlog", reward_scale=500.0,
+        )
+        """
+        evaluate_critic_hat_return(
+                 dataset_name, specific_dataset, task_id,
+                 new_step, reward_checkpoint,  hidden_layers, hidden_dim, 
+                 reward_hidden_layers, reward_hidden_dim,
+                 all_trajs, gamma, drop_timeouts=False, value_decode="symlog",
         )
         print()
         td_residual_stats(
