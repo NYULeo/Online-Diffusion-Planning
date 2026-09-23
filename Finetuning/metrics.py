@@ -482,6 +482,7 @@ def evaluate_critic_hat_return(
     reward_hidden_layers: int,
     reward_hidden_dim: int,
     trajs: List[dict],
+    J_by_state: np.ndarray,
     gamma: float = 0.99,
     drop_timeouts: bool = True,
     value_decode: str = "symlog",
@@ -494,9 +495,14 @@ def evaluate_critic_hat_return(
         check_device, get_critic_model, get_critic_stats, get_Q_scale,
         get_reward_model, get_reward_stats,
     )
-    from Finetuning.metrics import (
-        align_reward_mask, decode_v, explained_variance,
-    )
+    def test_wsjd( 
+        J_by_state: np.ndarray,
+    ):
+        stats = within_state_j_dispersion(J_by_state)
+        stats["J_by_state"] = J_by_state
+        return stats
+
+    
 
     device = check_device()
     ns = 0 if critic_checkpoint == -1 else critic_checkpoint
@@ -626,13 +632,15 @@ def evaluate_critic_hat_return(
     var_g = float(np.var(Gv))
     ev = float("nan") if var_g < 1e-12 else float(1.0 - np.var(Gv - pred) / var_g)
     mae = float(np.mean(np.abs(pred - Gv)))
+    WSJD = test_wsjd(J_by_state)
     print(
         f"hat-return test ckpt={critic_checkpoint}\n"
         f"  n={len(pred)}  IC={ic:.3f}  EV={ev:.3f}  MAE={mae:.3f}\n"
         f"  pred mean/std={pred.mean():.3f}/{pred.std():.3f}\n"
         f"  Ghat mean/std={Gv.mean():.3f}/{Gv.std():.3f}"
+        f"  WSJD = {WSJD['wsjd']:.3f}\n"
     )
-    return {"ic": ic, "ev": ev, "mae": mae, "pred": pred, "G": Gv}
+    return {"ic": ic, "ev": ev, "mae": mae, "pred": pred, "G": Gv, 'WSJD': WSJD['wsjd']}
 
 @torch.no_grad()
 def td_residual_stats(
