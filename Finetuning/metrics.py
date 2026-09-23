@@ -761,7 +761,7 @@ def evaluate_critic_hat_return(
         f"  Ghat mean/std={Gv.mean():.3f}/{Gv.std():.3f}\n"
         f"  WSJD = {WSJD['wsjd']:.3f}\n"
         f"  E_s[ E R^N / E R^1] = {bellman_metrics['expected_ratio_EN_over_E1']:.4f}\n"
-        f"  E_s[Var_k E R^k] = {bellman_metrics["expected_var_k"]:.4f}\n"
+        f"  E_s[Var_plans J] = {bellman_metrics['expected_var_k']:.4f}\n"
         #f"  mean_of_RK={cuts['mean_of_RK']:.4f}  mean_of_STD={cuts['mean_of_STD']:.4f}\n"
         #f"  ratio={cuts['ratio']:.4f}  E[Rn]/E[R1]={cuts['E_RNm1_div_E_R1']:.4f}"
     )
