@@ -129,6 +129,9 @@ def R_s_from_cuts(R_tau: torch.Tensor) -> np.ndarray:
         raise ValueError("R_tau must be (M, L, K)")
     return R_tau.mean(dim=1).detach().cpu().numpy()
 
+
+
+
 def decode_v(v, value_decode, q_mean, q_std):
         from Finetuning.utils import symexp
         if value_decode == "symlog":
@@ -710,7 +713,26 @@ def evaluate_critic_hat_return(
         s = torch.as_tensor(X[sl], device=device)
         v = decode_v(critic(s).squeeze(-1), value_decode, q_mean, q_std)
         pred[sl] = v.detach().float().cpu().numpy().reshape(-1)
+    
 
+    R1_list, Rn_list = [], []
+    off_r = off_v = 0
+    for obs, acts in segs:
+        T = len(acts)
+        rr = r_hat[off_r : off_r + T]
+        vv = pred[off_v : off_v + T + 1].copy()
+        gg = Gv[off_v : off_v + T + 1]
+        vv[-1] = 0.0
+        off_r += T
+        off_v += T + 1
+        if T < 1:
+            continue
+        R1_list.append(rr + gamma * vv[1:])
+        Rn_list.append(np.asarray(gg[:T], dtype=np.float64))
+    R_s = np.stack(
+        [np.concatenate(R1_list), np.concatenate(Rn_list)], axis=1
+    )
+    cuts = bellman_cut_stats(R_s)
     ic = float(spearmanr(pred, Gv).correlation)
     var_g = float(np.var(Gv))
     ev = float("nan") if var_g < 1e-12 else float(1.0 - np.var(Gv - pred) / var_g)
@@ -720,10 +742,20 @@ def evaluate_critic_hat_return(
         f"hat-return test ckpt={critic_checkpoint}\n"
         f"  n={len(pred)}  IC={ic:.3f}  EV={ev:.3f}  MAE={mae:.3f}\n"
         f"  pred mean/std={pred.mean():.3f}/{pred.std():.3f}\n"
-        f"  Ghat mean/std={Gv.mean():.3f}/{Gv.std():.3f}"
+        f"  Ghat mean/std={Gv.mean():.3f}/{Gv.std():.3f}\n"
         f"  WSJD = {WSJD['wsjd']:.3f}\n"
+        f"  mean_of_RK={cuts['mean_of_RK']:.4f}  mean_of_STD={cuts['mean_of_STD']:.4f}\n"
+        f"  ratio={cuts['ratio']:.4f}  E[Rn]/E[R1]={cuts['E_RNm1_div_E_R1']:.4f}"
     )
-    return {"ic": ic, "ev": ev, "mae": mae, "pred": pred, "G": Gv, 'WSJD': WSJD['wsjd']}
+    return {
+        "ic": ic, "ev": ev, "mae": mae,
+        "pred": pred, "G": Gv,
+        "WSJD": WSJD["wsjd"],
+        "mean_of_RK": cuts["mean_of_RK"],
+        "mean_of_STD": cuts["mean_of_STD"],
+        "ratio": cuts["ratio"],
+        "E_RNm1_div_E_R1": cuts["E_RNm1_div_E_R1"],
+    }
 
 @torch.no_grad()
 def td_residual_stats(
