@@ -18,7 +18,7 @@ def explained_variance(g: np.ndarray, v: np.ndarray) -> float:
 
 def spearman_correlation(g: np.ndarray, v: np.ndarray) -> float:
     return float(spearmanr(g, v).correlation)
-
+    
 def within_state_j_dispersion(J_by_state: np.ndarray, eps: float = 1e-8):
     
     J = np.asarray(J_by_state, dtype=np.float64)
@@ -465,7 +465,6 @@ def evaluate_critic(
          )
     return {"ic": ic, "ev": ev, "WSJD": WSJD['wsjd'], "mae": mae, "pred": pred, "G": tgt}
 
-
 @torch.no_grad()
 def td_residual_stats(
     dataset_name: str,
@@ -606,7 +605,6 @@ def td_residual_stats(
         f"mean={out['goal_arrive']['mean']:.4f}  std={out['goal_arrive']['std']:.4f}"
     )
     return out
-
 
 def value_grad_stats(
     dataset_name: str,

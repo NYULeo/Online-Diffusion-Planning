@@ -62,11 +62,3 @@ def plot_lines(data_list, labels=None, colors=None, markers=None,
     plt.show()
     return fig
 
-
-# Or manually create from the extracted values (x-axis divided by 100):
-# Each round has 2400 env steps, divided by 100 = 24
-env, dataset, eval_dataset = ogbench.make_env_and_datasets(
-                "antmaze-giant-navigate-singletask-task5-v0", render_mode="rgb_array"
-            )
-print(max(dataset['rewards']))
-
