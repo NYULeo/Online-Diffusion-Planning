@@ -1029,37 +1029,12 @@ def train_critic_with_planner7(
         ).reshape(N, n_loc)
         r_hat = r_hat / Scale.Q_scale
 
-        if lam is not None:
-            plan_targets = torch.zeros(N, device=device)
-            w = 1.0 - lam
-            weight_sum = 0.0
-            for L in range(1, n_loc + 1):
-                discounts = gamma_pow_t[:L]
-                disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
-                s_L = (s_raw[:, L] - c_mean) / c_std
-                v_boot = symexp(target_critic(s_L))
-                plan_targets = plan_targets + w * (disc_return + (gamma ** L) * v_boot)
-                weight_sum += w
-                w *= lam
-            plan_targets = plan_targets / max(weight_sum, 1e-8)
-        else:
-            """
-            r_list = []
-            for L in range(1, n_loc + 1):
-                discounts = gamma_pow_t[:L]
-                disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
-                s_L = (s_raw[:, L] - c_mean) / c_std
-                v_boot = symexp(target_critic(s_L))
-                r_list.append(disc_return + (gamma ** L) * v_boot)
-            R = torch.stack(r_list, dim=1)
-            plan_targets = R.mean(dim=1) - rho * R.std(dim=1, unbiased=False).clamp(min=0.0)
-            """
-            L = n_loc
-            discounts = gamma_pow_t[:L]
-            disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
-            s_L = (s_raw[:, L] - c_mean) / c_std
-            v_boot = symexp(target_critic(s_L))
-            plan_targets = disc_return + (gamma ** L) * v_boot
+        L = n_loc
+        discounts = gamma_pow_t[:L]
+        disc_return = (discounts.unsqueeze(0) * r_hat[:, :L]).sum(dim=1)
+        s_L = (s_raw[:, L] - c_mean) / c_std
+        v_boot = symexp(target_critic(s_L))
+        plan_targets = disc_return + (gamma ** L) * v_boot
 
         s0_raw = s_raw[:, 0]
         s0_key = torch.round(s0_raw * 1e5) / 1e5
