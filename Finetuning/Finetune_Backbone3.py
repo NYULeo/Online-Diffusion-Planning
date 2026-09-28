@@ -8,7 +8,6 @@ from gymnasium.vector import AsyncVectorEnv
 from Finetuning.utils import Lambda, RewardDataset, PlannerDataset, KernelDataset, cycle, EMA, RewardTracker, get_trajs, get_success_trajs, check_Critic, get_kernel, get_new_critic_stats, load_success_trajs, KernelConfig
 from Finetuning.Critic_Backbone import train_critic_with_planner7
 from Finetuning.traj_reward4 import RewardConfig, TotalReward, TotalReward_Critic
-from adjoint_matching import AdjointMatchingFineTuner, AdjointMatchingConfig
 from acc_adjoint_matching import Acc_AdjointMatchingConfig, Acc_AdjointMatchingFineTuner
 from Finetuning.Rollout import rollout
 from Pretrain.Planners.Backbone.Dit import DiT1d
@@ -89,7 +88,7 @@ class Train_Critic_Config:
 
 @dataclass
 class FinetuningConfig():
-    AMConfig: AdjointMatchingConfig | Acc_AdjointMatchingConfig
+    AMConfig: Acc_AdjointMatchingConfig
     RewardConfig: RewardConfig 
     AlphaConfig: AlphaSchedulerConfig
     dataset_name: str
@@ -456,27 +455,6 @@ class OnlineFinetuner():
              critic_buffer = half_pretrained_trajs + half_buffer_trajs
         return critic_buffer
     
-    """
-    def get_generated_plans(self, number_of_generated_plans: int):
-        dataloader = cycle(DataLoader(self.PlannerDataset, batch_size = 12, shuffle = False))
-        generated_plans = []
-        for i in range(number_of_generated_plans):
-            s0 = next(dataloader)
-            s0 = s0.squeeze(0).cpu().numpy()
-            x = sample_euler_karras(s0, 
-                               self.AMFineTuner.new_score_net, 
-                               self.config.AMConfig.d_s, 
-                               self.config.AMConfig.d_a, 
-                               self.config.AMConfig.horizon,  
-                               self.config.AMConfig.diffusion_steps, 
-                               self.config.AMConfig.num_karras, 
-                               self.config.AMConfig.eta, 
-                               self.device)
-            
-            generated_plans.append(x)
-        return generated_plans
-    """
-
     def get_generated_plans(self, number_of_generated_plans: int):
          # Build global s0 batch deterministically on all ranks
          #  (all processes must run same code before split/gather)

@@ -750,38 +750,12 @@ def reward_heatmap(checkpoint: int = 0, show: bool = True):
 
 
 
-"""
+
 if __name__ == "__main__":
     critic_heatmap(0)
     #reward_heatmap(0)
-"""
 
 
 
-"""
-env, dataset, eval_dataset = ogbench.make_env_and_datasets(
-                 "cube-single-play-singletask-task4-v0", render_mode="rgb_array"
-            )
-
-Dict = {}
-
-temp = 0
-for i in range(len(dataset['observations'])):
-     if(dataset['rewards'][i] == 0):
-        if(temp > 0):
-             continue 
-        else:
-             temp = i
-             
-     else:
-         if(dataset['rewards'][i-1] == 0):
-              print(dataset['terminals'][i-1])
-              if( (i - temp) not in Dict.keys()):
-                  Dict[(i - temp)] = 1
-              else:
-                  Dict[(i - temp)] += 1
-              temp = 0
-                   
-"""
-          
+  
 

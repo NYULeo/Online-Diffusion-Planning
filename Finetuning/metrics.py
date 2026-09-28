@@ -729,7 +729,7 @@ def evaluate_critic_hat_return(
         v = decode_v(critic(s).squeeze(-1), value_decode, q_mean, q_std)
         pred[sl] = v.detach().float().cpu().numpy().reshape(-1)
     
-
+    """
     R1_list, Rn_list = [], []
     off_r = off_v = 0
     for obs, acts in segs:
@@ -747,6 +747,7 @@ def evaluate_critic_hat_return(
     R_s = np.stack(
         [np.concatenate(R1_list), np.concatenate(Rn_list)], axis=1
     )
+    """
     #cuts = bellman_cut_stats(R_s)
     bellman_metrics =  two_bellman_metrics(J_by_state)
     ic = float(spearmanr(pred, Gv).correlation)
