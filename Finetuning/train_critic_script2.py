@@ -126,9 +126,9 @@ if __name__ == '__main__':  # pragma: no cover
               "hidden_dim": 512,
               "reward_hidden_layers": 4,
               "reward_hidden_dim": 512,
-              "batch_size": 128,
-              "oversample": 40,
-              "num_steps": 200,
+              "batch_size": 1023,
+              "oversample": 30,
+              "num_steps": 100,
               "resample_every": 1,
               "train_horizon": train_horizon,             # passed as horizon= to the trainer
               "gamma": 0.99,
